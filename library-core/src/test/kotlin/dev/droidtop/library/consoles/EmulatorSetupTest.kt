@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * The emulator setup helper's pure parts (Droidtop/tracker#248): changing one key of an emulator's config without
+ * The emulator setup helper's pure parts (mytop-project/tracker#248): changing one key of an emulator's config without
  * touching the rest, finding the BIOS folder, naming a picked BIOS file, and the players-database `setup` object.
  */
 class EmulatorSetupTest {

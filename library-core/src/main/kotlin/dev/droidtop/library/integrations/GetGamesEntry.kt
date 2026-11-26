@@ -1,7 +1,7 @@
 package dev.droidtop.library.integrations
 
 /**
- * The "Get games" entry (docs/SPEC.md 13, "There is no Get games sheet"; owner, 2026-10-16, Droidtop/tracker#218):
+ * The "Get games" entry (docs/SPEC.md 13, "There is no Get games sheet"; owner, 2026-10-16, mytop-project/tracker#218):
  * every place that offers it opens the one search, empty and ready for typing, scoped as that place is, and the
  * download sources answer there. This holds the label and the pure rules the entries and the search share, so a new
  * surface adds an entry that uses them rather than a rule of its own. Pure: no Android, no I/O.
@@ -9,11 +9,11 @@ package dev.droidtop.library.integrations
 object GetGamesEntry {
     const val LABEL = "Get games"
 
-    /** The search's heading over matches from the download sources, and Updates' row for them (Droidtop/tracker#612, #621). */
+    /** The search's heading over matches from the download sources, and Updates' row for them (mytop-project/tracker#612, #621). */
     const val NEW_GAMES = "Get new games"
 
     /**
-     * Downloads and Updates' one Get games row (owner, 2026-10-30, Droidtop/tracker#825: "We want a single get games
+     * Downloads and Updates' one Get games row (owner, 2026-10-30, mytop-project/tracker#825: "We want a single get games
      * section"): Gaming opens the search in place; elsewhere it opens over the screen in front.
      */
     const val SEARCH_ROW_ID = "get_games_search"

@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * What the person's picks teach (Droidtop/tracker#318 §6.4): a game matched by hand records its searched name,
+ * What the person's picks teach (mytop-project/tracker#318 §6.4): a game matched by hand records its searched name,
  * compacted as [PcMatching.normalize] does, with the match picked. A later pass that searches the same name, for
  * another folder or a new version of the game, takes that match at tier A- with no search. A new pick for the same
  * name replaces the old one. Automatic matches teach nothing.

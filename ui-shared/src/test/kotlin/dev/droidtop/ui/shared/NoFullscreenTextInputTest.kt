@@ -4,7 +4,7 @@ import android.view.inputmethod.EditorInfo
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** droidtop's fields keep the input method out of full screen (Droidtop/tracker#485 comment 6224857113). */
+/** droidtop's fields keep the input method out of full screen (mytop-project/tracker#485 comment 6224857113). */
 class NoFullscreenTextInputTest {
     @Test
     fun `the no-fullscreen and no-extract flags are added and the rest kept`() {

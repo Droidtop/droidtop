@@ -63,7 +63,7 @@ internal fun appsViewQuery(view: NamedLibraryView, current: LibraryQuery): Libra
 /**
  * What opening Apps shows: the remembered view, unless it is a built-in one that holds nothing (the
  * Games tab of a person who has marked none), which opened onto "No apps match these filters" with
- * nothing filtered (Droidtop/tracker#500). Then All. Null leaves the query as it is. [counts] is
+ * nothing filtered (mytop-project/tracker#500). Then All. Null leaves the query as it is. [counts] is
  * [appsViewCounts]; an empty map means the counts are not in yet, and nothing is decided.
  */
 internal fun appsLandingQuery(views: List<NamedLibraryView>, query: LibraryQuery, counts: Map<String, Int>): LibraryQuery? {

@@ -29,7 +29,7 @@ sealed interface HostResolution {
 
 /**
  * A file host droidtop downloads from through the host's own API, with the person's account there when they have one
- * (docs/SPEC.md 12a "Host resolvers", Droidtop/tracker#638): one mechanism for every host, PixelDrain the first. Blocking
+ * (docs/SPEC.md 12a "Host resolvers", mytop-project/tracker#638): one mechanism for every host, PixelDrain the first. Blocking
  * network calls: off the main thread.
  */
 interface HostResolver {

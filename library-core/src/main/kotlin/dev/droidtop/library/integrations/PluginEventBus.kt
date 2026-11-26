@@ -121,7 +121,7 @@ fun notifyDevicesChanged(context: Context) {
 }
 
 /**
- * Fires [PluginEvent.THEME_CHANGED] (Droidtop/tracker#559) at every runnable plugin that subscribed to it: the role
+ * Fires [PluginEvent.THEME_CHANGED] (mytop-project/tracker#559) at every runnable plugin that subscribed to it: the role
  * tokens changed. Set as [dev.droidtop.library.theme.RoleTokens.onChanged] at start.
  */
 fun notifyThemeChanged(context: Context, light: Boolean) {
@@ -181,7 +181,7 @@ internal fun defaultPlayerChangedArgs(
 )
 
 /**
- * Fires [PluginEvent.CONTEXT_RECEIVED] (docs/plugin-api.md F8, Droidtop/tracker#794) at the plugin that owns
+ * Fires [PluginEvent.CONTEXT_RECEIVED] (docs/plugin-api.md F8, mytop-project/tracker#794) at the plugin that owns
  * [contextId], when it subscribed: a merged copy of that context was made current here. Set as
  * [dev.droidtop.pluginhost.PluginContexts.onReceived] at start; returns at once.
  */
@@ -200,8 +200,8 @@ fun notifyContextReceived(context: Context, pluginId: String, contextId: String,
 
 /**
  * Fires the window events (`window.opened`, `window.closed`, `window.focused`; docs/plugin-api.md 1.12,
- * Droidtop/tracker#221) at every runnable plugin that subscribed to one and holds `windows.read`, for the windows of
- * apps that permission reaches only. Each event a plugin is told is counted on its day's activity (Droidtop/tracker#61).
+ * mytop-project/tracker#221) at every runnable plugin that subscribed to one and holds `windows.read`, for the windows of
+ * apps that permission reaches only. Each event a plugin is told is counted on its day's activity (mytop-project/tracker#61).
  * Called by the Desktop session with each change of its window list; returns at once.
  */
 fun notifyWindowEvents(context: Context, events: List<dev.droidtop.pluginhost.WindowEvents.Event>) {
@@ -232,7 +232,7 @@ fun notifyWindowEvents(context: Context, events: List<dev.droidtop.pluginhost.Wi
 }
 
 /**
- * Fires `clipboard.changed` (docs/plugin-api.md 1.12, Droidtop/tracker#221) at every runnable plugin that subscribed
+ * Fires `clipboard.changed` (docs/plugin-api.md 1.12, mytop-project/tracker#221) at every runnable plugin that subscribed
  * to it and holds `clipboard.read` as granted. No args: a plugin reads the text with `clipboard.get_text`, which is
  * audited. Called by the clipboard bridge on each change; returns at once.
  */

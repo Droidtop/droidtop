@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Droidtop/tracker#318 decision 7a: a RetroAchievements game found only by title waits for the person's answer. */
+/** mytop-project/tracker#318 decision 7a: a RetroAchievements game found only by title waits for the person's answer. */
 class RaChoicesTest {
     private val game = RaGame(42, "Super Metroid", 3, 74, 610, listOf("abc"))
 

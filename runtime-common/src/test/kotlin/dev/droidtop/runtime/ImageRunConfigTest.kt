@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/SPEC.md 3 "The image's own program" (Droidtop/tracker#555 D6a): an image's program, as Docker runs it. */
+/** docs/SPEC.md 3 "The image's own program" (mytop-project/tracker#555 D6a): an image's program, as Docker runs it. */
 class ImageRunConfigTest {
     // nginx's config, trimmed to what is read.
     private val nginx = """

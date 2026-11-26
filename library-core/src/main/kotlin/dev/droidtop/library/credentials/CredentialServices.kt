@@ -1,7 +1,7 @@
 package dev.droidtop.library.credentials
 
 /**
- * What each credential in [CredentialStore] is for, by service (Droidtop/tracker#12, the owner's "Keys and accounts"
+ * What each credential in [CredentialStore] is for, by service (mytop-project/tracker#12, the owner's "Keys and accounts"
  * page, 2026-10-28): the page lists these, says where each is used, and removes one by clearing its keys in the one
  * store, the same blank write each service's own page makes (`CredentialVault.put`: a blank value removes the entry).
  * Every key in [CredentialStore.KEYS] belongs to exactly one service (CredentialServicesTest), so a key added to the

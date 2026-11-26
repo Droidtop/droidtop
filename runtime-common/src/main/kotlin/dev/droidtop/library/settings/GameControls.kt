@@ -2,7 +2,7 @@ package dev.droidtop.library.settings
 
 /**
  * The controls for a running game, and the one decision "does this row ask first" (docs/SPEC.md "The companion's
- * tabs" and "Quick Menu: a branching panel", Droidtop/tracker#414). Pure state: the companion's Game tab and the
+ * tabs" and "Quick Menu: a branching panel", mytop-project/tracker#414). Pure state: the companion's Game tab and the
  * running game's L2 sheet both read it, so turning Ask before stopping off changes both the same way.
  */
 enum class GameRow { RESUME, QUIT, RESTART, KILL, EMULATOR, OVERLAY, PERFORMANCE_MODE, SCREENSHOT }

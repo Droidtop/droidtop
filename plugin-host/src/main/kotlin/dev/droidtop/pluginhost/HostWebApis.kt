@@ -26,7 +26,7 @@ internal object HostWebApis {
 
     /**
      * The session a plugin's calls use: its own, plus droidtop's sign-in for each declared download site it keeps none
-     * of its own for (Droidtop/tracker#648 slice 5). Only [stored] is ever saved back to the plugin's vault.
+     * of its own for (mytop-project/tracker#648 slice 5). Only [stored] is ever saved back to the plugin's vault.
      */
     private fun inUse(env: BrokerEnvironment, record: PluginRecord): WebSessions.Stored? =
         DownloadSites.borrow(stored(env, record), env.sharedSites(record.manifest.id, WebSessions.declaredDomains(record.manifest.v2.permissions)))
@@ -72,7 +72,7 @@ internal object HostWebApis {
             val url = sessionUrl(args, domains)
             val doneCookie = args.optString("doneCookie").trim().takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) }
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.SIGN_IN, url, domains, stored(env, record), doneCookie))
-            // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
+            // A browser check passed in the view clears droidtop's requests to that site too (mytop-project/tracker#600).
             env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
             // A new sign-in may be another account: its name is the plugin's to tell again (set_account).
             if (result.completed) save(env, record, result.session?.copy(account = null))
@@ -131,7 +131,7 @@ internal object HostWebApis {
             runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
             val downloads = dev.droidtop.pluginhost.hosts.HostLinks.resolve(url) ?: run {
                 val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, inUse(env, record), null, maxDownloads = max)
-                // Out of sight first (Droidtop/tracker#783): a served host or a started download needs no page, and an
+                // Out of sight first (mytop-project/tracker#783): a served host or a started download needs no page, and an
                 // expired link is the plugin's to ask its site for again; only a page the person must act on is shown.
                 val hidden = env.hiddenWebSession(request, PluginWebAccount.expiredText(record))
                 if (hidden?.end == HiddenWebSession.End.EXPIRED) {
@@ -140,7 +140,7 @@ internal object HostWebApis {
                 }
                 hidden?.takeIf { it.end == HiddenWebSession.End.PERSON }?.let { env.vault()?.let { v -> SiteChecks.keep(v, record.manifest.id, it.result.session) } }
                 val result = hidden?.takeIf { it.end != HiddenWebSession.End.PERSON }?.result ?: show(env, record, request)
-                // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
+                // A browser check passed in the view clears droidtop's requests to that site too (mytop-project/tracker#600).
                 env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
                 // The site may have renewed the session while the person was there: the plugin's own sites are kept for
                 // it, a shared download site's go back to droidtop.
@@ -225,13 +225,13 @@ data class WebSessionRequest(
     /** [Mode.BROWSE]: told the address of each page the view finishes showing, on the main thread. Nothing else of a page is read. */
     val onPage: ((String) -> Unit)? = null,
     /**
-     * [Mode.OPEN]: how many downloads the page may start before the view closes (Droidtop/tracker#419); above 1 the view
+     * [Mode.OPEN]: how many downloads the page may start before the view closes (mytop-project/tracker#419); above 1 the view
      * stays open, says how many it has, and Done ends it sooner.
      */
     val maxDownloads: Int = 1,
     /**
      * The site's own sign-in page, when the plugin declares one: a check or a download page offers it as a full page
-     * (no in-page overlay), and with [doneCookie] a check stays open until the person is signed in (Droidtop/tracker#600).
+     * (no in-page overlay), and with [doneCookie] a check stays open until the person is signed in (mytop-project/tracker#600).
      */
     val signInUrl: String? = null,
 ) {

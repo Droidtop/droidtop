@@ -150,7 +150,7 @@ class OnboardingActivity : AppCompatActivity() {
      * own activity (docs/SPEC.md 6e): the stick and hat move through the
      * steps like the D-pad, and the selection ring shows only while a pad or
      * keyboard is driving -- a person setting up with a finger sees no ring
-     * (Droidtop/tracker#159).
+     * (mytop-project/tracker#159).
      */
     private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) }, window = { window })
 
@@ -174,7 +174,7 @@ class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Too little space to start: the storage-full screen, before any setup state is read or saved (docs/SPEC.md
-        // 10c, "Storage full", Droidtop/tracker#849). Its Try again recreates this screen once there is room.
+        // 10c, "Storage full", mytop-project/tracker#849). Its Try again recreates this screen once there is room.
         if (StorageFullScreen.showIfFull(this)) return
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         // The ground runs under the bars; the theme would paint them grey
@@ -386,7 +386,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
             ?: oldMode?.takeIf { it != Mode.LAUNCHER }
             ?: if (oldDesktop && !oldGaming) Mode.DESKTOP else Mode.GAMING
         alsoOther.value = saved.optBoolean("also", oldGaming && oldDesktop)
-        // "STANDARD" is DROIDTOP's name from before Droidtop/tracker#571 row 11, in a run saved by an older build.
+        // "STANDARD" is DROIDTOP's name from before mytop-project/tracker#571 row 11, in a run saved by an older build.
         val savedHome = saved.optString("home").let { if (it == "STANDARD") HomeImplementation.DROIDTOP.name else it }
         homeChoice.value = HomeImplementation.entries.firstOrNull { it.name == savedHome }
             ?: HomeImplementation.NONE
@@ -501,9 +501,9 @@ internal fun plannedSteps(
     opensInto: Mode,
     alsoOther: Boolean,
     controllerAsks: Boolean = true,
-    // Two screens connected when the run started: then which one the menus go on is asked (Droidtop/tracker#598).
+    // Two screens connected when the run started: then which one the menus go on is asked (mytop-project/tracker#598).
     twoScreens: Boolean = false,
-    // Android settings droidtop can change itself are left to change, and a shell can do it (Droidtop/tracker#816).
+    // Android settings droidtop can change itself are left to change, and a shell can do it (mytop-project/tracker#816).
     deviceSetup: Boolean = false,
 ): List<OnboardingStep> = buildList {
     val gaming = opensInto == Mode.GAMING || alsoOther
@@ -1030,7 +1030,7 @@ internal fun launcherLabel(context: Context, component: ComponentName): String? 
  * What onboarding's Desktop check says, in plain words. Pure.
  *
  * A device whose kernel refuses an app `ptrace(PTRACE_TRACEME)` cannot run proot at all (docs/SPEC.md 3, "Not every
- * Android lets an app trace its children"; the BlueStacks rigs, dq-desktop-04 and Droidtop/tracker#555), but the root
+ * Android lets an app trace its children"; the BlueStacks rigs, dq-desktop-04 and mytop-project/tracker#555), but the root
  * backend needs no tracing, so that case names the way that works here: Shizuku started as root. Any other failure
  * keeps the short sentence; the backend's own text goes to the log.
  */

@@ -19,7 +19,7 @@ object EngineRunners {
 
 /**
  * Whether Enginehost runs games of this kind: the one rule for the "Engine" badge, the Kind filter and the page's
- * "runs in Wine" (Droidtop/tracker#603). It reads the engines database's strategy order ([defs]): an engine whose row
+ * "runs in Wine" (mytop-project/tracker#603). It reads the engines database's strategy order ([defs]): an engine whose row
  * puts ENGINEHOST first is Enginehost's, one whose rows do not (Unity and Unreal, built for Windows or Linux) runs
  * as a PC game, store or local. So an engine that gains an Enginehost core (AGS, droidtop-platforms bf9a195) reads
  * "Engine" with the database update, not an app change. Before the database is read, an engine kind counts as
@@ -65,7 +65,7 @@ enum class OwnershipMark { SHARED, LEFT }
 
 /**
  * What a PC or engine game's origin reads, at each length it is drawn
- * (docs/SPEC.md 7i, "Badges", Droidtop/tracker#397 slice G):
+ * (docs/SPEC.md 7i, "Badges", mytop-project/tracker#397 slice G):
  * [badge] on the capsule ("PC", "PC · GOG", "Engine"; null when the
  * Capsule badge option is Off), [full] on the focus line and the page's
  * Source row ("Steam · Shared with you", "GOG · via Heroic", "Folder:
@@ -89,7 +89,7 @@ data class OriginLabel(
  * [origins] is how many sources the library has rows from (the Source
  * facet's values): a PC capsule names its source only when there is more
  * than one, so a Steam-only library reads "PC". A badge is a plain fact, shown only when it is useful (owner,
- * 2026-10-14, Droidtop/tracker#496): the store or computer a game is on, never a folder's name, and never the engine
+ * 2026-10-14, mytop-project/tracker#496): the store or computer a game is on, never a folder's name, and never the engine
  * an engine game is built on (an implementation category: "Engine" is the fact). The focus line keeps all of it.
  * [via] is the launcher it was imported through. Ownership is
  * never text on a capsule: Shared and No longer in your library are a [mark].

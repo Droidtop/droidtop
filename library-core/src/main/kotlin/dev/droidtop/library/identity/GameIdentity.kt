@@ -4,7 +4,7 @@ import java.util.UUID
 
 /*
  * Which real game a library entry is (docs/SPEC.md 7h, "One identity model"; the matching and metadata proposal,
- * Droidtop/tracker#318, approved 2026-10-24). Every game has a stable local uid, minted at first sight, and a set of
+ * mytop-project/tracker#318, approved 2026-10-24). Every game has a stable local uid, minted at first sight, and a set of
  * claims: a store id, a content hash, a database id, a plugin's thread. A path is only where the game lives on a device
  * (a locator), never what it is, so a ROM that moves or a game seen on another device keeps its identity. Claims are
  * append-only: one is retired by naming what replaced it, never deleted.
@@ -108,7 +108,7 @@ interface IdentityStore {
     suspend fun putLocator(device: String, locator: String, uid: String)
     suspend fun addClaim(uid: String, claim: StoredClaim)
 
-    /** Marks [uid] missing since [sinceMs] when it is not marked yet; null takes the mark off (Droidtop/tracker#318 §7.3). */
+    /** Marks [uid] missing since [sinceMs] when it is not marked yet; null takes the mark off (mytop-project/tracker#318 §7.3). */
     suspend fun missingSince(uid: String, sinceMs: Long?)
 }
 
@@ -139,7 +139,7 @@ class GameIdentities(
     }
 
     /**
-     * The library's view of [present] and [missing] locators on [device] (Droidtop/tracker#318 §7.3; owner,
+     * The library's view of [present] and [missing] locators on [device] (mytop-project/tracker#318 §7.3; owner,
      * 2026-10-24: missing games are kept, never deleted automatically): a game none of whose locators is present is
      * marked missing from now, a mark it already has keeps its first date, and a game seen again loses the mark.
      * Nothing is deleted. A locator never registered is left alone.

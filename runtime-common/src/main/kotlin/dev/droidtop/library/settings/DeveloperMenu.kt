@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import android.content.Context
 
 /**
- * The Developer menu (docs/SPEC.md 7, "Developer menu"; Droidtop/tracker#579; the owner, 2026-10-17: "It's probably
+ * The Developer menu (docs/SPEC.md 7, "Developer menu"; mytop-project/tracker#579; the owner, 2026-10-17: "It's probably
  * worth moving a lot of the advanced stuff (like the containment checker) to a dev menu"). Off until the person taps
  * droidtop's version in Settings, About droidtop, [TAPS] times, as Android's own developer options are found; then a
  * Developer row opens [SCREEN] and the rows that are only for finding faults show where they belong (a plugin's

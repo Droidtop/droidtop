@@ -7,7 +7,7 @@ import dev.droidtop.library.stores.StoreSaves
 import dev.droidtop.pluginhost.PluginJobsCenter
 
 /**
- * What is happening now, for the one contextual spot in the status area (docs/SPEC.md 7i "Home", Droidtop/tracker#742;
+ * What is happening now, for the one contextual spot in the status area (docs/SPEC.md 7i "Home", mytop-project/tracker#742;
  * the owner: "Have a contextual spot that shows an icon for whatever's currently happening"). Everything droidtop does
  * in the background is a job in the one jobs center, so this reads the jobs and nothing else: a download or install,
  * a library scan, a scrape, a save sync, an update check, a plugin's job. Pure.
@@ -61,7 +61,7 @@ object HappeningNow {
     }
 
     /**
-     * What the spot shows from one jobs list to the next (Droidtop/tracker#834: the artwork ring "keeps emptying and
+     * What the spot shows from one jobs list to the next (mytop-project/tracker#834: the artwork ring "keeps emptying and
      * partially refilling"): it stays on the job it showed while that job runs, and that job's fill only moves
      * forward. A smaller number for the same job is not drawn; a new job starts from its own number.
      */

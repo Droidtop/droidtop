@@ -38,7 +38,7 @@ import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
 /**
- * The companion's Network tab (docs/SPEC.md "The companion's tabs", Network; Droidtop/tracker#583; owner, 2026-10-17:
+ * The companion's Network tab (docs/SPEC.md "The companion's tabs", Network; mytop-project/tracker#583; owner, 2026-10-17:
  * "put that in its own network tab. Move wifi, cellular, ethernet, virtual interface management, and etc there too,
  * though they should display contextually, with a manage button"). Each network that is up is one row, only what
  * this device has: what it is, its state and name, and Manage, which opens Android's own screen for it. A VPN reads

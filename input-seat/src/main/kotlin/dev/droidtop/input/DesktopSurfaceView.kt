@@ -12,7 +12,7 @@ import android.view.inputmethod.InputMethodManager
 
 /**
  * The desktop's surface, and an editor the on-screen keyboard can type into (docs/SPEC.md 6b "The on-screen
- * keyboard", Droidtop/tracker#685). A `SurfaceView` is not an editor, so Android's keyboard never came up over the
+ * keyboard", mytop-project/tracker#685). A `SurfaceView` is not an editor, so Android's keyboard never came up over the
  * desktop and typing on a console without a keyboard meant a trip to the companion's Keys tab.
  *
  * What the keyboard sends reaches the container through [router]'s own key path, as a keyboard's keys:
@@ -42,7 +42,7 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
     }
 
     /**
-     * A text field in the container took or lost the focus (host-bridge's input method, Droidtop/tracker#685): the
+     * A text field in the container took or lost the focus (host-bridge's input method, mytop-project/tracker#685): the
      * on-screen keyboard follows, as it does for an Android text field. Not while a hardware keyboard is attached,
      * which already types into the desktop. Main thread.
      */
@@ -59,7 +59,7 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
     /**
      * Android's keyboard can already be up when the desktop gets the focus back: shown for another field (the search
      * sheet's) or by Android itself (`show_ime_with_hard_keyboard`). It stayed bound to that field, so its taps reached
-     * nothing in the container (Droidtop/tracker#685, rig 2638). The input is started again on the desktop each time it
+     * nothing in the container (mytop-project/tracker#685, rig 2638). The input is started again on the desktop each time it
      * or its window gets the focus, so whatever keyboard is up types into the container.
      */
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {

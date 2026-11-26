@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The bar's window controls under sway (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686). */
+/** The bar's window controls under sway (docs/SPEC.md 2b "Window controls", mytop-project/tracker#686). */
 class WindowPlacementTest {
     @Test
     fun `maximize and snap float the window and size it to the workspace`() {

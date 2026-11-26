@@ -14,7 +14,7 @@ import dev.droidtop.runtime.tasks.TaskPolicy
 import kotlinx.coroutines.launch
 
 /**
- * Standard's Clear all apps (docs/SPEC.md "The task manager", Droidtop/tracker#252): every app except
+ * Standard's Clear all apps (docs/SPEC.md "The task manager", mytop-project/tracker#252): every app except
  * droidtop, Enginehost and what the user protected, closed by the same [TaskManager] the Quick Menu
  * and the companion use. Reached from the mode switcher's own menu (the one dialog every mode and
  * the home screen's long-press already open) and from the gesture slot action "Close all apps".

@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * `rmi` (Droidtop/tracker#715): which stored images the names given come off, decided before any is removed. A
+ * `rmi` (mytop-project/tracker#715): which stored images the names given come off, decided before any is removed. A
  * container keeps its own tree and its own copy of the image's run settings from when it was made, so removing its
  * image breaks nothing in it; still, as Docker and Podman do, an image a container came from is only removed with
  * force. Pure.

@@ -10,7 +10,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * droidtop's baseline profile (docs/SPEC.md 10b, Droidtop/tracker#954 item 13): the code a person runs first after an
+ * droidtop's baseline profile (docs/SPEC.md 10b, mytop-project/tracker#954 item 13): the code a person runs first after an
  * update, so Android compiles it ahead of time instead of droidtop starting interpreted. The walk is the start into
  * Gaming's Home, then the left menu's PC Games and Settings, the screens every session opens.
  *

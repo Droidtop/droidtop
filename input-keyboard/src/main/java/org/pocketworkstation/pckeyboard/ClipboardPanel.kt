@@ -15,7 +15,7 @@ import android.widget.TextView
 import java.util.TimeZone
 
 /*
- * The clipboard panel (docs/SPEC.md 6a, "Clipboard history", Droidtop/tracker#903 H12d). Ported in part from
+ * The clipboard panel (docs/SPEC.md 6a, "Clipboard history", mytop-project/tracker#903 H12d). Ported in part from
  * FlorisBoard, https://github.com/florisboard/florisboard at bac346e8, Apache-2.0, Copyright (C) 2021-2025 The
  * FlorisBoard Contributors (NOTICE.md): from `ime/clipboard/ClipboardInputLayout.kt`, the clip's menu as a sheet over
  * the dimmed history (the list at 12% while it is open, a tap outside it closes it) showing the whole clip and its time
@@ -385,7 +385,7 @@ internal class ClipboardPanel(
 }
 
 /**
- * The clipboard search (Droidtop/tracker#903 H12d), like the emoji search ([EmojiSearchBar]): a line showing the query
+ * The clipboard search (mytop-project/tracker#903 H12d), like the emoji search ([EmojiSearchBar]): a line showing the query
  * typed on the keyboard itself, which it takes while open ([KeyboardCapture]), and the matching clips in a row
  * ([ClipSearch]: every word, any order, ignoring case and accents). A tap pastes ([onPick]); Enter or Done closes it.
  */

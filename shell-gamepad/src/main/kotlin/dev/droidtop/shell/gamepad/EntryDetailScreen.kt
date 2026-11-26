@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A console game's page, and an Android app's, in the one frame every kind of game's page is drawn in
- * ([GamePageFrame]; docs/SPEC.md 7i, "The page's frame"; the owner, Droidtop/tracker#845: "One page for every kind
+ * ([GamePageFrame]; docs/SPEC.md 7i, "The page's frame"; the owner, mytop-project/tracker#845: "One page for every kind
  * of game"). Reached from a card's Info, a search result or a game's menu; B or Back closes it.
  *
  * What this page knows, and where the frame puts it:
@@ -85,7 +85,7 @@ internal fun EntryDetailScreen(
     library: Library,
     onLaunch: () -> Unit,
     onClose: () -> Unit,
-    /** The entry after an edit of its metadata or its favourite, for the list that holds it (Droidtop/tracker#766). */
+    /** The entry after an edit of its metadata or its favourite, for the list that holds it (mytop-project/tracker#766). */
     onEntryChanged: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -116,7 +116,7 @@ internal fun EntryDetailScreen(
             val romFile = java.io.File(entry.id)
             val gamesRoot = dev.droidtop.library.GamesRoots.rootOf(dev.droidtop.library.GamesRoots.current(context), romFile)
             val systemId = entry.systemId
-            // The person's own shots of it come first (Droidtop/tracker#596).
+            // The person's own shots of it come first (mytop-project/tracker#596).
             dev.droidtop.library.GameScreenshots.of(context, entry.id) + if (gamesRoot != null && systemId != null) {
                 dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
             } else {
@@ -321,7 +321,7 @@ internal fun EntryDetailScreen(
         statuses = statuses,
         strip = strip,
         rowsByTab = rowsByTab,
-        // Scrape first (the owner, Droidtop/tracker#845: "put "scrape" IN the edit metadata panel"), then every field.
+        // Scrape first (the owner, mytop-project/tracker#845: "put "scrape" IN the edit metadata panel"), then every field.
         // An app has no metadata of its own to edit, so no button.
         editMetadataRows = if (isRomEntry) {
             { close ->

@@ -201,7 +201,7 @@ object LibraryGrouping {
      *
      * A folder with no marker joins a store's row the same way when the
      * person linked it to that row ([LibraryEntry.sameAs], "The same game
-     * as...", Droidtop/tracker#745), or when a scrape learned the row's store
+     * as...", mytop-project/tracker#745), or when a scrape learned the row's store
      * id for it ([LibraryEntry.storeIds]) AND the two names are equal by
      * [GameNaming.nameKey]: a store id alone could come from a wrong match,
      * and a name alone is the look-alike the store rule guards against

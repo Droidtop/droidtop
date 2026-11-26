@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Settings > Accounts and sources > "Network and cloud storage" (docs/SPEC.md "Network and cloud storage",
- * Droidtop/tracker#573): the person's own shares, one row each with its state, and Add share. A share is added
+ * mytop-project/tracker#573): the person's own shares, one row each with its state, and Add share. A share is added
  * and tested only by the person; what uses it (saves, backups, a games root) is turned on where that thing is.
  */
 object StorageSharesCatalog {
@@ -243,7 +243,7 @@ object StorageSharesCatalog {
                                     value = "",
                                     secret = true,
                                     // Typed in place, the field never shows what is kept, so a blank one writes nothing; removing it
-                                    // is the row below (owner, 2026-11-19, Droidtop/tracker#954 item 12).
+                                    // is the row below (owner, 2026-11-19, mytop-project/tracker#954 item 12).
                                     onChange = { c, v -> if (v.isNotEmpty()) withContext(Dispatchers.IO) { StorageShares.setPassword(c, now.id, v) } },
                                 ),
                                 if (!hasPassword) null else AsyncActionItem(

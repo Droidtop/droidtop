@@ -13,7 +13,7 @@ import android.content.Context
  * marked as kid-friendly (the `kidGame` flag droidtop already stores per
  * game and real ES-DE calls the same thing). GUEST is for somebody
  * else's hands on the owner's handheld: the whole library, none of the
- * owner's private panels (Droidtop/tracker#420).
+ * owner's private panels (mytop-project/tracker#420).
  *
  * The way OUT deliberately does not live in Settings, because Settings
  * is the thing being hidden: the Quick Menu's System tab keeps a row for
@@ -73,7 +73,7 @@ object UiModeRefresh {
 }
 
 /**
- * The optional passkey for leaving Kid, Kiosk and Guest (docs/SPEC.md "UI modes and ControlAccess", Droidtop/tracker#414),
+ * The optional passkey for leaving Kid, Kiosk and Guest (docs/SPEC.md "UI modes and ControlAccess", mytop-project/tracker#414),
  * ES-DE's own UI mode passkey in droidtop's form. None by default: leaving is then one press, as before. Set, the
  * Quick Menu's Leave row asks for it by pad or touch ([ENTRY_ACTIVITY]). Stored as a salted SHA-256, never the
  * digits; forgetting it is recovered by clearing droidtop's storage ([RECOVERY]).

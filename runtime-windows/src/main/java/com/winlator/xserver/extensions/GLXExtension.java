@@ -7,7 +7,7 @@ import com.winlator.xserver.errors.BadImplementation;
 import com.winlator.xserver.errors.XRequestError;
 
 /**
- * "GLX" as a name only, for a session whose OpenGL is Mesa's xlib libGL (docs/SPEC.md 10b; Droidtop/tracker#309).
+ * "GLX" as a name only, for a session whose OpenGL is Mesa's xlib libGL (docs/SPEC.md 10b; mytop-project/tracker#309).
  *
  * That libGL does GLX on the client side and draws through plain X requests, so it never sends this server a GLX
  * request. winex11 still asks the server for the GLX extension first and turns OpenGL off for the whole process

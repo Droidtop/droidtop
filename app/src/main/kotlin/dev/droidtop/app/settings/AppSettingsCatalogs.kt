@@ -166,10 +166,10 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(consoleSystemsScreen())
         SettingsScreenRegistry.register(EmulatorsCatalog.screen())
         SettingsScreenRegistry.register(RiskyActionsCatalog.screen())
-        // The one game folders screen (Droidtop/tracker#589).
+        // The one game folders screen (mytop-project/tracker#589).
         SettingsScreenRegistry.register(FoldersCatalog.screen())
         SettingsScreenRegistry.register(scraperScreen())
-        // Favourites and collections from another frontend (Droidtop/tracker#724).
+        // Favourites and collections from another frontend (mytop-project/tracker#724).
         SettingsScreenRegistry.register(FrontendImportCatalog.screen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
@@ -186,7 +186,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.LinkRouter.handlersScreen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.screen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.reviewScreen())
-        // Downloads and Updates leads with getting games and closes with each source's standing (Droidtop/tracker#644).
+        // Downloads and Updates leads with getting games and closes with each source's standing (mytop-project/tracker#644).
         SettingsScreenRegistry.register(PluginJobsScreen.screen(lead = StoresCatalog::getGamesGroups, trail = StoresCatalog::sourcesGroups))
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.ManualDownloads.screen())
@@ -225,7 +225,7 @@ object AppSettingsCatalogs {
         // The search index must not pay for the folder walk in
         // consoleSystemsGroups: on a real device it held "Indexing
         // settings..." for 10-40 s before the first result
-        // (Droidtop/tracker#136). It reads the static groups plus the
+        // (mytop-project/tracker#136). It reads the static groups plus the
         // folder picker; the per-folder rows are live library data, not
         // settings to find by name.
         indexGroups = { context -> consoleSystemsGroups(context, systemId, forIndex = true) },
@@ -259,7 +259,7 @@ object AppSettingsCatalogs {
         }
         // Each folder's system, the person's choice or its name's. The input is the library's console folders only
         // (SystemFolders), so there is no PC or engine folder to tell apart here: the old per-folder store and engine
-        // checks walked each folder on every opening and could never match (Droidtop/tracker#571 row 31).
+        // checks walked each folder on every opening and could never match (mytop-project/tracker#571 row 31).
         val classifiedFolders = rawFolders.map { folder ->
             folder to SystemOverridePrefs.resolveForFolder(context, folder.absolutePath, folder.name, systemsById)
         }
@@ -573,7 +573,7 @@ object AppSettingsCatalogs {
     )
 
     // The same "Get the BIOS for this system" row the emulator setup helper shows, here for the games folder's own
-    // bios folder: without it the files were only reachable from Game sources (Droidtop/tracker#270).
+    // bios folder: without it the files were only reachable from Game sources (mytop-project/tracker#270).
     private fun getBiosGroup(context: android.content.Context, gamesRoot: File, spec: SystemBiosSpec): CatalogGroup? {
         val folder = File(gamesRoot, "bios").absolutePath
         val reach = dev.droidtop.library.consoles.EmulatorSetup.writeReach("$folder/x")
@@ -909,10 +909,10 @@ object AppSettingsCatalogs {
                         return@buildList
                     }
                     // The row says where setup is (its value) and asks once before
-                    // the long download or reinstall starts (Droidtop/tracker#299);
+                    // the long download or reinstall starts (mytop-project/tracker#299);
                     // the same WindowsSetup path launch and the game page use.
                     add(windowsSetupItem(provisioned, setupState))
-                    // Wine's process tree counts against Android's limit on child processes (Droidtop/tracker#816).
+                    // Wine's process tree counts against Android's limit on child processes (mytop-project/tracker#816).
                     PhantomProcessRow.item(context, "windows_child_processes")?.let(::add)
                     PhantomBreakdownRow.item(context, "windows_child_processes_what")?.let(::add)
                     // A new game from an installer, in a prefix of its own (docs/SPEC.md 7c).
@@ -932,10 +932,10 @@ object AppSettingsCatalogs {
             // driver and Direct3D: the default every game without settings
             // of its own runs with (docs/SPEC.md 5a). Before setup they are
             // the device's defaults, and the choices are setup's
-            // (Droidtop/tracker#372).
+            // (mytop-project/tracker#372).
             if (wineOptions && runtime != null) WineOptionsCatalog.groups(context, entryId = null, title = null) else emptyList()
         ) + (
-            // The managed prefixes (docs/SPEC.md 5a "Per-game prefixes", piece 1 and 2; Droidtop/tracker#584): each
+            // The managed prefixes (docs/SPEC.md 5a "Per-game prefixes", piece 1 and 2; mytop-project/tracker#584): each
             // with its Wine build, size and the games in it, and Remove beside one no game uses. Reads the library and
             // walks each prefix, so it is left out of search indexing.
             if (wineOptions && provisioned) listOf(prefixesGroup(context)) else emptyList()
@@ -1021,9 +1021,9 @@ object AppSettingsCatalogs {
                 title = "Accounts",
                 items = listOf(
                     GitHubAccountCatalog.accountRow(context),
-                    // Every key droidtop holds, in one place (Droidtop/tracker#12, the owner's choice (b), 2026-10-28).
+                    // Every key droidtop holds, in one place (mytop-project/tracker#12, the owner's choice (b), 2026-10-28).
                     keysAndAccountsRow(keysHeld),
-                    // Every key and sign-in droidtop holds, in one list (Droidtop/tracker#12, the owner's 2026-10-28 choice).
+                    // Every key and sign-in droidtop holds, in one list (mytop-project/tracker#12, the owner's 2026-10-28 choice).
                     KeysAndAccountsCatalog.linkRow(),
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
@@ -1064,7 +1064,7 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
-            // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", Droidtop/tracker#573).
+            // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", mytop-project/tracker#573).
             StorageSharesCatalog.group(context),
             CatalogGroup(
                 id = "accounts_plugins",
@@ -1085,7 +1085,7 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
-            // What droidtop can set on Android itself, through the elevated access above (Droidtop/tracker#816).
+            // What droidtop can set on Android itself, through the elevated access above (mytop-project/tracker#816).
             DeviceSetupRows.group(context),
         )
     }
@@ -1109,7 +1109,7 @@ object AppSettingsCatalogs {
                 title = "Browser",
                 items = listOf(browserRow(context), webEngineRow(context)),
             ),
-            // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).
+            // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648).
             CatalogGroup(
                 id = "accounts_download_sites",
                 title = "Download sites",
@@ -1201,7 +1201,7 @@ object AppSettingsCatalogs {
             else -> "Signed in"
         }
         val subtitle = "Plugins never see your sign-in"
-        // The state drawn beside its words (show, then say: Droidtop/tracker#738); an expired sign-in waits for the person.
+        // The state drawn beside its words (show, then say: mytop-project/tracker#738); an expired sign-in waits for the person.
         val mark = when (state) {
             "Signed in" -> dev.droidtop.library.settings.StatusMark.SIGNED_IN
             "Expired" -> dev.droidtop.library.settings.StatusMark.ATTENTION
@@ -1317,7 +1317,7 @@ object AppSettingsCatalogs {
      * setup page behind it (ScraperKeyScreen).
      */
     /**
-     * Each debrid account in the person's order (Droidtop/tracker#638): its key row, whether it is used for downloads,
+     * Each debrid account in the person's order (mytop-project/tracker#638): its key row, whether it is used for downloads,
      * and moving it in the order, which settles a tie between accounts a job costs the same (the cheapest serves first).
      */
     private fun debridAccountRows(context: Context): List<CatalogItem> {
@@ -1343,7 +1343,7 @@ object AppSettingsCatalogs {
         }
     }
 
-    // The service's own page, opened in place, in the frame every Settings page has (Droidtop/tracker#869).
+    // The service's own page, opened in place, in the frame every Settings page has (mytop-project/tracker#869).
     private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String, subtitle: String? = null) = NestedScreenItem(
         id = "accounts_" + service.name.lowercase(),
         title = title,
@@ -1423,7 +1423,7 @@ object AppSettingsCatalogs {
      * the audit log last saw it used. A change is written at once and takes effect on the plugin's next call.
      */
     /**
-     * Accounts and sources > Plugins > Apps that start games (Droidtop/tracker#124, docs/SPEC.md 7 "Other apps that start
+     * Accounts and sources > Plugins > Apps that start games (mytop-project/tracker#124, docs/SPEC.md 7 "Other apps that start
      * games"): every app that asked, with its answer as the same three chips a plugin's permission has. An app is listed
      * once it asked; nothing here can add one.
      */
@@ -1483,7 +1483,7 @@ object AppSettingsCatalogs {
         // The ScreenScraper sentence used to say droidtop had no developer ID,
         // long after one was registered (ScreenScraperDevCredentials), so the
         // page argued against its own default (UI pass 2026-09-24, finding H7).
-        // A scrape asks the sources over the network: offline the page says so first (Droidtop/tracker#594).
+        // A scrape asks the sources over the network: offline the page says so first (mytop-project/tracker#594).
         needsNetwork = true,
         groups = { context ->
             listOf(
@@ -1516,7 +1516,7 @@ object AppSettingsCatalogs {
                             subtitle = "Searched by name. Once a game is found, IGDB, the Steam store and SteamGridDB " +
                                 "add what they hold for that same game when they are set up",
                             // A metadata plugin is a choice beside the built-in sources, asked alone like them
-                            // (Droidtop/tracker#67).
+                            // (mytop-project/tracker#67).
                             options = dev.droidtop.library.scraper.PcScraperSource.entries.map {
                                 ChoiceOption(it.name, it.label)
                             } + dev.droidtop.library.integrations.PluginMetadataSources.sources(context).map {
@@ -1586,7 +1586,7 @@ object AppSettingsCatalogs {
                                     ?.let { dev.droidtop.library.scraper.ScrapeOffer.set(ctx, it) }
                             },
                         ),
-                        // PC and engine games get their details by themselves (Droidtop/tracker#568), on by default.
+                        // PC and engine games get their details by themselves (mytop-project/tracker#568), on by default.
                         ToggleItem(
                             id = "scrape_pc_auto",
                             title = "Get PC game details automatically",

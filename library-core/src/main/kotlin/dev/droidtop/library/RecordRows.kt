@@ -5,7 +5,7 @@ import dev.droidtop.pluginhost.DownloadSystems
 /*
  * The rows of a source's record, as droidtop draws them wherever one is shown (docs/SPEC.md 7g, "Getting an update";
  * docs/SPEC.md 12a, "A source's item page"): the update record page and its settings form in Gaming, and a source
- * result's detail page (Droidtop/tracker#737), so a download, a release in parts and a source's own controls read the
+ * result's detail page (mytop-project/tracker#737), so a download, a release in parts and a source's own controls read the
  * same on each. Pure.
  */
 
@@ -13,18 +13,18 @@ import dev.droidtop.pluginhost.DownloadSystems
 sealed interface RecordAction {
     data class Download(val download: UpdateSources.Download) : RecordAction
 
-    /** droidtop's own pick (Droidtop/tracker#838): the build, the system and the host chosen, the mirrors tried in turn. */
+    /** droidtop's own pick (mytop-project/tracker#838): the build, the system and the host chosen, the mirrors tried in turn. */
     data object GetBest : RecordAction
 
     /**
-     * One build for one platform (Droidtop/tracker#838): its mirrors, in the source's order, tried in turn in the person's
+     * One build for one platform (mytop-project/tracker#838): its mirrors, in the source's order, tried in turn in the person's
      * host order. The hosts are the row's to show (a chip each, where the screen draws chips).
      */
     data class Group(val downloads: List<UpdateSources.Download>) : RecordAction
     data class Open(val url: String) : RecordAction
 
     /**
-     * Open thread (Droidtop/tracker#862): the record's own page in droidtop's web view with the source's session, and
+     * Open thread (mytop-project/tracker#862): the record's own page in droidtop's web view with the source's session, and
      * what the person starts there is placed as this game's download. The person's way past a mirror droidtop cannot get.
      */
     data object OpenThread : RecordAction
@@ -33,10 +33,10 @@ sealed interface RecordAction {
     /** The Downloads tab's system row: A, Left and Right move to the next or the previous system. */
     data object PickSystem : RecordAction
 
-    /** The source's sign-in, when its download links are for signed-in people and no one is (Droidtop/tracker#599). */
+    /** The source's sign-in, when its download links are for signed-in people and no one is (mytop-project/tracker#599). */
     data object SignIn : RecordAction
 
-    /** The source's site checks the browser first: its check, in droidtop's web view (Droidtop/tracker#600). */
+    /** The source's site checks the browser first: its check, in droidtop's web view (mytop-project/tracker#600). */
     data object PassCheck : RecordAction
 
     /** One of the source's own controls (docs/plugin-api.md 1.10, `item.page`): a switch flips, a button runs. */
@@ -72,9 +72,9 @@ fun signInRow(sourceLabel: String, record: UpdateSources.Record, signedOut: Bool
         .takeIf { signedOut && record.downloads.any { it.url == null } }
 
 /**
- * One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738).
+ * One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: mytop-project/tracker#738).
  * [heading] is a section's heading ("Extras", "Other builds"): drawn as a heading, never focused or picked
- * (Droidtop/tracker#859).
+ * (mytop-project/tracker#859).
  */
 data class RecordRow(
     val title: String,
@@ -99,7 +99,7 @@ fun nextFocusable(rows: List<RecordRow>, from: Int, step: Int): Int {
 }
 
 /**
- * One choice in a build's host list (Droidtop/tracker#859): "Try in order" first, then each host. The owner,
+ * One choice in a build's host list (mytop-project/tracker#859): "Try in order" first, then each host. The owner,
  * 2026-10-31: "Pressing A opens a list of sources, at the top is "try in order", with the sources listed below so the
  * user can override them. A quick double tap of A accomplishes the same behavior, while still giving users choice".
  * [downloads] is what the choice gets: every mirror for Try in order, else that host's link alone.
@@ -126,7 +126,7 @@ fun hostChoices(group: List<UpdateSources.Download>): List<HostChoice> {
 }
 
 /**
- * What the source states of the game besides its version (Droidtop/tracker#845): its platforms, its languages and its
+ * What the source states of the game besides its version (mytop-project/tracker#845): its platforms, its languages and its
  * content notes, a row each when it states them. Shared by every page that shows a record's facts. Pure.
  */
 fun factRows(record: UpdateSources.Record): List<RecordRow> = listOfNotNull(
@@ -135,7 +135,7 @@ fun factRows(record: UpdateSources.Record): List<RecordRow> = listOfNotNull(
     record.contentNotes.takeIf { it.isNotEmpty() }?.let { RecordRow("Content", subtitle = it.joinToString(", ")) },
 )
 
-/** Which of a source's named texts are which (Droidtop/tracker#845). Pure. */
+/** Which of a source's named texts are which (mytop-project/tracker#845). Pure. */
 object RecordSections {
     private val CHANGELOG = Regex("^(changelog|change log|what'?s new)$", RegexOption.IGNORE_CASE)
 
@@ -145,7 +145,7 @@ object RecordSections {
 
 /**
  * The source's named texts beside its overview and changelog ("Installation", "Developer notes"), a row each with its
- * text under it, in the source's order (Droidtop/tracker#845). The record's Info tab shows them. Pure.
+ * text under it, in the source's order (mytop-project/tracker#845). The record's Info tab shows them. Pure.
  */
 fun sectionRows(record: UpdateSources.Record): List<RecordRow> =
     record.sections.filterNot { RecordSections.isChangelog(it.title) }.map { RecordRow(it.title, subtitle = it.body) }
@@ -170,7 +170,7 @@ fun groupedDownloads(downloads: List<UpdateSources.Download>): List<UpdateSource
 }
 
 /**
- * The System choices the record's links give (Droidtop/tracker#617, #845), by key, in the order the Downloads tab's
+ * The System choices the record's links give (mytop-project/tracker#617, #845), by key, in the order the Downloads tab's
  * picker offers them: the thread's own download groupings ("windows+linux", "android"), [DownloadLines.options].
  */
 fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadLines.options(record.downloads)
@@ -185,7 +185,7 @@ private fun linkRow(d: UpdateSources.Download): RecordRow {
 }
 
 /**
- * [downloads]' rows, where two would read the same ("Italian Translation" twice, Droidtop/tracker#859) each saying
+ * [downloads]' rows, where two would read the same ("Italian Translation" twice, mytop-project/tracker#859) each saying
  * where its link goes: the address's host, else "Link 1", "Link 2". Pure.
  */
 private fun linkRows(downloads: List<UpdateSources.Download>): List<RecordRow> {
@@ -218,13 +218,13 @@ fun partsLine(d: UpdateSources.Download): String? {
 fun buildOf(section: String): String? = section.substringBefore(" · ", "").trim().ifEmpty { null }
 
 /**
- * The build [d] is for: the one the source names (`build`, Droidtop/tracker#845), else the one its heading names
+ * The build [d] is for: the one the source names (`build`, mytop-project/tracker#845), else the one its heading names
  * ([buildOf]), for a source that does not name it yet.
  */
 fun buildOf(d: UpdateSources.Download): String? = d.build?.trim()?.ifEmpty { null } ?: buildOf(d.section)
 
 /**
- * A build's links as rows (Droidtop/tracker#838): one row per build and platform, its hosts listed under it, A trying
+ * A build's links as rows (mytop-project/tracker#838): one row per build and platform, its hosts listed under it, A trying
  * them in turn; a heading with one link is that link's row. Most games have one build and get just that. When a thread
  * has several ("Steam Build" beside the default one), the copy's build comes first, marked "Your copy" when droidtop
  * knows the copy ([steamCopy]; null on a page with no copy), and the others follow under "Other builds". Pure.
@@ -254,7 +254,7 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
 /**
  * The Downloads tab's rows: when the links differ by system, a System row first, droidtop's word on the picked system
  * if it has one (Android: not trackable), then only the picked system's builds ([buildRows]). The links for any system
- * follow whichever system is picked, under their own heading (the owner, 2026-10-23, Droidtop/tracker#617): "Patches"
+ * follow whichever system is picked, under their own heading (the owner, 2026-10-23, mytop-project/tracker#617): "Patches"
  * and "Extras" (a walkthrough, a mod, a save file) apart from the game, "Other" for the rest, each with its own heading
  * under it as its description. [steamCopy] is whether the copy being updated is a Steam copy, null with no copy.
  */
@@ -263,7 +263,7 @@ fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boole
         return listOfNotNull(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"), openThreadRow(record))
     }
     val lines = DownloadLines.of(record.downloads, picked)
-    // droidtop's own pick first (Droidtop/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
+    // droidtop's own pick first (mytop-project/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
     val get = listOfNotNull(
         RecordRow("Get the update", subtitle = "droidtop picks the build and the host, and tries the next if one fails", action = RecordAction.GetBest)
             .takeIf { DownloadPick.offers(record.downloads) },
@@ -293,7 +293,7 @@ private fun apart(downloads: List<UpdateSources.Download>, subtitle: String?): L
     return group("Patches", patches) + group("Extras", extras) + group("Other", other)
 }
 
-/** The row that opens the record's own page for the person to start the download there (Droidtop/tracker#862). */
+/** The row that opens the record's own page for the person to start the download there (mytop-project/tracker#862). */
 const val OPEN_THREAD = "Open thread"
 
 /** The Downloads tab's last row, when the record has a page: [OPEN_THREAD]. Null for a record with no page. Pure. */

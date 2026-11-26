@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * `library.files` op `changed` (docs/plugin-api.md 3 A2, docs/SPEC.md 7g "Targeted indexing", Droidtop/tracker#354):
+ * `library.files` op `changed` (docs/plugin-api.md 3 A2, docs/SPEC.md 7g "Targeted indexing", mytop-project/tracker#354):
  * a plugin that put a file in a game folder says so, and droidtop indexes exactly that. The broker's job is the
  * permission, the shape of the arguments and the scope: every path inside the person's game folders.
  */

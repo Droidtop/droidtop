@@ -72,7 +72,7 @@ fun CatalogIcon.glyph(): ImageVector = when (this) {
 }
 
 /**
- * A catalog row's leading picture: [iconFile] (a store's cached mark, Droidtop/tracker#503) when there is one, drawn
+ * A catalog row's leading picture: [iconFile] (a store's cached mark, mytop-project/tracker#503) when there is one, drawn
  * by the image loader off the main thread and in its own colours; else [icon]'s glyph, tinted. Nothing for neither.
  */
 @androidx.compose.runtime.Composable

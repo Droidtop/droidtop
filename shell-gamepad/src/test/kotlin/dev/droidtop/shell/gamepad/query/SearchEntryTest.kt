@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** The search entries (docs/SPEC.md 12a, "One search: where it opens"; Droidtop/tracker#485 F7c). */
+/** The search entries (docs/SPEC.md 12a, "One search: where it opens"; mytop-project/tracker#485 F7c). */
 class SearchEntryTest {
     private val systems = mapOf("snes" to "SNES", "psx" to "PlayStation", "n64" to "Nintendo 64", "sfc" to "Super Famicom")
 

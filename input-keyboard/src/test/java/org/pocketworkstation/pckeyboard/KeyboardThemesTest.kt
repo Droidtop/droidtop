@@ -6,7 +6,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** HKR's modern themes and "Light and dark" (Droidtop/tracker#903 H12b), as pure rules. */
+/** HKR's modern themes and "Light and dark" (mytop-project/tracker#903 H12b), as pure rules. */
 class KeyboardThemesTest {
     private val modern = intArrayOf(
         KeyboardAppearance.FOLLOW, KeyboardAppearance.DYNAMIC, KeyboardAppearance.HIGH_CONTRAST, KeyboardAppearance.MATCH_HOST,

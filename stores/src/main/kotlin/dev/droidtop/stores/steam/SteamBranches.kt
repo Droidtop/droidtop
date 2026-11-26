@@ -8,7 +8,7 @@ import kotlinx.coroutines.future.await
 
 /**
  * Steam's branches ("betas") of a game (docs/SPEC.md 7g, "Stores",
- * Droidtop/tracker#313): which ones the picker lists, which depots a branch
+ * mytop-project/tracker#313): which ones the picker lists, which depots a branch
  * has, and how a branch that asks for a password is opened. The password check
  * and the private depot section are the two calls the depot downloader makes
  * itself (Steam3Session.checkAppBetaPassword, getPrivateBetaDepotSection);

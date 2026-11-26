@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Android 13+ restricted settings (docs/SPEC.md 4c, Droidtop/tracker#314, #329). */
+/** Android 13+ restricted settings (docs/SPEC.md 4c, mytop-project/tracker#314, #329). */
 class RestrictedSettingsRulesTest {
     private val errored = RestrictedSettingsRules.MODE_ERRORED
     private val allowed = RestrictedSettingsRules.MODE_ALLOWED

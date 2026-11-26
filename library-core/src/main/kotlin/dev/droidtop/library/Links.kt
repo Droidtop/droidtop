@@ -8,7 +8,7 @@ import dev.droidtop.library.settings.Notices
 import dev.droidtop.library.stores.StoreWeb
 
 /**
- * The one way droidtop opens a web address a person pressed (Droidtop/tracker#763): a page of a store droidtop runs
+ * The one way droidtop opens a web address a person pressed (mytop-project/tracker#763): a page of a store droidtop runs
  * opens in that store's own view, signed in ([StoreWeb.openLink]); anything else goes to Android as a browsable link,
  * so an app that claims it (Steam's s.team approve page, an app store) gets it, and droidtop's own link handler passes
  * any other on to the browser. When nothing can open it, a flash says so and the answer is false.

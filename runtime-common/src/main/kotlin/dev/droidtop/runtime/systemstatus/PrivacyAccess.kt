@@ -9,7 +9,7 @@ import android.provider.Settings
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
- * The companion's Privacy card (docs/SPEC.md "The companion's tabs", Privacy; Droidtop/tracker#414 slice C17):
+ * The companion's Privacy card (docs/SPEC.md "The companion's tabs", Privacy; mytop-project/tracker#414 slice C17):
  * - with the helper app, the apps that used the camera, the microphone or location in the last 24 hours, read from
  *   Android's own record (`dumpsys appops --op <op>`: each package's last `Access:` with how long ago);
  * - "What droidtop can access": each of droidtop's own grants, whether it holds it, and why it asks.
@@ -78,7 +78,7 @@ object PrivacyAccess {
 
     fun droidtopGrants(context: Context): List<Grant> {
         val pkg = context.packageName
-        // The one check per grant is the requirement's (Droidtop/tracker#830 R1); this list reads it.
+        // The one check per grant is the requirement's (mytop-project/tracker#830 R1); this list reads it.
         val usage = dev.droidtop.runtime.requirements.Requirements.isMet(context, dev.droidtop.runtime.requirements.AndroidAccess.USAGE)
         val listener = dev.droidtop.runtime.requirements.Requirements.isMet(context, dev.droidtop.runtime.requirements.AndroidAccess.NOTIFICATIONS)
         val accessibility = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)

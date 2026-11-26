@@ -211,7 +211,7 @@ fun GamepadShell(
         // The shell window's one sliding focus ring (FocusGlide.kt); each
         // panel, menu and page that is a window of its own hosts its own.
         FocusGlideHost(Modifier.fillMaxSize()) {
-          // Focus is always somewhere in the shell, so the first D-pad press moves it (Droidtop/tracker#820).
+          // Focus is always somewhere in the shell, so the first D-pad press moves it (mytop-project/tracker#820).
           PadFocusHolder(Modifier.fillMaxSize()) {
             GamepadShellBody(
                 library = library,
@@ -244,7 +244,7 @@ internal fun GamepadShellBody(
     /**
      * What Home's Continue playing and Recently added are built from (the folded PC games, the Retro
      * library and the launcher apps that are games), published for the companion's Home so its rails match
-     * the shell's (Droidtop/tracker#328).
+     * the shell's (mytop-project/tracker#328).
      */
     onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
     // Real deep-link params from :app's MainActivity, which itself reads
@@ -266,7 +266,7 @@ internal fun GamepadShellBody(
     openQuickMenu: Boolean = false,
     triggerRescan: Boolean = false,
     triggerBrowseThemes: Boolean = false,
-    // A HOME press brought droidtop to the front (Droidtop/tracker#936).
+    // A HOME press brought droidtop to the front (mytop-project/tracker#936).
     homePress: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -322,7 +322,7 @@ internal fun GamepadShellBody(
     // loses it the moment something else is drawn instead (build 542:
     // "B from a game detail does not return to the PC grid"). Saveable rather than plain remember so the
     // Activity recreate the Text size setting triggers
-    // (AccessibilityPrefs, Droidtop/tracker#87) restores this whole
+    // (AccessibilityPrefs, mytop-project/tracker#87) restores this whole
     // place instead of dropping the user on the default section.
     val nav = rememberSaveable(saver = sessionOnly(ShellBackStack.Saver)) { ShellBackStack(GamingPrefs.defaultSection(context)) }
     val section = nav.section
@@ -332,7 +332,7 @@ internal fun GamepadShellBody(
     val pcGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
         dev.droidtop.shell.gamepad.pc.PcGamesState().apply { view = dev.droidtop.shell.gamepad.pc.PcView.OVERVIEW }
     }
-    // Home's own place (its strip, its cursor), apart from PC Games' (Droidtop/tracker#611).
+    // Home's own place (its strip, its cursor), apart from PC Games' (mytop-project/tracker#611).
     val homeGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
         dev.droidtop.shell.gamepad.pc.PcGamesState()
     }
@@ -464,14 +464,14 @@ internal fun GamepadShellBody(
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
     // Coming back from a running game (Back from droidtop's own game screen, HOME or a wake while one runs) sets
-    // openQuickMenu: with the game still running that opens its sheet, Resume first (Droidtop/tracker#740: what can
+    // openQuickMenu: with the game still running that opens its sheet, Resume first (mytop-project/tracker#740: what can
     // be done with the game is L2's, not R2's); with none, the Quick Menu as before.
     LaunchedEffect(deepLinkToken) {
         val gameRunning = dev.droidtop.library.LaunchDisplay.running.value != null
         overlays.runningGameOpen = openQuickMenu && gameRunning
         overlays.quickMenuOpen = openQuickMenu && !gameRunning
         overlays.leftMenuOpen = false
-        // HOME is the way home, as on any Android home screen (Droidtop/tracker#936: pressed twice in Settings,
+        // HOME is the way home, as on any Android home screen (mytop-project/tracker#936: pressed twice in Settings,
         // droidtop stayed on Settings). With no game to return to and no section asked for, the shell goes to the
         // section it opens on (GamingPrefs.defaultSection, Home unless the person chose another).
         if (homePress && !gameRunning && startSectionName == null) {
@@ -499,7 +499,7 @@ internal fun GamepadShellBody(
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) ControllerLayouts.recheck(context)
-            // Background music plays only while the shell is in front (Droidtop/tracker#725).
+            // Background music plays only while the shell is in front (mytop-project/tracker#725).
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) BackgroundMusic.shellShown(context, true)
             if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) BackgroundMusic.shellShown(context, false)
         }
@@ -598,7 +598,7 @@ internal fun GamepadShellBody(
     }
 
     // The Windows system-files offer's pending answer
-    // (Droidtop/tracker#140): non-null while the offer is on screen, and
+    // (mytop-project/tracker#140): non-null while the offer is on screen, and
     // calling it IS the answer -- it resumes the consent ask
     // PcRunnerOptions.runAction is suspended on. The same
     // registered-hook shape as LaunchDisplay.chooser above, for the same
@@ -643,7 +643,7 @@ internal fun GamepadShellBody(
         )
     }
 
-    // "Your theme is ready" (Droidtop/tracker#532): a theme that finished downloading while nobody was choosing one is
+    // "Your theme is ready" (mytop-project/tracker#532): a theme that finished downloading while nobody was choosing one is
     // offered here instead of replacing the look in use. An unanswered offer from an earlier process is restored.
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { dev.droidtop.library.theme.ThemeOffer.restore(context) }
@@ -730,7 +730,7 @@ internal fun GamepadShellBody(
         }
     }
 
-    // A job row's game page shown over the row that asked (docs/SPEC.md 7g, "Facets in place", Droidtop/tracker#639),
+    // A job row's game page shown over the row that asked (docs/SPEC.md 7g, "Facets in place", mytop-project/tracker#639),
     // inside Gaming, so Back returns to the row. The page is the PC page; a game that has none is left to the caller.
     var inPlacePage by remember { mutableStateOf<String?>(null) }
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -752,7 +752,7 @@ internal fun GamepadShellBody(
         },
     )
 
-    // L2 on the running game leads with its sheet (Droidtop/tracker#740): Resume and Restart launch the shell's one way,
+    // L2 on the running game leads with its sheet (mytop-project/tracker#740): Resume and Restart launch the shell's one way,
     // and a console game's search opens Gaming's.
     val runningGameHost = remember(library) {
         RunningGameHost(library, { entry -> onLaunch(entry) }, { id, name -> overlays.systemSearch = id to name })
@@ -794,7 +794,7 @@ internal fun GamepadShellBody(
                 Log.i("droidtop.ReturnToGame", "Quick Menu closed")
                 overlays.quickMenuOpen = false
             },
-            // Power and mode's Search tile, the left menu's Search row until Droidtop/tracker#621 M4. Kiosk and Kid
+            // Power and mode's Search tile, the left menu's Search row until mytop-project/tracker#621 M4. Kiosk and Kid
             // keep the library and leave out what manages the device, downloads and settings with it.
             onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
                 {
@@ -1132,7 +1132,7 @@ internal fun GamepadShellBody(
                 false
             },
     ) {
-        // Live setup progress (Droidtop/tracker#140): the launch path's
+        // Live setup progress (mytop-project/tracker#140): the launch path's
         // own lines about what a Windows setup is fetching, drawn as
         // chrome rather than as the failure banner below -- a
         // several-minute download painted red is exactly how the
@@ -1151,7 +1151,7 @@ internal fun GamepadShellBody(
             )
         }
         // Launch failure (see onLaunch's crash boundary): a focused
-        // dialog, not a banner (Droidtop/tracker#171) -- the shell stays
+        // dialog, not a banner (mytop-project/tracker#171) -- the shell stays
         // visible behind it, and the pad's B, a row tap or a tap outside
         // dismisses it; a failure the user can fix offers the fix on the
         // spot instead of getting out of the way.
@@ -1295,7 +1295,7 @@ internal fun GamepadShellBody(
                 background = background,
                 // In Retro Games A goes into what the cursor is on (a system,
                 // a game's page): "Open", the verb Home and the left menu use
-                // for it (Droidtop/tracker#681). "Select" is left for where A
+                // for it (mytop-project/tracker#681). "Select" is left for where A
                 // chooses. A game's page names its own presses, a layer on
                 // this footer (GamePageFrame).
                 aLabel = if (!overlayScreen && section == GamingSection.GAMES) "Open" else "Select",
@@ -1371,7 +1371,7 @@ internal fun GamepadShellBody(
                             onClose = { nav.back() },
                             onEntryChanged = onEntryChanged,
                         )
-                        // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
+                        // Get new games (mytop-project/tracker#612, #621): a page of Updates that opens on what is
                         // new for the person, with Search first, never on a blank search bar; leaving it goes back to
                         // Updates.
                         shownSection == GamingSection.NEW_GAMES -> {
@@ -1380,7 +1380,7 @@ internal fun GamepadShellBody(
                                 entries = foldedGameEntries.orEmpty(),
                                 onOpenUpdates = { nav.openSection(GamingSection.UPDATES) },
                                 // Get new games is a row of Downloads and Updates' Get games now
-                                // (Droidtop/tracker#749).
+                                // (mytop-project/tracker#749).
                                 onBack = { nav.openSection(GamingSection.DOWNLOADS) },
                             )
                         }
@@ -1389,7 +1389,7 @@ internal fun GamepadShellBody(
                         // something here too, for the reason Settings' is.
                         shownSection.placeScreenId != null -> {
                             canGoBack = true
-                            // Downloads and Updates' Get games row opens the one search here, over the place (Droidtop/tracker#825).
+                            // Downloads and Updates' Get games row opens the one search here, over the place (mytop-project/tracker#825).
                             var getGamesOpen by remember { mutableStateOf(false) }
                             // Every registered store's Open library and holding rows, built in or plugged in,
                             // and Game sources' Wine shortcuts and Imported rows: PC Games, filtered.
@@ -1411,7 +1411,7 @@ internal fun GamepadShellBody(
                                     // Get games' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
                                     // Downloads and Updates' "Updates · N available" row opens the Updates place, the one page; as a
-                                    // link of its own it was a second Updates entry in the place's column (Droidtop/tracker#837).
+                                    // link of its own it was a second Updates entry in the place's column (mytop-project/tracker#837).
                                     put(dev.droidtop.library.integrations.PluginJobsScreen.UPDATES_LINK_ID) { nav.openSection(GamingSection.UPDATES) }
                                     put(dev.droidtop.library.integrations.GetGamesEntry.SEARCH_ROW_ID) { getGamesOpen = true }
                                 }
@@ -1442,7 +1442,7 @@ internal fun GamepadShellBody(
                                 // Updates):
                                 // the menu is their way in. A place off the left menu (Plugins, Social, Game sources)
                                 // keeps
-                                // its Settings row, or it had none (Droidtop/tracker#759: Plugins, and with it every
+                                // its Settings row, or it had none (mytop-project/tracker#759: Plugins, and with it every
                                 // plugin's Approve, could not be found).
                                 placeScreenIds = settingsHiddenPlaceScreens(uiMode),
                                 onHelpRowClaim = { claim ->
@@ -1566,15 +1566,15 @@ internal fun GamepadShellBody(
             // On Retro Games it yields to a theme that draws its own clock
             // or system status in the view on screen (docs/SPEC.md 7k2), so
             // the two never overlap; the system list and a gamelist are
-            // decided apart (Droidtop/tracker#658).
+            // decided apart (mytop-project/tracker#658).
             val retroView = if (canGoBack) "gamelist" else "system"
-            // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
+            // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; mytop-project/tracker#494, #485 F7a).
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
                 FloatingStatusCluster(
                     onClick = { overlays.quickMenuOpen = true },
                     // The activity spot opens where the jobs are: the Quick Menu's Downloads tab
-                    // (Droidtop/tracker#742).
+                    // (mytop-project/tracker#742).
                     onActivity = {
                         overlays.quickMenuStart = QuickSection.DOWNLOADS
                         overlays.quickMenuOpen = true
@@ -1638,7 +1638,7 @@ internal val PROCESS_MARK: Long = System.currentTimeMillis()
  * (`isChangingConfigurations`). Any other destroy with the process still
  * alive (Android freeing a backgrounded Activity) leaves it false, so the
  * next start is a cold one and opens on Home, not on the last view
- * (Droidtop/tracker#361). False until the host says otherwise.
+ * (mytop-project/tracker#361). False until the host says otherwise.
  */
 object ShellRestore {
     @Volatile
@@ -1747,7 +1747,7 @@ internal fun ButtonHintFooter(
 internal enum class GamingSection(val place: dev.droidtop.library.settings.Place? = null) {
     /**
      * Home, a section of its own (owner, 2026-10-23: "Home should NOT be the same section. Home should be dynamic",
-     * Droidtop/tracker#611). It was PC Games in another view, sharing one state, so visiting Home threw away where
+     * mytop-project/tracker#611). It was PC Games in another view, sharing one state, so visiting Home threw away where
      * PC Games was (its grid view, its cursor) and the other way round. It draws the same shelves surface with a
      * state of its own.
      */
@@ -1755,11 +1755,11 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
     GAMES, PC_GAMES, APPS, SETTINGS,
 
     /**
-     * The places things live (docs/SPEC.md 7j, "Places", Droidtop/tracker#258):
+     * The places things live (docs/SPEC.md 7j, "Places", mytop-project/tracker#258):
      * reached from the left menu only, never as top-bar tabs, each one a
      * registered settings catalog screen drawn in place ([PlaceCatalogView]).
      * Which places there are is the one list every mode reads
-     * ([dev.droidtop.library.settings.Place], Droidtop/tracker#346).
+     * ([dev.droidtop.library.settings.Place], mytop-project/tracker#346).
      */
     STORES(dev.droidtop.library.settings.Place.STORES),
     SOCIAL(dev.droidtop.library.settings.Place.SOCIAL),
@@ -1768,10 +1768,10 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
 
     /**
      * Get new games: the one search over the download sources, on its own (owner, 2026-10-23: "add a 'get new games'
-     * under 'updates' that's its own UI", Droidtop/tracker#612). A page of Updates, opened by its Get new games row,
+     * under 'updates' that's its own UI", mytop-project/tracker#612). A page of Updates, opened by its Get new games row,
      * not a row of the left menu (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER Updates. The left menu
-     * is growing really large", Droidtop/tracker#621). Back returns to Updates, itself a page of Downloads and Updates
-     * (Droidtop/tracker#639), which the left menu marks.
+     * is growing really large", mytop-project/tracker#621). Back returns to Updates, itself a page of Downloads and Updates
+     * (mytop-project/tracker#639), which the left menu marks.
      */
     NEW_GAMES,
     PLUGINS(dev.droidtop.library.settings.Place.PLUGINS),
@@ -1787,13 +1787,13 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
 
     /**
      * The left menu row that stands for this section: itself, or Downloads and Updates for Updates and Get new games,
-     * its pages (Droidtop/tracker#639).
+     * its pages (mytop-project/tracker#639).
      */
     val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
 
     /**
-     * A place that is no row of Gaming's left menu (Droidtop/tracker#644 slice 3). Plugins and Social are sections of
-     * the Quick Menu: Plugins' management is the last row of its section (owner, 2026-10-17, Droidtop/tracker#586:
+     * A place that is no row of Gaming's left menu (mytop-project/tracker#644 slice 3). Plugins and Social are sections of
+     * the Quick Menu: Plugins' management is the last row of its section (owner, 2026-10-17, mytop-project/tracker#586:
      * "The plugin menu on the left pretty much shouldn't exist, the quick menu should be for lots of that stuff";
      * 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu"), and Social is drawn in its section
      * (owner, 2026-10-24: "Game sources go into the qam, as does social"). Game sources is no destination: getting
@@ -1817,7 +1817,7 @@ internal const val PLACE_PLUGINS_SCREEN_ID = dev.droidtop.library.settings.Place
 /**
  * The places whose Settings row is left out in [mode] because the left menu already leads to them, with their pages
  * ([GamingSection.menuSection]): never a place off the left menu, whose Settings row is its way in
- * (Droidtop/tracker#759).
+ * (mytop-project/tracker#759).
  */
 internal fun settingsHiddenPlaceScreens(mode: dev.droidtop.library.settings.UiMode): Set<String> {
     val menu = menuSectionsFor(mode).toSet()
@@ -1847,7 +1847,7 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
     // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates and Get new games are pages
-    // of Downloads and Updates (Place.listed, Droidtop/tracker#792); Plugins, Social and Game sources are elsewhere
+    // of Downloads and Updates (Place.listed, mytop-project/tracker#792); Plugins, Social and Game sources are elsewhere
     // (offLeftMenu).
     val places = GamingSection.entries.filter { it.place?.listed == true && !it.offLeftMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
@@ -2092,7 +2092,7 @@ internal fun LibraryEntry.gameGroup(): GameGroup =
 /**
  * The card a list starts on when it is rebuilt: the one whose [keys] entry is
  * [focusKey], else the first. By id, so the order changing under a rescan
- * does not move it (Droidtop/tracker#642).
+ * does not move it (mytop-project/tracker#642).
  */
 internal fun restoredFocusIndex(keys: List<String>, focusKey: String?): Int =
     keys.indexOf(focusKey).coerceAtLeast(0)
@@ -2168,7 +2168,7 @@ internal fun HomeSectionRow(
                 GameCard(
                     entry = entry,
                     modifier = if (index == 0 && firstCardFocus != null) Modifier.focusRequester(firstCardFocus) else Modifier,
-                    // A opens the details, where Play is (Droidtop/tracker#641).
+                    // A opens the details, where Play is (mytop-project/tracker#641).
                     onActivate = { onShowDetail(entry) },
                     onShowDetail = { onShowDetail(entry) },
                     onOptions = { onOptions(entry) },
@@ -2185,12 +2185,12 @@ internal fun HomeSectionRow(
 internal fun GameCard(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
-    // What A and a tap do. Gaming opens the game's details, where Play is (owner, 2026-10-24, Droidtop/tracker#641:
+    // What A and a tap do. Gaming opens the game's details, where Play is (owner, 2026-10-24, mytop-project/tracker#641:
     // "it should open the game's page"); Standard's games screen plays.
     onActivate: () -> Unit,
     // Y: the game's details.
     onShowDetail: () -> Unit,
-    // L2 and a long press: the game's own menu, one menu by two paths (Droidtop/tracker#621). Standard's games
+    // L2 and a long press: the game's own menu, one menu by two paths (mytop-project/tracker#621). Standard's games
     // screen has no details page and passes its options as both.
     onOptions: () -> Unit = onShowDetail,
     onFocused: () -> Unit = {},
@@ -2237,8 +2237,8 @@ internal fun GameCard(
                         onShowDetail()
                         true
                     }
-                    // L2 is the focused game's menu everywhere in Gaming (proposal 6.A, Droidtop/tracker#644 slice
-                    // 4), a Retro game's too (Droidtop/tracker#621 M6).
+                    // L2 is the focused game's menu everywhere in Gaming (proposal 6.A, mytop-project/tracker#644 slice
+                    // 4), a Retro game's too (mytop-project/tracker#621 M6).
                     GamepadAction.L2 -> {
                         onOptions()
                         true
@@ -2263,7 +2263,7 @@ internal fun GameCard(
             // relying on clickable() to cover it. Y opens the detail screen
             // (§7).
             // A long press is the touch path to L2: the game's own menu
-            // (Droidtop/tracker#621), Android's list convention.
+            // (mytop-project/tracker#621), Android's list convention.
             .padRow(onClick = onActivate, onLongClick = onOptions)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
@@ -2374,12 +2374,12 @@ internal class EsDeGroupHistory {
 }
 
 /**
- * What the last launch left for the person (Droidtop/tracker#763: the shell body's launch state, held together).
+ * What the last launch left for the person (mytop-project/tracker#763: the shell body's launch state, held together).
  * [error] is the user-visible failure: a failed launch must inform, never kill. [progress] is a Windows setup's live
- * progress on the same path (Droidtop/tracker#140), kept apart from [error] because it is not a failure, and cleared
+ * progress on the same path (mytop-project/tracker#140), kept apart from [error] because it is not a failure, and cleared
  * when the attempt ends either way. The fixable kinds a banner offers to fix: [missingEmulator] (the system had no
- * emulator), [unknownProgram] (a Windows game whose program droidtop could not tell, Droidtop/tracker#308) and
- * [missingCore] (a RetroArch core missing or incomplete, Droidtop/tracker#271); [programScreen] is the program
+ * emulator), [unknownProgram] (a Windows game whose program droidtop could not tell, mytop-project/tracker#308) and
+ * [missingCore] (a RetroArch core missing or incomplete, mytop-project/tracker#271); [programScreen] is the program
  * choice once opened.
  */
 @androidx.compose.runtime.Stable
@@ -2393,7 +2393,7 @@ internal class LaunchProblems {
 }
 
 /**
- * The shell's own overlays and which is open (Droidtop/tracker#763: held together): the Quick Menu (hold Select) and
+ * The shell's own overlays and which is open (mytop-project/tracker#763: held together): the Quick Menu (hold Select) and
  * the section it opens on when something asked for one ([quickMenuStart], Downloads for the status cluster's activity spot,
  * cleared on close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
  * system's search, by its id and name, from the running console game's sheet; and that sheet itself, on coming back
@@ -2403,7 +2403,7 @@ internal class LaunchProblems {
 internal class ShellOverlays {
     var quickMenuOpen by mutableStateOf(false)
     var quickMenuStart by mutableStateOf<QuickSection?>(null)
-    // The running game's sheet, opened on coming back to the game (Droidtop/tracker#740).
+    // The running game's sheet, opened on coming back to the game (mytop-project/tracker#740).
     var runningGameOpen by mutableStateOf(false)
     var leftMenuOpen by mutableStateOf(false)
     var globalSearchOpen by mutableStateOf(false)

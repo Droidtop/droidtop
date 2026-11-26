@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** droidtop's own notices on plugin pages (Droidtop/tracker#521 items 6, 9 and 10). */
+/** droidtop's own notices on plugin pages (mytop-project/tracker#521 items 6, 9 and 10). */
 class PluginViewsNoticesTest {
     @Test
     fun `a finished job says so in droidtop's words, with the plugin's sentence as the body`() {

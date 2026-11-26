@@ -37,7 +37,7 @@ import java.util.Date
 
 /*
  * The status readout every surface draws (Gaming's header, the companion, the Desktop tray and Standard's taskbar):
- * here in ui-shared so a module without shell-gamepad, Standard's taskbar, draws the same one (Droidtop/tracker#701).
+ * here in ui-shared so a module without shell-gamepad, Standard's taskbar, draws the same one (mytop-project/tracker#701).
  */
 
 /**
@@ -56,8 +56,8 @@ import java.util.Date
  * Tapping it opens the Quick Menu, which has the controls behind these
  * readings. Not a focus target, like everything in the top bar. The
  * companion draws the same readout in place of Android's status bar
- * (Droidtop/tracker#524), its tap opening its own System tab. [ink] is its quiet colour: the shell's muted ink, or a
- * surface's own text colour where the shell's tokens are not its ground (Standard's taskbar, Droidtop/tracker#701).
+ * (mytop-project/tracker#524), its tap opening its own System tab. [ink] is its quiet colour: the shell's muted ink, or a
+ * surface's own text colour where the shell's tokens are not its ground (Standard's taskbar, mytop-project/tracker#701).
  */
 @Composable
 fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, ink: Color = MenuTokens.OnSurfaceMuted) {
@@ -100,7 +100,7 @@ fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Mo
                 BatteryGlyph(battery, snapshot.charging, normal = ink)
                 if (showBatteryPercent && battery != null) {
                     // One line whatever width it is given: "100%" wrapped a character per line in a crowded Desktop bar
-                    // (Droidtop/tracker#691).
+                    // (mytop-project/tracker#691).
                     Text("$battery%", color = ink, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
                 }
             }
@@ -127,7 +127,7 @@ private fun statusDescription(clock: String, status: SystemStatusSnapshot?): Str
 /**
  * The connection as a drawn glyph: Wi-Fi arcs by signal, bars for wired and mobile, crossed when there is none, in the
  * danger ink without internet. [normal] is its quiet ink and [height] its size (14dp in the header); a theme's status
- * element without icons of its own draws this too, in its colour and at its height (Droidtop/tracker#659).
+ * element without icons of its own draws this too, in its colour and at its height (mytop-project/tracker#659).
  */
 @Composable
 fun NetworkGlyph(status: SystemStatusSnapshot, normal: Color = MenuTokens.OnSurfaceMuted, height: Dp = 14.dp) {

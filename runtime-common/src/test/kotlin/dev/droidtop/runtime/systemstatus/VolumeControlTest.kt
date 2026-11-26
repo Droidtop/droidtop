@@ -4,7 +4,7 @@ import dev.droidtop.library.settings.UiMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The one volume write path and Kid's cap (VolumeControl.kt, Droidtop/tracker#414 slice C19). */
+/** The one volume write path and Kid's cap (VolumeControl.kt, mytop-project/tracker#414 slice C19). */
 class VolumeControlTest {
     @Test fun `Kid's cap clamps every stream's slider, other modes are not capped`() {
         // Media 0..15, ring 0..7: a 50% cap is 7 and 3.

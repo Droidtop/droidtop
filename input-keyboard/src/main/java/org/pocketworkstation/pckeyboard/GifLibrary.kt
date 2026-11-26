@@ -1,5 +1,5 @@
 /*
- * GIFs and stickers from the person's own folders (docs/SPEC.md 6a, "GIFs and stickers", Droidtop/tracker#903 H5).
+ * GIFs and stickers from the person's own folders (docs/SPEC.md 6a, "GIFs and stickers", mytop-project/tracker#903 H5).
  *
  * Parts of this file are ported from CleverKeys' offline GIF panel, https://github.com/tribixbite/CleverKeys at
  * c8cbb74b94689d7b4eb27392a8e653cb93b28e6f, GPL-3.0 (Copyright (C) tribixbite and contributors), which droidtop's
@@ -37,7 +37,7 @@ data class GifItem(
 )
 
 /**
- * Where GIFs and stickers come from (Droidtop/tracker#903 H5). The local library ([LocalGifLibrary]) is the only one:
+ * Where GIFs and stickers come from (mytop-project/tracker#903 H5). The local library ([LocalGifLibrary]) is the only one:
  * an online search (Klipy, since Tenor's API closed on 2026-06-30) waits for the owner, and needs no change here.
  * [onResult] runs on the main thread.
  */

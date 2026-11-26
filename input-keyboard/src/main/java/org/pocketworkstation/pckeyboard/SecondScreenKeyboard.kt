@@ -225,7 +225,7 @@ object SecondScreenKeyboard {
      * because the [LatinIME] that normally handles them is not in the loop.
      *
      * [compact] draws Hacker's own Compact 5-row layout and its Fn layer instead (`kbd_compact`, the layout mode
-     * Hacker's offers as "Compact"): fewer, wider keys, for the add-on screen (Droidtop/tracker#903 H12c, KeyboardPanel).
+     * Hacker's offers as "Compact"): fewer, wider keys, for the add-on screen (mytop-project/tracker#903 H12c, KeyboardPanel).
      */
     fun applyLayout(
         view: LatinKeyboardView,
@@ -286,7 +286,7 @@ class SecondScreenKeyboardListener(
     /** Fn / layout-switch, which change what THIS keyboard shows and go nowhere else. */
     private val onLayoutToggle: () -> Unit = {},
     /**
-     * Space-bar drag moves the cursor (Droidtop/tracker#340). A hardware key is typed the moment it goes down, so
+     * Space-bar drag moves the cursor (mytop-project/tracker#340). A hardware key is typed the moment it goes down, so
      * with this on the space bar goes down and up together when it is let go, unless the touch became a drag.
      */
     private val deferSpace: Boolean = false,
@@ -303,7 +303,7 @@ class SecondScreenKeyboardListener(
     private var repeatingKey: Int? = null
 
     /**
-     * The space bar under [deferSpace] (Droidtop/tracker#772: one state where three booleans allowed combinations that
+     * The space bar under [deferSpace] (mytop-project/tracker#772: one state where three booleans allowed combinations that
      * cannot happen): [UP] untouched; [PENDING] pressed, nothing sent yet; [DOWN] held long enough to be pressed at the
      * far side; [DRAGGED] turned into a cursor drag, so its release types nothing.
      */
@@ -409,7 +409,7 @@ class SecondScreenKeyboardListener(
             return
         }
         // As onPress does: Shift is pressed for a character that needs it only when it is not latched already, so a
-        // latched Shift is neither pressed twice nor let go under the person (Droidtop/tracker#772).
+        // latched Shift is neither pressed twice nor let go under the person (mytop-project/tracker#772).
         val keys = KeySequencer(send)
         for (character in text) {
             val stroke = resolver.resolve(character) ?: continue

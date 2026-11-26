@@ -30,7 +30,7 @@ data class PluginCatalogRelease(
     val contractVersion: Int? = null,
 ) {
     /**
-     * Why this droidtop cannot run this release, in words for the row's red tag (Droidtop/tracker#932), or null when it
+     * Why this droidtop cannot run this release, in words for the row's red tag (mytop-project/tracker#932), or null when it
      * can, or the index does not say. The manifest is checked again at install whatever this says.
      */
     fun incompatibility(): String? {
@@ -70,7 +70,7 @@ data class PluginCatalogOrigin(
     val plugins: List<PluginCatalogPlugin>,
     /** The key document's SPKI, base64, when [keySha256] is set: what an added catalog's origin is trusted with on first use, after the person saw its fingerprint. */
     val keyBase64: String? = null,
-    /** The key block's superseded markers, old key SHA-256 to its successor's ([dev.droidtop.pluginhost.KeySupersession], Droidtop/tracker#887). */
+    /** The key block's superseded markers, old key SHA-256 to its successor's ([dev.droidtop.pluginhost.KeySupersession], mytop-project/tracker#887). */
     val superseded: Map<String, String> = emptyMap(),
 )
 
@@ -95,7 +95,7 @@ data class PluginCatalogInfo(
     val keyBase64: String?,
     /** The organisation's own origin id (e.g. "gamegrab"), listed under [keyBase64]; null without a master. */
     val origin: String? = null,
-    /** The master key block's superseded markers (Droidtop/tracker#887). */
+    /** The master key block's superseded markers (mytop-project/tracker#887). */
     val superseded: Map<String, String> = emptyMap(),
 )
 

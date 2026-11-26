@@ -118,7 +118,7 @@ import java.io.File
  * mode (SPEC 7b, "All done"). With Gaming set up and no folder added it
  * also offers "Add your games", back to the one step that does it, so a
  * person never lands on an empty library with nothing to press
- * (Droidtop/tracker#172).
+ * (mytop-project/tracker#172).
  */
 @Composable
 internal fun DoneStep(

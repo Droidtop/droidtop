@@ -6,7 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A store's Cloud saves switch on its page in the Stores place (docs/SPEC.md 7g, "Stores", Droidtop/tracker#224): on
+ * A store's Cloud saves switch on its page in the Stores place (docs/SPEC.md 7g, "Stores", mytop-project/tracker#224): on
  * unless the person turned it off, kept in the store's own preferences file (`<store>_prefs`, `cloud_saves`, where
  * Steam always kept it). Off, a launch and an exit leave the saves alone; "Sync cloud saves" on a game's menu still
  * syncs, because the person asked. Preferences reads: never on the main thread.

@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * The pad buttons that reach droidtop's own chrome while Desktop is showing (docs/SPEC.md 2b "Desktop
- * chrome with a pad", Droidtop/tracker#350).
+ * chrome with a pad", mytop-project/tracker#350).
  *
  * Desktop hands the pad to the container (SPEC 6b: the right stick is the pointer, the stick clicks are
  * the mouse buttons) and the activity's input gate steps aside, so the taskbar, Start menu and tray had no
@@ -16,11 +16,11 @@ import kotlinx.coroutines.flow.asSharedFlow
  * Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the container's), L1 the list of windows, R1 the search. They are claimed only from a gamepad. D-pad and face buttons are left alone, as before. The activity [claim]s the key before any view sees it; the shell collects [requests].
  *
  * A keyboard's keys are the container's, but for three shortcuts to droidtop's chrome (docs/SPEC.md 6b "Where
- * Meta goes", Droidtop/tracker#697), read by [KeyShortcuts]: Ctrl+Esc opens Start, Alt+Esc the list of windows and
+ * Meta goes", mytop-project/tracker#697), read by [KeyShortcuts]: Ctrl+Esc opens Start, Alt+Esc the list of windows and
  * Alt+Space the search.
  *
  * The list of windows (L1, Alt+Esc) holds every screen's windows; with the desktop on a second screen its Y moves the
- * chosen one to another screen (DesktopShell's WindowsSheet, Droidtop/tracker#908 step D4).
+ * chosen one to another screen (DesktopShell's WindowsSheet, mytop-project/tracker#908 step D4).
  */
 object DesktopPadRoutes {
     enum class Route { START_MENU, QUICK_MENU, WINDOWS, SEARCH }
@@ -62,7 +62,7 @@ object DesktopPadRoutes {
     private val keyboard = KeyShortcuts()
 
     /**
-     * The keyboard's way to droidtop's chrome (Droidtop/tracker#697). Pure: [onKey] says whether droidtop takes the
+     * The keyboard's way to droidtop's chrome (mytop-project/tracker#697). Pure: [onKey] says whether droidtop takes the
      * key and which route, if any, it raises.
      *
      * Android keeps Meta and Alt+Tab from every app: PhoneWindowManager.interceptKeyBeforeDispatching consumes the

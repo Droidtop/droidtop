@@ -31,7 +31,7 @@ const val INLINE_KEYBOARD_HEIGHT_PERCENT = 35f
 /**
  * droidtop's one keyboard ([KeyboardPanel]: the embedded Hacker's Keyboard grid) as a composable, for every
  * Compose surface that draws a keyboard of its own (docs/SPEC.md 4c, "Typing on the add-on display",
- * Droidtop/tracker#314). [sink] may change between compositions; the view keeps the one it was built with and
+ * mytop-project/tracker#314). [sink] may change between compositions; the view keeps the one it was built with and
  * forwards to the latest.
  */
 @Composable
@@ -59,12 +59,12 @@ fun DroidtopKeyboard(
 
 /**
  * droidtop's keyboard for a droidtop text field, wherever droidtop's keyboard serves it ([KeyboardTargets.servesField]:
- * a screen where Android draws no keyboard, or any screen while a companion takes the typing, Droidtop/tracker#612).
+ * a screen where Android draws no keyboard, or any screen while a companion takes the typing, mytop-project/tracker#612).
  * With a companion the keys are typed on its Keys panel and Android's keyboard is kept away from this screen.
  * It types into whichever field of this window has focus, through the window's own key path ([WindowKeySink]),
  * so it needs no input method, no window focus and no permission. [active] is whether the person is typing in the
  * field now: a page whose cursor left the field for its rows passes false, and the keyboard closes wherever it was
- * shown (the companion's stayed up over search results, Droidtop/tracker#485 rig step 1), coming back with the cursor.
+ * shown (the companion's stayed up over search results, mytop-project/tracker#485 rig step 1), coming back with the cursor.
  */
 @Composable
 fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
@@ -131,7 +131,7 @@ object OwnFieldWindows {
 }
 
 /**
- * A dialog's one text field, holding the cursor from the moment the dialog opens (Droidtop/tracker#523): keys from any
+ * A dialog's one text field, holding the cursor from the moment the dialog opens (mytop-project/tracker#523): keys from any
  * keyboard, the companion's included (it types into the focused field, [OwnFieldKeyboard]), land in it with no press
  * to reach it first. Android's keyboard comes up with that focus only where droidtop raises one on its own
  * ([KeyboardTargets.raisesOnOwnFocus]: one screen, no controller or keyboard); pass [raisesKeyboardWithFocus] as the field's
@@ -164,7 +164,7 @@ val raisesKeyboardWithFocus: Boolean get() = KeyboardTargets.raisesOnOwnFocus()
  * Keeps Android's keyboard from coming up by itself when this window takes focus with a field in it, unless droidtop's
  * own rule raises one ([raisesKeyboardWithFocus]). A window that leaves its soft input state unspecified gets the system
  * keyboard on a large screen as soon as a text field in it is focused, whatever Compose asks for: on the console Y
- * opened Search and Gboard came up over Gaming although the field asked for none (Droidtop/tracker#832, dev.2778).
+ * opened Search and Gboard came up over Gaming although the field asked for none (mytop-project/tracker#832, dev.2778).
  * Only the state bits change, never adjustResize. An explicit show (A or a tap on the field) still raises it.
  */
 @Composable

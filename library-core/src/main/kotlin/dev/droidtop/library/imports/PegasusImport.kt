@@ -1,7 +1,7 @@
 package dev.droidtop.library.imports
 
 /**
- * Pegasus's own files, read for an import (Droidtop/tracker#724): its collections from `metadata.pegasus.txt` (or
+ * Pegasus's own files, read for an import (mytop-project/tracker#724): its collections from `metadata.pegasus.txt` (or
  * `metadata.txt`) and its favourites from `favorites.txt`. Only read: no ROM is touched, moved or copied, and nothing
  * is written back. Pure; the caller reads the files.
  *

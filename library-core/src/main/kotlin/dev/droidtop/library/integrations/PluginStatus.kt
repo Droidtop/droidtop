@@ -9,7 +9,7 @@ import dev.droidtop.pluginhost.RequiredApi
 import dev.droidtop.pluginhost.RuntimeNeed
 
 /**
- * A plugin's state, the one answer every place that lists plugins gives (Droidtop/tracker#512, #644): a word or two
+ * A plugin's state, the one answer every place that lists plugins gives (mytop-project/tracker#512, #644): a word or two
  * for its card and page ("Needs approval", "Running") and the status glyph for a row that has room for one only
  * ([mark]: none when it runs as it should). Pure.
  */

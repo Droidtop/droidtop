@@ -9,7 +9,7 @@ import dev.droidtop.library.settings.IconPacks
 import kotlinx.coroutines.launch
 
 /**
- * The icon pack choice of Standard's launcher, as the shared catalog sees it (Droidtop/tracker#508). Choosing one does
+ * The icon pack choice of Standard's launcher, as the shared catalog sees it (mytop-project/tracker#508). Choosing one does
  * what Standard's own Icon pack page does (the pack's icons dropped from the cache, the launcher model reloaded), and
  * then rescans the Apps kinds, so Gaming's Apps tiles, which come from the same icon cache, follow.
  */

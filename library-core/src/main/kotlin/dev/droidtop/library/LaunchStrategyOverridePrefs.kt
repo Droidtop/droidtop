@@ -33,7 +33,7 @@ object LaunchStrategyOverridePrefs {
     }
 
     /**
-     * "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): [strategy] runs [entryId]'s next launch only,
+     * "Run once with…" (docs/SPEC.md 7i, mytop-project/tracker#636): [strategy] runs [entryId]'s next launch only,
      * and the saved choice above is left as it is. Held in memory, not in the preferences, because the
      * launch it is for starts straight after it is set; a process that dies in between forgets it, which is
      * the right answer for a choice made for one run.
@@ -48,7 +48,7 @@ object LaunchStrategyOverridePrefs {
     /**
      * What [forLaunch] will answer for [entryId], without taking a "Run once with…" choice: for the step before the
      * launch that decides whether it can start at all (PcRunnerOptions.resolveAndPlay), so it weighs the runner the
-     * launch will use (Droidtop/tracker#752: "Run once with… > Wine" ran Enginehost's setup instead).
+     * launch will use (mytop-project/tracker#752: "Run once with… > Wine" ran Enginehost's setup instead).
      */
     fun peekForLaunch(context: Context, entryId: String): String? = once[entryId] ?: get(context, entryId)
 

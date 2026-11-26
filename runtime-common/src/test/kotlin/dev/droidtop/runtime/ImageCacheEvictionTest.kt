@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which kept images the cache limit removes (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911). */
+/** Which kept images the cache limit removes (docs/SPEC.md 3, "Storage is checked before it is spent"; mytop-project/tracker#911). */
 class ImageCacheEvictionTest {
     private fun kept(digest: String, vararg blobs: String) = ImageCacheEviction.Kept(digest, blobs.toSet())
 

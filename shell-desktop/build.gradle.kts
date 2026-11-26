@@ -29,11 +29,11 @@ dependencies {
     implementation(project(":input-seat"))
     implementation(project(":runtime-common"))
     // The shell's shared pieces (Gaming's game page, menu and install offer), wired out
-    // to Desktop rather than written twice (docs/SPEC.md 2b, Droidtop/tracker#349).
+    // to Desktop rather than written twice (docs/SPEC.md 2b, mytop-project/tracker#349).
     implementation(project(":shell-gamepad"))
     // The notice card every surface shares (docs/SPEC.md 7k, "Notices").
     implementation(project(":ui-shared"))
-    // The search's Linux app icons, PNG or SVG, decoded by droidtop's one image loader (Droidtop/tracker#689).
+    // The search's Linux app icons, PNG or SVG, decoded by droidtop's one image loader (mytop-project/tracker#689).
     implementation(libs.coil.compose)
     implementation(libs.coil.android)
     implementation(libs.androidx.core.ktx)
@@ -41,7 +41,7 @@ dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
-    // LocalLifecycleOwner: the session hands Android-kept keys over only while resumed (Droidtop/tracker#697).
+    // LocalLifecycleOwner: the session hands Android-kept keys over only while resumed (mytop-project/tracker#697).
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.foundation)

@@ -21,7 +21,7 @@ import timber.log.Timber
 
 /**
  * Installs a game's pending redistributables ([RedistPlan]) in its prefix before the game starts (docs/SPEC.md 9,
- * "Redistributable installers"; Droidtop/tracker#916). For each: its licence on droidtop's own sheet over the game
+ * "Redistributable installers"; mytop-project/tracker#916). For each: its licence on droidtop's own sheet over the game
  * screen (Accept / Decline / "Remember for other games", pad and touch), unless remembered; then the installer, run
  * out of sight in the prefix with its silent switches, and the outcome in the prefix's record. Decline installs nothing
  * and is asked again next time. The installer's own window never shows.

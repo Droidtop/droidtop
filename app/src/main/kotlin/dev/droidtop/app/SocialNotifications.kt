@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Message notifications and the unread count for every social provider (docs/SPEC.md "Social",
- * Droidtop/tracker#327). A message that arrives while its conversation is not open is one notification
+ * mytop-project/tracker#327). A message that arrives while its conversation is not open is one notification
  * per conversation (the provider and the friend), titled with the friend's name, the service as its
  * sub-text, replaced by that conversation's next message; tapping it opens the Social place. Posted only
  * when notifications are already allowed for droidtop; whether a provider's messages notify at all is

@@ -2,7 +2,7 @@ package dev.droidtop.library.scraper
 
 /**
  * What a picture is for, the roles Steam's library and SteamGridDB (and its Decky plugin, decky-steamgriddb) give art
- * (docs/SPEC.md 7h, "Artwork roles", Droidtop/tracker#585): each role has its own shape and its own place, and a
+ * (docs/SPEC.md 7h, "Artwork roles", mytop-project/tracker#585): each role has its own shape and its own place, and a
  * picture is shown only in a slot of its shape, never squashed or cropped into another.
  *
  * [mediaFolder] is the ES-DE `downloaded_media` folder it is filed in ([PcMediaLayout.mediaFile]): a capsule is

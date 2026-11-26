@@ -25,7 +25,7 @@ import java.text.Normalizer
  *    ("Deluxe Edition", "GOTY") do not make a different game. The weakest
  *    rung: it never joins rows that hold two different ids from the same
  *    store (steam:440 and steam:620 are two games, whatever their titles
- *    say; Droidtop/tracker#318, "One identity model"). A Steam row and a
+ *    say; mytop-project/tracker#318, "One identity model"). A Steam row and a
  *    GOG row still join on it.
  *
  * The title key is an EXACT comparison, never a similarity: `Doom` and
@@ -61,7 +61,7 @@ object StoreIdentity {
     /**
      * The key two spellings of one title share, or "" when nothing is left
      * of it. Built on the game's identity fold ([TitleKeys.latinSlug],
-     * Lutris's slug, Droidtop/tracker#870): case, diacritics, trademark
+     * Lutris's slug, mytop-project/tracker#870): case, diacritics, trademark
      * symbols, apostrophes and punctuation folded. On top of it, for store
      * matching only: compatibility forms folded (fullwidth letters), "&" read
      * as "and", any other punctuation or underscore a word break (the slug

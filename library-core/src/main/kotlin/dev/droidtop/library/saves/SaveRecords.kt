@@ -12,7 +12,7 @@ import androidx.room.Transaction
 import dev.droidtop.library.PlayHistoryDatabase
 
 /**
- * An id a game is known by outside droidtop: a store's or a scraper's (docs/SPEC.md 7o "Saves", Droidtop/tracker#546).
+ * An id a game is known by outside droidtop: a store's or a scraper's (docs/SPEC.md 7o "Saves", mytop-project/tracker#546).
  * `kind` is one of [GameIdKind]. Written by the PC scrape when it completes a record (the ids it learned were not
  * kept anywhere before), and by the matcher's reading of an entry's own store id.
  */

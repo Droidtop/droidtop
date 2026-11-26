@@ -3,7 +3,7 @@ package dev.droidtop.input.chinese
 import org.pocketworkstation.pckeyboard.InputEngine
 
 /**
- * Chinese through RIME (librime), behind the engine seam (Droidtop/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through
+ * Chinese through RIME (librime), behind the engine seam (mytop-project/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through
  * RIME"). Every call is one or two librime calls through droidtop's JNI, made synchronously on the main thread under
  * SPEC's threading rule, and the session's context is read back as the seam's composing text and candidates
  * ([RimeContext]). The library and its data load on [runtime]'s own thread; until they have, [state] says Loading (with

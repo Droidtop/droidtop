@@ -90,7 +90,7 @@ class ContainerNames(private val file: File) {
         }
 
         /**
-         * What a copy of [source] is called before anyone renames it (Droidtop/tracker#757): "Debian copy", numbered
+         * What a copy of [source] is called before anyone renames it (mytop-project/tracker#757): "Debian copy", numbered
          * when that is taken ("Debian copy 2"), cut so it stays within [MAX_LENGTH].
          */
         fun copyName(source: String, others: Collection<String>): String {

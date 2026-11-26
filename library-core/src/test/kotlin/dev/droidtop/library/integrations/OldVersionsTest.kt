@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A game's older version folders and their saves before one is removed (docs/SPEC.md 7i; Droidtop/tracker#624). */
+/** A game's older version folders and their saves before one is removed (docs/SPEC.md 7i; mytop-project/tracker#624). */
 class OldVersionsTest {
     private val dir: File = Files.createTempDirectory("old-versions").toFile()
 

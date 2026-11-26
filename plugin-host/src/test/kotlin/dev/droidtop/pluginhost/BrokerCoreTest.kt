@@ -188,7 +188,7 @@ class BrokerCoreTest {
         assertTrue("a whole sentence, not \"not now\"", first.message!!.startsWith("You chose Not now"))
         assertTrue(env.states["acme.caller"].isNullOrEmpty())
         assertEquals(listOf("acme.caller" to "priv.shell.adb"), env.refused)
-        // Droidtop/tracker#518: the same call does not ask again in this run.
+        // mytop-project/tracker#518: the same call does not ask again in this run.
         assertEquals(PluginErrorCode.PERMISSION_DENIED, reply(core.call(request("priv.shell", "exec"))).code)
         assertEquals(1, env.prompts.size)
         // A new run (or a choice on the Permissions page) asks again.

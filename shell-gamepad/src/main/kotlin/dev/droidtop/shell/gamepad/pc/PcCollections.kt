@@ -68,7 +68,7 @@ internal fun collectionViewId(collectionId: String): String = "collection:$colle
 
 /**
  * The saved views that are tabs of a store's imported collection the store no longer has (a sync replaced it, or it
- * became favourites instead: Steam's "favorite" was a second Favourites tab, Droidtop/tracker#756). A person's own
+ * became favourites instead: Steam's "favorite" was a second Favourites tab, mytop-project/tracker#756). A person's own
  * views and their own collections' views are never in it. Pure.
  */
 internal fun staleImportedViewIds(viewIds: Collection<String>, collectionIds: Set<String>): Set<String> =
@@ -182,7 +182,7 @@ private const val TILE_WIDTH_DP = 220
  * each with its name, its count and, when it is a tab, a mark, without
  * needing focus. The page owns the cursor ([selected]); a tap selects, a
  * second tap opens, and a long press opens the tile's menu, the one L2 and
- * Select open (owner, 2026-10-23, Droidtop/tracker#621).
+ * Select open (owner, 2026-10-23, mytop-project/tracker#621).
  */
 @Composable
 internal fun PcCollectionsView(

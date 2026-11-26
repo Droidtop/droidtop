@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 /**
  * droidtop Browser, installed and updated by droidtop itself (owner, 2026-11-22: "we probably also want to add a browser
- * installer into droidtop"; docs/SPEC.md 12a). The browser is droidtop's own GeckoView app (Droidtop/droidtop-browser)
+ * installer into droidtop"; docs/SPEC.md 12a). The browser is droidtop's own GeckoView app (mytop-project/droidtop-browser)
  * that shows droidtop's sign-in, check and download pages where the device's WebView is too old (docs/plugin-api.md G3a).
  *
  * The newest release of its repository is fetched, the APK for this device's processor is downloaded as a Downloads job,
@@ -22,7 +22,7 @@ import org.json.JSONObject
 object BrowserInstall {
     const val PACKAGE = "dev.droidtop.browser"
     const val LABEL = "droidtop Browser"
-    private const val RELEASES = "https://api.github.com/repos/Droidtop/droidtop-browser/releases/latest"
+    private const val RELEASES = "https://api.github.com/repos/mytop-project/droidtop-browser/releases/latest"
 
     /** The processors the browser is built for, in droidtop's order of preference. */
     private val ABIS = listOf("arm64-v8a", "x86_64")

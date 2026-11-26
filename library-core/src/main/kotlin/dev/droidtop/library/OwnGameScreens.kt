@@ -30,7 +30,7 @@ object OwnGameScreens {
         fun stop()
 
         /**
-         * Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565): on or off for this screen's game, or null
+         * Controller mouse mode (docs/SPEC.md 5b, mytop-project/tracker#565): on or off for this screen's game, or null
          * where the screen has no pointer to drive. The Quick Menu's Game section shows and turns it.
          */
         val padMouse: Boolean? get() = null
@@ -38,7 +38,7 @@ object OwnGameScreens {
         fun setPadMouse(on: Boolean) {}
 
         /**
-         * The pad's layout for this screen's game (docs/SPEC.md 5b "Controller layouts", Droidtop/tracker#618), as the
+         * The pad's layout for this screen's game (docs/SPEC.md 5b "Controller layouts", mytop-project/tracker#618), as the
          * line the Quick Menu's Controls row shows ("Gamepad" for none), or null where the screen has no layouts.
          * [nextControls] steps to the next one, keeps it for the game, and returns its line. Main thread.
          */
@@ -47,7 +47,7 @@ object OwnGameScreens {
         fun nextControls(): String? = null
 
         /**
-         * Report a problem (docs/SPEC.md 7e2; from the Quick Menu, owner 2026-10-28, Droidtop/tracker#601): whether
+         * Report a problem (docs/SPEC.md 7e2; from the Quick Menu, owner 2026-10-28, mytop-project/tracker#601): whether
          * this screen can make a report of its running game, and makes one, ending in the share sheet. [done] gets the
          * line to say, on any thread. Never a link to the tracker, which is private.
          */
@@ -60,7 +60,7 @@ object OwnGameScreens {
     }
 
     /**
-     * The one way into a game screen's pointer (Droidtop/tracker#565): relative moves in the game's own pixels, the
+     * The one way into a game screen's pointer (mytop-project/tracker#565): relative moves in the game's own pixels, the
      * buttons, and wheel steps. Controller mouse mode and the companion's Keys trackpad both go through it, and it goes
      * through the calls the screen's touch trackpad already makes. Main thread.
      */

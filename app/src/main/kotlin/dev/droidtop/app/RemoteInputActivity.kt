@@ -43,13 +43,13 @@ import dev.droidtop.library.credentials.handoff.RemoteInputState
 import dev.droidtop.library.credentials.handoff.consoleLine
 
 /**
- * The console side of "Type from another device" (docs/SPEC.md, "Type from another device", Droidtop/tracker#645): a
+ * The console side of "Type from another device" (docs/SPEC.md, "Type from another device", mytop-project/tracker#645): a
  * QR code and the plain address while the session waits, the question "Does your device show 482 913?" with Confirm and
  * Refuse, and "Phone connected: typing" once paired. Opening it starts the session when none runs ([RemoteInputs]);
  * leaving it does not end the session, so the person can go to a field and type: Close here, or on the notification,
  * ends it. Opened from the companion's Keys screen, the Quick Menu's row and the key setup screens.
  *
- * File transfer (Droidtop/tracker#645, slice 3) has its controls here: the folder files from the phone go into (the
+ * File transfer (mytop-project/tracker#645, slice 3) has its controls here: the folder files from the phone go into (the
  * system folder picker; Download/droidtop until one is chosen), "Send to the phone" (the system document picker) with
  * "Stop offering", and the lines "Receiving name (size)" and "Phone sent name (size)".
  */
@@ -164,7 +164,7 @@ private fun RemoteInputScreen(
                 shown.lastSent?.let { Text(stringResource(R.string.remote_input_last_sent, it), style = MaterialTheme.typography.bodyLarge) }
                 // Why the last thing sent did not arrive (a file not stored or not complete, a field that took nothing): a
                 // failure that stays on this screen until the next send, drawn as one, not as a line of text among the
-                // facts (Droidtop/tracker#645, docs/SPEC.md 7k "Notices").
+                // facts (mytop-project/tracker#645, docs/SPEC.md 7k "Notices").
                 shown.notice?.let { NoticeCard(Notice(NoticeTone.Caution, "Not received", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
                 shown.clip?.let { Text(stringResource(R.string.remote_input_clipboard_from_the_device, it), style = MaterialTheme.typography.bodyLarge) }
                 shown.receiving?.let { Text(stringResource(R.string.remote_input_receiving, it), style = MaterialTheme.typography.bodyLarge) }

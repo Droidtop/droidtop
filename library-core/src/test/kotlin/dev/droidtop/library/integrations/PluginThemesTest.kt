@@ -4,7 +4,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Themes from plugins (docs/plugin-api.md 3 C7, Droidtop/tracker#714): what Browse themes lists from a provider's answer. */
+/** Themes from plugins (docs/plugin-api.md 3 C7, mytop-project/tracker#714): what Browse themes lists from a provider's answer. */
 class PluginThemesTest {
     @Test
     fun `each theme is an https repository in a folder named for its plugin, marked with the plugin`() {

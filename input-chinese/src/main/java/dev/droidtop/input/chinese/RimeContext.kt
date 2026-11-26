@@ -3,7 +3,7 @@ package dev.droidtop.input.chinese
 import org.pocketworkstation.pckeyboard.InputEngine
 
 /**
- * What a RIME session shows after a key (Droidtop/tracker#903 H8b): librime's RimeContext, read by droidtop's JNI
+ * What a RIME session shows after a key (mytop-project/tracker#903 H8b): librime's RimeContext, read by droidtop's JNI
  * (rime_jni.cc), which has already turned librime's UTF-8 byte offsets into UTF-16 chars. So every index here counts
  * chars, as the seam does. Pure.
  */

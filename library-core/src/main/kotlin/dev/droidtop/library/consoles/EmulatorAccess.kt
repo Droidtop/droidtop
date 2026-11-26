@@ -11,7 +11,7 @@ import dev.droidtop.runtime.tasks.RiskyPrompts
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
- * Giving an emulator the access it needs from the Emulator setup helper (docs/SPEC.md "Risky actions", Droidtop/tracker#248):
+ * Giving an emulator the access it needs from the Emulator setup helper (docs/SPEC.md "Risky actions", mytop-project/tracker#248):
  * All files access through the privileged helper's appops, and the runtime permissions it asks for through `pm grant`.
  * Both are risky actions ([RiskyClass.GRANT_ACCESS]): [TaskManager.shell] refuses them unless the person has turned the
  * class on, and every use is confirmed first on the row that runs it. Blocking: background threads only.

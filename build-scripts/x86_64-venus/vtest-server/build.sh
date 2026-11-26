@@ -1,4 +1,4 @@
-# droidtop's vtest server recipe (Droidtop/tracker#608, #921), built with Termux's package builder as
+# droidtop's vtest server recipe (mytop-project/tracker#608, #921), built with Termux's package builder as
 # packages/virgl-vtest-droidtop. It is Termux's packages/virglrenderer-android recipe (termux-packages 789d4606fe49:
 # virglrenderer 1.3.0 with Venus, built with the NDK in its host step, replaying Venus on Android's own Vulkan),
 # changed in three ways only:
@@ -13,13 +13,13 @@
 #
 # Its socket comes from --socket-path on the command line; Termux's default under its own prefix is never used.
 #
-# The sources are vendor/virglrenderer (Droidtop/virglrenderer, branch droidtop: the virglrenderer-1.3.0 tag with
-# Termux's patches 0001-0012 but 0003 as commits) and vendor/libepoxy (Droidtop/libepoxy, branch droidtop: the 1.5.10
+# The sources are vendor/virglrenderer (mytop-project/virglrenderer, branch droidtop: the virglrenderer-1.3.0 tag with
+# Termux's patches 0001-0012 but 0003 as commits) and vendor/libepoxy (mytop-project/libepoxy, branch droidtop: the 1.5.10
 # tag with Termux's 0003-use-angle as a commit). Nothing is patched at build time. The x86_64 graphics workflow copies
 # both trees into the termux-packages checkout as droidtop-src/, the one place the builder's container can read them,
 # and Termux's COPYING-gl4es beside this file (the licence of the gl4es code virglrenderer's 0008 adds).
 TERMUX_PKG_HOMEPAGE=https://virgil3d.github.io/
-TERMUX_PKG_DESCRIPTION="virglrenderer vtest server with Venus on Android Vulkan, for droidtop (Droidtop/tracker#608)"
+TERMUX_PKG_DESCRIPTION="virglrenderer vtest server with Venus on Android Vulkan, for droidtop (mytop-project/tracker#608)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_GENERATE_REPOLOGY_METADATA=false

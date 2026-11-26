@@ -5,7 +5,7 @@ import java.io.File
 
 /**
  * One command of a sibling container on the desktop's PATH, distrobox-export `--bin` style (docs/SPEC.md 3d
- * "Exported commands", Droidtop/tracker#555 D5 and D7). [name] is the program's name, run by the sibling's own PATH.
+ * "Exported commands", mytop-project/tracker#555 D5 and D7). [name] is the program's name, run by the sibling's own PATH.
  */
 data class ExportedCommand(val containerId: String, val containerName: String, val name: String) {
     /** The token the wrapper names it by ([ContainerLauncher.token] of the container and the name). */
@@ -14,7 +14,7 @@ data class ExportedCommand(val containerId: String, val containerName: String, v
 
 /**
  * Running a command of one container from another: the enter path (docs/SPEC.md 3d "Entering another container",
- * Droidtop/tracker#555 D7, the shared-binds option). A program in the primary runs `droidtop-enter <token> args...`
+ * mytop-project/tracker#555 D7, the shared-binds option). A program in the primary runs `droidtop-enter <token> args...`
  * (an exported command's wrapper does), which makes a request directory in droidtop's request channel, a folder
  * every container sees at the same path, holding three FIFOs for the program's stdin, stdout and stderr, its
  * arguments and the working folder, and renames it into place. droidtop looks the token up in its own list, runs

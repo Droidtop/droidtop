@@ -4,7 +4,7 @@ import dev.droidtop.pluginhost.PluginWebAccount
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A failed source's row runs the one action that fixes it (Droidtop/tracker#746). */
+/** A failed source's row runs the one action that fixes it (mytop-project/tracker#746). */
 class SourceFixTest {
     @Test
     fun `a site that wants the person in it opens that site`() {

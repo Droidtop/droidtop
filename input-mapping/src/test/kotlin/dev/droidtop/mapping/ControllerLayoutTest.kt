@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Steam's layout format, read and written (Droidtop/tracker#618 C3). [LAYOUT] is droidtop's own, written for this test
+ * Steam's layout format, read and written (mytop-project/tracker#618 C3). [LAYOUT] is droidtop's own, written for this test
  * in Steam's structure: a WASD stick, a face-button pad with a long press, the right stick as a mouse, a chord, a
  * mode shift and a layer, a key Steam has that this reader does not know, a condition and a comment.
  */

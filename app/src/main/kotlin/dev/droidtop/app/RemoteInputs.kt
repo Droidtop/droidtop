@@ -20,9 +20,9 @@ import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * The one "Type from another device" session of this process (docs/SPEC.md, "Type from another device",
- * Droidtop/tracker#645) and the Android parts [RemoteInput] is given: the state the console shows ([state]), the
+ * mytop-project/tracker#645) and the Android parts [RemoteInput] is given: the state the console shows ([state]), the
  * clipboard and the folder. Where text lands is the keyboard and input module's ([RemoteTyping.router],
- * Droidtop/tracker#903).
+ * mytop-project/tracker#903).
  * Every way in (the companion's Keys screen, the Quick Menu row, the key setup screens) opens [RemoteInputActivity],
  * which starts the session through [RemoteInputService] when none runs.
  */
@@ -95,7 +95,7 @@ object RemoteInputs {
 }
 
 /**
- * The console's clipboard for the shared clipboard (docs/SPEC.md, "Type from another device", Droidtop/tracker#645),
+ * The console's clipboard for the shared clipboard (docs/SPEC.md, "Type from another device", mytop-project/tracker#645),
  * both calls on the main thread. What a paired device writes (the phone page, KDE Connect) is also kept in the
  * keyboard's clipboard history ([ClipboardHistoryStore.fromPairedDevice]). Reading follows what Android allows: only
  * the app in front or the active input method gets the clip, so from the background it is [ClipRead.Unavailable]. A
@@ -113,7 +113,7 @@ internal class AndroidClipboard(private val context: Context) : ConsoleClipboard
         } catch (e: SecurityException) {
             return@call false
         }
-        // The paired device's clip also lands on the keyboard's clipboard panel, under its rules (Droidtop/tracker#903).
+        // The paired device's clip also lands on the keyboard's clipboard panel, under its rules (mytop-project/tracker#903).
         ClipboardHistoryStore.fromPairedDevice(context, text)
         true
     }

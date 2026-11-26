@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
  *     ([ScanPrune]): hidden and marker folders, a store's non-game tree.
  *     A ROM system folder (`psx`, `gba`: [GameEngineDetector.isConsoleSystemFolder])
  *     is not one either: the ROM walk owns it, and the PC walk used to
- *     list every file in it to find no executable (Droidtop/tracker#275).
+ *     list every file in it to find no executable (mytop-project/tracker#275).
  *     ES-DE's own `pc` and `windows` systems are the exception, since a
  *     PC game is exactly what a person keeps there.
  *  2. **A folder that directly holds an executable is the game.** Its own
@@ -77,7 +77,7 @@ import java.util.concurrent.ConcurrentHashMap
  *     with no manifest), and a result inside a manifest's folder is that
  *     folder. The desktop agent reads the same manifests.
  *  8. **A folder holding a GOG offline installer and no program is that
- *     game, not installed** ([GogInstallers], Droidtop/tracker#405): an
+ *     game, not installed** ([GogInstallers], mytop-project/tracker#405): an
  *     installer is no program (rule 2 never sees `setup_*.exe`), so such
  *     a folder used to be dropped by rule 5. When nothing below it is a
  *     game, it is listed, and its row is an Install row

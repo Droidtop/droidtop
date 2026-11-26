@@ -59,7 +59,7 @@ internal fun appFacts(sort: AppsInsights.Sort, figure: Double?, usedData: Boolea
 /**
  * Touch-only companion view of the shared running-app list (docs/SPEC.md "The companion's tabs", Apps). Clear all
  * asks first, with the safe answer first, and leaves alone what is protected and whatever is open on this
- * companion's own screen; each row's Protect keeps its app from Clear all (Droidtop/tracker#252).
+ * companion's own screen; each row's Protect keeps its app from Clear all (mytop-project/tracker#252).
  */
 @Composable
 internal fun CompanionTasks() {

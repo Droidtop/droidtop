@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The desktop's pad chords (docs/SPEC.md 6b "Pad chords", Droidtop/tracker#383), with the bundled layout, through
+ * The desktop's pad chords (docs/SPEC.md 6b "Pad chords", mytop-project/tracker#383), with the bundled layout, through
  * [DesktopInputRouter.onPadChord]. Expected values are evdev codes (KEY_LEFTCTRL = 29, KEY_C = 46, KEY_V = 47,
  * KEY_UP = 103), what the container receives.
  */

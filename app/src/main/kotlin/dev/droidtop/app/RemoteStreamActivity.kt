@@ -55,7 +55,7 @@ import java.util.concurrent.Executors
  * device id, its windowcast address and, optionally, part of a window's title. A computer this device has not
  * paired with windowcast asks for the PIN its windowcast shows.
  *
- * Opened for a library entry, it is that entry's running game (Droidtop/tracker#428), registered as droidtop's own game
+ * Opened for a library entry, it is that entry's running game (mytop-project/tracker#428), registered as droidtop's own game
  * screen ([OwnGameScreens]) the way a Windows game's screen is: the companion's Game and Input tabs show while it runs,
  * Quit (Disconnect) ends it, and opening the entry again returns to it. Leaving it ends the running game.
  *

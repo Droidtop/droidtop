@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The number and calculator pad mode (droidtop, Droidtop/tracker#903 H12c; docs/SPEC.md 6a, "Modes"):
+<!-- The number and calculator pad mode (droidtop, mytop-project/tracker#903 H12c; docs/SPEC.md 6a, "Modes"):
      the digits, a point, the four operators and = in a 4 by 4 grid, with Backspace, ABC (back to Normal),
      a comma and Enter beside it. The operators type + - * / so a sum works in any field; = types the answer
      to the sum before the cursor (PadCalculator). Keys as kbd_phone draws them. -->

@@ -46,7 +46,7 @@ import dev.droidtop.shell.gamepad.ShellProgressBar
 
 /**
  * The offer droidtop stops on before a store install or update
- * (Droidtop/tracker#227): the download's size, when the library knows it,
+ * (mytop-project/tracker#227): the download's size, when the library knows it,
  * and the free space of the game folder the store installs to, named BEFORE
  * anything downloads, so a 60 GB download on a 12 GB card is a decision and
  * not a 94 percent surprise.
@@ -66,7 +66,7 @@ import dev.droidtop.shell.gamepad.ShellProgressBar
  * it, so the caller opens the store's screen directly.
  *
  * The one disk read of the sheet is the folder list's StatFs, off the
- * main thread on IO (Droidtop/tracker#227: no disk work while drawing);
+ * main thread on IO (mytop-project/tracker#227: no disk work while drawing);
  * everything else is already on the [LibraryEntry]. The pad comes through
  * the one pipeline, the same registered-hook shape
  * [dev.droidtop.shell.gamepad.WindowsSetupOfferDialog] uses for the
@@ -231,7 +231,7 @@ internal fun StoreInstallOfferSheet(
  * rows are, at least as big as a finger on a screen without a pad. A tap
  * presses the row's own action; the pad's cursor answers the same press.
  * A folder's row also draws how full its partition is ([used], show, then
- * say: Droidtop/tracker#738) under its words, which keep saying the free
+ * say: mytop-project/tracker#738) under its words, which keep saying the free
  * space; the bar is a drawing only, so a screen reader hears the words once.
  */
 @Composable

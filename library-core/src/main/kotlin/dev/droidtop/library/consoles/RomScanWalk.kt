@@ -147,7 +147,7 @@ object RomScanWalk {
         systemFolder: File,
         extensions: Set<String>? = null,
         // File names (lower case) that are never games wherever they sit: the BIOS images the database knows, which
-        // carry a system's own ROM extension (Droidtop/tracker#665). A BIOS folder is already skipped by name.
+        // carry a system's own ROM extension (mytop-project/tracker#665). A BIOS folder is already skipped by name.
         notGames: Set<String> = BiosDatabase.fileNames,
         newBudget: () -> dev.droidtop.library.ScanBudget? = { null },
     ): RomScanResult {
@@ -223,7 +223,7 @@ object RomScanWalk {
         runCatching { if (file.length() > 64 * 1024) null else file.readLines() }.getOrNull()
 
     /**
-     * A program folder as one game (Droidtop/tracker#931: an unpacked DOS game listed each of its 42 files as a
+     * A program folder as one game (mytop-project/tracker#931: an unpacked DOS game listed each of its 42 files as a
      * game). A folder below [systemFolder] that holds two or more programs ([PROGRAMS]: `.exe`, `.com`, `.bat`) is a
      * game installed there, not a shelf of games: everything found in it, at any depth, gives way to its one main
      * program ([mainProgram]), which the folder names. A program alone in its folder, and anything directly in the

@@ -19,7 +19,7 @@ import dev.droidtop.shell.gamepad.StatusCluster
 
 /**
  * The shared status readout ([StatusCluster]: clock, network, battery) for a View surface in a window with no activity,
- * Standard's taskbar (Droidtop/tracker#701), as [NoticeViews] is the notice card for Standard's settings rows. It is the
+ * Standard's taskbar (mytop-project/tracker#701), as [NoticeViews] is the notice card for Standard's settings rows. It is the
  * same readout Gaming's header, the companion and the Desktop tray draw, never a second copy in Views. The window has
  * no lifecycle of its own, so the [Readout] carries one (and saved state), as `InGameOverlays.overlayView` does in
  * :app; [Readout.dispose] ends it when its window goes.

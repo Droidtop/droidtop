@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** "What's new" from Steam's news answer (Droidtop/tracker#229). */
+/** "What's new" from Steam's news answer (mytop-project/tracker#229). */
 class SteamNewsClientTest {
     private fun answer(vararg items: String) = JSONObject("""{"appnews":{"appid":440,"newsitems":[${items.joinToString(",")}],"count":${items.size}}}""")
 

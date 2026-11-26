@@ -12,12 +12,12 @@ import org.junit.Test
 import dev.droidtop.library.settings.WordsForTests
 
 /**
- * A folder game's update row shows the update in place (docs/SPEC.md 7g, "Facets in place"; Droidtop/tracker#639): on
+ * A folder game's update row shows the update in place (docs/SPEC.md 7g, "Facets in place"; mytop-project/tracker#639): on
  * the console its A opened the game's page and Android fell to the Standard launcher. The row is a nested screen, so A
  * pushes the update's own screen wherever Updates is drawn and has nothing of its own to run: no activity can start.
  */
 class UpdateRowInPlaceTest {
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 

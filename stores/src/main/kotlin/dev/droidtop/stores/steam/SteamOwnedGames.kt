@@ -12,7 +12,7 @@ import kotlinx.coroutines.future.await
 
 /**
  * Steam's own answer to "which games does this account own" (docs/SPEC.md 7g,
- * "Stores"; Droidtop/tracker#377): the Player service's GetOwnedGames, asked
+ * "Stores"; mytop-project/tracker#377): the Player service's GetOwnedGames, asked
  * the way a profile counts games, with free games only once played
  * (`include_played_free_games`) and without the free sub
  * (`include_free_sub` off). A game it lists is the person's own whatever its

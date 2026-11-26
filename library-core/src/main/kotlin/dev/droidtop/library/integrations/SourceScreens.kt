@@ -34,7 +34,7 @@ object SourceScreens {
     }
 
     /**
-     * Where a source opens from Game sources (Droidtop/tracker#540): its search, with no library system needed. A
+     * Where a source opens from Game sources (mytop-project/tracker#540): its search, with no library system needed. A
      * source that serves only PC systems opens straight on the PC search; any other asks which system, the PC
      * (when it serves it) first and then the systems it serves ([downloadTargets], so a system with no folder yet is
      * offered too and its folder is made when a download is placed). A source that names no system opens the same page.
@@ -109,7 +109,7 @@ object SourceScreens {
                 // stack line) is for its developer and sits one step behind "Technical details".
                 add(ActionItem("source_failure_${source.id}", dev.droidtop.pluginhost.PluginFailureWords.of(null, source.label).title, subtitle = "It did not answer. Try again in a moment."))
                 val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
-                // Always shown, not only with the Developer menu (Droidtop/tracker#883 §3.7: Info always).
+                // Always shown, not only with the Developer menu (mytop-project/tracker#883 §3.7: Info always).
                 add(
                     NestedScreenItem(
                         "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",

@@ -104,7 +104,7 @@ import kotlinx.coroutines.launch
  * game for the Plugins section's game panels.
  *
  * The Plugins section is Decky Loader's plugin list (docs/plugin-api.md
- * C17, Droidtop/tracker#316): one row per plugin, A opens that plugin's
+ * C17, mytop-project/tracker#316): one row per plugin, A opens that plugin's
  * panel (its tiles, its own `ui.panel` view and the way to its settings),
  * B comes back to the list, and the last row leads to the Plugins place.
  * It is the catalog navigator over [dev.droidtop.library.integrations.PluginPanels],
@@ -132,7 +132,7 @@ internal fun QuickMenu(
     /** Whether [openPlace] would open this place in the current mode (Kiosk and Kid hide the device-management places). */
     placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
-    // The section to open on, when it is shown (a link to Updates opens Downloads, Droidtop/tracker#749); null is the usual one.
+    // The section to open on, when it is shown (a link to Updates opens Downloads, mytop-project/tracker#749); null is the usual one.
     startSection: QuickSection? = null,
     // Opens the one search from Power and mode's Search tile; null where there is none (Kiosk and Kid, Desktop's tray).
     onSearch: (() -> Unit)? = null,
@@ -150,7 +150,7 @@ internal fun QuickMenu(
         floatMargin = if (window.portrait) 0.dp else Space.Md,
     ) { sheetWidth, close ->
         val context = androidx.compose.ui.platform.LocalContext.current
-        // The Plugins section is the one way to plugins (Droidtop/tracker#644): it shows whenever a plugin is installed or
+        // The Plugins section is the one way to plugins (mytop-project/tracker#644): it shows whenever a plugin is installed or
         // plugins can be managed from here, never only when one has a panel. Read off the main thread.
         val canManagePlugins = placeAvailable(PLACE_PLUGINS_SCREEN_ID)
         val hasPlugins by androidx.compose.runtime.produceState(canManagePlugins) {
@@ -173,7 +173,7 @@ internal fun QuickMenu(
             QuickTiles.visibleSections(hasPlugins, hasSocial, uiMode, order)
         }
         var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection) }
-        // The section a finger is held on in the rail, named in the header until it lifts (Droidtop/tracker#674).
+        // The section a finger is held on in the rail, named in the header until it lifts (mytop-project/tracker#674).
         var preview by remember { mutableStateOf<QuickSection?>(null) }
         val sectionStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         LaunchedEffect(sections, section) {
@@ -201,7 +201,7 @@ internal fun QuickMenu(
         // closes. A held Select arrives as R2 too, so holding it
         // again closes the sheet it opened. Start is the left
         // menu's button, so it swaps to that menu rather than
-        // closing this one (Droidtop/tracker#258).
+        // closing this one (mytop-project/tracker#258).
         val keys = Modifier.onPad(preview = true) { press ->
             when (press.action) {
                 GamepadAction.R2 -> {
@@ -229,8 +229,8 @@ internal fun QuickMenu(
         val paneWidthDp = sheetWidth.value.toInt() - if (window.portrait) 0 else RailWidthDp
         val pane: @Composable (Modifier) -> Unit = { paneModifier ->
             // Top and bottom only: the heading and the drawn sections take the sheet's 16dp side gutter themselves, and a
-            // catalog section takes it from its own gutter, sized to the pane (Droidtop/tracker#649).
-            // A pane under 600dp reads the compact ladder (Droidtop/tracker#739): the sheet is about 400dp on the
+            // catalog section takes it from its own gutter, sized to the pane (mytop-project/tracker#649).
+            // A pane under 600dp reads the compact ladder (mytop-project/tracker#739): the sheet is about 400dp on the
             // console's internal screen, where the full-screen roles wrapped a notification to four lines.
             NarrowPane(paneWidthDp) {
                 Column(modifier = paneModifier.padding(vertical = 16.dp)) {
@@ -242,7 +242,7 @@ internal fun QuickMenu(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
                         ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
                         Text(
-                            // A finger held on a rail glyph names its section here first (Droidtop/tracker#674).
+                            // A finger held on a rail glyph names its section here first (mytop-project/tracker#674).
                             (preview ?: section).label,
                             style = TypeRole.screenTitle,
                             color = MenuTokens.OnSurface,
@@ -257,21 +257,21 @@ internal fun QuickMenu(
                     // One saved state per section: sections share one composable (the tile grids), so a cursor must
                     // not carry from one to the next, and each keeps its own cursor and scroll while the sheet is open,
                     // so stepping away with L1/R1 and back lands where the person was (DroidDeck's per-page focus
-                    // and scroll memory, Droidtop/tracker#363).
+                    // and scroll memory, mytop-project/tracker#363).
                     // key() as well: several sections share one call site (the tile grids), and without a new group per
                     // section the shared one kept its composition across L1/R1, so its focus request never ran again
-                    // and the focus was lost with the old section's rows (Droidtop/tracker#820).
+                    // and the focus was lost with the old section's rows (mytop-project/tracker#820).
                     key(section) { sectionStates.SaveableStateProvider(section.name) {
                         when (section) {
                             // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
                             // window's content gutter. Under the window's own size that was 2.8 percent of the whole
                             // screen inside a sheet a third as wide, on top of the pane's 16dp: 36dp + 16dp a side at
                             // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
-                            // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
+                            // large", mytop-project/tracker#649). They now see the pane as their window, so the gutter is the
                             // scale's floor, 16dp, and it is the only one.
                             QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS, QuickSection.PROFILE -> {
                                 // A catalog page names its presses to the shell's footer (declaresHints), which the sheet covers:
-                                // Social, Downloads, Plugins and Profile had no hint row at all (UI review, Droidtop/tracker#954
+                                // Social, Downloads, Plugins and Profile had no hint row at all (UI review, mytop-project/tracker#954
                                 // item 10). Here the page declares to the sheet's own, drawn under it like every other section's.
                                 val paneHints = remember(section) { dev.droidtop.shell.gamepad.input.FocusedHints() }
                                 CompositionLocalProvider(
@@ -284,7 +284,7 @@ internal fun QuickMenu(
                                     when (section) {
                                         QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
                                         QuickSection.DOWNLOADS -> DownloadsSection(close)
-                                        // The person's own name and picture (Droidtop/tracker#586), a page of the sheet.
+                                        // The person's own name and picture (mytop-project/tracker#586), a page of the sheet.
                                         QuickSection.PROFILE -> CatalogNavigator(
                                             root = remember { dev.droidtop.library.profile.ProfileStore.screen() },
                                             onExit = close,
@@ -367,7 +367,7 @@ private fun QuickRail(
     )
 }
 
-/** The Performance section's rows, in order (Droidtop/tracker#812). */
+/** The Performance section's rows, in order (mytop-project/tracker#812). */
 private enum class PerfRow { OVERLAY, CORNER, SIZE, MODE }
 
 /**
@@ -396,7 +396,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     val overlayCorner by PerformanceOverlay.corner.collectAsState()
     val overlaySize by PerformanceOverlay.size.collectAsState()
     // Asked again each time the screen comes back, so a grant given in Android's settings shows at once
-    // (Droidtop/tracker#83: read once, the row stayed "Needs display over apps", or offered an overlay it could not draw).
+    // (mytop-project/tracker#83: read once, the row stayed "Needs display over apps", or offered an overlay it could not draw).
     val resumes = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val canDraw = remember(resumes.value) { PerformanceOverlay.canDraw(context) }
     val hasShell = remember { PerformanceOverlay.hasShell() }
@@ -409,7 +409,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         }
     }
     var modeNote by remember { mutableStateOf<String?>(null) }
-    // The section's rows in order: where the overlay sits and how big it is only while it shows (Droidtop/tracker#812).
+    // The section's rows in order: where the overlay sits and how big it is only while it shows (mytop-project/tracker#812).
     val rows = buildList {
         add(PerfRow.OVERLAY)
         if (canDraw && overlayLevel != OverlayLevel.OFF) {
@@ -450,7 +450,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     }
 
     // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
-    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    // and the first D-pad press only gave the section focus (mytop-project/tracker#820).
     LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Performance") }
     LaunchedEffect(Unit) { PerformanceMonitor.watch(context) }
 
@@ -495,7 +495,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             MenuRow(
                 title = words(R.string.gamepad_overlay),
                 // The row is the action and the value says what A does: a missing grant reads "Allow", with what it needs
-                // on the line under it, not a status that looks like a label (Droidtop/tracker#943).
+                // on the line under it, not a status that looks like a label (mytop-project/tracker#943).
                 value = if (canDraw) overlayLevel.label else "Allow",
                 subtitle = when {
                     !canDraw -> "Needs display over apps"
@@ -582,7 +582,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     alarm = (s.thermalStatus ?: 0) >= 3,
                 )
                 // No "GPU and frame rate" readout: it never had a reading here; the overlay above is where they show
-                // (Droidtop/tracker#571 row 35).
+                // (mytop-project/tracker#571 row 35).
             }
         }
         HintRow(
@@ -643,7 +643,7 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
 
 /**
  * Downloads: where updates are checked for and started, then the running and recent jobs (owner, 2026-10-29,
- * Droidtop/tracker#749: "actually initializing updates and stuff handled in the QAM"). The screen is `:app`'s
+ * mytop-project/tracker#749: "actually initializing updates and stuff handled in the QAM"). The screen is `:app`'s
  * ([PluginJobsScreen.QUICK_MENU_ID], built by UpdatesPage with the jobs list's own rows), hosted through the catalog's
  * navigator; without it (a build with no `:app`) the jobs list alone.
  */
@@ -681,7 +681,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     }
     val posted by NotificationsStore.items.collectAsState()
     // What can be cleared first, then what an app keeps up while it runs under one "Active" heading: whether a
-    // notification can be cleared is a property of the group, not something to read on every row (Droidtop/tracker#674).
+    // notification can be cleared is a property of the group, not something to read on every row (mytop-project/tracker#674).
     val items = remember(posted) { posted.sortedBy { !it.clearable } }
     val activeStart = items.indexOfFirst { !it.clearable }
     val recent by dev.droidtop.library.settings.Notices.recent.collectAsState()
@@ -710,7 +710,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     var heldStep by remember { mutableStateOf(false) }
 
     // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
-    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    // and the first D-pad press only gave the section focus (mytop-project/tracker#820).
     LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Notifications") }
     // List items: the Recent heading (when there is Recent), its rows, then the system rows.
     val headingOffset = if (recent.isNotEmpty()) 1 else 0
@@ -903,10 +903,10 @@ private fun recentTime(atMillis: Long): String {
 
 
 /**
- * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
+ * The Plugins section (docs/plugin-api.md C17, mytop-project/tracker#316): Decky Loader's list and panels as one catalog
  * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
  * row, Manage plugins, pushes the Plugins screen here too: Gaming's plugins live in this section, not in the
- * left menu (docs/SPEC.md 4, Droidtop/tracker#586). A page a quick tile's press answered with opens over the sheet,
+ * left menu (docs/SPEC.md 4, mytop-project/tracker#586). A page a quick tile's press answered with opens over the sheet,
  * as before panels existed.
  */
 @Composable
@@ -935,7 +935,7 @@ private fun PluginsTab(
 /**
  * A notification's text as the Quick Menu shows it: without the app's own sentences telling a finger what to do
  * ("Tap to turn off wireless debugging"), which are wrong advice on a pad, where A opens it and the footer says so
- * (Droidtop/tracker#674). The rest of the text is the app's, unchanged. Pure, for the tests.
+ * (mytop-project/tracker#674). The rest of the text is the app's, unchanged. Pure, for the tests.
  */
 internal fun notificationBody(text: String): String =
     text.split(Regex("(?<=[.!?])\\s+"))

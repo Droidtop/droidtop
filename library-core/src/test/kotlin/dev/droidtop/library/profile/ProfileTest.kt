@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Which name droidtop shows for the person (ProfileStore.resolve, Droidtop/tracker#586). */
+/** Which name droidtop shows for the person (ProfileStore.resolve, mytop-project/tracker#586). */
 class ProfileTest {
     private val steam = ProfileCandidate("social:steam", "Gabe", "Steam")
     private val itch = ProfileCandidate("store:itch", "gabe_itch", "itch.io")

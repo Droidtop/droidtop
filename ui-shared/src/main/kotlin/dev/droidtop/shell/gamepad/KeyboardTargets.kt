@@ -56,21 +56,21 @@ object KeyboardTargets {
 
     private fun companionDisplays(): Set<Int> = companions.value.values.mapNotNull { it() }.toSet()
 
-    /** Whether droidtop's keyboard, not Android's, serves a droidtop field on [fieldDisplay] right now (Droidtop/tracker#612). */
+    /** Whether droidtop's keyboard, not Android's, serves a droidtop field on [fieldDisplay] right now (mytop-project/tracker#612). */
     fun servesField(fieldDisplay: Int?, assistive: Boolean = false): Boolean =
         fieldDisplay != null &&
             AddonKeyboardRules.droidtopServesField(fieldDisplay, AddonKeyboard.localDisplays.value, placement(fieldDisplay, assistive))
 
     /**
      * Whether a keyboard comes up when droidtop itself puts the cursor in a field: only with one screen and no
-     * controller or keyboard attached (Droidtop/tracker#612). Otherwise it waits for the person to choose to type.
+     * controller or keyboard attached (mytop-project/tracker#612). Otherwise it waits for the person to choose to type.
      */
     fun raisesOnOwnFocus(): Boolean =
         AddonKeyboardRules.raisesOnOwnFocus(companionDisplays().isNotEmpty(), dev.droidtop.shell.gamepad.input.ControllerLayouts.padOrKeyboard.value)
 
     /**
      * Where the keyboard for a field on [fieldDisplay] goes right now. When "Companion" cannot be honoured it says why,
-     * once per change, in the log and to the Displays row ([AddonKeyboard.lastCompanionFallback], Droidtop/tracker#523).
+     * once per change, in the log and to the Displays row ([AddonKeyboard.lastCompanionFallback], mytop-project/tracker#523).
      */
     fun placement(fieldDisplay: Int, assistive: Boolean = false): KeyboardPlacement {
         val companions = companionDisplays()
@@ -128,7 +128,7 @@ object KeyboardTargets {
     }
 
     /**
-     * One keyboard only (Droidtop/tracker#523): a field whose keys are served elsewhere ([Opened.Elsewhere]: the
+     * One keyboard only (mytop-project/tracker#523): a field whose keys are served elsewhere ([Opened.Elsewhere]: the
      * companion's Input controller, the internal screen) must not also bring up Android's keyboard over its own
      * window, which covers what is being edited. The field's own focus asks Android for it after droidtop opened
      * the other, so this runs while the request stands and sends the keyboard away again; the field keeps its focus

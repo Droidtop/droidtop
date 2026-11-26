@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts RIME's engine library (Droidtop/tracker#903 H8a's prerelease) into
+# Puts RIME's engine library (mytop-project/tracker#903 H8a's prerelease) into
 # input-chinese/rime/, where input-chinese/src/main/cpp/CMakeLists.txt links
 # it: jniLibs/<abi>/librime.so for arm64-v8a and x86_64, and include/rime_api.h
 # for droidtop's own JNI. The release and the archive's SHA-256 are
@@ -25,7 +25,7 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf -- "${work:?}"' EXIT
 curl -fsSL --retry 5 --retry-delay 10 -o "$work/r.tar.zst" \
-    "https://github.com/Droidtop/droidtop/releases/download/$tag/rime-engine.tar.zst"
+    "https://github.com/mytop-project/droidtop/releases/download/$tag/rime-engine.tar.zst"
 echo "$sha  $work/r.tar.zst" | sha256sum -c -
 # Only plain relative paths: the archive unpacks into DEST and nowhere else.
 if zstd -dc "$work/r.tar.zst" | tar -tf - | grep -E '(^/|(^|/)\.\.(/|$))'; then

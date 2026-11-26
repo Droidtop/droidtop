@@ -13,7 +13,7 @@ import org.junit.Test
  * The settings navigator's place -- its screen stack and each depth's
  * selected row -- as saveable data: what lets the Activity recreate the
  * Text size setting triggers put the user back on the row they changed
- * instead of the settings root (Droidtop/tracker#87).
+ * instead of the settings root (mytop-project/tracker#87).
  */
 class SettingsCatalogRestoreTest {
 

@@ -71,7 +71,7 @@ object CompositorProvisioning {
      * The shared desktop's icon theme, installed with the file manager: a
      * stock image ships none, and with none GTK renders only its built-in
      * fallback icons, every file and folder in PCManFM a blank page (rig
-     * fix2-u2.png in device/verify-2026-09-29, Droidtop/tracker#146).
+     * fix2-u2.png in device/verify-2026-09-29, mytop-project/tracker#146).
      * Adwaita, because GTK looks in it whatever theme is selected (GTK 3's
      * gtkicontheme.c: "Always look in the Adwaita, gnome and hicolor icon
      * themes"), so the package alone is the fix, nothing selects it.

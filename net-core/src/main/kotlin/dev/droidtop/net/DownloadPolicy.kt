@@ -181,7 +181,7 @@ object DownloadPolicy {
     }
 
     /**
-     * Whether droidtop may check for updates on a metered network under [settings] (Droidtop/tracker#833): a check is a
+     * Whether droidtop may check for updates on a metered network under [settings] (mytop-project/tracker#833): a check is a
      * few small reads, so the network rule's own line for small downloads decides, and only Wi-Fi only stops it. Before,
      * Update settings had a second switch, "Only on Wi-Fi or unmetered networks", for the same thing.
      */

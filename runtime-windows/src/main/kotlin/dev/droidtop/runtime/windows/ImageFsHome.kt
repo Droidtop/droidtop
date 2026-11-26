@@ -11,7 +11,7 @@ import java.nio.file.LinkOption
  * gamenative's ImageFsInstaller (ensureSharedHomeSymlink) turns `imagefs/home` into a symlink to
  * `imagefs_shared/home`, so one user home is shared by every image variant. A prefix written at
  * `imagefs/home/xuser-1` is therefore really in `imagefs_shared/home/xuser-1`, and a delete fenced to
- * `imagefs` correctly refuses it: its parent resolves outside the fence (Droidtop/tracker#249, console
+ * `imagefs` correctly refuses it: its parent resolves outside the fence (mytop-project/tracker#249, console
  * 2026-10-14: "xuser-1 is not inside .../imagefs"). The fence is not widened to fit. It moves to the one
  * directory the installer itself names, and only when `home` points exactly there.
  */

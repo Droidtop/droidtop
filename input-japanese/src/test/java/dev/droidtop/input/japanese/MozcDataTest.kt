@@ -17,7 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#903 H7c: the dictionary's download, checks and placing, against a fake server. */
+/** mytop-project/tracker#903 H7c: the dictionary's download, checks and placing, against a fake server. */
 class MozcDataTest {
     private val dir: File = Files.createTempDirectory("mozc-data").toFile()
 
@@ -74,7 +74,7 @@ class MozcDataTest {
         val server = Server(body = archive)
         val percents = ArrayList<Int>()
         assertNull(MozcData.ensure(dir, pin(), server) { percents += it })
-        assertEquals("https://github.com/Droidtop/droidtop/releases/download/mozc-engine-test/mozc.data.gz", server.url)
+        assertEquals("https://github.com/mytop-project/droidtop/releases/download/mozc-engine-test/mozc.data.gz", server.url)
         assertArrayEquals(dictionary, MozcData.file(dir).readBytes())
         onlyTheDictionaryOrNothing(present = true)
         assertTrue(MozcData.present(dir, pin()))

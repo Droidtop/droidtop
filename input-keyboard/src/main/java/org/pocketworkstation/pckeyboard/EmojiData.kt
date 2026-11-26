@@ -5,13 +5,13 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * One emoji, with its skin-tone [variants] in the data's order (Droidtop/tracker#903 H4): five for one person (light,
+ * One emoji, with its skin-tone [variants] in the data's order (mytop-project/tracker#903 H4): five for one person (light,
  * medium-light, medium, medium-dark, dark), 25 for two people (the first person's tone times the second's), more for a
  * few groups; none for an emoji without tones.
  */
 data class EmojiEntry(val emoji: String, val name: String, val keywords: List<String>, val variants: List<String> = emptyList()) {
     // What search compares, lower-cased and split once when the entry is made (on the loader thread), not on every
-    // key typed into the search (Droidtop/tracker#772).
+    // key typed into the search (mytop-project/tracker#772).
     internal val lowerName: String = name.lowercase()
     internal val nameWords: List<String> = lowerName.split(' ', '-', ':')
     internal val lowerKeywords: List<String> = keywords.map { it.lowercase() }
@@ -21,7 +21,7 @@ data class EmojiGroup(val id: String, val entries: List<EmojiEntry>)
 
 /**
  * The emoji the keyboard offers, with the names and keywords search reads (docs/SPEC.md 6a, "Emoji panel and
- * search", Droidtop/tracker#342). The data is `assets/emoji/en.txt`, FlorisBoard's generated CLDR v48 list
+ * search", mytop-project/tracker#342). The data is `assets/emoji/en.txt`, FlorisBoard's generated CLDR v48 list
  * (Apache-2.0 app, Unicode data; see `assets/emoji/SOURCE.txt`), parsed here as it is: `[group]` headers, then
  * `emoji;name;keyword|keyword` lines. A line starting with a tab is a skin-tone variant of the line above: kept on that
  * entry ([EmojiEntry.variants]), not shown in the grid or search on its own. No Android classes, so it is tested on
@@ -57,7 +57,7 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
     /**
      * Only the entries [canDraw] says this device can draw, a group left out when none of its entries can be. The list
      * is CLDR v48, newer than the emoji font of most Android versions, so without it the grid showed boxes for the
-     * newest emoji (rig 2026-11-04, AVD droidtop-rig4-dual, Droidtop/tracker#342: two in the Smileys grid).
+     * newest emoji (rig 2026-11-04, AVD droidtop-rig4-dual, mytop-project/tracker#342: two in the Smileys grid).
      */
     fun drawable(canDraw: (String) -> Boolean): EmojiCatalog =
         EmojiCatalog(
@@ -75,7 +75,7 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
     }
 
     /**
-     * Emoji for a whole word just typed (Droidtop/tracker#903 H4), best first, at most [limit]: an emoji whose name is
+     * Emoji for a whole word just typed (mytop-project/tracker#903 H4), best first, at most [limit]: an emoji whose name is
      * the word, then one with the word among its name's words, then one with it as a keyword ("pizza", "cat", "love").
      * Only words of three letters or more; kaomoji are left to their tab. Exact words, not prefixes, so a word half
      * typed offers nothing. Pure.
@@ -123,7 +123,7 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
             }
             for (line in text.lineSequence()) {
                 if (line.startsWith("\t")) {
-                    // A skin-tone variant of the entry above (Droidtop/tracker#903 H4): kept on it, not in the grid.
+                    // A skin-tone variant of the entry above (mytop-project/tracker#903 H4): kept on it, not in the grid.
                     line.trimStart('\t').substringBefore(';').takeIf { it.isNotEmpty() && entries.isNotEmpty() }?.let { tones += it }
                     continue
                 }
@@ -146,7 +146,7 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
 }
 
 /**
- * The skin tone the grid and search show (Droidtop/tracker#903 H4): 0 is the default (yellow), 1 to 5 light to dark.
+ * The skin tone the grid and search show (mytop-project/tracker#903 H4): 0 is the default (yellow), 1 to 5 light to dark.
  * Picking a tone from an emoji's long-press row keeps it for every emoji that has it, as Gboard does. Pure.
  */
 object EmojiTones {
@@ -173,7 +173,7 @@ object EmojiTones {
 }
 
 /**
- * Kaomoji (Droidtop/tracker#903 H4): `assets/kaomoji/kaomoji.txt`, AnySoftKeyboard's list (Apache-2.0; see SOURCE.txt
+ * Kaomoji (mytop-project/tracker#903 H4): `assets/kaomoji/kaomoji.txt`, AnySoftKeyboard's list (Apache-2.0; see SOURCE.txt
  * there), `[Group]` lines then one kaomoji per line, `#` for comments. Each becomes an [EmojiEntry] named "kaomoji
  * <group>", so emoji search finds them by their group ("joy", "love"), in one [GROUP] tab. Pure.
  */
@@ -206,7 +206,7 @@ object EmojiWords {
     }
 }
 
-/** The most recently used emoji, newest first (Droidtop/tracker#342). One per line when saved. */
+/** The most recently used emoji, newest first (mytop-project/tracker#342). One per line when saved. */
 object EmojiRecents {
     const val MAX = 30
 

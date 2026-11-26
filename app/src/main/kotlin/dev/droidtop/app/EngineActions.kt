@@ -23,7 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * What droidtop's engine does for a request, done one way for every front (docs/SPEC.md 3d; Droidtop/tracker#555
+ * What droidtop's engine does for a request, done one way for every front (docs/SPEC.md 3d; mytop-project/tracker#555
  * D14): the docker and podman commands print text from these, the Engine API prints JSON. Each says what happened
  * in a value, never by printing, so neither front can do a thing the other does differently.
  */
@@ -267,7 +267,7 @@ internal object EngineActions {
 
     /** The last [tail] lines of [info]'s program log. */
     /**
-     * `rmi` (Droidtop/tracker#715): each of [names] taken out of the image store, unless a container among
+     * `rmi` (mytop-project/tracker#715): each of [names] taken out of the image store, unless a container among
      * [containers] came from it and there is no [force] ([ImageRemoval.plan]). Blobs another image shares stay.
      */
     suspend fun removeImages(app: Context, containers: List<ContainerInfo>, names: List<String>, force: Boolean): List<ImageRemoval.Outcome> {
@@ -281,7 +281,7 @@ internal object EngineActions {
         withContext(Dispatchers.IO) {
             val log = ContainerProgram.hostLogFile(app.filesDir, info.container.id)
             if (sinceMs == null && untilMs == null) return@withContext ContainerProgram.lastLines(log, tail)
-            // By when the lines were written (Droidtop/tracker#715): the log's times say where those are.
+            // By when the lines were written (mytop-project/tracker#715): the log's times say where those are.
             val range = LogTimes.range(LogTimes.read(LogTimes.fileFor(log)), log.length(), sinceMs, untilMs)
             LogTimes.lines(log, range).takeLast(tail)
         }

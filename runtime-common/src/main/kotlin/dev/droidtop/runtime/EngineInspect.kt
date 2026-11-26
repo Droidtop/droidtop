@@ -14,7 +14,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * `inspect` (docs/SPEC.md 3d, "inspect, create, restart and -p"; Droidtop/tracker#555 D13): a container's details as
+ * `inspect` (docs/SPEC.md 3d, "inspect, create, restart and -p"; mytop-project/tracker#555 D13): a container's details as
  * JSON in Docker's shape, with Podman's few names added on the podman front. Only what droidtop knows is said: there
  * is no Pid, no network of the container's own and no host path. A folder mount names the folder the person mapped,
  * as `-v` takes it. Pure.

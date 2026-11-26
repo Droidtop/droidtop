@@ -18,7 +18,7 @@ import dev.droidtop.library.settings.Notices
 
 /**
  * What an activity gives the shell's screens, for a window that has none: the in-game overlays, drawn in an
- * accessibility or draw-over-apps window over another app (docs/SPEC.md "In-game overlays", Droidtop/tracker#788).
+ * accessibility or draw-over-apps window over another app (docs/SPEC.md "In-game overlays", mytop-project/tracker#788).
  * Every screen the overlays show is the shell's own, and some ask for what only an activity has: a catalog page
  * registers its file and folder pickers (`rememberLauncherForActivityResult`), several screens handle Back
  * (`BackHandler`). Without these the Quick Menu over RetroArch crashed droidtop on its Downloads tab ("No

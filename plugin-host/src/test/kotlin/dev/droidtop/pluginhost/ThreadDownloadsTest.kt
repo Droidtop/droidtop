@@ -9,7 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The one thread parser (Droidtop/tracker#838). The pages here are written for the tests in the shape forum threads
+ * The one thread parser (mytop-project/tracker#838). The pages here are written for the tests in the shape forum threads
  * use (XenForo's `bbWrapper` post, bold labels, `<br>` lines, links named by their host), not copied from any site.
  * Real pages are read only from a local folder ([snapshotsFolder]), never kept in the repository.
  */
@@ -46,7 +46,7 @@ class ThreadDownloadsTest {
 
     @Test
     fun `links named for their platform are each platform's download, hosted where they point`() {
-        // Droidtop/tracker#859: a thread whose links are named "Win" and "Linux" read as one host called "Win".
+        // mytop-project/tracker#859: a thread whose links are named "Win" and "Linux" read as one host called "Win".
         val read = ThreadDownloads.read(
             page(
                 """<b>DOWNLOAD</b><br>
@@ -70,7 +70,7 @@ class ThreadDownloadsTest {
             ),
         )
         assertEquals(listOf("Win/Linux", "Steam Build · Win/Linux", "Steam Build · Win/Linux"), read.entries.map { it.section })
-        // The build is named on its own too (Droidtop/tracker#845); the default build has none.
+        // The build is named on its own too (mytop-project/tracker#845); the default build has none.
         assertEquals(listOf(null, "Steam Build", "Steam Build"), read.entries.map { it.build })
         val json = ThreadDownloads.toJson(read).getJSONArray("entries")
         assertFalse(json.getJSONObject(0).has("build"))
@@ -78,7 +78,7 @@ class ThreadDownloadsTest {
     }
 
     /**
-     * The shape of the thread in Droidtop/tracker#838: a build with no heading for three platforms, a "Steam Build" for
+     * The shape of the thread in mytop-project/tracker#838: a build with no heading for three platforms, a "Steam Build" for
      * one, five hosts on every line, then patches and a row of extras, some starred. Two builds for Windows, five
      * mirrors each, and nothing from the patches or the extras taken as a build.
      */
@@ -190,7 +190,7 @@ class ThreadDownloadsTest {
     }
     @Test
     fun `a first post's platforms, languages and content notes are read, and none it does not state`() {
-        // Droidtop/tracker#845: facts beside the links, for the source's metadata.
+        // mytop-project/tracker#845: facts beside the links, for the source's metadata.
         val facts = ThreadDownloads.facts(
             listOf("Thread Updated: 2026-10-01", "Censored: No", "Version: 0.5", "OS: Win, Linux, Mac", "Language: English, Japanese"),
         )
@@ -207,7 +207,7 @@ class ThreadDownloadsTest {
     }
     @Test
     fun `a first post's named sections are read in order, and a heading with nothing under it is left out`() {
-        // Droidtop/tracker#845: named texts for the game page, and the post itself for Show thread.
+        // mytop-project/tracker#845: named texts for the game page, and the post itself for Show thread.
         val sections = ThreadDownloads.sections(
             listOf(
                 "Overview:", "A story about a town.", "It has two endings.",

@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
 
 /**
  * Close, minimise and maximise on the title bars of sway's windows, and a finger-sized resize band around them
- * (docs/SPEC.md 2b "Window controls", Droidtop/tracker#910), over one surface showing the sway output [outputName]
+ * (docs/SPEC.md 2b "Window controls", mytop-project/tracker#910), over one surface showing the sway output [outputName]
  * ([primary]: the desktop's own surface, whose output may still be unnamed with one output).
  *
  * Drawn from droidtop's side, over the surface, from where sway's tree puts each window ([DesktopWindows.frames], read

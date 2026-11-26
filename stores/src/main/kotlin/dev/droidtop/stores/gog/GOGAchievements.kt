@@ -14,7 +14,7 @@ import okhttp3.Request
 import org.json.JSONObject
 
 /**
- * A GOG game's achievements and the signed-in account's progress, read-only, for its page (Droidtop/tracker#230; owner,
+ * A GOG game's achievements and the signed-in account's progress, read-only, for its page (mytop-project/tracker#230; owner,
  * 2026-10-23: "read-only and for display"). GOG serves them from its Galaxy gameplay service
  * (`gameplay.gog.com/clients/<client>/users/<user>/achievements`) to the account's token for the game's own client
  * ([GOGGameClient]), the call Galaxy and the Comet client make. droidtop unlocks nothing. Kept ten minutes per game,

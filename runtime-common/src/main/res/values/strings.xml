@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Catalog words of :runtime-common, English as the source language (Droidtop/tracker#177). Names start with the
+  Catalog words of :runtime-common, English as the source language (mytop-project/tracker#177). Names start with the
   screen they belong to, since Android merges every module's strings into one set. Read through Words.
 -->
 <resources>
@@ -57,7 +57,7 @@
     <string name="accessibility_how_big_everything_on_screen">In every app</string>
     <string name="accessibility_talkback">TalkBack</string>
     <string name="accessibility_android_s_screen_reader_speaks">Android\'s screen reader</string>
-    <!-- Device setup (docs/SPEC.md "Device setup", Droidtop/tracker#816) -->
+    <!-- Device setup (docs/SPEC.md "Device setup", mytop-project/tracker#816) -->
     <string name="device_setup_no_shell">Needs Shizuku or wireless debugging</string>
     <string name="device_setup_failed">Couldn\'t change it</string>
     <string name="device_setup_done">Done. Press again to undo it</string>
@@ -302,7 +302,7 @@
     <string name="gaming_look_for_new_or_changed_games">Look for new or changed games and apps again</string>
     <string name="gaming_looks_in_your_game_folders_for">PC and engine games</string>
     <string name="gaming_text_and_layout_together_auto_fits">Text and layout. Auto fits the screen</string>
-    <!-- Requirements (Droidtop/tracker#830, SPEC "Permissions", One wording): what does not work yet, and the granted thing as a noun. -->
+    <!-- Requirements (mytop-project/tracker#830, SPEC "Permissions", One wording): what does not work yet, and the granted thing as a noun. -->
     <string name="requirement_action_allow">Allow</string>
     <string name="requirement_action_set_up">Set up</string>
     <string name="requirement_all_files_missing">Game folders can\'t be read yet</string>

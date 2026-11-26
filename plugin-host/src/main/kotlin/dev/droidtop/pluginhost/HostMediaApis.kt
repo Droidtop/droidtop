@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 /**
  * The person's music, videos, pictures and documents for a plugin (docs/plugin-api.md 3 A9, `media.read@1`,
- * Droidtop/tracker#714): a now-playing, gallery, backup or media-server plugin reads what Android's media library lists,
+ * mytop-project/tracker#714): a now-playing, gallery, backup or media-server plugin reads what Android's media library lists,
  * a page at a time, and opens one item read-only. droidtop runs the query itself (a contained plugin has no
  * filesystem of its own) and hands out a read-only descriptor, never a path. Both ops need `media.read`, a dangerous
  * permission.

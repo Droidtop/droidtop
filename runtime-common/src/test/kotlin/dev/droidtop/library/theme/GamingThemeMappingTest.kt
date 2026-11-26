@@ -212,7 +212,7 @@ class GamingThemeMappingTest {
             ),
         )
         val n = GamingThemeMapping.map(neutral)
-        // Azure is the fallback when a theme names no colour (owner, 2026-10-24, Droidtop/tracker#644), moved only in
+        // Azure is the fallback when a theme names no colour (owner, 2026-10-24, mytop-project/tracker#644), moved only in
         // lightness as far as this grey ground needs: still blue, and readable.
         assertEquals(argb("FFFFFF"), n.onSurface)
         val blue = n.accent and 0xFF
@@ -343,7 +343,7 @@ class GamingThemeMappingTest {
 
     @Test
     fun eachViewIsDecidedApart() {
-        // A clock on the system view only leaves the gamelist to droidtop's cluster (Droidtop/tracker#658, t18).
+        // A clock on the system view only leaves the gamelist to droidtop's cluster (mytop-project/tracker#658, t18).
         val systemClock = theme(
             system = listOf(element("clock", "clock")),
             gamelist = listOf(element("image", "logo", *fullScreen)),
@@ -365,7 +365,7 @@ class GamingThemeMappingTest {
 
     @Test
     fun `droidtop's own palette is the approved visual language`() {
-        // Owner, 2026-10-24, Droidtop/tracker#644 (docs/DESIGN-LANGUAGE.md, "The approved design"): never pure black or
+        // Owner, 2026-10-24, mytop-project/tracker#644 (docs/DESIGN-LANGUAGE.md, "The approved design"): never pure black or
         // pure white, three surfaces one step apart, one azure accent, and a focused row in that accent.
         val d = GamingThemeColors.DEFAULT
         assertEquals(argb("11151C"), d.ground)

@@ -144,13 +144,13 @@ class CompanionTabsTest {
     @Test
     fun `however short the bar, Home never moves into More`() {
         val sizes = mapOf("home" to 100f, "device" to 100f, "droidtop" to 100f, "social" to 100f)
-        // Room for More alone: every tab but Home and Device moves under it (Droidtop/tracker#786 plan 4.2).
+        // Room for More alone: every tab but Home and Device moves under it (mytop-project/tracker#786 plan 4.2).
         val squeezed = slots(gamingDefault, UiMode.FULL, emptyList(), 120f, sizes, moreSize = 100f)
         assertEquals(listOf("home", "device"), ids(squeezed.tabs))
         assertEquals(listOf("droidtop", "social"), ids(squeezed.more).take(2))
     }
 
-    // Droidtop/tracker#786 S3: a page can be a tab of its own, and is never listed under More.
+    // mytop-project/tracker#786 S3: a page can be a tab of its own, and is never listed under More.
     @Test
     fun `a page chosen as a tab sits on the bar and pages are never under More`() {
         val bar = slots(listOf("home", CompanionPrefs.DEVICE_NETWORK), UiMode.FULL, emptyList(), 0f, emptyMap())

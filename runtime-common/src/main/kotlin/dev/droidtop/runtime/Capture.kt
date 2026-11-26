@@ -18,14 +18,14 @@ import java.io.File
 import kotlin.coroutines.resume
 
 /**
- * The one entry point for screenshots (docs/SPEC.md "The companion's tabs", Screenshots; Droidtop/tracker#414 slice
+ * The one entry point for screenshots (docs/SPEC.md "The companion's tabs", Screenshots; mytop-project/tracker#414 slice
  * C15): the companion's Game row and its pin take one here. Two routes, in order:
  * - the helper app's shell runs `screencap -p` into droidtop's own external cache folder (Android's default screen;
  *   `screencap -d` wants a physical display id that apps are not given);
  * - else droidtop's accessibility service takes it (`AccessibilityService.takeScreenshot`, Android 11 and later, any
  *   screen): that service's second job beside typing, registered as [accessibility] while it is connected.
  * The picture is saved to Pictures/Screenshots like Android's own, and handed back for Share. While a game droidtop
- * started is running, it is also filed under that game ([fileUnderGame], Droidtop/tracker#596).
+ * started is running, it is also filed under that game ([fileUnderGame], mytop-project/tracker#596).
  */
 object Capture {
     enum class Route { PROVIDER, ACCESSIBILITY, NONE }
@@ -92,14 +92,14 @@ object Capture {
         Shot(uri, if (filed) "Saved to Pictures/Screenshots and to the game's page" else "Saved to Pictures/Screenshots")
     }
 
-    /** How long a screenshot from a menu over the game waits for the menu to close (Droidtop/tracker#626). */
+    /** How long a screenshot from a menu over the game waits for the menu to close (mytop-project/tracker#626). */
     const val AFTER_MENU_MS = 700L
 
     private val later = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
 
     /**
      * A screenshot of [displayId] taken [afterMs] from now, for a control drawn over the game that closes first (the
-     * Quick Menu's Screenshot, Droidtop/tracker#626): the shot shows the game, not the menu. [done] gets the result,
+     * Quick Menu's Screenshot, mytop-project/tracker#626): the shot shows the game, not the menu. [done] gets the result,
      * on a background thread.
      */
     fun takeSoon(context: Context, displayId: Int, afterMs: Long = AFTER_MENU_MS, done: (Shot) -> Unit) {

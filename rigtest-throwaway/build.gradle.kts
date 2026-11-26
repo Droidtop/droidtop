@@ -1,5 +1,5 @@
 // Test-only: the throwaway app the priv.packages rig check installs, grants, clears and uninstalls on a real console
-// (app/src/androidTest PrivPackagesRigTest, Droidtop/tracker#130). It has no code and is never shipped or published;
+// (app/src/androidTest PrivPackagesRigTest, mytop-project/tracker#130). It has no code and is never shipped or published;
 // its APK is carried inside droidtop's androidTest APK only.
 plugins {
     alias(libs.plugins.android.application)

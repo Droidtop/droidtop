@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The page pieces' accessibility (docs/SPEC.md 7k, "Page anatomy"; Droidtop/tracker#485 F2a, final design
+ * The page pieces' accessibility (docs/SPEC.md 7k, "Page anatomy"; mytop-project/tracker#485 F2a, final design
  * C.8): every pressable thing has a label and a role and is at least 48dp tall, a disabled button still says
  * why in its label, the header is a heading, and the focus line says where the rest of a cut sentence is.
  */

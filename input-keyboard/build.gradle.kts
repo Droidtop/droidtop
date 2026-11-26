@@ -70,10 +70,10 @@ android {
 
 dependencies {
     implementation(libs.androidx.appcompat)
-    // Inline autofill suggestions in the keyboard (Android 11+, Droidtop/tracker#342).
+    // Inline autofill suggestions in the keyboard (Android 11+, mytop-project/tracker#342).
     implementation(libs.androidx.autofill)
     implementation(libs.androidx.core.ktx)
-    // Offline voice typing's English model arrives as a .tar.bz2, unpacked as it downloads (Droidtop/tracker#343).
+    // Offline voice typing's English model arrives as a .tar.bz2, unpacked as it downloads (mytop-project/tracker#343).
     implementation(libs.commons.compress)
 
     testImplementation(libs.junit)

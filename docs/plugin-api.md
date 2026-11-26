@@ -7,7 +7,7 @@ links to it; §12a stays the record of what is already built (the
 manifest, signing, trust tiers, the catalog, the runners, the job shape).
 This document is where the API's decisions live.
 
-Umbrella issue: Droidtop/tracker#53 (label `plugin-api`; the roadmap in §9
+Umbrella issue: mytop-project/tracker#53 (label `plugin-api`; the roadmap in §9
 names each item's issue).
 
 **Premise (owner, 2026-09-28).** A droidtop device is a general-purpose
@@ -65,7 +65,7 @@ other in this document:
   API, the same for every kind, and a test proves each other path closed.
   The audit of those paths (into droidtop at every tier, and into the OS
   without full access), what closed each and the test that proves it, is
-  §5.6 (Droidtop/tracker#53).
+  §5.6 (mytop-project/tracker#53).
 
 **Scope.** This is droidtop's plugin API only. Enginehost has its own
 plugin system, and the two share nothing but a design language (§12a,
@@ -185,7 +185,7 @@ meaning. A contract 1 manifest is no longer installed (§6).
   entry carries that extension point's static fields (label, surfaces,
   targets, filters). droidtop calls only the points and ops a plugin
   declared, as it does today for capabilities. A reply to an undeclared
-  op is thrown away. Since 2026-10-07 (Droidtop/tracker#316) this holds at
+  op is thrown away. Since 2026-10-07 (mytop-project/tracker#316) this holds at
   the boundary, not only in the surfaces that choose whom to ask: the one
   check every host call goes through (`PluginGrants.pointRefusal`) refuses
   a point the manifest does not declare at a version this build serves,
@@ -193,7 +193,7 @@ meaning. A contract 1 manifest is no longer installed (§6).
   An entry's `label` is its own title, which droidtop shows **after** the
   point's name, never instead of it: "Status tiles and widgets: VPN" on the
   approval list and the Permissions screen (`ProvidedPoint.titled`, at most
-  40 characters of the label, cut with an ellipsis; Droidtop/tracker#521
+  40 characters of the label, cut with an ellipsis; mytop-project/tracker#521
   item 3). A label the same as the point's name is dropped.
 - **`permissions`** lists every host-API permission the plugin may use.
   Each entry has an optional plain-language `reason`, which is shown on
@@ -205,7 +205,7 @@ meaning. A contract 1 manifest is no longer installed (§6).
 - **`subscribes`** lists the events the plugin wants, each with a
   version. An unknown id is ignored, not refused, as today.
 - **`exports`** and **`requires`** cover plugin-provided APIs (§2).
-- **Categories** (decided 2026-10-16, Droidtop/tracker#179; the owner,
+- **Categories** (decided 2026-10-16, mytop-project/tracker#179; the owner,
   verbatim: "Yeah, plugins are channeled, too. They should also have
   categories"). A plugin names one category, `category`, from this fixed
   list; the catalog index repeats it on the plugin's entry, and the
@@ -226,7 +226,7 @@ meaning. A contract 1 manifest is no longer installed (§6).
   `integrations`, `games` as `sources`. A missing category is `other`. The
   release line a plugin is offered on is the catalog's business, not the
   manifest's (SPEC 12a, "Channels").
-- **Presentation** (Droidtop/tracker#521 item 2; `PluginPresentation`):
+- **Presentation** (mytop-project/tracker#521 item 2; `PluginPresentation`):
   `summary` (one line, at most 80 characters, under the plugin's name on
   its page and in the list), `publisher` (at most 60, "Made by"),
   `homepage` (https only, "Its page"), `category` (one id of the fixed
@@ -276,11 +276,11 @@ Error codes are a closed set: `INVALID_ARGS`, `UNSUPPORTED`,
 `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `TIMEOUT`,
 `PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`,
 `SIGN_IN_REQUIRED`, `BROWSER_CHECK_REQUIRED`, `OFFLINE`, `SITE_DOWN`, `NEEDS_UPDATE`
-(the last three 2026-11-05, Droidtop/tracker#883 §3.7). A plugin's own ordinary failure ("no network",
+(the last three 2026-11-05, mytop-project/tracker#883 §3.7). A plugin's own ordinary failure ("no network",
 "nothing found") is an error reply, not a crash. This keeps today's
 distinction in `PluginCrashPolicy`.
 
-**What the person reads of an error (2026-10-14, Droidtop/tracker#485).**
+**What the person reads of an error (2026-10-14, mytop-project/tracker#485).**
 An error may also carry `title` and `subtitle` (plain words, at most 60
 and 140 characters), `permission` and `action`:
 `{"code": "PERMISSION_DENIED", "message": "...", "title": "Not allowed",
@@ -292,7 +292,7 @@ logged as a plugin message. `SIGN_IN_REQUIRED` offers its `action` (a view
 action) as "Sign in". The helpers write it (`gg.error(code, title, ...)`,
 `PluginReply.error(code, title, subtitle, permission, action)`).
 
-**A failure is one plain sentence (2026-10-15, Droidtop/tracker#544 item 8).**
+**A failure is one plain sentence (2026-10-15, mytop-project/tracker#544 item 8).**
 An error's `message` is one plain sentence for the person: what happened, in
 their words, with no HTTP status, no exception or stack trace, no markup and
 no site's page text ("The site did not answer" is a message; "f95zone
@@ -301,11 +301,11 @@ are not). What the code saw goes in the optional `detail` field (plain text,
 at most 400 characters are kept, markup removed), which droidtop shows only
 behind "Technical details". droidtop still guards a message that breaks the
 rule (a source's search shows droidtop's own sentence instead), and the
-conformance script (Droidtop/tracker#71) flags messages with `HTTP`, a stack
+conformance script (mytop-project/tracker#71) flags messages with `HTTP`, a stack
 trace or markup.
 
 **Sign-in and browser checks are droidtop's to draw (2026-10-15,
-Droidtop/tracker#544 item 1).** A plugin whose site needs the person signed
+mytop-project/tracker#544 item 1).** A plugin whose site needs the person signed
 in answers `SIGN_IN_REQUIRED`; one whose site shows a browser check first
 ("Checking your browser") answers `BROWSER_CHECK_REQUIRED`. Neither
 needs a title, a sentence about how to sign in, or a made-up result
@@ -317,7 +317,7 @@ again after). It opens the plugin's `web.session` in droidtop's web view: the
 for a browser check. This needs `web.session` with a site; for a plugin
 without one, a `SIGN_IN_REQUIRED`'s own `action` is still offered as before.
 
-**droidtop finds the browser check itself (2026-10-23, Droidtop/tracker#600).**
+**droidtop finds the browser check itself (2026-10-23, mytop-project/tracker#600).**
 The owner: "f95 has gotten more aggressive with cloudflare filtering.
 F95checker has gotten better at allowing users to solve the captcha. we need
 to do the same." A plugin no longer has to recognise a check:
@@ -328,7 +328,7 @@ to do the same." A plugin no longer has to recognise a check:
   Cloudflare's `cf-mitigated: challenge` header, reaches the plugin as the
   error `BROWSER_CHECK_REQUIRED` with one plain sentence ("<host> checks the
   browser first; open it in droidtop to continue"). It never gets the page.
-- **Read by droidtop's web view after that (2026-10-24, Droidtop/tracker#600).**
+- **Read by droidtop's web view after that (2026-10-24, mytop-project/tracker#600).**
   Cloudflare refuses droidtop's HTTP client even with the clearance the
   person earned. So once a host has shown the plugin a check (met and not
   passed, or a clearance kept for it), a `GET` to it through `net.http` or
@@ -372,7 +372,7 @@ The reply uses the same `{ok, data|error}` shape.
 | Kind | Host → plugin | Plugin → host | Jobs |
 | --- | --- | --- | --- |
 | `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); one that does not implement it answers UNSUPPORTED, since contract 1's translation is gone (§6) | `PluginContext.call(api, version, op, args)` on the context handed to `onLoad`; `PluginContext.openFile(...)` for an op that hands over a file (built 2026-10-08) | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
-| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal; `droidtop.host.open(api, op, args=None, version=1)` returns the same dict with the descriptor number under `fd` when a file was handed over (built 2026-10-08) | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge registers the job, runs it on a Java thread droidtop starts (not a Python thread: a thread Python makes is attached to the JVM around every host call, and one died of the sandbox's own trap, Droidtop/tracker#558), forwards progress live, and calls `cancel_job(job_id)` cooperatively |
+| `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal; `droidtop.host.open(api, op, args=None, version=1)` returns the same dict with the descriptor number under `fd` when a file was handed over (built 2026-10-08) | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge registers the job, runs it on a Java thread droidtop starts (not a Python thread: a thread Python makes is attached to the JVM around every host call, and one died of the sandbox's own trap, mytop-project/tracker#558), forwards progress live, and calls `cancel_job(job_id)` cooperatively |
 | `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text; no `open` yet: a Flutter plugin runs contained like every kind (§5.3, built 2026-10-09); its own folder is reached by path through the file broker (§5.3 "The plugin's own folder by path", 2026-10-14), so `path_provider`, `shared_preferences` and `sqflite` find real folders, and anything else goes through `data` over `hostCall` | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 **What a `native_bundle` plugin links against.** Its dex is loaded with
@@ -403,7 +403,7 @@ The rules that make this "no kind-specific features":
    script,** and nothing else. This is what `PluginKind`'s own doc
    comment already asks for ("add a case and a matching runner").
 
-**`app_interface`: an installed app as a plugin (Droidtop/tracker#547;
+**`app_interface`: an installed app as a plugin (mytop-project/tracker#547;
 contract 2026-10-23).** The owner: "This is a third plugin type,
 "application interface". It's a plugin that's also another app. It has to
 go through the same approvals and everything as a normal plugin, and is
@@ -432,11 +432,11 @@ store". Its adapter is the app itself:
   approval).
 - **The service** is exported with the action
   `dev.droidtop.plugin.APP_INTERFACE` and returns an `IPluginRuntime`
-  binder built from the one AIDL droidtop builds from too, Droidtop/lib-plugins'
+  binder built from the one AIDL droidtop builds from too, mytop-project/mytop-plugins'
   `android/aidl/dev/droidtop/pluginhost/IPluginRuntime.aidl`, `IPluginHostBroker.aidl`
   and `IPluginRuntimeCallback.aidl` (package `dev.droidtop.pluginhost`; methods are only
   ever appended). An app takes it as a submodule and compiles it with its own build
-  (`aidl.srcDir`), so no copy can drift (Droidtop/tracker#867). droidtop
+  (`aidl.srcDir`), so no copy can drift (mytop-project/tracker#867). droidtop
   binds it and calls `loadContained(pluginId, manifestJson, [], [],
   broker)` with the manifest droidtop verified itself, then `handle`,
   `startJob`, `cancelJob`, `registerCallback` and `unloadPlugin` as for any
@@ -500,7 +500,7 @@ store". Its adapter is the app itself:
       manifest that is not this app's).
     - **A plugin this droidtop cannot speak** says which side needs
       updating, read from the manifest's own `contractVersion`
-      (Droidtop/tracker#854, Enginehost missing from Plugins): "<App>
+      (mytop-project/tracker#854, Enginehost missing from Plugins): "<App>
       needs an update to work with this droidtop" (older than contract 2,
       or a kind or shape droidtop cannot read), or "<App> is made for a
       newer droidtop" (newer than this build's contract).
@@ -515,7 +515,7 @@ store". Its adapter is the app itself:
   - **Uninstalling it** removes the plugin, not the app, and lets droidtop's
     binding to the app go.
 - **The enhancement provider host is an app interface plugin droidtop
-  makes itself** (Droidtop/tracker#852; docs/SPEC.md "Enhancement
+  makes itself** (mytop-project/tracker#852; docs/SPEC.md "Enhancement
   providers"). `dev.droidtop.providerhost` is signed on the device by a key
   droidtop keeps in Android's Keystore, and that key is the host's only
   official certificate: the host is Official by it alone, and its package
@@ -570,13 +570,13 @@ each plugin:
 | **Approve** | The approval screen shows, in plain language: what the plugin adds and where (grouped by mode), what it can access (normal permissions as a short list; each dangerous permission and high-risk extension point as its own line), what it needs from other plugins, and its trust badge (Official / Added by you). Every item is a tick box and **the plugin runs with the ticked subset** (decided 2026-10-01, §4.3 "Approval is a list"). Unticked dangerous permissions stay at `ask` (§4.3). | the approval screen in `AppSettingsCatalogs.pluginsScreen` |
 | **Enable** | An approved plugin is enabled by default. Disabling stops every call to it and hides its contributions everywhere, because `PluginStore.runnableFor` is the only iterator (checklist point 6). | `PluginStore.setEnabled` |
 | **Resolve** | On every install, approve, enable, disable, uninstall or crash, the `requires` graph is recomputed (§2.3). A plugin whose *required* API has no runnable provider is **Waiting**. It is not disabled, and it resumes by itself when a provider appears. | new: `PluginApiResolver` |
-| **Start** | droidtop starts first and needs nothing from plugins; then droidtop starts the plugin host, which starts the plugins (docs/SPEC.md 12a "Start order", Droidtop/tracker#775). droidtop's start loads no plugin and starts no plugin process, and a plugin process runs none of droidtop's start. The host's start, after droidtop's first screen, brings up what runs without a call: retries, background services and schedules, Standard's entries, the apps that carry a plugin. | `PluginHostStart`, `IsolatedProcess` |
-| **Run** | Loading is lazy: a plugin is loaded on its first call, and its process is let go 60 s after the last use (built 2026-10-08, `PluginProcesses`). **Loaded once per process, not once per call (2026-11-05, Droidtop/tracker#884):** every call asks for the load, which is how a stopped process starts again, but a plugin already loaded in its live process (the same tier and bundle, the same runtime still bound and alive) is ready at once, and calls at the same time share the one load in progress (`LoadOnce` in `NativePluginRunner.load`); an unload, a crash, a process that ended or a new bundle loads it again. Before, each call acquired the process, read the grants and every installed record, opened every file, started a new file broker and made a blocking binder call, once per source per search at the same time; a job or a running background service (§3 E8) keeps it in use. A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
+| **Start** | droidtop starts first and needs nothing from plugins; then droidtop starts the plugin host, which starts the plugins (docs/SPEC.md 12a "Start order", mytop-project/tracker#775). droidtop's start loads no plugin and starts no plugin process, and a plugin process runs none of droidtop's start. The host's start, after droidtop's first screen, brings up what runs without a call: retries, background services and schedules, Standard's entries, the apps that carry a plugin. | `PluginHostStart`, `IsolatedProcess` |
+| **Run** | Loading is lazy: a plugin is loaded on its first call, and its process is let go 60 s after the last use (built 2026-10-08, `PluginProcesses`). **Loaded once per process, not once per call (2026-11-05, mytop-project/tracker#884):** every call asks for the load, which is how a stopped process starts again, but a plugin already loaded in its live process (the same tier and bundle, the same runtime still bound and alive) is ready at once, and calls at the same time share the one load in progress (`LoadOnce` in `NativePluginRunner.load`); an unload, a crash, a process that ended or a new bundle loads it again. Before, each call acquired the process, read the grants and every installed record, opened every file, started a new file broker and made a blocking binder call, once per source per search at the same time; a job or a running background service (§3 E8) keeps it in use. A crash, an uncaught exception, a native crash, a timeout or process death disables that plugin with a reason, and the user re-enables it by hand (12a checklist point 6). **Kept as is:** crash containment is the one rule `PluginCrashPolicy` exists for. | `PluginCrashPolicy`, `NativePluginRunner` |
 | **Update** | Same key: approval carries over (12a "Trust over updates"). **v2 adds a permission diff.** An update that adds any permission, extension point or `exports` entry keeps running with its *old* grants; the new items wait at `ask`, and the plugin's page asks about those items only, on the same list as at approval ("Wants new access", §4.3). An update never gains dangerous access silently. A different key, or a previously DENIED plugin, goes back to PENDING (unchanged). | `PluginStore`, `PluginRecord.approvedKeySha256` |
 | **Uninstall** | `onUnload` runs, and the payload, data directory, vault entries, grants and scheduled work are deleted. The audit log for the plugin is kept for 7 days (labelled "removed plugin") so that "what did it do" can still be answered. Dependents are re-resolved (§2.5). | `PluginStore.uninstall` |
 
 **Signing a plugin (keys and certificates; docs/SPEC.md 12a,
-Droidtop/tracker#550).** Every bundle carries `manifest.jws`: a detached
+mytop-project/tracker#550).** Every bundle carries `manifest.jws`: a detached
 JWS (RFC 7515) over the exact `manifest.json` bytes, its protected header
 `{"alg": "ES256" | "RS256", "typ": "droidtop-plugin+jws", "x5c": [leaf, ...]}`
 with standard-base64 DER certificates, leaf first, the anchor left out. The
@@ -627,7 +627,7 @@ in droidtop.
 
 ### 1.6 UI extensions: the view schema
 
-*Decided 2026-10-01 (Droidtop/tracker#164). Owner: "we've gotta make sure
+*Decided 2026-10-01 (mytop-project/tracker#164). Owner: "we've gotta make sure
 the plugin API is full featured ... also need plugins to expose their own
 UI extensions for it."*
 
@@ -650,7 +650,7 @@ one host mechanism (`PluginViews`, `library-core`), so a plugin screen is a
 catalog screen: no second renderer per mode, and every improvement to the
 catalog renderers reaches plugin screens for free.
 
-**Notices (2026-10-14, Droidtop/tracker#485).** A `notice` node is a
+**Notices (2026-10-14, mytop-project/tracker#485).** A `notice` node is a
 condition the person should know about, drawn as droidtop's own notice
 card (docs/SPEC.md 7k, "Notices") and named "from <plugin>":
 
@@ -662,7 +662,7 @@ card (docs/SPEC.md 7k, "Notices") and named "from <plugin>":
 ```
 
 - `tone` is `info`, `caution` or `danger` (danger since 2026-10-15,
-  Droidtop/tracker#521 item 1: the owner wants each notice to carry its
+  mytop-project/tracker#521 item 1: the owner wants each notice to carry its
   real weight, "We need to surface appropriate contextual stuff"). Danger
   is for what the person is about to lose or risk now (a save that will be
   overwritten, an account that will be signed out everywhere); a
@@ -725,10 +725,10 @@ still renders on an older droidtop):
 | `choice` | `title`, `subtitle?`, `options[{value,label}]`, `value`, `action?` | a pick-one (the version, region and format pickers of a download) |
 | `slider` | `title`, `subtitle?`, `min`, `max`, `value`, `action?` | an integer stepper |
 | `text` | `title`, `subtitle?`, `value`, `action?` | a text field (controller and touch text entry). **Never secret**: there is no password field; secrets wait for the vault (G1, #69) |
-| `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only row with the host's job bar (gliding; -1 is the checking shimmer), never a percent in text (Droidtop/tracker#644) |
+| `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only row with the host's job bar (gliding; -1 is the checking shimmer), never a percent in text (mytop-project/tracker#644) |
 | `notice` | `title`, `subtitle?`, `details?`, `tone` (`info`, `caution`, `danger`), `placement?` (`section`, `banner`), `action?` | droidtop's notice card, "from <plugin>" (see "Notices" above) |
 
-**Typed values (Droidtop/tracker#521 item 7).** An `info` or `row`
+**Typed values (mytop-project/tracker#521 item 7).** An `info` or `row`
 `value` may be an object instead of a string, and droidtop writes it the
 way it writes its own values: `{"bool": true}` is "On" / "Off";
 `{"number": n, "unit": "bytes"}` is a size ("1.5 GB"), `"seconds"` a
@@ -739,7 +739,7 @@ with separators ("1,500"), and any other unit is written after the number
 droidtop cannot read shows no value. A plugin sends the number, not its
 own "1.5 GB".
 
-**`needs` (Droidtop/tracker#521 item 5).** Any node may name one of the
+**`needs` (mytop-project/tracker#521 item 5).** Any node may name one of the
 plugin's declared permissions with `needs`, or `"app"` for the app an
 `apps.bridge` plugin manages (F1, #520: while that app is not installed,
 the node is inert with "Needs <app>, which isn't installed"). While the person has that
@@ -773,7 +773,7 @@ their values wherever the new view still has that input and the value still
 fits it (a choice still offered, a slider value in range); the rest take the
 view's own values. After an action that worked, the view's own values are
 shown, because the plugin's state is what changed (2026-11-06,
-Droidtop/tracker#846: a mirror picked before a browser check went back to
+mytop-project/tracker#846: a mirror picked before a browser check went back to
 the first one).
 
 On an input node, `action` fires when the value is committed, with the new
@@ -806,7 +806,7 @@ completion's `values` may carry `message`, and `notice` (a notice node as
 JSON text, drawn like a reply's `data.notice`). A job that finishes with no
 `notice` gets droidtop's own Info notice "Finished" on the page that
 started it, with the job's `message` as its body unless it only says
-"Done" (Droidtop/tracker#521 item 9); a plugin does not draw its own "it
+"Done" (mytop-project/tracker#521 item 9); a plugin does not draw its own "it
 worked" row.
 
 For a resumable native job, `PluginJobProgress.checkpoint(percent,
@@ -840,7 +840,7 @@ page for a plugin.
 | `ui.panel@1` (C17) | `panel {context:{surface, game?}}` | the plugin's Quick Menu panel, under its tiles (1.8) |
 | `ui.game_section@1` (C18) | `section {context:{target, sectionId}}` | rows on a game's page; the whole section opens as a page for its inputs (1.8) |
 
-**Which systems a source serves (`systems`, Droidtop/tracker#543).** A
+**Which systems a source serves (`systems`, mytop-project/tracker#543).** A
 `library.sources` entry in `provides` may declare the systems it can give
 games for, next to `point` and `id`:
 
@@ -870,7 +870,7 @@ contract bump; a build that does not know the field ignores it. Several
 (one entry without it makes the plugin undeclared).
 
 **`library.sources` with views (getting games through the one search).** There is no Get games screen (owner,
-2026-10-16, Droidtop/tracker#218; docs/SPEC.md 13 "There is no Get games sheet"): a source's `search` answers the
+2026-10-16, mytop-project/tracker#218; docs/SPEC.md 13 "There is no Get games sheet"): a source's `search` answers the
 one search, and its rows sit in the ranked list beside the device's games and apps. Every call on this
 point carries `context: {system: {id, name}, destination}`; `system.id` is
 droidtop's system id (the ES-DE short name, `snes`), `destination` the
@@ -900,7 +900,7 @@ no destination, such as the PC library). Ops:
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
   result as a `row` that opens `detail`. At most 200 results are shown (on the source's own page under Game
   sources, which asks without a `limit`).
-- `index {limit, cursor?}` → `{results: [result], next?}` (optional, Droidtop/tracker#937): the source's whole list,
+- `index {limit, cursor?}` → `{results: [result], next?}` (optional, mytop-project/tracker#937): the source's whole list,
   a page at a time, the same results as `search`. Declared with `"bulkIndex": true` on the `library.sources` entry;
   droidtop asks for it weekly as an automatic download (on Wi-Fi, never while a game runs) and keeps the results in
   the source's own index, which typing searches without asking the source. `next` is the cursor of the next page;
@@ -909,7 +909,7 @@ no destination, such as the PC library). Ops:
   source is then asked only when the person presses "Search the sources".
 - `featured {platform?, limit, context}` → `{results: [result]}`, the same results as `search`: what the source
   features now (a site's latest updates, its new or popular games), best first, scoped to `platform` (droidtop's
-  system id) when given (proposed and approved 2026-10-23, Droidtop/tracker#612). Optional and additive (§7): a
+  system id) when given (proposed and approved 2026-10-23, mytop-project/tracker#612). Optional and additive (§7): a
   source with no such list answers UNSUPPORTED, or never declares it, and features nothing. Send at most `limit`. The same 10 s budget as `search`, and the same errors. Its rows join Get new
   games' page under the source's name (docs/SPEC.md 13).
 - **A result's facets (contract 3).** A `search` or `featured` result may carry `facets: [...]` (§1.10): its
@@ -920,7 +920,7 @@ no destination, such as the PC library). Ops:
   rows, its files), its pickers (`choice` nodes for version, region,
   format, mirror) and its actions, at least one `job` action with op
   `acquire`. Optional: droidtop's default detail shows the result's title
-  and a Download job. Contract 3 (2026-10-29, Droidtop/tracker#737): the
+  and a Download job. Contract 3 (2026-10-29, mytop-project/tracker#737): the
   reply may instead be the result's facets (`{facets: [...]}`, or `items:
   [{id, facets}]` with the result's `id`): its `item.page` bundles
   (`metadata`, `description`, `image`, `download`, `links`) and `link`s are
@@ -949,11 +949,11 @@ no destination, such as the PC library). Ops:
   into its own downloads area, then places it in `context.destination` and
   indexes that file, from the download job, so the game appears even if the
   page that started it was closed or droidtop restarted meanwhile. The `acquire` job itself runs inside that
-  Downloads job (Droidtop/tracker#354): the person's Download is one row in Downloads from the press, and a page
+  Downloads job (mytop-project/tracker#354): the person's Download is one row in Downloads from the press, and a page
   only watches it. Credential headers (Authorization, cookies, token and key
   headers) remain in memory only. A plugin may omit `download` and continue
   doing its own transfer as before. **Engine hint** (2026-10-09,
-  Droidtop/tracker#380, #355): with `download`, a job may return `engine`,
+  mytop-project/tracker#380, #355): with `download`, a job may return `engine`,
   an engines-database id (`renpy`, `unity`, `html`, ...: the ids
   `EngineRegistryParser.ENGINE_IDS` knows) naming the engine the source says
   the game uses. droidtop pins the placed file, and the folder an archive of
@@ -965,7 +965,7 @@ no destination, such as the PC library). Ops:
   ahead either way.
 
   **System hint, file names, unpacking and redirects** (2026-10-09,
-  Droidtop/tracker#417). With `download`, a job may return `system`, droidtop's
+  mytop-project/tracker#417). With `download`, a job may return `system`, droidtop's
   id for the game's platform (`dos`, `windows`, `snes`, ...). When the search is
   not already that system's own (a search from the PC library or from
   global search), the download is placed in that system's games folder, so the
@@ -973,7 +973,7 @@ no destination, such as the PC library). Ops:
   games folder yet gets one, named by the system's id (`dos`), beside the
   person's other system folders (the folder most of them are in, else the first
   games root), and the job says so ("Made a dos folder in Roms",
-  Droidtop/tracker#846). Only a system droidtop does not know fails the job,
+  mytop-project/tracker#846). Only a system droidtop does not know fails the job,
   with a sentence saying so, and the game is never dropped in another system's
   folder.
   **File names:** `fileName` is kept as given, because the library reads
@@ -993,7 +993,7 @@ no destination, such as the PC library). Ops:
   to the games folder's `bios` folder under droidtop's BIOS database's name for
   it, created when missing, not among the games: its md5 is one the database
   lists for the system, or, from a plugin that also provides `emulator.bios`,
-  its name is the database's (`AcquireBios`, Droidtop/tracker#558). The page
+  its name is the database's (`AcquireBios`, mytop-project/tracker#558). The page
   then says what the download did ("Added <file>"), not only "Finished".
   **Several files:** instead of `download` the reply may return `downloads`,
   a JSON string holding a list of 1 to 16 descriptors (each as above, with its
@@ -1004,7 +1004,7 @@ no destination, such as the PC library). Ops:
   or nothing: if any name exists, or two share a name, nothing is placed. This
   is for a release that is several files (a cue sheet and its tracks). Parts
   of one split archive are handled as in the next paragraph.
-  **Torrents and magnets** (2026-10-22, Droidtop/tracker#577). The owner:
+  **Torrents and magnets** (2026-10-22, mytop-project/tracker#577). The owner:
   "magnet or torrents. Ideally the data itself, but a URL will be downloaded
   sandboxed, checked, then added". A `download` descriptor may name one of
   three things:
@@ -1027,14 +1027,14 @@ no destination, such as the PC library). Ops:
   game folder, so a source that fetches a torrent elsewhere and hands over
   its files (a debrid service) can produce the same thing.
 
-  **Debrid is droidtop's (2026-10-24, Droidtop/tracker#638).** Every torrent
+  **Debrid is droidtop's (2026-10-24, mytop-project/tracker#638).** Every torrent
   or magnet a reply names may be served by the person's debrid accounts
   (TorBox, Real-Debrid) before any peer is contacted: a service that has it
   whole hands over its files as direct links into the same folder. A source
   names the torrent and does nothing else for it: it never asks a debrid
   service itself and never sees the person's keys.
 
-  **File hosts are droidtop's too (2026-10-24, Droidtop/tracker#638 part 5).**
+  **File hosts are droidtop's too (2026-10-24, mytop-project/tracker#638 part 5).**
   A link a source gives on a host droidtop has an API for (PixelDrain, Mega, GoFile)
   is served by the person's own account on the host, then by a debrid
   account, then by the host's anonymous API, before droidtop's web view
@@ -1052,7 +1052,7 @@ no destination, such as the PC library). Ops:
   headers. It is a download of its own, never one of `downloads`. Seeding
   ends when the download does (`seed-time` 0). A download of a whole folder
   is not offered to the app-catalog or BIOS replies, which take one file.
-  **Split releases** (Droidtop/tracker#419): with `downloads` and
+  **Split releases** (mytop-project/tracker#419): with `downloads` and
   `unpack: "archive"` on every descriptor, the files must be the parts of one
   split archive, numbered 1 to N without a gap, in any order; otherwise the
   job is refused before anything downloads. Byte-split parts (`X.7z.001`,
@@ -1083,7 +1083,7 @@ plain sentence ("The game index is not downloaded yet"); droidtop shows it
 under the source's name and, when the source provides `ui.settings`, an
 "Open <plugin> settings" row right there.
 
-**Fetchers answer in the one search (2026-10-16, Droidtop/tracker#218).**
+**Fetchers answer in the one search (2026-10-16, mytop-project/tracker#218).**
 The owner, 2026-10-16: "The Get Games sheet shouldn't really be a sheet.
 Get Games results should be injected into the search by fetcher plugins".
 And the same day: "Remember that ALL plugin activity happens over the
@@ -1173,7 +1173,7 @@ one-line reason (the shape `SourceOutcome` already uses for search,
 2026-09-30), never a blank area and never a spinner that does not end.
 When an op succeeds with nothing to show (no results, an empty view),
 the host draws its own Info notice "Nothing here yet", from the plugin,
-with Refresh (Droidtop/tracker#521 item 6). A view may give the one
+with Refresh (mytop-project/tracker#521 item 6). A view may give the one
 sentence that notice says under its title with the top-level `empty`
 ("Saves you make appear here"; at most the notice subtitle length, cut
 beyond); without it droidtop's words stand alone. A plugin does not add
@@ -1230,7 +1230,7 @@ every call UNSUPPORTED.
 - `library.sources`: `PluginGameSource` calls contract 2 `search` for the
   one search (`UnifiedSearch`) and opens source `detail` views. A source's own page under Game sources (`SourceScreens`)
   opens its `form` and adds results after committed inputs. There is no Get
-  games screen (2026-10-16, Droidtop/tracker#218). A successful acquire job's files are indexed (A2), not rescanned.
+  games screen (2026-10-16, mytop-project/tracker#218). A successful acquire job's files are indexed (A2), not rescanned.
 - **Not built yet** (queued): reply views for `ui.context_action` and
   `ui.quick_tile`, and samples that use views.
 
@@ -1238,7 +1238,7 @@ every call UNSUPPORTED.
 
 ### 1.7 A plugin's own full-screen UI: `ui.main`
 
-*Decided 2026-10-01 (Droidtop/tracker#187). Owner: "we need a 'view plugin
+*Decided 2026-10-01 (mytop-project/tracker#187). Owner: "we need a 'view plugin
 interface' menu in settings that'll launch the plugin's main UI to let us
 configure stuff or etc."*
 
@@ -1289,7 +1289,7 @@ and rows through views.
   plugin's headless engine: a crash of either is a crash of the plugin
   (`PluginCrashPolicy`).
 
-### 1.8 Plugin UI, Decky-style (decided 2026-10-07, Droidtop/tracker#316)
+### 1.8 Plugin UI, Decky-style (decided 2026-10-07, mytop-project/tracker#316)
 
 *Owner: "we probably want to use a decky loader style system for our
 plugins, at least from the UI" ... "Plugins don't ONLY appear there. That's
@@ -1335,7 +1335,7 @@ takes the shape and refuses the mechanism:
   backends that run as root by a manifest flag. A plugin reaches root only
   through a provider plugin the user approved (2.7).
 
-### 1.9 Plugins in every mode (decided 2026-10-08, Droidtop/tracker#53)
+### 1.9 Plugins in every mode (decided 2026-10-08, mytop-project/tracker#53)
 
 *Owner: "they need to be able to act on all the UI modes if they want to. I
 feel like we've been focusing exclusively on gaming mode until now", then
@@ -1387,9 +1387,9 @@ of surfaces of their own.
   Each is a catalogue row already; they come after
   Gaming's surfaces are complete.
 
-### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, approved 2026-10-23, contract 3, Droidtop/tracker#602)
+### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, approved 2026-10-23, contract 3, mytop-project/tracker#602)
 
-**Facets inform the screen; they do not take it over (owner, 2026-11-15, Droidtop/tracker#939: "Facets shouldn't be
+**Facets inform the screen; they do not take it over (owner, 2026-11-15, mytop-project/tracker#939: "Facets shouldn't be
 entire pages, generally. They should be popups or overlays. A facet shouldn't take over, it should give information to
 the main UI").** A facet shows where the person already is: as a row, a value or tag on a row, or, when it needs a
 screen of its own, a popup over the screen it was opened from (`CatalogPopup`: the shell's panel width, at most 70% of
@@ -1409,7 +1409,7 @@ point and `host.info().facets`); the renderer (facets become the view model the 
 group is a section, a list's entries are rows, a `page` call opens a page whose reply is facets, and an input's value
 goes back as `args.value`, typed); and the Quick Menu's plugin section (a plugin whose `ui.facets` entry declares
 `quickmenu` gets its panel from `get {target: "quickmenu"}`, through `FacetGuards.admit`, in place of its old
-`ui.panel`); and the plugin's settings (since Droidtop/tracker#880 declared in its manifest and drawn with no call, below
+`ui.panel`); and the plugin's settings (since mytop-project/tracker#880 declared in its manifest and drawn with no call, below
 "Declared settings"; the `settings.page` target is retired, `PluginSettingsRows.has` being the one test); and the game page (a plugin whose `ui.facets` entry
 declares `game.page` takes a section's place on every game's page in Gaming, asked `get {target: "game.page", subject}`
 with the game as its subject only when it holds `library.read`, its rows drawn as a section's are); the plugin's own page (`plugin.page`: a
@@ -1420,7 +1420,7 @@ source's record page is drawn from the item's bundles (`metadata`, `description`
 through the guards, from `ui.facets get {target: "item.page", subject: {type: "item", source, id}}` when the source
 declares that target, or from facets on its `record` reply (`items: [{id, facets}]`, which counts as declaring the item
 page); a contract 2 `record` is read as before (`ItemPageFacets`). A source result's page is the item page too
-(Droidtop/tracker#737): a `library.sources` `detail` reply of facets about the result is drawn from its bundles the
+(mytop-project/tracker#737): a `library.sources` `detail` reply of facets about the result is drawn from its bundles the
 same way, through the same guards (`SourceItemPage`). Hiding one facet is a switch per facet under the
 plugin's "What it shows", beside "Where it appears": droidtop remembers what each plugin last showed on each target
 (`PluginFacets.Seen`), a facet switched off is not drawn there (`FacetGuards.unhidden`, kept under
@@ -1431,7 +1431,7 @@ Select of a facet itself, and the person's order of plugins per target.
 Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A
 plugin's own full UI (a `ui.settings` page, a view of its own, a Flutter screen) stays allowed, but only for what
 facets cannot express, and a plugin's catalog listing says which of its surfaces are its own. When a plugin needs
-something no facet kind or target can do, that need is droidtop's work first: it is raised on Droidtop/tracker#602
+something no facet kind or target can do, that need is droidtop's work first: it is raised on mytop-project/tracker#602
 as a candidate kind or target before the plugin falls back to a full UI. Every gamegrab-sources plugin moves its
 bespoke UI onto facets wherever they cover it, and its old path is deleted, not kept beside the facets.
 
@@ -1439,18 +1439,18 @@ The owner, 2026-10-23, the rule of thumb for every plugin: "they should use face
 UIs are available, but they'll rarely be something the user actually uses. facets turn the plugins from 'little bubble
 the user has to do work to use' into 'part of the application'". In every plugin review, a feature reachable only
 through a plugin's own UI is a finding; the one exception is a feature no facet kind can express, and then the fix is
-the facet kind to propose here (Droidtop/tracker#602).
+the facet kind to propose here (mytop-project/tracker#602).
 
 **Facets go where they fit (the owner, 2026-10-24: "Facets go where they fit. No clunky redirects, no weird pathing.
 That's one of the main reasons I designed the facets system, so the app can surface information where it makes
 sense").** A surface that exists to act on an item shows that item's facets in place, inline or as a sheet over the
-current screen; it never navigates to another screen just to reach a facet (first applied on Droidtop/tracker#639: an
+current screen; it never navigates to another screen just to reach a facet (first applied on mytop-project/tracker#639: an
 Updates row presents its download facet). In a review, a redirect to reach a facet is a finding.
 
 **What facets are (the owner, 2026-10-29: "Facets are 'how a plugin presents information and integrates itself'.
 While a plugin CAN have a full UI, that's unideal, and likely a fallback").** A plugin's own full UI is the fallback for
 what no facet can express, not a second way to do what facets do. With that, the owner approved the six additions
-below (Droidtop/tracker#602, the facets-first audit): form groups, `toggle` on `item.page`, the `grant` action, the
+below (mytop-project/tracker#602, the facets-first audit): form groups, `toggle` on `item.page`, the `grant` action, the
 `secret` kind, `parts` on a `download` entry and the `search.filter` target.
 
 *The owner: "The facets system would benefit from being standardized as a system for presenting small surfaces to
@@ -1491,7 +1491,7 @@ Every facet is one JSON object:
   droidtop asked the plugin about, by droidtop's id), `{type: "plugin"}` (the plugin itself; the default),
   `{type: "device"}`, `{type: "window", windowId, appId}` (a Desktop window, by droidtop's own id for it, never the
   compositor's) or `{type: "file", token, mime}` (a file or folder the person picked, by document token, never a
-  path). **droidtop names windows and files** (Droidtop/tracker#221, 2026-11-06): a facet about either is taken only
+  path). **droidtop names windows and files** (mytop-project/tracker#221, 2026-11-06): a facet about either is taken only
   when it is about the very one droidtop asked about (`FacetGuards.admit`'s `asked`), so a plugin cannot reach a
   window or a file it was not shown.
 - `targets`: where the plugin would like it (see Targets). droidtop takes only targets the plugin declared and that
@@ -1510,10 +1510,10 @@ Every facet is one JSON object:
 | Kind | Fields | Drawn as |
 |---|---|---|
 | `info` | `label`, `value` (a string, or a typed value as in §1.6: bool, number with unit, enum), `sub?`, `filterable?`, `sortable?` | A label and value. With `filterable` or `sortable`, an item's info becomes a filter facet or a sort of the lists it is in (the label names it; values group by equality, numbers by range) |
-| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?`, `icon?` | Its words in the value column and the host's status glyph beside the label: `busy` a turning ring, `warning` the caution circled "!", `error` the danger octagon; `ok`, `on` and `off` show no glyph (Droidtop/tracker#644) |
+| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?`, `icon?` | Its words in the value column and the host's status glyph beside the label: `busy` a turning ring, `warning` the caution circled "!", `error` the danger octagon; `ok`, `on` and `off` show no glyph (mytop-project/tracker#644) |
 | `badge` | `text` (at most 16 characters), `tone?`, `icon?` | A small chip on a row, a capsule or a tile ("Update", "Beta", "3 new") |
 | `progress` | `label`, `value` (0 to 100, or -1 for unknown), `sub?`, `cancel?` (an action) | A bar with its words; a job's progress is a job's, in Downloads and installs (§8) |
-| `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | The host's bar, filled to `value` of `max`, with "120 of 512 MB" under it (storage, battery, a quota; Droidtop/tracker#644) |
+| `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | The host's bar, filled to `value` of `max`, with "120 of 512 MB" under it (storage, battery, a quota; mytop-project/tracker#644) |
 | `chart` | `label`, `style` (`line` or `bars`), `points` (at most 60 numbers; for `bars`, at most 12 `{label, value}`), `unit?` | A sparkline (a speed, a temperature over the last minutes) or a small bar chart (storage by folder). Nothing larger: no axes the plugin draws, no colours of its own |
 | `action` | `label`, `sub?`, `call` (an action, below), `confirm?` (`none`, `confirm`, `danger`), `icon?` (from droidtop's icon set) | A button, a menu entry or a row, as the target draws actions. `confirm` is droidtop's two-step confirm; `danger` adds danger colours and names what is lost (`sub`) |
 | `toggle` | `label`, `value: bool`, `sub?`, `call`, `icon?` | A switch; the change is sent at once |
@@ -1522,10 +1522,10 @@ Every facet is one JSON object:
 | `input` | `label`, `value`, `hint?`, `inputKind?` (`text`, `number`, `url`, `search`; 2026-10-29: `kind` is the envelope's, so the field type has its own key), `call`, `optional?` | A text field (controller and touch entry). Never secret: secrets stay with G1/G3. In a form group it has no `call`, and `optional: true` lets the form be sent with it empty; any other empty input holds the submit back ("Fill in Device ID first"), and nothing reaches the plugin |
 | `list` | `title?`, `entries: [{id, title, sub?, value?, badges?, media?, call?}]` (at most 200), `more?` (an action that asks for the next page) | Rows (a search's results, a watch list, a friends list, a download's mirrors) |
 | `collection` | `title?`, `entries: [{id, title, media, badges?, call?}]` (at most 60), `shape?` (`capsule`, `wide`, `square`) | Tiles or capsules (a Home shelf, a store's sale) |
-| `media` | `role` (`cover`, `wide`, `hero`, `logo`, `icon`, `screenshot`, `banner`, `video`), `url`, `poster?` (a video's still), `width?`, `height?`, `alt` | A picture by role (Droidtop/tracker#585), fetched and checked by droidtop; a video plays only on the person's press, muted until unmuted |
+| `media` | `role` (`cover`, `wide`, `hero`, `logo`, `icon`, `screenshot`, `banner`, `video`), `url`, `poster?` (a video's still), `width?`, `height?`, `alt` | A picture by role (mytop-project/tracker#585), fetched and checked by droidtop; a video plays only on the person's press, muted until unmuted |
 | `text` | `body` (at most 20,000 characters), `format?` (`plain`, or `basic`: paragraphs, headings, bold, italic, lists, and links drawn by droidtop) | A text block (an About, a changelog, terms) |
 | `link` | `label`, `url`, `kind?` (`source`, `homepage`, `store`, `forum`, `wiki`, `discord`, `support`, `other`) | A link row; opened on the person's press in droidtop's web view or another app, never fetched |
-| `guide` | `title`, `from` (who it is from, as the person reads it: "F95zone thread"), `format` (`web`, `pdf`, `text`), exactly one of `url` (https) or `document` (a file name in the plugin's own data folder, as `data.write` wrote it), `updated?` (epoch ms) | A walkthrough or guide for the item (2026-10-30, Droidtop/tracker#817, agreed with the UI lane): droidtop's one guide reader opens it, by pad, on the game page, the companion beside the running game and the overlay. Only guides that exist, at most 32 per item; `id` stable per plugin and item, as the reader keeps its place under it. A `url` is opened or fetched only when the person picks it: `web` in droidtop's web view without the plugin's session, `pdf` and `text` fetched by droidtop (any https host, at most 64 MiB, the type checked). A `document` that leaves the folder or is missing is dropped. Any plugin may give guides for an item, not only its source. droidtop never takes guides from `download` sections; it adds the game folder's own `walkthrough*`, `guide*` and `readme*` documents itself |
+| `guide` | `title`, `from` (who it is from, as the person reads it: "F95zone thread"), `format` (`web`, `pdf`, `text`), exactly one of `url` (https) or `document` (a file name in the plugin's own data folder, as `data.write` wrote it), `updated?` (epoch ms) | A walkthrough or guide for the item (2026-10-30, mytop-project/tracker#817, agreed with the UI lane): droidtop's one guide reader opens it, by pad, on the game page, the companion beside the running game and the overlay. Only guides that exist, at most 32 per item; `id` stable per plugin and item, as the reader keeps its place under it. A `url` is opened or fetched only when the person picks it: `web` in droidtop's web view without the plugin's session, `pdf` and `text` fetched by droidtop (any https host, at most 64 MiB, the type checked). A `document` that leaves the folder or is missing is dropped. Any plugin may give guides for an item, not only its source. droidtop never takes guides from `download` sections; it adds the game folder's own `walkthrough*`, `guide*` and `readme*` documents itself |
 | `notice` | §1.6's notice, unchanged: `title`, `sub?`, `details?`, `tone`, `placement?`, `call?` | droidtop's notice card, "from <plugin>" |
 | `account` | `site`, `signedIn`, `name?` | droidtop's own account row (docs/SPEC.md "A plugin's site account"); its Sign in and Sign out are droidtop's, never the plugin's |
 | `group` | `title?`, `facets: [facet]` (one level deep), `form?: true`, `submit?` (an action, with `form`) | Facets kept together, in order: a section of a page, a card of the companion. **A form** (2026-10-29): with `form: true` its inputs do not send their own `call`s; droidtop holds what the person enters and sends it all with `submit` when it is pressed, as `args.values` (`{facetId: value}`), so "Add a device" (an ID, a name, a trust choice, then Add) is one call. A form's inputs need no `call` of their own; `submit` is drawn as the group's last button and is pressed only once every input that is not optional has a value |
@@ -1534,7 +1534,7 @@ Every facet is one JSON object:
 A facet's text is the plugin's; its look, size, focus order, pad and touch behaviour and its TalkBack wording
 ("VPN, on, Connected to Home, switch") are droidtop's alone.
 
-**Icons are names, from droidtop's icon set** (Droidtop/tracker#221, 2026-11-06). `icon` on `action`, `status`,
+**Icons are names, from droidtop's icon set** (mytop-project/tracker#221, 2026-11-06). `icon` on `action`, `status`,
 `badge` and `toggle` is one of: `add`, `app`, `battery`, `bluetooth`, `check`, `clipboard`, `close`, `cloud`,
 `download`, `error`, `file`, `folder`, `info`, `lock`, `mic`, `network`, `next`, `notification`, `open`, `pause`,
 `play`, `previous`, `remove`, `search`, `send`, `settings`, `share`, `star`, `stop`, `sync`, `terminal`, `unlock`,
@@ -1549,10 +1549,10 @@ the information means and can use it beyond drawing (filters, updates, linking, 
 
 | Bundle | Fields | Built from, and used for |
 |---|---|---|
-| `metadata` | `title?`, `version?`, `developer?`, `publisher?`, `engine?` (an engines-database id), `status?` (`ongoing`, `completed`, `onhold`, `abandoned`), `released?` (`YYYY-MM-DD`), `updated?` (epoch ms), `rating?` (0 to 1), `votes?`, `tags?` (at most 64 of 40 characters), `genres?` (at most 16), `platforms?`, `languages?` and `contentNotes?` (2026-10-31, Droidtop/tracker#845: the platforms the game is for in the person's words, "Windows", "Browser"; the languages it is in; its content notes, "Uncensored"; at most 64 each) | the record's Info rows Platforms, Languages and Content; `info` and `badge` facets on the game page, list rows and capsules; the PC Games filters and sorts (Release status, Tags, Rating, Developer, Genre); `version` is what an update is compared with (docs/SPEC.md 7g) |
-| `description` | `overview?`, `changelog?`, `sections?`, `thread?`. `sections` (2026-10-31, Droidtop/tracker#845): `[{title, body}]`, at most 64, the source's other named texts in its order ("Installation", "Developer notes"); a section headed "Changelog" (or "What's new") is the changelog when `changelog` is absent. `thread`: the source page's main text as it reads (a forum thread's first post), for the game page's Show thread | `text` facets: the game page's About, the record page's Overview and Changelog; each section a row of the record's Info tab, its text under its heading; `thread` is what Show thread reads (UI lane, #845 U5) |
+| `metadata` | `title?`, `version?`, `developer?`, `publisher?`, `engine?` (an engines-database id), `status?` (`ongoing`, `completed`, `onhold`, `abandoned`), `released?` (`YYYY-MM-DD`), `updated?` (epoch ms), `rating?` (0 to 1), `votes?`, `tags?` (at most 64 of 40 characters), `genres?` (at most 16), `platforms?`, `languages?` and `contentNotes?` (2026-10-31, mytop-project/tracker#845: the platforms the game is for in the person's words, "Windows", "Browser"; the languages it is in; its content notes, "Uncensored"; at most 64 each) | the record's Info rows Platforms, Languages and Content; `info` and `badge` facets on the game page, list rows and capsules; the PC Games filters and sorts (Release status, Tags, Rating, Developer, Genre); `version` is what an update is compared with (docs/SPEC.md 7g) |
+| `description` | `overview?`, `changelog?`, `sections?`, `thread?`. `sections` (2026-10-31, mytop-project/tracker#845): `[{title, body}]`, at most 64, the source's other named texts in its order ("Installation", "Developer notes"); a section headed "Changelog" (or "What's new") is the changelog when `changelog` is absent. `thread`: the source page's main text as it reads (a forum thread's first post), for the game page's Show thread | `text` facets: the game page's About, the record page's Overview and Changelog; each section a row of the record's Info tab, its text under its heading; `thread` is what Show thread reads (UI lane, #845 U5) |
 | `image` | as `media` | Filed by role; only for a role the game has no picture for, unless the person chose this source's art |
-| `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?, systems?, parts?}]`, at most 200. `parts` (2026-10-29): `[{label, url?, link?, size?}]`, at most 100, the pieces of one split release on one host; the entry is one row ("4 parts, 12 GB"), and picking it fetches every part in one Downloads job and joins and unpacks them as droidtop's split-set path does (multi-volume RAR, numbered 7-Zip and ZIP parts), never one row per part. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands. `systems` (2026-10-23, Droidtop/tracker#617): the systems the link is for, of `windows`, `linux`, `mac`, `android`; without it droidtop reads them from `section` ("Win/Linux" is Windows and Linux), and an entry naming none is for any system. `role` (2026-10-30, Droidtop/tracker#838): `build` (default), `patch` or `extra`; `official` (default true) is false for an item the thread marks unofficial (`*`). `build` (2026-10-31, Droidtop/tracker#845): the build a game's link is for, as the source names it ("Steam Build"), absent for the default build; without it droidtop reads the build from `section` ("Steam Build · Win/Linux"), and `sources.parse_thread` gives it for every link under a build's heading. Patches and extras are offered, never taken by droidtop's own pick. A mirror is one entry however many systems it covers: droidtop keeps one entry per address (or per section, host and `link` without one), holding every system any copy named (Droidtop/tracker#838) | A `list` of `action` entries on the record page's Downloads tab: one row per `section` of builds (a build and its platform, "Steam Build · Win/Linux"), its hosts listed under it and tried in turn; a section with one link is that link's row; the copy's build first when there are several (docs/SPEC.md 7g, Droidtop/tracker#838). When the links differ by system, a System row comes first, offering the thread's own download groupings ("Windows/Linux", "Android"; the one last picked for that source, else the one with Windows, then Linux), and only the picked choice's links show; the ones for any system follow under "Patches", "Extras" (a heading naming a walkthrough, a patch, a save file and the like) or "Other", each with its `section` as its description, so a plugin puts what a link is ("Walkthrough") in `section`; Android picked, droidtop says "This will not be trackable by us. Windows or Linux is recommended." The picker and the notice are droidtop's, drawn from `systems`: no facet filters another, and no plugin words droidtop's notice. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
+| `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?, systems?, parts?}]`, at most 200. `parts` (2026-10-29): `[{label, url?, link?, size?}]`, at most 100, the pieces of one split release on one host; the entry is one row ("4 parts, 12 GB"), and picking it fetches every part in one Downloads job and joins and unpacks them as droidtop's split-set path does (multi-volume RAR, numbered 7-Zip and ZIP parts), never one row per part. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands. `systems` (2026-10-23, mytop-project/tracker#617): the systems the link is for, of `windows`, `linux`, `mac`, `android`; without it droidtop reads them from `section` ("Win/Linux" is Windows and Linux), and an entry naming none is for any system. `role` (2026-10-30, mytop-project/tracker#838): `build` (default), `patch` or `extra`; `official` (default true) is false for an item the thread marks unofficial (`*`). `build` (2026-10-31, mytop-project/tracker#845): the build a game's link is for, as the source names it ("Steam Build"), absent for the default build; without it droidtop reads the build from `section` ("Steam Build · Win/Linux"), and `sources.parse_thread` gives it for every link under a build's heading. Patches and extras are offered, never taken by droidtop's own pick. A mirror is one entry however many systems it covers: droidtop keeps one entry per address (or per section, host and `link` without one), holding every system any copy named (mytop-project/tracker#838) | A `list` of `action` entries on the record page's Downloads tab: one row per `section` of builds (a build and its platform, "Steam Build · Win/Linux"), its hosts listed under it and tried in turn; a section with one link is that link's row; the copy's build first when there are several (docs/SPEC.md 7g, mytop-project/tracker#838). When the links differ by system, a System row comes first, offering the thread's own download groupings ("Windows/Linux", "Android"; the one last picked for that source, else the one with Windows, then Linux), and only the picked choice's links show; the ones for any system follow under "Patches", "Extras" (a heading naming a walkthrough, a patch, a save file and the like) or "Other", each with its `section` as its description, so a plugin puts what a link is ("Walkthrough") in `section`; Android picked, droidtop says "This will not be trackable by us. Windows or Linux is recommended." The picker and the notice are droidtop's, drawn from `systems`: no facet filters another, and no plugin words droidtop's notice. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (mytop-project/tracker#599) |
 | `links` | `entries: [link]`, at most 32 | `link` facets: the game page's Links, Open the source's page |
 | `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. Only store and source plugins may give it, under the guards in "Store information" below |
 | `update` | `version?`, `url?`, `gone?` | A `badge` and an `info`: the Update available badge and shelf, Updates, the record page's version line |
@@ -1580,7 +1580,7 @@ The owner: "Any store OR SOURCE plugin can provide that information. There has t
 - **The person's say.** Each plugin's store information is its own switch under the plugin's "Where it appears", and
   a store or source the person hides is hidden on every game.
 
-#### Failures in droidtop's words (Droidtop/tracker#852 part 2 slice 2, from #883 §3.7, approved 2026-11-05)
+#### Failures in droidtop's words (mytop-project/tracker#852 part 2 slice 2, from #883 §3.7, approved 2026-11-05)
 
 A plugin's failure carries a code from the fixed list (§1.3), and droidtop words it with its one fix
 (`PluginFailureWords`). The subject is the feature's own name, the one it has in Game sources, never "the plugin".
@@ -1601,7 +1601,7 @@ A plugin's failure carries a code from the fixed list (§1.3), and droidtop word
 - **A page droidtop cannot draw** is skipped and logged for the developer; the person sees an empty page.
 - **What the plugin said, and its `detail`, is in Info (Technical details) always**, not only with the Developer
   menu on: "no status shown without its reason" (DESIGN-LANGUAGE).
-#### Declared settings: drawn with no call (Droidtop/tracker#880, decided 2026-11-05)
+#### Declared settings: drawn with no call (mytop-project/tracker#880, decided 2026-11-05)
 
 The owner: "opening the f95zones settings page gets me a spinner? why the hell should settings have to load?", then
 "The plugin should have exposed a Settings facet, or exposed things in advance. It should not have to be asked or
@@ -1643,19 +1643,19 @@ its own (a game, an item) or none. A plugin declares the targets it uses on a `p
 | `game.row`, `game.tile` | A game's list row and its capsule | `badge`, `status`, `progress` (one per plugin) | the game |
 | `item.page` | The record page of an item (docs/SPEC.md 7g, "Getting an update") | the bundles, `action`, `notice`, `link`, `toggle` (2026-10-29: watch or unwatch a thread, follow a release), `guide` (2026-10-30) | the item |
 | `library.filter`, `library.sort` | The PC Games filter and sort sheets | from `info` with `filterable`/`sortable`, and the bundles' fields | items attached to games |
-| `search.result` | The one search's results (C5, Droidtop/tracker#218) | `list` entries, `collection` entries | the query |
+| `search.result` | The one search's results (C5, mytop-project/tracker#218) | `list` entries, `collection` entries | the query |
 | `search.filter` | A source's own options in the one search, under its name (2026-10-29) | `choice`, `toggle`, `input`, `notice`, `action` | the plugin. The values travel with the query on `library.sources` `search` as `args.filters` (`{facetId: value}`) and are kept per source, as the System pick is; a `notice` with an `action` says why the source cannot search yet and fixes it in place ("No site is on" with the switches, "Download the game index" as a job). A source's §1.6 `form` is deleted once it gives these |
-| `home.shelf`, `home.card` | Home's shelves and cards (Droidtop/tracker#586) | `collection` (a shelf), `info`, `media`, `action`, `progress` (a card) | none |
+| `home.shelf`, `home.card` | Home's shelves and cards (mytop-project/tracker#586) | `collection` (a shelf), `info`, `media`, `action`, `progress` (a card) | none |
 | `quickmenu` | The Quick Menu's plugin entries, which take over the left plugin menu (#586) | `status`, `toggle`, `action`, `progress`, `meter`, `chart`, `choice`, `group` | the device, the running game |
 | `companion.tab`, `companion.card` | The companion's tabs and cards (C15) | all but `collection` in a card; a tab is a `group` | the device, the running game |
-| `settings.page` | **Retired** (Droidtop/tracker#880): the plugin's settings are declared in its manifest (below, "Declared settings"); still accepted in a manifest, never asked or drawn | — | — |
+| `settings.page` | **Retired** (mytop-project/tracker#880): the plugin's settings are declared in its manifest (below, "Declared settings"); still accepted in a manifest, never asked or drawn | — | — |
 | `notification` | droidtop's notifications (C6) | `notice`, up to three `action`s, `progress` | any |
 | `status.area` | The status bar and the floating status cluster | `status` (the dot and label only), `badge`, `meter` | the device |
 | `widget` | Android home-screen widgets (C10) | `info`, `status`, `progress`, `meter`, `media`, `list` (5 rows), `action` (2) | the plugin, the device |
 | `plugin.page` | The plugin's own page under Plugins | everything | the plugin |
 | `desktop.tray` | The desktop's taskbar tray (C8) | `status`, `badge`, `action` (a menu of up to 8), `toggle`, `meter` | the device |
-| `desktop.window` | A Desktop window's menu on the bar (2026-11-06, Droidtop/tracker#221): where a plugin hooks into an application, "Send to phone" on a browser window | `action`, `toggle`, `badge` (three per plugin) | the window (`{type: "window"}`), asked only for windows of apps the plugin may see: it needs `windows.read`, narrowed by the manifest's `apps` (catalogue E5). Risk medium |
-| `files.action` | The file manager's actions and "open with" (C9) | `action` | a file or folder the person picked (`{type: "file", token, mime}`: droidtop passes a document token, D4, never a path). The guards took only `plugin` as its subject until 2026-11-06 (Droidtop/tracker#221), which no file action can be about |
+| `desktop.window` | A Desktop window's menu on the bar (2026-11-06, mytop-project/tracker#221): where a plugin hooks into an application, "Send to phone" on a browser window | `action`, `toggle`, `badge` (three per plugin) | the window (`{type: "window"}`), asked only for windows of apps the plugin may see: it needs `windows.read`, narrowed by the manifest's `apps` (catalogue E5). Risk medium |
+| `files.action` | The file manager's actions and "open with" (C9) | `action` | a file or folder the person picked (`{type: "file", token, mime}`: droidtop passes a document token, D4, never a path). The guards took only `plugin` as its subject until 2026-11-06 (mytop-project/tracker#221), which no file action can be about |
 | `launcher.drawer` | The app drawer's and home screen's actions (C12) | `action`, `badge` | an app |
 | `onboarding.step` | A step of onboarding (C13) | `info`, `text`, `media`, inputs, `action`, `notice` | the device. Risk high: offered only by plugins from the person's trusted catalogs, and shown only after droidtop's own steps |
 | `<plugin>:<slot>` | A slot another plugin opens in its own page or card (below) | what the slot's owner lists | the slot owner's subject |
@@ -1737,7 +1737,7 @@ Enforcement is droidtop's, at the API; a manifest only asks (docs/SPEC.md 12a):
 - **Stale while asking:** a target shows what droidtop has at once, saying when it was fetched where that matters,
   and the plugin is asked in the background.
 - **Never fetched to act:** a download, a link or a version comparison uses the kept facet. A `download` entry whose
-  page no longer works opens the item's `source` link instead (Droidtop/tracker#599).
+  page no longer works opens the item's `source` link instead (mytop-project/tracker#599).
 - **Several plugins about one game:** each bundle has its own source order (Settings, "Metadata sources", one list
   per bundle, all starting from one default order: the game's own linked update source, then metadata plugins in
   install order). `tags` and `genres` are joined, images are per role, and `download` and `store` list each source's
@@ -1836,7 +1836,7 @@ So:
 
 ---
 
-### 1.11 Sources behave the same: match, links, states (approved 2026-10-30, Droidtop/tracker#784)
+### 1.11 Sources behave the same: match, links, states (approved 2026-10-30, mytop-project/tracker#784)
 
 The owner, 2026-10-29: "We need to normalize the other plugins as much as possible. We want users to be able to
 interact with them consistently", after F95's Match showed a correct link as "thread 214581" and could not be changed
@@ -1873,7 +1873,7 @@ plugin. The parts marked *(built)* have landed.
      ("Steam Build · Win/Linux"), a platform label is one entry per host covering every system it names ("Win/Linux"
      is one download for Windows and Linux), hosts keep the thread's order, "Patches" and "Extras" items carry `role`,
      and a `*` makes one `official: false`; each link under a build's heading carries that heading as `build`. It
-     answers `{version?, entries, problem?, message?, facts?}`. `facts` (2026-10-31, Droidtop/tracker#845) is what the
+     answers `{version?, entries, problem?, message?, facts?}`. `facts` (2026-10-31, mytop-project/tracker#845) is what the
      first post states besides its links, for the source's `metadata` facet: `platforms` from an "OS:" or
      "Platform:" line in droidtop's names where it knows them ("Win" is Windows), `languages` from "Language:", and
      `contentNotes` from "Censored:" ("No" is "Uncensored"). `sections` are the post's named texts (`[{title, body}]`:
@@ -1916,10 +1916,10 @@ plugin. The parts marked *(built)* have landed.
      droidtop-agent;
    - Droidtop: Old versions, and any other plugin that matches or acquires.
 
-### 1.12 Plugins in Desktop mode: hooking into desktop applications (designed 2026-11-06, Droidtop/tracker#221)
+### 1.12 Plugins in Desktop mode: hooking into desktop applications (designed 2026-11-06, mytop-project/tracker#221)
 
 *The owner, 2026-10-01: "allow for plugins to run IN desktop mode, hook into applications in the desktop for
-functionality". The design is on Droidtop/tracker#221 (2026-11-06), built to the lane's recommendation; it is built
+functionality". The design is on mytop-project/tracker#221 (2026-11-06), built to the lane's recommendation; it is built
 in slices, and each slice says here what it built.*
 
 **Where the code runs.** In the plugin's own contained process, as every plugin's does (§5.3). It talks only to
@@ -1968,7 +1968,7 @@ its windows over when it connects and takes them back when it ends (`DesktopPlug
 every call is in the activity log.
 
 **The bar, as built (slice 3, 2026-11-06).** Both targets are drawn by the one renderer, as a page opened from the
-bar (`DesktopPluginFacets`), so nothing on the bar waits on a plugin process to draw (Droidtop/tracker#852 part 2's
+bar (`DesktopPluginFacets`), so nothing on the bar waits on a plugin process to draw (mytop-project/tracker#852 part 2's
 rule): the bar shows what the manifest says, and the plugin is asked `get` only when the person opens its entry.
 - **The tray:** one button per plugin that declares `desktop.tray`, is on in Desktop and has the target switched on,
   by the plugin's name, beside the Plugins button; it opens the plugin's tray facets about the device. Drawing a
@@ -2023,9 +2023,9 @@ other fixtures it is never packaged. Writing it found two gaps, both fixed with 
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
 **What the person approves.** Each permission above, each target (`facets:desktop.tray`, `facets:desktop.window`,
-`facets:files.action`) and each association is its own row on the plugin's approval list (§4.2, Droidtop/tracker#164).
+`facets:files.action`) and each association is its own row on the plugin's approval list (§4.2, mytop-project/tracker#164).
 `windows.read`, `windows.control` and `clipboard.read` are dangerous and start unticked; `clipboard.write` is normal
-(D6) and every write is audited all the same. Every use of them is in the audit log (§4.6, Droidtop/tracker#61); window events delivered are counted per day.
+(D6) and every write is audited all the same. Every use of them is in the audit log (§4.6, mytop-project/tracker#61); window events delivered are counted per day.
 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
 2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
@@ -2033,7 +2033,7 @@ an action, below, covers the legitimate uses), and capturing a window's picture 
 approval (built 2026-11-06, below). 6, a test fixture plugin exercising each (built 2026-11-06, below).
 
 **The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
-agreed to these, which are proposed on Droidtop/tracker#602 and not yet built ("I agree with 5-8"):
+agreed to these, which are proposed on mytop-project/tracker#602 and not yet built ("I agree with 5-8"):
 - `copy` on `info` and on `list` entries: droidtop copies the value on the person's press, so no clipboard
   permission is needed;
 - a `countdown` and relative-time value ("ends in 3 min", "2 h ago"), counted by droidtop, where today a live time
@@ -2049,7 +2049,7 @@ than the rest, but is also among the most useful. For instance, making a tailsca
 plugin, we could present a facet that IS a special page of the full UI the plugin contains". The proposal:
 - an action `kind: "surface"` names a surface the plugin declares ahead of time in its manifest, on its `ui.main`
   entry (`"surfaces": [{"id": "tray", "size": "popover"}]`), as every facet a plugin can describe ahead of time is
-  declared (Droidtop/tracker#852, the owner's #883 decision);
+  declared (mytop-project/tracker#852, the owner's #883 decision);
 - the plugin draws inside it, in its own process, as `ui.main` does (§1.7), so it is offered where `ui.main` is;
 - droidtop owns the frame: a "from <plugin>" header, a size cap per target, Close and Back, and its place, anchored
   to what opened it. Nothing the plugin draws covers droidtop's own components;
@@ -2303,7 +2303,7 @@ never disables its callers.
    - **Stream sessions (`exec_stream`, built 2026-10-09,
      plugin-enforce-5).** A command that outlives one call or takes input
      (droidtop's `PrivilegedShell.spawn`, the rooted desktop stack,
-     Droidtop/tracker#394). Four quick ops on `priv.shell`, each gated by
+     mytop-project/tracker#394). Four quick ops on `priv.shell`, each gated by
      the same per-level permission as `exec`:
      - `exec_stream {argv, session}`: starts `argv` directly (no shell
        unless `argv` names one). `session` is a token the caller chooses
@@ -2389,7 +2389,7 @@ the Shizuku binder must run full-trust.
 The group ids (A1, B3, ...) are stable references for issues and code
 comments.
 
-### Naming (owner, 2026-10-10, Droidtop/tracker#459)
+### Naming (owner, 2026-10-10, mytop-project/tracker#459)
 
 "It probably makes sense to make API call names simple and descriptive. We
 should be able to parse the api call behavior by what it does, and the name
@@ -2510,7 +2510,7 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
     never used to write; it is only ever a name for a file already written
     there.
   - **`library.files` `changed {added[], removed[], changed[]}`** (host
-    call, version 1; Droidtop/tracker#354, docs/SPEC.md 7g "Targeted
+    call, version 1; mytop-project/tracker#354, docs/SPEC.md 7g "Targeted
     indexing"). Absolute paths, 1 to 200 per call. Droidtop classifies and
     adds, updates or removes exactly those files and folders in its index
     with the rules a scan uses, looking at a new game folder's own contents
@@ -2528,7 +2528,7 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
 **A3 Metadata providers and scrapers.** EP `library.metadata@1`. Risk
 medium. *(Proposed 2026-10-22: `fetch`'s fields become facets in contract 3,
 §1.10; they are read as facets meanwhile.)* The owner, 2026-10-16: "can we add an automatic scraping system?
-We have LOTS of games with no metadata" (Droidtop/tracker#568), and on
+We have LOTS of games with no metadata" (mytop-project/tracker#568), and on
 the same issue: "That's fine for plugins, but our built-in scrapers don't
 talk over the API".
 - **For:** what a plugin knows about a game, offered next to droidtop's
@@ -2548,11 +2548,11 @@ talk over the API".
         and the ids read from its folder);
       - `sourceLinks`, kept for plugins written before `storeIds`.
       - `folder` carries at least `name`, the game's folder name, also
-        sent as `fileName` (2026-10-17, Droidtop/tracker#575).
+        sent as `fileName` (2026-10-17, mytop-project/tracker#575).
     - A source with no link for the game searches by `title` and by
       `folder.name`, and answers only exact matches, as droidtop's
       built-in sources match.
-    - A person's own search (2026-11-04, Droidtop/tracker#861; SPEC 7g, "The person's own search text"): the
+    - A person's own search (2026-11-04, mytop-project/tracker#861; SPEC 7g, "The person's own search text"): the
       match picker sends `asked: "person"` and the words the person typed as `title`, with no `fileName` and no
       `folder`, so the source searches those words only.
     - The host takes the one most confident candidate at or above 0.5 (a
@@ -2637,7 +2637,7 @@ talk over the API".
     before one in another, one with none counting as any; a `wide` fills the landscape slot
     when there is no `hero`. 10 s per provider.
   - No `fetch`: droidtop downloads each `url` itself with the scrape's own write.
-- **When (2026-11-05, Droidtop/tracker#714):** during a PC game's scrape, after droidtop's own
+- **When (2026-11-05, mytop-project/tracker#714):** during a PC game's scrape, after droidtop's own
   sources (SteamGridDB, the Steam store, IGDB, the match), each allowed provider in turn,
   filling only the roles those left empty (`PluginArtwork`, called from `PcFlavour`).
 - **Surfaces:** the scrape (Scrape PC games). The artwork picker on a game is not yet offered.
@@ -2701,7 +2701,7 @@ Risk —.
     string at most 2,048 characters long that droidtop only hands back to
     `download`; at most 200 downloads. Asked when the page opens, never
     in the update round. A download may instead, or as well, carry `url`
-    (2026-10-22, Droidtop/tracker#599): the https address of the link
+    (2026-10-22, mytop-project/tracker#599): the https address of the link
     itself, as the source's page has it. droidtop keeps the record, and
     picking that download opens `url` in droidtop's web view with the
     plugin's session (G3): the person starts the download there, droidtop
@@ -2727,7 +2727,7 @@ Risk —.
   Tapping an update, or a linked source's row, opens droidtop's record
   page for that source (`record`); a source that does not answer `record`
   (`UNSUPPORTED`) gets a record page that says it has no update page, with
-  Change link under it (Droidtop/tracker#619).
+  Change link under it (mytop-project/tracker#619).
 - **Permission:** `provide:library.updates`, `net.domains`.
 - **Facets (proposed 2026-10-22, §1.10):** in contract 3, `record` and
   `check`'s `facts` become `item.page` facets (`ui.facets` `get`, or
@@ -2764,14 +2764,14 @@ Risk —.
 - **Rules:** the host hands the plugin read or write file descriptors
   for the save paths it resolved itself. The plugin never picks a path.
 
-**A7a Where saves are, both ways (Droidtop/tracker#547, contract
+**A7a Where saves are, both ways (mytop-project/tracker#547, contract
 2026-10-23).** EP `saves.roots@1`. Risk medium. Host API `saves`
 (permission `saves.exchange`, normal; only an `app_interface` plugin may
 call it, any other gets `PERMISSION_DENIED`). The owner: "The two applications
 should detect and work with each other over the plugin API so no matter
 what, saves go where they're needed". Which app launched a game makes no
 difference:
-- **droidtop asks the plugin (EP `saves.roots@1`, Droidtop/tracker#546
+- **droidtop asks the plugin (EP `saves.roots@1`, mytop-project/tracker#546
   design v3 section 8, checks C10 and D12):** one point per job, so this
   is #546's point; the first contract post's `saves.locations@1` is
   dropped.
@@ -2821,9 +2821,9 @@ difference:
     (`SaveSyncEngines`): a store's cloud adopts the saves into droidtop's
     folder for the game and uploads them, as after a game droidtop
     launched; paired computers and handhelds take it once they sync from
-    a folder outside a Wine prefix (Droidtop/tracker#546), a cloud or
-    network share once droidtop has one (Droidtop/tracker#573), and a
-    `saves.sync` plugin (Droidtop/tracker#284). `synced` is whether any
+    a folder outside a Wine prefix (mytop-project/tracker#546), a cloud or
+    network share once droidtop has one (mytop-project/tracker#573), and a
+    `saves.sync` plugin (mytop-project/tracker#284). `synced` is whether any
     engine covers the game, `engines` what each did. With none, nothing is
     copied and that is no failure (`accepted: true, synced: false`).
     `saveFolder` must be a folder in shared storage or on a card, whose
@@ -2855,7 +2855,7 @@ difference:
   registered, asked by the save model next, and the reported folder shown
   on the game's Saves row.
 
-**A7b Engine cores (Droidtop/tracker#752, 2026-10-29).** EP
+**A7b Engine cores (mytop-project/tracker#752, 2026-10-29).** EP
 `engines.cores@1`. Risk low. Only an `app_interface` plugin is asked.
 Host API `engines` (no permission; only an `app_interface` plugin that
 provides `engines.cores`, with the point on, may call it, any other gets
@@ -2884,7 +2884,7 @@ exist:
   still has it. An app that cannot be asked now (waiting for approval,
   turned off, needing an update) keeps its last answer; it is dropped
   only when the plugin is removed or no longer provides the point
-  (Droidtop/tracker#854: a dropped list made a game page offer "Get …
+  (mytop-project/tracker#854: a dropped list made a game page offer "Get …
   support" for a core that was installed).
 - **The plugin tells droidtop:** `engines report_changed {}` →
   `{accepted}`: a core was installed, removed or updated, or the catalog
@@ -2918,7 +2918,7 @@ exist:
   - D: the library object view.
 - **Permission:** `provide:achievements.provider`, `net.domains`, and
   `library.history` if the provider reads play sessions.
-- **Status (2026-10-24, Droidtop/tracker#143):** `set` and `progress` built (`PluginAchievements`): when a game's
+- **Status (2026-10-24, mytop-project/tracker#143):** `set` and `progress` built (`PluginAchievements`): when a game's
   page opens and neither RetroAchievements nor the game's store has achievements for it, each provider is asked in
   turn (10 s each) and the first with any fills the page's Achievements row and its page, the same row and page as
   RetroAchievements' and Steam's. An `https` badge is kept, anything else dropped; 1000 at most. The event and the
@@ -2937,7 +2937,7 @@ exist:
 - **Surfaces:** G: the companion screen now-playing; A/D: file manager
   views (a plugin's own pages).
 - **Permission:** `media.read` (dangerous).
-- **Status:** built (2026-11-05, Droidtop/tracker#714, `HostMediaApis`, `AndroidMediaLibrary`).
+- **Status:** built (2026-11-05, mytop-project/tracker#714, `HostMediaApis`, `AndroidMediaLibrary`).
 - **Rules:** the host queries MediaStore. A contained plugin (§5.3) has
   no filesystem of its own.
 
@@ -2948,7 +2948,7 @@ writes real files that droidtop's own scan finds (A2).
   not files, such as cloud or streaming services, may need this
   reopened.
 
-**A11 BIOS providers.** EP `emulator.bios@1` (Droidtop/tracker#415, decided
+**A11 BIOS providers.** EP `emulator.bios@1` (mytop-project/tracker#415, decided
 2026-10-09). Risk medium; no `provide:` consent (medium), it appears as an
 "Adds" tick box like the other medium points.
 - **For:** a plugin that can supply the BIOS files an emulated system needs,
@@ -2987,7 +2987,7 @@ writes real files that droidtop's own scan finds (A2).
 - **For:** a catalog of Android apps: an F-Droid repository client, a tracker
   of release pages (Obtainium-style). The plugin lists; droidtop downloads,
   checks, installs and decides what is an update (docs/SPEC.md 10b
-  "Installing apps", Droidtop/tracker#261).
+  "Installing apps", mytop-project/tracker#261).
 - **Ops** (every call also carries `device {sdk, abis, locale}`, so the plugin
   answers for this device):
   - `list_sources {}` → `{sources: [{id, name, address, enabled, updated?, apps?,
@@ -3038,15 +3038,15 @@ writes real files that droidtop's own scan finds (A2).
   sources (an F-Droid client reads repositories on any host the person adds,
   so `net.any`); `intents.in` to receive the links it declares.
 - **Status:** host side built 2026-10-10 (`AppCatalogs`, `AppCatalogScreen`,
-  `ApkInstaller`); the F-Droid plugin is Droidtop/droidtop-plugin-fdroid.
+  `ApkInstaller`); the F-Droid plugin is mytop-project/droidtop-plugin-fdroid.
 
 ### B. Launch and runtime
 
-**A13 Stores.** EP `library.stores@1` (Droidtop/tracker#220; owner,
+**A13 Stores.** EP `library.stores@1` (mytop-project/tracker#220; owner,
 2026-10-01: "we need store/source and downloader integration APIs",
 downloading belonging to sources). Risk high. Built 2026-10-28 (rows and
 sign-in; installing and uninstalling); updates, `launch` and the plugin's
-link from Stores 2026-11-05 (Droidtop/tracker#805, built to the
+link from Stores 2026-11-05 (mytop-project/tracker#805, built to the
 recommendation, owner to confirm).
 - **What it is:** a store droidtop shows beside its own (Steam, GOG,
   Epic, Amazon, itch). A plugin's store is a `StoreLibrary` like theirs
@@ -3293,14 +3293,14 @@ Risk low.
   quick-settings-like surfaces: "VPN on", "Sync now", "Fan: quiet".
 - **Ops:** `state → {label, value, on?, icon}` and `toggle` or `action`. The label is cut to 32 characters and the value to
   16 (`tileLabel`, `tileValue` in docs/view-limits/plugin-view-limits.json), with an ellipsis: a tile is a host row
-  of fixed height (Droidtop/tracker#644).
+  of fixed height (mytop-project/tracker#644).
 - **Surfaces:**
   - G: the plugin's panel in the Quick Menu (C17), first rows;
   - A: an `android.service.quicksettings.TileService` slot that droidtop
     owns (P2);
   - D: the tray (C8).
 - **Permission:** none.
-- **While a game runs (2026-10-15, Droidtop/tracker#544 item 6).** A tile
+- **While a game runs (2026-10-15, mytop-project/tracker#544 item 6).** A tile
   entry (`ui.quick_tile` or `ui.status_tile`) may declare
   `"whileGame": true`: it is shown only while a game is running. With
   `"gamePackages": ["com.retroarch", ...]` (the `ui.panel` entry's field) it
@@ -3308,7 +3308,7 @@ Risk low.
   is shown whatever runs. RetroArch's Save state and Fast-forward are the
   case: `{"point": "ui.quick_tile", "id": "save_state", "gamePackages":
   ["com.retroarch", "com.retroarch.aarch64"]}`.
-- **On a widget (2026-10-16, Droidtop/tracker#563).** A tile whose
+- **On a widget (2026-10-16, mytop-project/tracker#563).** A tile whose
   `surfaces` is empty or names `android.widget` can be put on droidtop's
   widgets (C10). Its state is asked with the same `state` op and budget,
   at most once every 30 s, and a press on the widget is the same `toggle`
@@ -3391,7 +3391,7 @@ Risk low.
   - D: a container-side notification through the host bridge.
 - **Permission:** `notify.post` (normal), rate-limited (§8). droidtop holds
   Android's `POST_NOTIFICATIONS` for it (§4.1, "Android permissions").
-- **Status:** built in part (2026-10-08, Droidtop/tracker#378): `post {title,
+- **Status:** built in part (2026-10-08, mytop-project/tracker#378): `post {title,
   text}` → `{posted}` as an Android notification in the plugin's own
   channel, at most 5 an hour; droidtop asks Android for its permission on
   first use during a call the person started. `actions`, `progress`,
@@ -3423,13 +3423,13 @@ Risk low.
 - **Rules:** only during a call the person started; a title that is one of
   droidtop's own notice titles is refused (`INVALID_ARGS`); limits as the
   notice node's. The `text` op and its `REFUSED`/`BUSY` answers come with
-  the text-entry work (Droidtop/tracker#485, slice 9).
+  the text-entry work (mytop-project/tracker#485, slice 9).
 - **Status:** built (2026-10-14).
 
 **C7 Themes and theme assets.** EP `theme.pack@1`. Risk medium.
 - **For:** ES-DE themes, icon packs, sound packs, wallpapers,
   controller-glyph sets and fonts.
-- **Ops (ES-DE themes, built 2026-11-05, Droidtop/tracker#714, built to the recommendation, owner to confirm):**
+- **Ops (ES-DE themes, built 2026-11-05, mytop-project/tracker#714, built to the recommendation, owner to confirm):**
   `list {kinds: ["esde"]}` → `{themes: [{id, name, author?, url, screenshots?, variants?, colorSchemes?,
   aspectRatios?, fontSizes?, deprecated?}]}`, at most 100: each theme an https git repository, as ES-DE's own
   `themes.json` names one, with up to 8 https screenshots. droidtop lists them in Browse themes after ES-DE's own,
@@ -3482,7 +3482,7 @@ Risk low.
 **C10 Widgets.** EP `ui.widget@1`. Risk low.
 - **For:** a small live panel on a launcher's page, the desktop surface
   or the companion screen: a clock, a system monitor, now playing, a sync
-  status (Droidtop/tracker#563: a plugin's integration on Niagara's or any
+  status (mytop-project/tracker#563: a plugin's integration on Niagara's or any
   launcher's pages).
 - **What the plugin supplies:** data only, in one of a closed set of
   templates that droidtop draws. Every template maps to views an Android
@@ -3523,7 +3523,7 @@ Risk low.
   filter every tile surface reads). The widget maker lists them from
   manifests without loading a plugin.
 - **Surfaces:**
-  - A: droidtop's widgets on any launcher's pages (Droidtop/tracker#563),
+  - A: droidtop's widgets on any launcher's pages (mytop-project/tracker#563),
     through the one widget renderer;
   - G: companion screen panels (§4d), not built;
   - D: the desktop surface, not built.
@@ -3546,7 +3546,7 @@ Risk low.
 - **Permission:** `provide:gaming.rows`, plus `net.domains` for the art,
   which the host fetches.
 - **Status:** built for shelves of library entries (2026-10-07,
-  Droidtop/tracker#316):
+  mytop-project/tracker#316):
   - op `rows {context:{surface:"gaming.home", library?}}` returns
     `{shelves:[{id, title, entries:["<entry id>"]}]}`
     (`docs/plugin-view.schema.json` `$defs.shelvesReply`);
@@ -3609,7 +3609,7 @@ Risk medium.
   G2.
 
 **C15 Companion screen panels.** No point of its own: a plugin's `ui.panel`
-(C17) is its companion panel too (decided 2026-10-09, Droidtop/tracker#414
+(C17) is its companion panel too (decided 2026-10-09, mytop-project/tracker#414
 slice C9; the `ui.companion@1` point once listed here was never built and is
 dropped, one panel per plugin).
 - **For:** content and controls for the companion screen (SPEC "The
@@ -3621,7 +3621,7 @@ dropped, one panel per plugin).
   The call's `context.surface` is `<mode>.companion` (`gaming.companion`,
   `standard.companion`, `desktop.companion`); `context.game` is the running
   game under the `library.read` rule, as in the Quick Menu.
-- **On facets (Droidtop/tracker#602).** A plugin whose `ui.facets` entry
+- **On facets (mytop-project/tracker#602).** A plugin whose `ui.facets` entry
   declares `companion.tab` is drawn on the companion from those facets, never
   from its `ui.panel` view: `get {target: "companion.tab", subject}` with the
   device as the subject on its tab and the Plugins tab, and with the running
@@ -3701,7 +3701,7 @@ dropped, one panel per plugin).
     that fails is one row saying so. Context actions (C4) on the same
     game are rows under Extras there too.
   - G: a console game's page and an app's draw the same rows under the same tabs (the game page's frame,
-    docs/SPEC.md 7i, Droidtop/tracker#845; each section was a chip that opened it as a page).
+    docs/SPEC.md 7i, mytop-project/tracker#845; each section was a chip that opened it as a page).
 - **Permission:** `provide:ui.game_section`; the game's identity is in
   `target` only with `library.read`, as for C4.
 - **Status:** built (2026-10-07, `PluginGameSections`).
@@ -3709,7 +3709,7 @@ dropped, one panel per plugin).
 **C19 Friends and chat.** EP `social.provider@1`. Risk medium.
 - **For:** a service's friends, presence and 1:1 chat (Discord, Matrix,
   another store) beside Steam's, in droidtop's one Social place
-  (docs/SPEC.md "Social", Droidtop/tracker#327).
+  (docs/SPEC.md "Social", mytop-project/tracker#327).
 - **Static fields:** `id` (one account; `default` when absent; a plugin
   with two accounts declares two entries) and `label` (the service's
   name, shown as the friends' badge; the plugin's label when absent).
@@ -3756,15 +3756,15 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | D1 | Network state | adapt to connectivity; VPN/hotspot tiles | `net.state()` → {type, metered, vpn, ssid?}; event `net.changed` | data | `net.state` (normal; SSID needs `net.wifi_details`, dangerous: location-grade) | low | built (2026-10-08, `net` `state` → {online, type, metered, vpn}); SSID and `net.changed` not built |
-| D2 | Network access | talk to the internet | `net.http {method, url, headers, body \| bodyBase64, timeoutMs, as}` → {status, url, headers, body \| bodyBase64, truncated} (each body ≤ 128 KiB: it travels inside the reply cap); `net.download {url, name, title?}` → {jobId}, a job into the plugin's own data (H1), its row named by `title` (one line, at most 60 characters) or else "Download" and the file's name, "Download data" when the name is a hash (`DownloadTitle`, Droidtop/tracker#739), read with `plugins.job_status` (`done`, `status`, `percent`) and stopped with `plugins.job_cancel` | data | `net.domains` (declared list, normal) / `net.any` (dangerous) / `net.local` (LAN, dangerous) | medium to high | built (2026-10-08, `HostNetApis`): the URL alone picks the permission before any name is looked up; https only outside the local network; redirects followed by droidtop with every hop checked; a declared name that resolves to the local network needs `net.local`; every request logged with its host |
+| D2 | Network access | talk to the internet | `net.http {method, url, headers, body \| bodyBase64, timeoutMs, as}` → {status, url, headers, body \| bodyBase64, truncated} (each body ≤ 128 KiB: it travels inside the reply cap); `net.download {url, name, title?}` → {jobId}, a job into the plugin's own data (H1), its row named by `title` (one line, at most 60 characters) or else "Download" and the file's name, "Download data" when the name is a hash (`DownloadTitle`, mytop-project/tracker#739), read with `plugins.job_status` (`done`, `status`, `percent`) and stopped with `plugins.job_cancel` | data | `net.domains` (declared list, normal) / `net.any` (dangerous) / `net.local` (LAN, dangerous) | medium to high | built (2026-10-08, `HostNetApis`): the URL alone picks the permission before any name is looked up; https only outside the local network; redirects followed by droidtop with every hop checked; a declared name that resolves to the local network needs `net.local`; every request logged with its host |
 | D3 | Storage and volumes | free space, removable media, where a library folder lives | `storage.volumes()` → [{id, label, removable, freeBytes}]; events `storage.mounted` / `unmounted` | data | `storage.volumes` (normal) | low | built (2026-10-08, `storage` `volumes`, with `primary`, `state`, `totalBytes`); the mount events are not built |
 | D4 | File picker (SAF) | let the user choose a file or folder for the plugin | `files.pick {mode, mime}` → a grant token; `files.open {token}` → fd | the system picker | `files.picker` (normal; the user's pick is the consent) | low | built (2026-10-08): `files.pick {mode: open \| create, mime, name}` → {picked, token, name, writable}, only during a call the person started; `files.open {token, mode}` → fd; `files.forget {token}`; folders are not offered |
 | D5 | Shared files | broad access to shared storage | `files.shared` `list`, `read`, `write`, `mkdir`, `delete`, `open` `{path, volume?}`, `path` inside one of the folders the permission entry declares (`paths`, `"*"` for all) | data | `files.shared.read` / `files.shared.write` (dangerous; droidtop holds MANAGE_EXTERNAL_STORAGE) | high | built (2026-10-08): never `Android/data` or `Android/obb`, checked again after links are followed, and only while droidtop itself has all-files access |
-| D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | built 2026-11-06 for Desktop (§1.12, Droidtop/tracker#221): `clipboard.get_text` (user-initiated only), `clipboard.set_text {text}` and the event `clipboard.changed`, on the desktop clipboard bridge; with no desktop running both are UNSUPPORTED |
-| D7 | Power and battery | defer work on low battery; power profiles | `power.get_state()` → {level (0 to 100, null without a battery), charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | `power.get_state` built (2026-10-16, Droidtop/tracker#553: read from the battery broadcast and Battery Saver; a plugin reads it instead of `/sys/class/power_supply`); `keep_awake` and the events not built |
+| D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | built 2026-11-06 for Desktop (§1.12, mytop-project/tracker#221): `clipboard.get_text` (user-initiated only), `clipboard.set_text {text}` and the event `clipboard.changed`, on the desktop clipboard bridge; with no desktop running both are UNSUPPORTED |
+| D7 | Power and battery | defer work on low battery; power profiles | `power.get_state()` → {level (0 to 100, null without a battery), charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | `power.get_state` built (2026-10-16, mytop-project/tracker#553: read from the battery broadcast and Battery Saver; a plugin reads it instead of `/sys/class/power_supply`); `keep_awake` and the events not built |
 | D8 | Display | know the displays (internal, companion, external) to place content | `display.list()` → [{id, role, size, density, hdr}]; events `display.added` / `removed`; `display.set {brightness}` | data; C15 renders | `display.info` (normal) / `display.control` (dangerous) | low / medium | not built |
 | D9 | Audio routing | route or duck audio per session | `audio.routes()`, `audio.set_route {id}`, `audio.volume {stream, level}`; event `audio.route_changed` | G Quick Menu | `audio.control` (normal); **no microphone API** (P2 decision: `audio.record` would be critical and needs a real use) | medium | not built |
-| D12 | Network links | a plugin with its own sockets (`net.sockets`, §5.3 "Open processes") binds, announces and resolves names itself | `net.get_links()` → {links: [{name, type, active, metered, addresses: [{address, prefixLength}], dns: [...], searchDomains: [...]}], dns: [...]}; the active link first, top-level `dns` its servers | data | `net.sockets` (dangerous) | low | built (2026-10-15, Droidtop/tracker#553; `NetLinks`, read from Android's `LinkProperties` of every network up) |
+| D12 | Network links | a plugin with its own sockets (`net.sockets`, §5.3 "Open processes") binds, announces and resolves names itself | `net.get_links()` → {links: [{name, type, active, metered, addresses: [{address, prefixLength}], dns: [...], searchDomains: [...]}], dns: [...]}; the active link first, top-level `dns` its servers | data | `net.sockets` (dangerous) | low | built (2026-10-15, mytop-project/tracker#553; `NetLinks`, read from Android's `LinkProperties` of every network up) |
 | D10 | Media session | now playing / transport control (Spotify-style, §7e) | `media.sessions()`, `media.control {id, action}`; event `media.changed`; EP `media.source` for a plugin that *is* a player | G companion; A widget | `media.sessions` (dangerous: sees what other apps play) | medium | built-in only (§7e) |
 | D11 | Input devices | controllers, keyboards, mice: which are connected, their layout | `input.devices()` → [{id, name, vendor, kind}]; events `input.connected` / `disconnected` | data | `input.devices` (normal) | low | not built |
 | D12 | Input injection | synthetic input (macros, remapping without Key Mapper) | `input.inject {events}`: **not offered by the host**; only through a `priv.*` provider's `input.remap` | — | provider permission (critical) | critical | not built, by design |
@@ -3776,8 +3776,8 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | D18 | Accessibility bridge | read the screen or act for the user (e.g. an auto-skipper, a TTS reader of game text) | `a11y.*`: **host only exposes the droidtop-owned service's events for droidtop's own windows** | — | `a11y.bridge` (critical, official origins only) | critical | not built; §10 Q3 |
 | D19 | Location | region-aware stores, time zones | not offered (droidtop holds no location permission; a plugin that needs it is the wrong shape) | — | — | — | not offered |
 | D20 | Camera | QR pairing | not offered by the host; QR *display* is C14; scanning goes to an app bridge | — | — | — | not offered |
-| D21 | Paired devices | a plugin that keeps the person's devices in step with its own counterparts on them (the Syncthing plugin accepts exactly the devices droidtop paired, so its own pairing is never shown) | `devices.list_paired()` → {devices: [{id, name, kind: "computer"\|"handheld", pairedAt, online, announced}]}, `announced` being what the same plugin id announced on that device or null; `devices.announce {value}`: an object of at most 4 KiB (null withdraws it) sent to every paired device, kept there per device, answered at once while droidtop sends it; event `devices.changed` (a device paired or forgotten, or a value it announced changed) | data | `devices.paired` (dangerous) | medium | built (2026-10-16, Droidtop/tracker#556, #553; `PairedDevices` over droidtop-agent build-67's `announce`, `serve_start` and `serve_stop`) |
-| D22 | Peer addresses | a VPN plugin (Tailscale, a WireGuard or ZeroTier bridge) tells droidtop where the person's other devices are on its network, so droidtop reaches them there too (Droidtop/tracker#645; owner, 2026-11-05: "We control tailscale like any other VPN ... Tailcale plugin, not full tailscale client") | `peers.set_addresses {addresses: [ip]}` → {}: replaces what the same plugin gave; `[]` withdraws it. IP literals only (nothing is resolved), at most 256. Today KDE Connect announces this device to each (docs/SPEC.md 7q); droidtop's own peer links (#373) take them next | data | `peers.addresses` (dangerous, always audited) | medium | built (2026-11-05, `HostPeersApis`) |
+| D21 | Paired devices | a plugin that keeps the person's devices in step with its own counterparts on them (the Syncthing plugin accepts exactly the devices droidtop paired, so its own pairing is never shown) | `devices.list_paired()` → {devices: [{id, name, kind: "computer"\|"handheld", pairedAt, online, announced}]}, `announced` being what the same plugin id announced on that device or null; `devices.announce {value}`: an object of at most 4 KiB (null withdraws it) sent to every paired device, kept there per device, answered at once while droidtop sends it; event `devices.changed` (a device paired or forgotten, or a value it announced changed) | data | `devices.paired` (dangerous) | medium | built (2026-10-16, mytop-project/tracker#556, #553; `PairedDevices` over droidtop-agent build-67's `announce`, `serve_start` and `serve_stop`) |
+| D22 | Peer addresses | a VPN plugin (Tailscale, a WireGuard or ZeroTier bridge) tells droidtop where the person's other devices are on its network, so droidtop reaches them there too (mytop-project/tracker#645; owner, 2026-11-05: "We control tailscale like any other VPN ... Tailcale plugin, not full tailscale client") | `peers.set_addresses {addresses: [ip]}` → {}: replaces what the same plugin gave; `[]` withdraws it. IP literals only (nothing is resolved), at most 256. Today KDE Connect announces this device to each (docs/SPEC.md 7q); droidtop's own peer links (#373) take them next | data | `peers.addresses` (dangerous, always audited) | medium | built (2026-11-05, `HostPeersApis`) |
 
 ### E. Desktop and computer
 
@@ -3786,11 +3786,11 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | E1 | Containers and lifecycle | see and drive the Linux/Wine containers (§3) | `containers.list()`, `containers.state {id}`; `start`, `stop`, `create {image ref}` (**jobs**); events `container.started` / `stopped` | D: Containers screen, taskbar; G: PC section | `containers.read` (normal) / `containers.manage` (dangerous) | medium / high | not built |
 | E2 | Container exec | run a command inside a container as the container user | `containers.exec {id, argv, env, cwd}` → a job with streamed stdout/stderr | data | `containers.exec` (critical: full access to the user's container home) | critical | not built |
 | E3 | Terminal | open a terminal for the user at a place (a container, a game's folder) | `terminal.open {container, cwd}`: the host opens its own terminal; the plugin never reads it | D: terminal window; A/G: a context action (C4) | `terminal.open` (normal: the user sees it and types) | low | not built |
-| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | built 2026-11-06 (§1.12, Droidtop/tracker#221): `files.handler@1` entries' `associations`, offered in droidtop's own Open with for the files it takes |
-| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | built 2026-11-06 (§1.12, Droidtop/tracker#221): `windows.list`, `windows.focus`, `windows.close` and the events `window.opened`, `window.closed`, `window.focused`, served from host-bridge's window list, nothing in the container; moving a window is not offered yet |
+| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | built 2026-11-06 (§1.12, mytop-project/tracker#221): `files.handler@1` entries' `associations`, offered in droidtop's own Open with for the files it takes |
+| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | built 2026-11-06 (§1.12, mytop-project/tracker#221): `windows.list`, `windows.focus`, `windows.close` and the events `window.opened`, `window.closed`, `window.focused`, served from host-bridge's window list, nothing in the container; moving a window is not offered yet |
 | E6 | Printing bridge | print from a plugin, or add a printer (the CUPS bridge, §4b) | `print.submit {fd, mime, options}` → the host shows its own print dialog; `print.printers()` | D/A: the print dialog | `print.submit` (normal: the dialog is the consent) / `print.admin` (dangerous) | low / high | not built |
 | E7 | Container package bridge | an "app store" for containers: search and install packages (apt, pacman, Flathub-style) | EP `containers.packages@1`: `search`, `install` (**job**), `remove` (**job**), `updates`; the host runs the package manager through E2 on the provider's behalf | D: the app store or Start menu; G: the PC section's "Get apps" | `provide:containers.packages` + `containers.exec` | critical | not built |
-| E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | EP `jobs.service@1` entries `{id, label, restart: never\|on_failure}` (default `on_failure`); droidtop starts each as a job (`run {serviceId}`) while the point is allowed and the entry's own switch is on, under one silent foreground notification, and restarts a failed one after 30 s, 2, 10 and 30 min, then leaves it stopped. **One row (2026-10-30, Droidtop/tracker#790):** a failing service keeps one row in Downloads, its last failed run, with Retry, which starts it at once with no failures counted; each new run takes that row's place. A plugin job's failure line is one plain sentence: a message that is a runtime's own words (a class name, an exception, a stack trace, over 200 characters or several lines) becomes "<plugin> couldn't load its native code on this device" or "<plugin> ran into a problem it didn't explain", and its words are the job's Details (`JobFailureLine`); a plugin's own plain sentence stays the line | all modes: Jobs, the notification; switches on the plugin's Permissions screen | `provide:jobs.service` (dangerous: battery and network while you are away; starts unticked) | high | built (2026-10-08, `PluginBackground`, `PluginServicesService`) |
+| E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | EP `jobs.service@1` entries `{id, label, restart: never\|on_failure}` (default `on_failure`); droidtop starts each as a job (`run {serviceId}`) while the point is allowed and the entry's own switch is on, under one silent foreground notification, and restarts a failed one after 30 s, 2, 10 and 30 min, then leaves it stopped. **One row (2026-10-30, mytop-project/tracker#790):** a failing service keeps one row in Downloads, its last failed run, with Retry, which starts it at once with no failures counted; each new run takes that row's place. A plugin job's failure line is one plain sentence: a message that is a runtime's own words (a class name, an exception, a stack trace, over 200 characters or several lines) becomes "<plugin> couldn't load its native code on this device" or "<plugin> ran into a problem it didn't explain", and its words are the job's Details (`JobFailureLine`); a plugin's own plain sentence stays the line | all modes: Jobs, the notification; switches on the plugin's Permissions screen | `provide:jobs.service` (dangerous: battery and network while you are away; starts unticked) | high | built (2026-10-08, `PluginBackground`, `PluginServicesService`) |
 | E9 | Scheduled jobs | periodic work (update checks, a backup) | EP `jobs.schedule@1` entries `{id, label, every: "15m".."30d", charging?, unmetered?}`; a periodic system job (only while one is on) starts each due one as a job (`run {scheduleId}`) when its constraints hold | all modes: Jobs; switches on the plugin's Permissions screen | `provide:jobs.schedule` (normal) | low | built (2026-10-08, `PluginScheduleJobService`) |
 | E10 | Inter-plugin IPC | plugins calling each other | **§2**: plugin-provided APIs through the broker are the only channel | — | per exported permission | varies | not built |
 
@@ -3798,19 +3798,19 @@ droidtop's own Android permissions, gated per plugin by the broker.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | App bridges | a plugin that represents another installed app (Syncthing, Key Mapper, Obtainium, Discord, #15): status, actions, and **droidtop's own fallback when the app is absent** | EP `apps.bridge@1` (today's `app_status`): `status` → `{package, installed?, status?, version?}` (2026-10-15, Droidtop/tracker#544 item 5, #521 item 4): `package` is the managed app, whose name, installed state and version droidtop reads from Android itself; `installed` only when the plugin knows better than Android; `status` one plain sentence about the app's state; `version` when Android does not know it. droidtop draws the app's row (its name, Installed / Not installed, the status sentence, the version, Launch); any other value is never shown as "Key: value", only behind "Technical details"; `action {id}` (quick call or **job**). The entry may name the app (2026-10-16, Droidtop/tracker#520): `{"point": "apps.bridge", "app": "RetroArch", "packages": [...], "get": "https://..."}` (`packages` defaults to the `apps.check` packages). While none is installed, droidtop puts one "<app> isn't installed" notice, with Get, at the top of the plugin's panel, and draws rows and tiles marked `"needs": "app"` inert with the reason; the plugin draws no "not installed" rows of its own | A/G/D: the app's row wherever droidtop shows that app (the Player screen today), Accounts and sources, C3 tiles | `provide:apps.bridge` + `apps.check` (declared packages) + `apps.bind` (for live connections) | medium | built as `app_status` (`PluginAppStatus`) |
-| F2 | Intents out | start another app, share to it, hand it a link or a file | `apps.launch {package}` (exists); `apps.intent {package, action, extras(strings), data?}` → the host builds and fires it; `apps.view {uri, title?}` → `{opened, reason?}`: droidtop builds `ACTION_VIEW` for the link and shows Android's own chooser (a magnet to a torrent app, a web page to a browser); the allowed schemes are `https`, `http` and `magnet` only (no `file`, `content`, `intent`, `javascript` or droidtop's own), at most 8192 characters, and only during a call the person started (a button's job); when no app takes the link the answer is `{opened: false, reason: "no app opens magnet links", copied}`, not an error, and **droidtop shows its own fallback** (2026-10-15, Droidtop/tracker#544 item 3): the link is put on the clipboard and droidtop says why and that it is ready to paste; when the person has turned "Open links in other apps" off, droidtop says so (and that it can be allowed in the plugin's Permissions) and copies the link the same way, and the plugin gets the usual `PERMISSION_DENIED`. A plugin only calls `apps.view`: it builds no copy page and no sentence about a refused permission; every use is in the activity log (the kind of link and a web page's host, never a query or a magnet's contents); `apps.share {text \| file token}` → the system share sheet | — | `apps.launch` (normal) / `apps.view` (normal: "Open links in other apps") / `apps.intents.out` (normal for declared packages; dangerous for any package) | medium | partial (`launchApp`, `launchAppWithExtras`; `apps.view` built 2026-10-09, `AppLinks`, Droidtop/tracker#418) |
-| F3 | Intents in | let links reach a plugin: a third-party scheme (fdroidrepos://), a site (`f95zone.to`), a path on any host (`/fdroid/repo`), share *to* droidtop; and ops callable from droidtop's own action links (`droidtop://call?v=2&...`, docs/SPEC.md 12a "Links", "Action links") | a `provides` entry's `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]` → droidtop's one router (`LinkRouter`) calls `open_link {link}` on that point; `linkOps: [{op, label, description, risk, args}]` → that op, called literally on that point after the person approved the call | "Open this link with" when several handlers match (remembered per kind of link); an action link's call-by-call review, showing the plugin's description and the permissions the call could use | `intents.in` (dangerous: other apps can trigger it) | high | built 2026-10-10 (Droidtop/tracker#459); droidtop declares the scheme aliases, the links-helper APK for other schemes is not built |
+| F1 | App bridges | a plugin that represents another installed app (Syncthing, Key Mapper, Obtainium, Discord, #15): status, actions, and **droidtop's own fallback when the app is absent** | EP `apps.bridge@1` (today's `app_status`): `status` → `{package, installed?, status?, version?}` (2026-10-15, mytop-project/tracker#544 item 5, #521 item 4): `package` is the managed app, whose name, installed state and version droidtop reads from Android itself; `installed` only when the plugin knows better than Android; `status` one plain sentence about the app's state; `version` when Android does not know it. droidtop draws the app's row (its name, Installed / Not installed, the status sentence, the version, Launch); any other value is never shown as "Key: value", only behind "Technical details"; `action {id}` (quick call or **job**). The entry may name the app (2026-10-16, mytop-project/tracker#520): `{"point": "apps.bridge", "app": "RetroArch", "packages": [...], "get": "https://..."}` (`packages` defaults to the `apps.check` packages). While none is installed, droidtop puts one "<app> isn't installed" notice, with Get, at the top of the plugin's panel, and draws rows and tiles marked `"needs": "app"` inert with the reason; the plugin draws no "not installed" rows of its own | A/G/D: the app's row wherever droidtop shows that app (the Player screen today), Accounts and sources, C3 tiles | `provide:apps.bridge` + `apps.check` (declared packages) + `apps.bind` (for live connections) | medium | built as `app_status` (`PluginAppStatus`) |
+| F2 | Intents out | start another app, share to it, hand it a link or a file | `apps.launch {package}` (exists); `apps.intent {package, action, extras(strings), data?}` → the host builds and fires it; `apps.view {uri, title?}` → `{opened, reason?}`: droidtop builds `ACTION_VIEW` for the link and shows Android's own chooser (a magnet to a torrent app, a web page to a browser); the allowed schemes are `https`, `http` and `magnet` only (no `file`, `content`, `intent`, `javascript` or droidtop's own), at most 8192 characters, and only during a call the person started (a button's job); when no app takes the link the answer is `{opened: false, reason: "no app opens magnet links", copied}`, not an error, and **droidtop shows its own fallback** (2026-10-15, mytop-project/tracker#544 item 3): the link is put on the clipboard and droidtop says why and that it is ready to paste; when the person has turned "Open links in other apps" off, droidtop says so (and that it can be allowed in the plugin's Permissions) and copies the link the same way, and the plugin gets the usual `PERMISSION_DENIED`. A plugin only calls `apps.view`: it builds no copy page and no sentence about a refused permission; every use is in the activity log (the kind of link and a web page's host, never a query or a magnet's contents); `apps.share {text \| file token}` → the system share sheet | — | `apps.launch` (normal) / `apps.view` (normal: "Open links in other apps") / `apps.intents.out` (normal for declared packages; dangerous for any package) | medium | partial (`launchApp`, `launchAppWithExtras`; `apps.view` built 2026-10-09, `AppLinks`, mytop-project/tracker#418) |
+| F3 | Intents in | let links reach a plugin: a third-party scheme (fdroidrepos://), a site (`f95zone.to`), a path on any host (`/fdroid/repo`), share *to* droidtop; and ops callable from droidtop's own action links (`droidtop://call?v=2&...`, docs/SPEC.md 12a "Links", "Action links") | a `provides` entry's `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]` → droidtop's one router (`LinkRouter`) calls `open_link {link}` on that point; `linkOps: [{op, label, description, risk, args}]` → that op, called literally on that point after the person approved the call | "Open this link with" when several handlers match (remembered per kind of link); an action link's call-by-call review, showing the plugin's description and the permissions the call could use | `intents.in` (dangerous: other apps can trigger it) | high | built 2026-10-10 (mytop-project/tracker#459); droidtop declares the scheme aliases, the links-helper APK for other schemes is not built |
 | F4 | Installed apps | know what is installed (to find emulators, detect a bridge target) | `apps.check {packages[] declared}`; `apps.list()` → all packages | data | `apps.check` (normal, declared list) / `apps.list` (dangerous: the full list is personal) | low / high | partial (`isAppInstalled`) |
 | F5 | Install apps | install or update an APK (an Obtainium-style updater) | `apps.install {file token}` → Android's own installer UI | Android's confirmation | `apps.install` (dangerous) | high | not built |
 | F6 | Bound connections | a live service or binder connection to another app | manifest `boundServiceTargets` (exists); the host binds, the plugin exchanges data through the broker (`apps.bound.call {package, method, args}` for AIDL surfaces the host knows) | — | `apps.bind` (dangerous, per package) | high | declared only |
 | F7 | Privileged operations | Shizuku / root | **plugin-provided** `priv.*`, `root.*` (§2.7) | — | `priv.shell.adb`, `priv.shell.root`, `priv.packages`, `priv.settings`, `root.modules` (all critical) | critical | host shim only |
-| F8 | Context sync | a plugin's supporting state kept in step, both ways, with a program on the person's paired computers (F95Checker's watch list for the F95 plugin is the first) | `context.open {context, fields: [{name, direction, rule}], presence}` → `{records, conflicts}`; protocol 2 (syncable data): `context.publish {context, records}` → `{published, generation, lines, conflicts}`, `context.copy {context}` → `{generation, records}`, event `context.received {context, generation}`; protocol 1: `context.get {context, after?, limit ≤ 200}` → `{records, next, conflicts}`; `context.put {context, key, fields}`; `context.remove {context, key}`; `context.sync {context}` → `{lines, conflicts}`; `context.resolve {context, key, field, keep: device\|computer}` | the plugin's own UI; the computer under Settings → Accounts and sources → Computers | `context.sync` (dangerous: the data travels to your computers and changes an app's data there) | high | built (protocol 1 2026-10-08; protocol 2 2026-10-30, Droidtop/tracker#794; `PluginContexts`, `HostContextApis`; see "F8 Context sync" below) |
-| F9 | Apps that start games | another Android app (a frontend, a launcher) asking droidtop to start a library entry; not a plugin, but held to this section's grant model (Droidtop/tracker#124, docs/SPEC.md "Other apps that start games") | the exported `dev.droidtop.app.action.LAUNCH_GAME` intent with `dev.droidtop.app.extra.ENTRY_ID`; the caller is named by `getCallingPackage` or Android 14's shared identity, never the referrer | the first-use sheet (4.3); Accounts and sources > Plugins > Apps that start games (4.4) | `launch.games`, per app (dangerous: asked on first use, Allow / Not now / Never) | medium | built 2026-10-28 (`ExternalGameLaunch`) |
+| F8 | Context sync | a plugin's supporting state kept in step, both ways, with a program on the person's paired computers (F95Checker's watch list for the F95 plugin is the first) | `context.open {context, fields: [{name, direction, rule}], presence}` → `{records, conflicts}`; protocol 2 (syncable data): `context.publish {context, records}` → `{published, generation, lines, conflicts}`, `context.copy {context}` → `{generation, records}`, event `context.received {context, generation}`; protocol 1: `context.get {context, after?, limit ≤ 200}` → `{records, next, conflicts}`; `context.put {context, key, fields}`; `context.remove {context, key}`; `context.sync {context}` → `{lines, conflicts}`; `context.resolve {context, key, field, keep: device\|computer}` | the plugin's own UI; the computer under Settings → Accounts and sources → Computers | `context.sync` (dangerous: the data travels to your computers and changes an app's data there) | high | built (protocol 1 2026-10-08; protocol 2 2026-10-30, mytop-project/tracker#794; `PluginContexts`, `HostContextApis`; see "F8 Context sync" below) |
+| F9 | Apps that start games | another Android app (a frontend, a launcher) asking droidtop to start a library entry; not a plugin, but held to this section's grant model (mytop-project/tracker#124, docs/SPEC.md "Other apps that start games") | the exported `dev.droidtop.app.action.LAUNCH_GAME` intent with `dev.droidtop.app.extra.ENTRY_ID`; the caller is named by `getCallingPackage` or Android 14's shared identity, never the referrer | the first-use sheet (4.3); Accounts and sources > Plugins > Apps that start games (4.4) | `launch.games`, per app (dangerous: asked on first use, Allow / Not now / Never) | medium | built 2026-10-28 (`ExternalGameLaunch`) |
 
 #### F8 Context sync
 
-Owner, 2026-10-08 (Droidtop/tracker#380): "It's context SYNC. It's meant to
+Owner, 2026-10-08 (mytop-project/tracker#380): "It's context SYNC. It's meant to
 allow you to do things on the computer and have them synced." A context is a
 plugin's supporting state, not library data. It syncs both ways between the
 device and the person's paired computers (docs/SPEC.md 7o "Computers"), so
@@ -3840,7 +3840,7 @@ database on the PC follows.
   keyed by thread id. It never reads the `cookies` table or the settings'
   passwords and tokens.
 - **Syncable data: the plugin syncs a copy, never its live data (protocol 2,
-  2026-10-30, Droidtop/tracker#794; droidtop-agent docs/DESIGN.md section 8).**
+  2026-10-30, mytop-project/tracker#794; droidtop-agent docs/DESIGN.md section 8).**
   The owner: a syncable context "is an explicit NON-USABLE context ... the
   point is that the sync is atomic, and it's not the live dataset", and "we
   need atomic syncs to prevent corruption".
@@ -3910,7 +3910,7 @@ database on the PC follows.
   UI, during a call the person started) or the person presses "Sync now" for
   a computer. Nothing polls.
 - **How droidtop reaches the computer** is droidtop-agent's channel
-  (Droidtop/droidtop-agent, docs/DESIGN.md): LAN direct, a direct WireGuard
+  (mytop-project/droidtop-agent, docs/DESIGN.md): LAN direct, a direct WireGuard
   tunnel, or the person's own cloud share. The plugin never sees an address,
   a key or the computer's files.
 
@@ -3920,31 +3920,31 @@ database on the PC follows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | G1 | Secure vault | per-plugin secrets (API keys, refresh tokens) | `vault.put {key, value}` → `{stored}`, `vault.get {key}` → `{value \| null}`, `vault.delete {key}` → `{deleted}`, `vault.keys` → `{keys}`; keys 1 to 128 of `[A-Za-z0-9._-]`, values up to 16 KiB, 256 per plugin; sealed with droidtop's one at-rest cipher (`KeystoreSecretCipher`, AES-GCM) under a Keystore key per plugin; in `noBackupFilesDir`, so **never in a backup**; file and key deleted on uninstall; a value whose key is gone reads as null | — | `vault.own` (normal; own namespace only) | low | built (2026-10-08, `PluginVault`) |
 | G2 | OAuth helper | sign in to a service without the plugin handling a password | `auth.oauth {authUrl, tokenUrl, clientId, scopes, pkce: true}` → the host opens a Custom Tab, catches the redirect on its own scheme, exchanges the code and stores the tokens in G1 → returns a vault key | A/G/D: a host sign-in sheet | `auth.oauth` (normal: the user sees and does the sign-in) | medium | not built |
-| G3 | Web session | sources that need a real browser session: a site sign-in, a "click to download" page, a protected link (#9, Droidtop/tracker#380) | Declared as `web.session` with the plugin's sites and, optionally, the site's sign-in page: `{"id": "web.session", "domains": ["f95zone.to"], "signIn": "https://f95zone.to/login/"}` (each domain covers its subdomains; https only; `signIn` must be on a declared site). **droidtop draws the account (2026-10-15, Droidtop/tracker#544 items 1 and 2):** the plugin's page carries "<site> account: Signed in / Not signed in" with Sign in (the `signIn` page) or Sign out, from the session droidtop keeps, and says that the plugin never sees the password; `SIGN_IN_REQUIRED` and `BROWSER_CHECK_REQUIRED` get droidtop's own Sign in / Open the site (§1.3). A plugin draws no account row, no "never sees your password" line and no sign-out of its own. Pressing droidtop's Sign in is the person allowing `web.session`, so an unanswered grant becomes allowed when a session is kept; one the person turned off stays off. `web.session sign_in {url, doneCookie?}` → `{signedIn}`: droidtop's own web view (`WebSessionActivity`, the one view droidtop shows signed-in pages in, also a store's own pages, SPEC 7g) opens `url` (a declared site) during a call the person started; the person signs in on the site's own page and presses Signed in, or the site setting `doneCookie` ends it; the cookies of the declared sites are sealed in the plugin's vault under a host key the plugin can neither read nor list (`@web.session`). `get_status` → `{signedIn, account}`; `clear` → `{cleared}`. `set_account {name}` → `{saved}` (2026-10-17): the name of the account the session is signed in to, as the plugin read it from the site (one line, 1 to 64 characters), shown as the value of droidtop's account row; `saved` is false when no one is signed in, and a new sign-in forgets it. A `doneCookie` on the `web.session` entry (`{"id": "web.session", "domains": [...], "signIn": "...", "doneCookie": "xf_user"}`) ends droidtop's own sign-in from the account row the way `sign_in`'s argument does. An `expiredText` on the entry (2026-10-30, Droidtop/tracker#783; up to 8 sentences, each one line of at most 200 characters, `{"id": "web.session", ..., "expiredText": ["This link has expired"]}`) is the words the site's page shows for a download link that has expired: droidtop opens a download link out of sight first (SPEC 12a), and a page carrying one of them, ignoring case and spacing, is an expired link. For a link from a source's record droidtop then asks the source for the record again and opens the same mirror's current link; droidtop never guesses at a site's page, so a plugin that declares none has no link found expired. The event `web.session.signed_in` (no args) tells a subscribed plugin that the person signed in through droidtop: the row, Switch account, or a source's Sign in. **The row is the one way in (SPEC 12a "A plugin's site account"):** signed out, pressing it opens the sign-in at once; signed in, it names the account and offers Sign out, and Switch account where `signIn` is declared. `fetch {url, method?, headers?, body?, as?}` → the `net.http` answer plus `signedIn`: one request to a declared site with the session's cookies and the web view's user agent added by droidtop (they replace any the plugin sent), refused if it would be redirected off the declared sites; it also needs `net.domains` for the site. `open_in_session {url, max?}` → `{captured, download: {url, fileName, size?, mimeType?, session}, downloads: [...]}` (`max` 1 to 16, default 1, 2026-10-16, Droidtop/tracker#419: above 1 the view stays open, counts what it took and closes at `max` or on Close; `downloads` lists every capture in order, each with its own token, and is an acquire reply's `values.downloads` as it is; `download` is the first): any https link (a thread on a declared site, or a file host it links to; the session's cookies still go only to the declared sites) opens in the web view with the session; the link opens out of sight first (2026-10-30, Droidtop/tracker#783, SPEC 12a): a page that leads to a host droidtop serves or starts a download needs no view, a page carrying the entry's `expiredText` answers `{captured: false, expired: true}` for the plugin to ask its site for a current link, and only a page the person must act on is shown; the first download the page starts is captured (address, the cookies it needs, user agent, referrer) and the view closes; the plugin returns that `download` as its `acquire` reply's `values.download`, and droidtop adds the captured headers by the one-use `session` token (its own plugin, the same address, within 30 minutes) and runs it through the Downloads job like any acquire download, with the cookies held in memory only. The session's cookies are in droidtop's shared cookie store only while the web view is open. **Download sites (2026-10-17, docs/SPEC.md 12a "Download sites"):** droidtop's own signed-in file hosts (Mega, Gofile, Pixeldrain and the ones the person added) have their cookies put into the view for their domains too, and a capture from one carries them by the token as above; no op reads, lists or reports them, and `fetch` sends them only to a plugin that declares that site and keeps no sign-in of its own for it (2026-10-28, Droidtop/tracker#648: its `fetch`, `open_in_session` and `get_status` then use droidtop's sign-in for that site, droidtop adding the cookies as for the plugin's own session; the person can turn it off in the plugin's Permissions, "Use your download-site sign-ins"; renewed cookies go back to droidtop, never into the plugin's vault). Deleted with the plugin's vault on uninstall. | droidtop's web view, headed with the site's name and the address the page is on, and nothing else: no instructions (owner, 2026-11-21). Its buttons say what they do: Signed in (sign-in) or Continue (a browser check) with Cancel, or Close where the view ends on its own (a download page, a store's pages), with "n of max taken" when it takes several; B goes back a page | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | built (2026-10-09, `HostWebApis`, `WebSessions`, `WebSessionActivity`) |
-| G3a | droidtop's pages in an app | sign-ins, browser checks and download pages on a current engine where the device's own WebView is too old: the Retroid Pocket 5's ROM allows only its WebView 109, whose Cloudflare check loops (owner, 2026-11-21: build droidtop Browser on GeckoView, Droidtop/tracker#605) | An application-interface plugin declares `provides: [{"point": "web.view", "version": 1}]`. When droidtop would open its own web view for a G3 sign-in, browser check or `open_in_session` page, or a download site's sign-in, and such an app is approved, running, has `web.view` allowed and still passes its signing check, droidtop starts the app's activity for the intent `dev.droidtop.pluginhost.action.WEB_VIEW` (sent to its package only) with the extra `dev.droidtop.pluginhost.web.token`, a one-use token. A store's own pages (SPEC 7g) stay in droidtop's view. `web.view take_request {token}` → `{mode: sign_in|check|open, label, url, domains, cookies: {domain: header}, maxDownloads, signInUrl, doneCookie}`, once, to the plugin the page was given to; `cookies` holds the session's cookies for the request's sites and droidtop's signed-in download sites (12a) for theirs, nothing else. `web.view report_page {token, url, title, cookies, signedIn?}` → `{finish}`: the app reports each page it finishes (the host's cookie header and, where the request has a `doneCookie`, whether it is set) and droidtop answers by the rules of its own view: a check passed (SiteCheck, and signed in where the plugin signs in there), the sign-in cookie set, or, in `open`, a link onto a file host droidtop serves, which ends the view as a handoff. `web.view finish {token, completed, userAgent, cookies, downloads: [{url, size?, mimeType?, contentDisposition?, referer?, cookie?, userAgent?}]}` → `{accepted}`: droidtop keeps the cookies of the request's sites only (sealed as after its own view) and the download sites' renewed ones, takes `http`/`https` downloads only, each once, at most `maxDownloads`, and answers the G3 call exactly as after its own view. Unanswered after 10 minutes is "nothing done". An app that has not taken the page 30 seconds after it was started (it failed to start) has it withdrawn, and droidtop's own view shows it instead. | the app's own screen, headed with the site's name and the address, with droidtop's buttons (Signed in or Continue with Cancel, or Close; "n of max taken") | `provide:web.view` (high: the app sees your sign-in on the sites your plugins use while a page is open); turning the point off in the app plugin's Permissions sends every page back to droidtop's view | high | built in droidtop (2026-11-21, `WebViewProviders`); the app side is droidtop Browser (Droidtop/droidtop-browser) |
-| G4 | GitHub token | higher API limits and private repositories for sources on GitHub (#16) | `github.request {path, headers?, as?, timeoutMs?}` → the `net.request` answer: a GET to `https://api.github.com<path>` made by the host with the person's token (set once in Accounts and sources; unauthenticated when there is none). The token never reaches the plugin; GitHubAuth decides on every redirect hop whether it may go there. The plugin's headers (a `Range`, `If-None-Match`) go on every hop. A download descriptor's `"auth": "github"` (A12) asks the same for a file. `github.token()` (the raw token) is not offered | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token, not built) | medium / high | `github.request` built 2026-10-10 (Droidtop/tracker#261) |
+| G3 | Web session | sources that need a real browser session: a site sign-in, a "click to download" page, a protected link (#9, mytop-project/tracker#380) | Declared as `web.session` with the plugin's sites and, optionally, the site's sign-in page: `{"id": "web.session", "domains": ["f95zone.to"], "signIn": "https://f95zone.to/login/"}` (each domain covers its subdomains; https only; `signIn` must be on a declared site). **droidtop draws the account (2026-10-15, mytop-project/tracker#544 items 1 and 2):** the plugin's page carries "<site> account: Signed in / Not signed in" with Sign in (the `signIn` page) or Sign out, from the session droidtop keeps, and says that the plugin never sees the password; `SIGN_IN_REQUIRED` and `BROWSER_CHECK_REQUIRED` get droidtop's own Sign in / Open the site (§1.3). A plugin draws no account row, no "never sees your password" line and no sign-out of its own. Pressing droidtop's Sign in is the person allowing `web.session`, so an unanswered grant becomes allowed when a session is kept; one the person turned off stays off. `web.session sign_in {url, doneCookie?}` → `{signedIn}`: droidtop's own web view (`WebSessionActivity`, the one view droidtop shows signed-in pages in, also a store's own pages, SPEC 7g) opens `url` (a declared site) during a call the person started; the person signs in on the site's own page and presses Signed in, or the site setting `doneCookie` ends it; the cookies of the declared sites are sealed in the plugin's vault under a host key the plugin can neither read nor list (`@web.session`). `get_status` → `{signedIn, account}`; `clear` → `{cleared}`. `set_account {name}` → `{saved}` (2026-10-17): the name of the account the session is signed in to, as the plugin read it from the site (one line, 1 to 64 characters), shown as the value of droidtop's account row; `saved` is false when no one is signed in, and a new sign-in forgets it. A `doneCookie` on the `web.session` entry (`{"id": "web.session", "domains": [...], "signIn": "...", "doneCookie": "xf_user"}`) ends droidtop's own sign-in from the account row the way `sign_in`'s argument does. An `expiredText` on the entry (2026-10-30, mytop-project/tracker#783; up to 8 sentences, each one line of at most 200 characters, `{"id": "web.session", ..., "expiredText": ["This link has expired"]}`) is the words the site's page shows for a download link that has expired: droidtop opens a download link out of sight first (SPEC 12a), and a page carrying one of them, ignoring case and spacing, is an expired link. For a link from a source's record droidtop then asks the source for the record again and opens the same mirror's current link; droidtop never guesses at a site's page, so a plugin that declares none has no link found expired. The event `web.session.signed_in` (no args) tells a subscribed plugin that the person signed in through droidtop: the row, Switch account, or a source's Sign in. **The row is the one way in (SPEC 12a "A plugin's site account"):** signed out, pressing it opens the sign-in at once; signed in, it names the account and offers Sign out, and Switch account where `signIn` is declared. `fetch {url, method?, headers?, body?, as?}` → the `net.http` answer plus `signedIn`: one request to a declared site with the session's cookies and the web view's user agent added by droidtop (they replace any the plugin sent), refused if it would be redirected off the declared sites; it also needs `net.domains` for the site. `open_in_session {url, max?}` → `{captured, download: {url, fileName, size?, mimeType?, session}, downloads: [...]}` (`max` 1 to 16, default 1, 2026-10-16, mytop-project/tracker#419: above 1 the view stays open, counts what it took and closes at `max` or on Close; `downloads` lists every capture in order, each with its own token, and is an acquire reply's `values.downloads` as it is; `download` is the first): any https link (a thread on a declared site, or a file host it links to; the session's cookies still go only to the declared sites) opens in the web view with the session; the link opens out of sight first (2026-10-30, mytop-project/tracker#783, SPEC 12a): a page that leads to a host droidtop serves or starts a download needs no view, a page carrying the entry's `expiredText` answers `{captured: false, expired: true}` for the plugin to ask its site for a current link, and only a page the person must act on is shown; the first download the page starts is captured (address, the cookies it needs, user agent, referrer) and the view closes; the plugin returns that `download` as its `acquire` reply's `values.download`, and droidtop adds the captured headers by the one-use `session` token (its own plugin, the same address, within 30 minutes) and runs it through the Downloads job like any acquire download, with the cookies held in memory only. The session's cookies are in droidtop's shared cookie store only while the web view is open. **Download sites (2026-10-17, docs/SPEC.md 12a "Download sites"):** droidtop's own signed-in file hosts (Mega, Gofile, Pixeldrain and the ones the person added) have their cookies put into the view for their domains too, and a capture from one carries them by the token as above; no op reads, lists or reports them, and `fetch` sends them only to a plugin that declares that site and keeps no sign-in of its own for it (2026-10-28, mytop-project/tracker#648: its `fetch`, `open_in_session` and `get_status` then use droidtop's sign-in for that site, droidtop adding the cookies as for the plugin's own session; the person can turn it off in the plugin's Permissions, "Use your download-site sign-ins"; renewed cookies go back to droidtop, never into the plugin's vault). Deleted with the plugin's vault on uninstall. | droidtop's web view, headed with the site's name and the address the page is on, and nothing else: no instructions (owner, 2026-11-21). Its buttons say what they do: Signed in (sign-in) or Continue (a browser check) with Cancel, or Close where the view ends on its own (a download page, a store's pages), with "n of max taken" when it takes several; B goes back a page | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | built (2026-10-09, `HostWebApis`, `WebSessions`, `WebSessionActivity`) |
+| G3a | droidtop's pages in an app | sign-ins, browser checks and download pages on a current engine where the device's own WebView is too old: the Retroid Pocket 5's ROM allows only its WebView 109, whose Cloudflare check loops (owner, 2026-11-21: build droidtop Browser on GeckoView, mytop-project/tracker#605) | An application-interface plugin declares `provides: [{"point": "web.view", "version": 1}]`. When droidtop would open its own web view for a G3 sign-in, browser check or `open_in_session` page, or a download site's sign-in, and such an app is approved, running, has `web.view` allowed and still passes its signing check, droidtop starts the app's activity for the intent `dev.droidtop.pluginhost.action.WEB_VIEW` (sent to its package only) with the extra `dev.droidtop.pluginhost.web.token`, a one-use token. A store's own pages (SPEC 7g) stay in droidtop's view. `web.view take_request {token}` → `{mode: sign_in|check|open, label, url, domains, cookies: {domain: header}, maxDownloads, signInUrl, doneCookie}`, once, to the plugin the page was given to; `cookies` holds the session's cookies for the request's sites and droidtop's signed-in download sites (12a) for theirs, nothing else. `web.view report_page {token, url, title, cookies, signedIn?}` → `{finish}`: the app reports each page it finishes (the host's cookie header and, where the request has a `doneCookie`, whether it is set) and droidtop answers by the rules of its own view: a check passed (SiteCheck, and signed in where the plugin signs in there), the sign-in cookie set, or, in `open`, a link onto a file host droidtop serves, which ends the view as a handoff. `web.view finish {token, completed, userAgent, cookies, downloads: [{url, size?, mimeType?, contentDisposition?, referer?, cookie?, userAgent?}]}` → `{accepted}`: droidtop keeps the cookies of the request's sites only (sealed as after its own view) and the download sites' renewed ones, takes `http`/`https` downloads only, each once, at most `maxDownloads`, and answers the G3 call exactly as after its own view. Unanswered after 10 minutes is "nothing done". An app that has not taken the page 30 seconds after it was started (it failed to start) has it withdrawn, and droidtop's own view shows it instead. | the app's own screen, headed with the site's name and the address, with droidtop's buttons (Signed in or Continue with Cancel, or Close; "n of max taken") | `provide:web.view` (high: the app sees your sign-in on the sites your plugins use while a page is open); turning the point off in the app plugin's Permissions sends every page back to droidtop's view | high | built in droidtop (2026-11-21, `WebViewProviders`); the app side is droidtop Browser (mytop-project/droidtop-browser) |
+| G4 | GitHub token | higher API limits and private repositories for sources on GitHub (#16) | `github.request {path, headers?, as?, timeoutMs?}` → the `net.request` answer: a GET to `https://api.github.com<path>` made by the host with the person's token (set once in Accounts and sources; unauthenticated when there is none). The token never reaches the plugin; GitHubAuth decides on every redirect hop whether it may go there. The plugin's headers (a `Range`, `If-None-Match`) go on every hop. A download descriptor's `"auth": "github"` (A12) asks the same for a file. `github.token()` (the raw token) is not offered | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token, not built) | medium / high | `github.request` built 2026-10-10 (mytop-project/tracker#261) |
 | G5 | Accounts registry | a plugin's account shown as a row in Accounts and sources (signed in or not, sign out) | EP `accounts.provider@1`: `status → {signedIn, name}`; `sign_in` (runs G2/G3), `sign_out` | A/G/D: Accounts and sources | `provide:accounts.provider` | low | not built |
 | G6 | Identity of the device user | "who is this" | not offered: plugins get no Android account list, no email, no device ids. `host.info()` gives a **per-plugin random install id** only | — | — | — | by design |
-| G7 | Theme tokens | UI a plugin draws itself (a Flutter plugin's pages, its own screen) in droidtop's colours, light or dark (Droidtop/tracker#559) | `ui.get_theme()` → {theme: "light"\|"dark", tokens: {ground, surface, surfaceVariant, onSurface, onSurfaceMuted, primary, onPrimary, caution, danger, focus, focusInner}}, each `#RRGGBB`, read from the palette in use (docs/SPEC.md 7k "Light and dark": the Gaming theme's while Gaming shows one, droidtop's own light or dark otherwise); `host.get_info` carries `theme`; event `host.theme_changed` {theme} when Light or dark, Android's night mode or the Gaming theme changes the set. A plugin draws no colour of its own for these roles. A Flutter plugin reads the same op through its host calls | — | — (no permission: the colours say nothing about the person) | low | built (2026-10-16, `RoleTokens`) |
-| G8 | Steam account | a plugin that does what people use ArchiSteamFarm for (free licences, keys, idling) on the person's own Steam account, with no sign-in of its own (Droidtop/tracker#379, built to the recommendation, owner to confirm) | `steam.get_status` → `{signedIn, steamId, accountName}`; `steam.list_changes {since}` → `{current, apps, packages, fullUpdateNeeded}` (Steam's product changes since a change number); `steam.get_product_info {apps?, packages?}` → each one's facts as one flat map (`"common/type": "Game"`, `"billingtype": "12"`; 100 ids a call); `steam.claim_free {apps?, packages?}` → `{results: [{kind, id, claimed, reason}], retryAfterMs}` (apps over droidtop's client connection, packages on the store with droidtop's web session); `steam.redeem_key {key}` → `{result, items}` (`ok`, `already_owned`, `invalid`, `already_redeemed`, `region_locked`, `needs_base_game`, `rate_limited`, `failed`); `steam.play {apps, minutes?}` → `{playing, reason}` (1 to 32 games shown as played, at most 12 hours, then droidtop stops); `steam.stop`. **droidtop keeps Steam's limits for every plugin together** (`SteamLimits`): at most 30 free licences in any rolling hour (an id over it answers `reason: "later"` with `retryAfterMs`), nothing for an hour after Steam says too many, one key every 10 s. No op reads the password, refresh token or cookies; trades, the market and Steam Guard confirmations are not offered | — | `steam.account` (dangerous) | high | built (2026-11-05, `HostSteamApis`, `SteamPluginAccount`) |
+| G7 | Theme tokens | UI a plugin draws itself (a Flutter plugin's pages, its own screen) in droidtop's colours, light or dark (mytop-project/tracker#559) | `ui.get_theme()` → {theme: "light"\|"dark", tokens: {ground, surface, surfaceVariant, onSurface, onSurfaceMuted, primary, onPrimary, caution, danger, focus, focusInner}}, each `#RRGGBB`, read from the palette in use (docs/SPEC.md 7k "Light and dark": the Gaming theme's while Gaming shows one, droidtop's own light or dark otherwise); `host.get_info` carries `theme`; event `host.theme_changed` {theme} when Light or dark, Android's night mode or the Gaming theme changes the set. A plugin draws no colour of its own for these roles. A Flutter plugin reads the same op through its host calls | — | — (no permission: the colours say nothing about the person) | low | built (2026-10-16, `RoleTokens`) |
+| G8 | Steam account | a plugin that does what people use ArchiSteamFarm for (free licences, keys, idling) on the person's own Steam account, with no sign-in of its own (mytop-project/tracker#379, built to the recommendation, owner to confirm) | `steam.get_status` → `{signedIn, steamId, accountName}`; `steam.list_changes {since}` → `{current, apps, packages, fullUpdateNeeded}` (Steam's product changes since a change number); `steam.get_product_info {apps?, packages?}` → each one's facts as one flat map (`"common/type": "Game"`, `"billingtype": "12"`; 100 ids a call); `steam.claim_free {apps?, packages?}` → `{results: [{kind, id, claimed, reason}], retryAfterMs}` (apps over droidtop's client connection, packages on the store with droidtop's web session); `steam.redeem_key {key}` → `{result, items}` (`ok`, `already_owned`, `invalid`, `already_redeemed`, `region_locked`, `needs_base_game`, `rate_limited`, `failed`); `steam.play {apps, minutes?}` → `{playing, reason}` (1 to 32 games shown as played, at most 12 hours, then droidtop stops); `steam.stop`. **droidtop keeps Steam's limits for every plugin together** (`SteamLimits`): at most 30 free licences in any rolling hour (an id over it answers `reason: "later"` with `retryAfterMs`), nothing for an hour after Steam says too many, one key every 10 s. No op reads the password, refresh token or cookies; trades, the market and Steam Guard confirmations are not offered | — | `steam.account` (dangerous) | high | built (2026-11-05, `HostSteamApis`, `SteamPluginAccount`) |
 
 ### H. Data
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in every tier, in a plugin process the private-folder path its broker answers with the plugin's own folder, 2026-10-29); `preferences(name)` (droidtop's store, §5.3 "Preferences and SQLite are droidtop's", 2026-10-29); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, Droidtop/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
+| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in every tier, in a plugin process the private-folder path its broker answers with the plugin's own folder, 2026-10-29); `preferences(name)` (droidtop's store, §5.3 "Preferences and SQLite are droidtop's", 2026-10-29); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, mytop-project/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
 | H2 | Shared databases | data other plugins or droidtop may read: droidtop's library index (A1), and a plugin's own published dataset | droidtop's own databases: only through A1 APIs, never a handle. A plugin publishing data does it as a plugin-provided API (§2), e.g. `acme.playlog.query` | — | per API | varies | by design |
-| H3 | Data kinds: moving data between equivalent plugins | hand a plugin's state to another plugin that takes the same kind, native or an app's (Syncthing-Fork's to droidtop's Syncthing plugin first) | manifest `dataKinds`; a data kind is a context (F8) whose copy carries files: `context.stage {context, name}` → write fd, `context.publish {context, records, files: [{name, size, sha256}]}`, `context.copy`, `context.open_file {context, name}` → read fd; droidtop's transfer moves a whole copy (below) | a plugin's page: Import <kind> from <plugin> | `data.kinds` (normal) | low | store and ops built (Droidtop/tracker#793, slice 1); the transfer screen, the root reader and the Syncthing import follow |
+| H3 | Data kinds: moving data between equivalent plugins | hand a plugin's state to another plugin that takes the same kind, native or an app's (Syncthing-Fork's to droidtop's Syncthing plugin first) | manifest `dataKinds`; a data kind is a context (F8) whose copy carries files: `context.stage {context, name}` → write fd, `context.publish {context, records, files: [{name, size, sha256}]}`, `context.copy`, `context.open_file {context, name}` → read fd; droidtop's transfer moves a whole copy (below) | a plugin's page: Import <kind> from <plugin> | `data.kinds` (normal) | low | store and ops built (mytop-project/tracker#793, slice 1); the transfer screen, the root reader and the Syncthing import follow |
 | H4 | Backup and restore | droidtop's own backup includes plugin data | manifest `backup: {include: ["prefs", "data/<subpath>"]}`; vault entries never included; restore re-verifies the plugin and asks before re-granting dangerous permissions | Settings → Backup | none | medium | not built (#46 is the credentials-in-backup issue) |
 | H5 | Logs and diagnostics | debugging a plugin; including it in "Share diagnostics" (#48) | `log.write {level, msg}` → a per-plugin ring buffer (256 KiB); the host scrubs tokens, emails, IPs, paths under the user's home and anything in the vault before any export; `diagnostics.read` would let a plugin read **droidtop's** logs | Accounts and sources → Plugins → <plugin> → Log; Share diagnostics | `log.write` (—) / `diagnostics.read` (dangerous, official only) | low / high | not built |
 | H6 | Telemetry | a plugin's own usage or crash reporting to its author | `telemetry.send {endpoint declared, payload ≤ 16 KiB}`: **off until the user turns it on per plugin**; the host shows the exact payload on the first send; nothing leaves the device without the user | Accounts and sources → Plugins → <plugin> → Share usage data (off) | `telemetry.send` (dangerous, opt-in) | high | not built |
 
-#### H3 Data kinds: moving data between equivalent plugins (Droidtop/tracker#793)
+#### H3 Data kinds: moving data between equivalent plugins (mytop-project/tracker#793)
 
 The owner, 2026-10-29: "We can use the syncable-data cache for the index transfer, make it a droidtop api function.
 expanding the API to allow transfers to equivalent internal and external plugins", and "The syncable data cache is
 the mechanism things like f95 use to do atomic database syncs". That mechanism is F8's protocol 2, syncable data
-(Droidtop/tracker#794): a copy made current whole, in one rename. A data kind is built on it, with no second store.
+(mytop-project/tracker#794): a copy made current whole, in one rename. A data kind is built on it, with no second store.
 
 - **A data kind** is a named, versioned format a plugin declares in its manifest:
   `"dataKinds": [{"kind": "syncthing.state", "version": 1, "export": true, "import": true}]` (a name of lowercase
@@ -3981,7 +3981,7 @@ the mechanism things like f95 use to do atomic database syncs". That mechanism i
   - droidtop makes the copy itself, after the person's press. Without root, it uses the app's own export, and the
     copy says what is missing ("no index: a full rescan will follow").
   - With root, the app's files are read through the **enhanced privileges provider**: the one provider host app
-    of Droidtop/tracker#852, which holds the device's elevated access. droidtop never holds root itself. The
+    of mytop-project/tracker#852, which holds the device's elevated access. droidtop never holds root itself. The
     owner, 2026-11-05: "the provider isn't the "shizuku" provider. It's the enhanced privileges provider, and
     shizuku is one plugin that runs in it. Magisk's hooks are another". So the reader asks the host for root, and
     whichever of its plugins holds root here serves the call.
@@ -3997,9 +3997,9 @@ the mechanism things like f95 use to do atomic database syncs". That mechanism i
 | Id | Group | For | What | Status |
 | --- | --- | --- | --- | --- |
 | I1 | Debug surface | plugin authors and bug reports | Accounts and sources → Plugins → <plugin> → Developer (shown when developer options are on): the manifest as parsed; its grants; the last 50 calls with durations and error codes; the last 50 broker calls; the log (H5); "Call op…" with a JSON argument box (replaces today's status-tile "Call …" debug row); "Force crash" (today's `force-crash` query) | the debug row exists, status_tile only |
-| I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that a test fixture of every kind must pass in CI | built 2026-10-16 (Droidtop/tracker#71): `:plugin-host-testing` holds `FakeEnv` (droidtop in memory), `FakeHost` (a `native_bundle` plugin's class in the JVM, its `host.call` through the real `BrokerCore`) and `Conformance`; the cases are one file, `conformance.json` in that module, which `plugin-host-testing/python/droidtop_fake_host.py` reads too. CI runs the native fixture (`ConformanceTest`) and the python fixture (android-checks.yml). The cases: a declared point answers, a granted host call succeeds, a turned-off permission is `PERMISSION_DENIED`, a failure is one plain sentence, a job reports and completes. Not covered: `flutter_embed` (its Dart code needs the engine; a rig check) |
+| I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that a test fixture of every kind must pass in CI | built 2026-10-16 (mytop-project/tracker#71): `:plugin-host-testing` holds `FakeEnv` (droidtop in memory), `FakeHost` (a `native_bundle` plugin's class in the JVM, its `host.call` through the real `BrokerCore`) and `Conformance`; the cases are one file, `conformance.json` in that module, which `plugin-host-testing/python/droidtop_fake_host.py` reads too. CI runs the native fixture (`ConformanceTest`) and the python fixture (android-checks.yml). The cases: a declared point answers, a granted host call succeeds, a turned-off permission is `PERMISSION_DENIED`, a failure is one plain sentence, a job reports and completes. Not covered: `flutter_embed` (its Dart code needs the engine; a rig check) |
 | I3 | Manifest schema | validation for authors and CI | `docs/plugin-manifest.schema.json` (JSON Schema for contract 2, with v1 accepted), used by `PluginManifest` tests | not built |
-| I4 | Test fixtures | a provider/caller pair per kind for the conformance script | droidtop ships no sample plugins (owner, 2026-10-14); fixtures live under the test directories and are never packaged | built for the JVM (2026-10-16): one conformance fixture each for `native_bundle` and `python` (Droidtop/tracker#71), and a `native_bundle` provider/caller pair through the real broker (`ProviderCallerTest`, Droidtop/tracker#129: the answer, `PROVIDER_UNAVAILABLE` while the provider is off or gone, the answer again when it is back; `FakeHost.provide`). The same steps on a device run with real plugins: Shizuku's `priv.shell` and the RetroArch manager calling it (coordinator, 2026-10-16: "Keep the rig part, run with real plugins ... Use disable where possible, since the console is production.") |
+| I4 | Test fixtures | a provider/caller pair per kind for the conformance script | droidtop ships no sample plugins (owner, 2026-10-14); fixtures live under the test directories and are never packaged | built for the JVM (2026-10-16): one conformance fixture each for `native_bundle` and `python` (mytop-project/tracker#71), and a `native_bundle` provider/caller pair through the real broker (`ProviderCallerTest`, mytop-project/tracker#129: the answer, `PROVIDER_UNAVAILABLE` while the provider is off or gone, the answer again when it is back; `FakeHost.provide`). The same steps on a device run with real plugins: Shizuku's `priv.shell` and the RetroArch manager calling it (coordinator, 2026-10-16: "Keep the rig part, run with real plugins ... Use disable where possible, since the console is production.") |
 
 ### J. Plugin platform (cross-cutting)
 
@@ -4128,7 +4128,7 @@ wording the host uses, so it is identical in every mode.
 That is 66 permissions. Those marked † are restricted to official
 origins.
 
-**Android permissions (decided 2026-10-08, Droidtop/tracker#378).** A
+**Android permissions (decided 2026-10-08, mytop-project/tracker#378).** A
 plugin never holds an Android permission: a contained process has none,
 and Android grants them to droidtop's package, not to a plugin. What a
 plugin declares is which of droidtop's Android-backed operations it needs;
@@ -4149,7 +4149,7 @@ other permission here.
   permission CAMERA, which droidtop itself does not have, so no plugin can
   use it through droidtop"). One droidtop requests but no operation uses is
   listed as "Not supported by this version of droidtop".
-- That list says each item in words, never as its id (2026-11-05, Droidtop/tracker#516: the rig read "permission
+- That list says each item in words, never as its id (2026-11-05, mytop-project/tracker#516: the rig read "permission
   gpu.render"): "Access this droidtop doesn't have yet" with the plugin's own reason, "A part named <label>" for an
   extension point, "News this droidtop doesn't send yet" for an event. The declared id stays in the detail, after
   "What it asked for:", for reference.
@@ -4203,14 +4203,14 @@ Each (plugin, permission) pair is in one of three states:
   not tick at approval becomes when the plugin declares it `required`
   (the list says "Needed" and that droidtop asks when it is first used),
   and what an update's new items start as. An optional one left unticked is
-  denied: the tick box really declines it (Droidtop/tracker#512).
+  denied: the tick box really declines it (mytop-project/tracker#512).
 
 When they are asked:
 
 - **At approval ("Approval is a list").** One screen, "What you're
   allowing", reached from the row under the plugin page's header (the
   page itself leads with the header and Approve on its bar,
-  Droidtop/tracker#512); what is ticked there is what Approve allows.
+  mytop-project/tracker#512); what is ticked there is what Approve allows.
   Every line below with a tick box can be unticked before approving,
   high-risk ones included:
   - "Adds": each extension point, with the mode it shows in (Gaming / Android / Desktop) beside it and nothing beside a point that has no particular place,
@@ -4242,7 +4242,7 @@ When they are asked:
     a prompt. The plugin row shows "Wants <label>", and the user can
     grant it there. Plugins cannot pop prompts on their own.
   - **Not now lasts this run of droidtop** (2026-10-16,
-    Droidtop/tracker#518): the same permission is not asked again until
+    mytop-project/tracker#518): the same permission is not asked again until
     droidtop restarts or the person chooses on the plugin's Permissions
     page; until then the call fails with `PERMISSION_DENIED` and a whole
     sentence saying so.
@@ -4277,7 +4277,7 @@ area, which reaches the same catalog screens from every mode:
 
 There is no second place.
 
-**Decided (Droidtop/tracker#830 R0; SPEC "Permissions").** The
+**Decided (mytop-project/tracker#830 R0; SPEC "Permissions").** The
 grant UI follows Android's permission UI as a whole:
 - the moment-of-use sheet asks "Allow <Plugin> to <do this>?" with the plugin's
   quoted reason and the risk, choices Allow and Don't allow, a separate
@@ -4322,7 +4322,7 @@ tick.
   picked-file calls are logged whatever their tier (built 2026-10-08).
   Other normal-permission calls, and ops that need no permission, are
   counted per day, not logged one by one (built 2026-10-28,
-  Droidtop/tracker#61): a count per day and per permission, or per
+  mytop-project/tracker#61): a count per day and per permission, or per
   `api op` when there is none, kept 30 days beside the ring and deleted
   with it (`PluginCallCounts`). Counts gather in memory and are written
   at most every 30 s, when the day changes, and before they are read.
@@ -4348,7 +4348,7 @@ tick.
 
 ### 5.1 What is enforced, and what is not
 
-Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
+Since 2026-10-08 (mytop-project/tracker#378) a plugin runs in one of two tiers
 (§5.3), and what is enforced depends on which:
 
 | | Contained (the default for contract 2) | Open process (`gpu.render`, `net.sockets`: each grant one hole) | Full trust (`host.full_trust`) |
@@ -4429,7 +4429,7 @@ check (§5.3) shows.
 ### 5.3 The contained execution tier (built 2026-10-08)
 
 To make the permission model hold for real, plugins must stop sharing
-droidtop's UID. The design, as built (Droidtop/tracker#378):
+droidtop's UID. The design, as built (mytop-project/tracker#378):
 
 - **Contained, the default for contract 2 plugins.** Each plugin runs in
   its own **isolated process**: `android:isolatedProcess="true"` on the
@@ -4447,7 +4447,7 @@ droidtop's UID. The design, as built (Droidtop/tracker#378):
     a host-backed data API.
   - **How the code loads:** see "Spike results" below.
 
-**Spike results (P2-1, Droidtop/tracker#378, 2026-10-08).** The loaders are
+**Spike results (P2-1, mytop-project/tracker#378, 2026-10-08).** The loaders are
 built, and the same code is what runs a contained plugin; there is no
 separate spike build. Whether each one works on a device is measured by
 the plugin page's **Containment check** (Advanced): it loads the plugin
@@ -4467,7 +4467,7 @@ commit that built this) and are written here when they arrive.
 | `native_bundle`, dex only | `:app` opens `classes.jar` and hands the descriptor over; the sandbox reads its `classes*.dex` into memory and loads them with `InMemoryDexClassLoader`, parented to droidtop's own loader so the plugin sees the plugin API. API 27+ takes any number of dex files, API 26 one. | **Yes.** Needs no path at all. |
 | `native_bundle` with `.so` | Its libraries for the device's ABI reach the process as descriptors and get virtual paths (`/droidtop-sandbox/plugin/lib/<abi>/...`); the class loader's library path names that folder (the `InMemoryDexClassLoader` constructor from API 29, the loader's own `addNativePath` on API 28). The plugin's own `System.loadLibrary` then runs the ordinary way: libcore's `findLibrary` check and ART's `android_dlopen_ext` are answered by the guarded hooks, the library is mapped from a private memfd copy, and ART registers it with the plugin's class loader, so JNI binds by symbol name or `RegisterNatives` as usual. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Needs Android 9 or later. A library whose `DT_NEEDED` names another of the plugin's own libraries loads only after that one (the linker resolves its dependencies by name, which the hooks do not see); load them in order. |
 | `python` | `:app` hands over libpython, the runtime's other libraries (OpenSSL, SQLite), the standard library as one zip (`python-stdlib.zip`, built once beside the runtime: pure Python, stored, no tests, IDLE or Tk) and every `lib-dynload` module. `libdroidtoppy.so` maps each library with `android_dlopen_ext` and `ANDROID_DLEXT_USE_LIBRARY_FD` from a private `memfd` copy of its descriptor, never from the descriptor itself (plugin-enforce-7: trying droidtop's own file first logged an `avc: denied { execute }` per library on the Android 14 rig, because `isolated_app` may never execute `app_data_file`). Each extension module is registered as a built-in (`PyImport_AppendInittab`) before the interpreter starts, because the import system loads an extension only by path. The zip goes on `sys.path` as `/proc/self/fd/<n>`; `zipimport` stats that path and reads it through an open-code hook (`PyFile_SetOpenCodeHook`) that answers with the descriptor itself (later with `pread`, so threads importing at once never share a file offset), so nothing is opened by path. `plugin.py` is executed from its text. One interpreter per plugin process. | **Built; the rig decides.** AOSP's policy (below) answers the first question: an isolated process may never map code from droidtop's files, so the memfd copy is the only path any library takes, and the report says so line by line ("memfd"). It may `getattr` a file handed to it, so the zip is expected on `sys.path` through its own descriptor. Whether a device's kernel and policy match AOSP's is what the report shows; if contained Python fails on one, the report and logcat's `avc:` lines say exactly what was refused. |
-| `flutter_embed` | A headless `FlutterEngine` in the isolated service. `:app` hands over the downloaded engine, the plugin's `libapp.so`, its `flutter_assets` as one zip (built once per installed bundle in droidtop's cache) and its registrant dex. `System.load` of the engine is answered by the guarded hooks; once the engine is in, its own imports are hooked too, so its `dlopen` of `libapp.so` maps the plugin's. **Flutter assets** (plugin-enforce-7): AssetManager opens an asset path itself, inside libandroidfw and libziparchive, and the hooks did not reach that open on the Android 13 rig ("Unable to open '/droidtop-sandbox/plugin/flutter_assets.zip'", `AssetManager.addAssetPath` refused). From API 30 the sandbox unpacks the zip descriptor once into a memfd of its own and adds a `ResourcesLoader` with an `AssetsProvider` (`ResourcesProvider.empty`) to its Resources before the engine is built; each asset is answered as an `AssetFileDescriptor` range of that memfd, so the engine's `AAssetManager_open` finds `flutter_assets/...` with nothing opened by path (`ContainedAssets`). On Android 8 to 10 there is no such API and the virtual path is the only route, so a contained Flutter plugin there depends on the hooks reaching the asset manager. **Engine arguments** (plugin-enforce-7, emulator-5560): FlutterLoader rejects an `--aot-shared-library-name` outside `getFilesDir()` ("External path ... rejected") and drops `--enable-software-rendering` in a release build, so a contained engine gets both, with `--enable-impeller=false` (Impeller refuses software rendering: "Check failed: !settings.enable_impeller"), at `FlutterJNI.init`, which passes its arguments to the engine unchanged. A library mapped from a memfd is known to the linker as `/memfd:<name> (deleted)`, so the hooks match that form too; before, the engine itself was never hooked and Dart found no snapshot. The engine draws in software (`--enable-software-rendering`): an isolated process may not open the GPU (grant `gpu.render` and it runs in a non-isolated droidtop-owned process that draws with hardware, "The graphics tier"). `ui.main`: an activity cannot run in an isolated process and the window manager is out of its reach, so droidtop's `PluginScreenActivity` owns a `SurfaceView`; the plugin's main-UI engine draws each frame into shared memory droidtop allocated and droidtop paints it into that surface ("ui.main in the sandbox" below: an isolated process can use neither vsync nor a Surface's buffers), and droidtop forwards touch, packed by droidtop itself (`FlutterPointerPacket`: Flutter's `AndroidTouchProcessor` asks the input service about each pointer's device, which an isolated process cannot reach, Droidtop/tracker#511), and keys (`KeyEventChannel`); Back pops the plugin's route and its last route (`SystemNavigator.pop`) closes the screen. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Plugin packages that need files (`path_provider`, `sqflite`) had none when contained until 2026-10-14; since then the file broker maps droidtop's private folder to the plugin's own ("The plugin's own folder by path" below). An isolated process cannot use a surface's gralloc buffers on either rig ("ui.main in the sandbox"), so a contained `ui.main` draws through droidtop's frames: seen drawing on emulator-5560 and BlueStacks (plugin-enforce-8). |
+| `flutter_embed` | A headless `FlutterEngine` in the isolated service. `:app` hands over the downloaded engine, the plugin's `libapp.so`, its `flutter_assets` as one zip (built once per installed bundle in droidtop's cache) and its registrant dex. `System.load` of the engine is answered by the guarded hooks; once the engine is in, its own imports are hooked too, so its `dlopen` of `libapp.so` maps the plugin's. **Flutter assets** (plugin-enforce-7): AssetManager opens an asset path itself, inside libandroidfw and libziparchive, and the hooks did not reach that open on the Android 13 rig ("Unable to open '/droidtop-sandbox/plugin/flutter_assets.zip'", `AssetManager.addAssetPath` refused). From API 30 the sandbox unpacks the zip descriptor once into a memfd of its own and adds a `ResourcesLoader` with an `AssetsProvider` (`ResourcesProvider.empty`) to its Resources before the engine is built; each asset is answered as an `AssetFileDescriptor` range of that memfd, so the engine's `AAssetManager_open` finds `flutter_assets/...` with nothing opened by path (`ContainedAssets`). On Android 8 to 10 there is no such API and the virtual path is the only route, so a contained Flutter plugin there depends on the hooks reaching the asset manager. **Engine arguments** (plugin-enforce-7, emulator-5560): FlutterLoader rejects an `--aot-shared-library-name` outside `getFilesDir()` ("External path ... rejected") and drops `--enable-software-rendering` in a release build, so a contained engine gets both, with `--enable-impeller=false` (Impeller refuses software rendering: "Check failed: !settings.enable_impeller"), at `FlutterJNI.init`, which passes its arguments to the engine unchanged. A library mapped from a memfd is known to the linker as `/memfd:<name> (deleted)`, so the hooks match that form too; before, the engine itself was never hooked and Dart found no snapshot. The engine draws in software (`--enable-software-rendering`): an isolated process may not open the GPU (grant `gpu.render` and it runs in a non-isolated droidtop-owned process that draws with hardware, "The graphics tier"). `ui.main`: an activity cannot run in an isolated process and the window manager is out of its reach, so droidtop's `PluginScreenActivity` owns a `SurfaceView`; the plugin's main-UI engine draws each frame into shared memory droidtop allocated and droidtop paints it into that surface ("ui.main in the sandbox" below: an isolated process can use neither vsync nor a Surface's buffers), and droidtop forwards touch, packed by droidtop itself (`FlutterPointerPacket`: Flutter's `AndroidTouchProcessor` asks the input service about each pointer's device, which an isolated process cannot reach, mytop-project/tracker#511), and keys (`KeyEventChannel`); Back pops the plugin's route and its last route (`SystemNavigator.pop`) closes the screen. | **Built 2026-10-09 (plugin-enforce-3); the rig decides.** Plugin packages that need files (`path_provider`, `sqflite`) had none when contained until 2026-10-14; since then the file broker maps droidtop's private folder to the plugin's own ("The plugin's own folder by path" below). An isolated process cannot use a surface's gralloc buffers on either rig ("ui.main in the sandbox"), so a contained `ui.main` draws through droidtop's frames: seen drawing on emulator-5560 and BlueStacks (plugin-enforce-8). |
 
 What every contained process is, by Android's rules: a random UID from the
 isolated range, no permissions, not in the `inet` group (no sockets), the
@@ -4530,15 +4530,15 @@ with it:
   its rig run says.
   Every plugin process paid it, and the processes restart after a minute
   idle, so the first search after a start ran out of its 10 s for several
-  sources at once (rig, release 0.2.0-dev.2070, Droidtop/tracker#218). An app
+  sources at once (rig, release 0.2.0-dev.2070, mytop-project/tracker#218). An app
   zygote that preloads the library (Android 10 and later) was tried and
   turned off the same day: on BlueStacks the preload left libbinder's
   ProcessState in the zygote, and every plugin process forked from it
   aborted with "libbinder ProcessState can not be used after fork" (rig,
-  release 0.2.0-dev.2097, Droidtop/tracker#218). The wait per plugin
+  release 0.2.0-dev.2097, mytop-project/tracker#218). The wait per plugin
   process stands until a start path that avoids it is found;
   `PluginStartRigTest` measures it, and `PythonPluginStartRigTest` measures
-  a python plugin's start step by step (Droidtop/tracker#848); both run on
+  a python plugin's start step by step (mytop-project/tracker#848); both run on
   the CI emulator, reported only, and by hand on the rig.
 
 **ui.main in the sandbox (plugin-enforce-8, emulator-5560 and BlueStacks).**
@@ -4584,7 +4584,7 @@ included, for two reasons in how droidtop drove the engine:
 locked down, we have to fix how WE handle them, maybe guarded hooks").**
 `SandboxFiles` and `native/src/sandbox_hooks.c`: every file a contained
 plugin's code loads by path gets a virtual path under `/droidtop-sandbox/`
-for a descriptor `:app` handed over. Since 2026-10-14 (Droidtop/tracker#470,
+for a descriptor `:app` handed over. Since 2026-10-14 (mytop-project/tracker#470,
 "merge, not replace") each one is a local file of the sandbox library
 (`sbx_local_add`): the process's lockdown traps every call that names a
 path, and an `open`, `stat` or `access` of a virtual path is answered from
@@ -4601,7 +4601,7 @@ engine's `dlsym` and window hooks. A virtual path nobody registered is
 `ENOENT`. The Containment check reports which libraries were hooked and how
 many import slots.
 
-**The plugin's own folder by path (2026-10-14, Droidtop/tracker#470).**
+**The plugin's own folder by path (2026-10-14, mytop-project/tracker#470).**
 Every plugin process loaded from descriptors, contained or open,
 gets a file broker in :app (`SandboxBroker`, `native/src/plugin_broker.c`),
 and its lockdown sends droidtop's private folder to it under every name
@@ -4615,11 +4615,11 @@ droidtop's own files are not among them under any name. SELinux lets an
 isolated process use a file the app hands it but not a folder (it checks
 `file_receive`), so in the contained tier the broker sends no folder
 descriptor and the process's handler holds each folder by its path
-(fibrewall 8be4adc, `sbx_policy_set_folders_by_path`, Droidtop/tracker#741):
+(fibrewall 8be4adc, `sbx_policy_set_folders_by_path`, mytop-project/tracker#741):
 listing, `mkdirs`, `realpath`, `chdir` and the `*at` calls on a folder go to
 the broker by path and work as in an open process.
 
-**Config and cache folders (2026-11-17, owner, Droidtop/tracker#741).**
+**Config and cache folders (2026-11-17, owner, mytop-project/tracker#741).**
 Every plugin has two explicit folders in its own folder, scoped to it,
 read, written and listed by path in every tier: `config`, for what it
 keeps (settings files, keys, a native engine's home), kept until the
@@ -4637,7 +4637,7 @@ Containment check's "droidtop's files" line looks for droidtop's
 plugin's folder, where there is none.
 
 **Preferences and SQLite are droidtop's (decided 2026-10-29,
-Droidtop/tracker#741).** The first emulator run of `ContainedFilesRigTest`
+mytop-project/tracker#741).** The first emulator run of `ContainedFilesRigTest`
 (Android 13 and 14) found Android's own Java paths to preferences and SQLite
 failing in an isolated process before any file is touched:
 `getSharedPreferences` first asks the user service whether storage is unlocked
@@ -4701,7 +4701,7 @@ internals". So:
   hidden API.
 
 **What a contained plugin's own folder holds (design 2026-10-16,
-Droidtop/tracker#375).** Decided by the coordinator, 2026-10-16:
+mytop-project/tracker#375).** Decided by the coordinator, 2026-10-16:
 "Contained Flutter plugins get shared_preferences, path_provider and `open`
 through droidtop, so standard Flutter packages just work while contained.
 It keeps contained-first, and it keeps the machinery invisible to plugin
@@ -4782,7 +4782,7 @@ the broker can answer it." The folder above is the mechanism; what it serves:
   above, say) names itself.
 
 **Open processes: one hole per permission (2026-10-15,
-Droidtop/tracker#553).** The graphics tier below became the first of a
+mytop-project/tracker#553).** The graphics tier below became the first of a
 family. The owner's decision for Syncthing (a plugin that dials peers and
 listens for them itself): one non-isolated plugin process type, where each
 granted permission opens only its own hole, never a separate process family
@@ -4826,7 +4826,7 @@ permission is not supported by this version of droidtop and runs contained.
   servers and search domains from Android's own view of it, and the
   plugin resolves names against those servers (Go's pure resolver, its
   dialer pointed at them) and binds and announces on those addresses.
-- **Shared folders by path (2026-10-16, Droidtop/tracker#553).** An open
+- **Shared folders by path (2026-10-16, mytop-project/tracker#553).** An open
   process also reaches, by path, the shared-storage folders its granted
   `files.shared.read` and `files.shared.write` entries declare (D5), on
   every mounted volume, while droidtop has all-files access: the file
@@ -4873,7 +4873,7 @@ opens that one hole:
   droidtop-owned `Surface` (`PluginScreenActivity`), with hardware instead
   of `--enable-software-rendering`.
 - **The system-call filter (plugin-enforce-6; since 2026-10-10 the sandbox
-  library's, Droidtop/tracker#470).** Before any of the plugin's code
+  library's, mytop-project/tracker#470).** Before any of the plugin's code
   loads, the process installs a seccomp-bpf filter on every thread
   (`native/src/plugin_filter.c`, `PluginSyscallFilter`). It is the
   lockdown of the sandbox library droidtop shares with Enginehost
@@ -4895,7 +4895,7 @@ opens that one hole:
   control, on Linux and on the Android emulator at API 28 and 34. A process
   that cannot take the filter does not run the plugin. The Containment check (Advanced)
   shows "System-call filter: on: ..." and the network line reads "refused".
-- **Files by path go to a broker (since 2026-10-10, Droidtop/tracker#470).**
+- **Files by path go to a broker (since 2026-10-10, mytop-project/tracker#470).**
   seccomp sees system-call numbers and integer arguments only ("BPF
   programs may not dereference pointers", kernel
   Documentation/userspace-api/seccomp_filter.rst), so it cannot tell an
@@ -4942,7 +4942,7 @@ opens that one hole:
   reserved for UID-level privilege that no per-permission process can give:
   Shizuku, root and `apps.bind`.
 
-**Narrowing it further: what was looked at (Droidtop/tracker#378,
+**Narrowing it further: what was looked at (mytop-project/tracker#378,
 2026-10-09; reference material only, no probes).**
 
 | Idea | What the platform allows | Outcome |
@@ -4965,7 +4965,7 @@ opens that one hole:
     the Shizuku binder arrives in droidtop's main process, whose provider
     hands it on, and the slots ask for it through Shizuku's multi-process
     support; the provider is not in a slot, so droidtop's start never waits
-    on another process to publish it, Droidtop/tracker#775);
+    on another process to publish it, mytop-project/tracker#775);
   - plugins that bind other apps' services (`apps.bind`: an isolated
     process cannot bind);
   - It needs `host.full_trust` (critical). A contract 2 plugin that cannot
@@ -4984,7 +4984,7 @@ opens that one hole:
   limited to official origins by default, and why each one is its own
   process.
 
-### 5.6 Every path but the API (audit, 2026-10-16, Droidtop/tracker#53)
+### 5.6 Every path but the API (audit, 2026-10-16, mytop-project/tracker#53)
 
 The audit the rule "Everything goes over the API" (top of this document)
 asks for. Its scope, from the coordinator's package of 2026-10-16:
@@ -5004,7 +5004,7 @@ asks for. Its scope, from the coordinator's package of 2026-10-16:
   allowed and is not listed as a finding.
 
 Each path is listed with its status, the commit that closed it and the
-test that proves it closed; the table is posted on Droidtop/tracker#53.
+test that proves it closed; the table is posted on mytop-project/tracker#53.
 Kinds: `native_bundle`, `python`, `flutter_embed` (there is no
 application-interface kind). Tiers: contained (an isolated process),
 open (`:plugin_open*`, droidtop's UID), full access (`:pluginhost*`,
@@ -5012,7 +5012,7 @@ droidtop's UID).
 
 | Path | Tier | Status | Closed by | Test |
 | --- | --- | --- | --- | --- |
-| Driving another plugin process (`IPluginRuntime`: `loadPlugin` of a folder the plugin wrote, so unsigned code in a full-access slot; `invoke`/`handle` on another plugin) by binding droidtop's non-exported plugin services as droidtop's UID | open, full | closed: every call is refused unless it comes from droidtop's own main process, by the system's record of that process (`AppCaller`, `DroidtopCallers`); an isolated process keeps the pid of its first caller of droidtop's UID, which is droidtop binding it. A one-way call (a screen's `screenTouch`, `screenKey`) has no caller pid, so it carries a secret the process made, which droidtop fetches once over the pid-checked `inputToken` after `attachScreen`, and is refused without it or from another UID (Droidtop/tracker#511: the pid check refused every touch and key, seen on the emulator rig) | the audit closings commit; #511 | `DroidtopCallersTest` |
+| Driving another plugin process (`IPluginRuntime`: `loadPlugin` of a folder the plugin wrote, so unsigned code in a full-access slot; `invoke`/`handle` on another plugin) by binding droidtop's non-exported plugin services as droidtop's UID | open, full | closed: every call is refused unless it comes from droidtop's own main process, by the system's record of that process (`AppCaller`, `DroidtopCallers`); an isolated process keeps the pid of its first caller of droidtop's UID, which is droidtop binding it. A one-way call (a screen's `screenTouch`, `screenKey`) has no caller pid, so it carries a secret the process made, which droidtop fetches once over the pid-checked `inputToken` after `attachScreen`, and is refused without it or from another UID (mytop-project/tracker#511: the pid check refused every touch and key, seen on the emulator rig) | the audit closings commit; #511 | `DroidtopCallersTest` |
 | Forged reports into droidtop (`IPluginRuntimeCallback`: a crash report that disables another plugin, frames into another plugin's screen) | all | closed: each process has its own callback, which believes a report only about a plugin loaded in that process | the audit closings commit | `DroidtopCallersTest` (ownership) |
 | droidtop's files through `DroidtopFileProvider` (its root is the whole file system; non-exported, but droidtop's UID passes) | open, full | closed: a plugin process (or an isolated UID) is refused | the audit closings commit | `DroidtopCallersTest` (process names) |
 | Shizuku's binder through its provider (OS rule) | open | closed: only droidtop and `:pluginhost*` get it; the Shizuku server still delivers it | the audit closings commit | `DroidtopCallersTest` (`mayUseShizuku`) |
@@ -5105,7 +5105,7 @@ stays in an open process of droidtop's UID until the broker's byte relay.
 Built (2026-11-05), to the recommendation, owner to confirm (coordinator,
 2026-11-05: "Build the recommended option where a decision is his, and
 record it as built to the recommendation, owner to confirm";
-Droidtop/tracker#850): the isolated `net.sockets` process is locked down
+mytop-project/tracker#850): the isolated `net.sockets` process is locked down
 with the sandbox's network filter (`SBX_LOCK_NET_FILTER`, Fibrewall 0.2.0).
 Every connect, accept and send that names an address is decided by
 droidtop's broker, and nothing goes around it: not a connect made from
@@ -5155,7 +5155,7 @@ pass, the full-access rows above stay open.
 
 ## 6. Contract 1 is gone; the capability labels that remain
 
-**Contract 1 is removed (owner, 2026-10-29, Droidtop/tracker#766: "contract-1 plugin support goes NOW, and we fix
+**Contract 1 is removed (owner, 2026-10-29, mytop-project/tracker#766: "contract-1 plugin support goes NOW, and we fix
 what breaks").** droidtop installs contract 2 and 3 only (`PLUGIN_MANIFEST_MIN_CONTRACT_VERSION`); a contract 1 bundle
 is refused at install ("contractVersion 1 is older than this build of droidtop runs (2): it needs an update"), and one
 already installed is never called and its page says "Needs an update" (`PluginTiers.refusal`). The translation that
@@ -5235,7 +5235,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     grant, or the call is refused. Set to Ask first (or not answered yet),
     a call the person started shows the first-use sheet for the point
     (`PluginGrants.askPoint`) and keeps the answer; from the background it
-    is refused with a "wanted" note (Droidtop/tracker#270).
+    is refused with a "wanted" note (mytop-project/tracker#270).
 - **Resolution and calls between plugins.**
   - `PluginApiResolver` recomputes the graph on a change of `PluginEpoch`
     (every record write, grant write and uninstall), never per call, to a
@@ -5270,7 +5270,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   is not built; the Permissions screen reads "last used" from it.
 - **Screens** (#59, #60, #62, #65).
   - The first-use sheet is `PluginGrantSheet`, the one sheet for every
-    mode (Droidtop/tracker#128): `PluginGrantPrompts.ask` publishes the
+    mode (mytop-project/tracker#128): `PluginGrantPrompts.ask` publishes the
     question and opens `PluginGrantSheetActivity`, a translucent activity
     of droidtop's own that draws the sheet over whatever is on screen
     (Gaming's shell, the Android home screen, the Desktop), in the Gaming
@@ -5285,11 +5285,11 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     export, with Allowed / Ask first / Blocked, its reason, "tried to use
     this while you were not being asked" and when it was last used (a
     logged call's time; an everyday permission, only counted per day
-    (4.6), the day of its newest count, Droidtop/tracker#60). Opening a
+    (4.6), the day of its newest count, mytop-project/tracker#60). Opening a
     plugin's own screen (`ui.main`) set to Ask first is its first use and
     asks on the sheet, as any point does (#59). New
     items from an update sit under "Wants new access" and the plugin's row
-    says so. The state is a chip with a tone (Droidtop/tracker#519, built
+    says so. The state is a chip with a tone (mytop-project/tracker#519, built
     2026-10-16): Allowed neutral, Ask first caution, Blocked danger, from
     the notice palette, so what a state costs shows without reading it.
     The tone is the choice's own (`ChoiceOption.tone`); any settings choice
@@ -5317,7 +5317,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     target carries its id, title and system only when the plugin holds
     `library.read`. Built on the detail screen of console ROMs and apps and
     the PC game page; on Standard's long-press app menu and Desktop's Start
-    menu row menu (Droidtop/tracker#67, 2026-10-16) as a "Plugin actions"
+    menu row menu (mytop-project/tracker#67, 2026-10-16) as a "Plugin actions"
     row, shown when a manifest's static filter matches (Standard answers
     from the hook's memory, the menu being built on the main thread), that
     opens one page of the actions (`PluginContextActions.screen`) in
@@ -5328,7 +5328,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     Android app is an `app` with its package, else a `game`). In Gaming the
     PC game menu (Y) and an app's Select menu have the same "Plugin actions"
     row and page, in the menu's own sheet (`gaming.game_menu`,
-    `gaming.app_menu`; Droidtop/tracker#67, 2026-10-16). The gamelist's own
+    `gaming.app_menu`; mytop-project/tracker#67, 2026-10-16). The gamelist's own
     options act on the list and name no game, so they have none.
   - **Metadata sources (A3).** `PluginMetadataSources` opens one session per
     console scrape pass and, for each game, asks every running source
@@ -5339,7 +5339,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     `fieldSources` under the plugin's name. `rating` is 0..1 and release
     dates are normalised to ES-DE's `YYYYMMDDT000000` or dropped. The PC scrape
     asks it the same way. **A plugin as the PC source (2026-10-28,
-    Droidtop/tracker#67):** Settings > Accounts and sources > PC & engine game
+    mytop-project/tracker#67):** Settings > Accounts and sources > PC & engine game
     source lists every running `library.metadata` plugin beside the built-in
     sources ("<label> (plugin)"). Chosen, it is the one source a PC pass asks:
     no built-in search and no other plugin, only the game's own store id first.
@@ -5369,8 +5369,8 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     permission `priv.shell.adb` (critical). `argv` is executed directly, not
     through a shell, and each stream is capped at 64 KiB.
   Install, the last `priv.packages` op of §2.2, is specified below
-  (Droidtop/tracker#130). Two more ops are specified
-  and built (2026-10-09, Droidtop/tracker#248), for the
+  (mytop-project/tracker#130). Two more ops are specified
+  and built (2026-10-09, mytop-project/tracker#248), for the
   Emulator setup helper, both under the `priv.packages` permission:
   - `set_appop {package, op, mode} -> {}`: `appops set <package> <op> <mode>`.
     `op` is an upper-case AppOps name (`^[A-Z][A-Z0-9_]*$`, the helper uses
@@ -5385,7 +5385,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   and the exact permission or appop named (docs/SPEC.md "Risky actions"), and it
   reads the result back from Android rather than trusting the reply. It offers
   the rows only while the running provider exports the op (`HostApiCaller.hasOp`).
-  Three more (2026-10-16, Droidtop/tracker#130; Shizuku plugin 1.5.0), also
+  Three more (2026-10-16, mytop-project/tracker#130; Shizuku plugin 1.5.0), also
   under `priv.packages`. Decided by the coordinator, 2026-10-16: "build a, b
   and c as you proposed" (clear_data, uninstall, revoke_permission); "uninstall
   refuses droidtop itself and Shizuku's own package. Also refuse any package
@@ -5405,7 +5405,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   mode, a permission name) before it runs anything, and each value is one
   argument of the command, never shell text. No droidtop screen calls these
   three yet; they are for plugins that manage apps.
-  And install (2026-10-16, Droidtop/tracker#130), a **job** under
+  And install (2026-10-16, mytop-project/tracker#130), a **job** under
   `priv.packages`. Decided by the coordinator, 2026-10-16: "The spec lists
   install, and the apps are meant to be feature-complete, so don't defer it
   indefinitely"; the design on the issue was accepted with "Streaming the APK
@@ -5454,7 +5454,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     `am instrument` from CI's `droidtop-android-test` artifact. "When a real
     droidtop screen or plugin first uses these calls, that screen gets the
     user-way rig check too."
-- **`priv.settings@1`** (2026-10-28, Droidtop/tracker#72; Shizuku plugin,
+- **`priv.settings@1`** (2026-10-28, mytop-project/tracker#72; Shizuku plugin,
   level `adb`), every op under the `priv.settings` permission (critical):
   - `get {namespace, key} -> {value}`: `settings get`; `value` is null for a
     setting that is not set.
@@ -5472,7 +5472,7 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   them off stops it mid-call; reading them is allowed. No droidtop screen
   calls it yet; it is for plugins that tune the device.
 - **Ops for the emulator setup helper** (specified 2026-10-08,
-  Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
+  mytop-project/tracker#130, #248; droidtop's side is built, the Shizuku provider
   plugin is to add them). Both are `priv.shell@1` ops, permission
   `priv.shell.adb`, and the provider refuses any `path` that is not a file in
   shared storage: absolute, under `/storage/` or `/sdcard/`, no empty, `.` or
@@ -5520,10 +5520,10 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   Ending a game this way (Quit to Library, the task manager's End) is the
   person's own action, so a provider that has not yet been allowed full
   access (§5.3) asks for it on the first-use sheet then, where a surface can
-  draw it (decided 2026-10-09, Droidtop/tracker#378). droidtop's other calls
+  draw it (decided 2026-10-09, mytop-project/tracker#378). droidtop's other calls
   to a provider (reading the task list, background checks) never show a
   sheet; the Permissions screen allows it too.
-- The provider plugin itself is `Droidtop/droidtop-plugin-shizuku`
+- The provider plugin itself is `mytop-project/droidtop-plugin-shizuku`
   (`droidtop-plugin/`): a contract 2 manifest exporting both interfaces,
   full-trust, with the existing status tile and app_status surfaces.
 
@@ -5599,10 +5599,10 @@ version was bumped.
 - The catalog can refuse to *offer* (not uninstall) a plugin whose only
   implemented major is gone.
 
-**Contract 2.2: the old op names go (owner, 2026-10-29, Droidtop/tracker#766).** The names contract 2.1 renamed
+**Contract 2.2: the old op names go (owner, 2026-10-29, mytop-project/tracker#766).** The names contract 2.1 renamed
 (`HostOpNames.DEPRECATED`, 21 of them, §3 "Naming") are served as aliases until contract 2.2, and 2.2 comes once no
 official plugin calls one: the bundle workflow warns on every old name it finds, so its logs are the check (the
-retroarch and fdroid plugins were the last callers, Droidtop/tracker#762). The bump deletes the map, `HostOpNames.current`,
+retroarch and fdroid plugins were the last callers, mytop-project/tracker#762). The bump deletes the map, `HostOpNames.current`,
 the broker's two helpers that apply it and `host.get_info`'s `deprecatedOps`; a plugin still calling an old name then
 gets `UNSUPPORTED` like any op droidtop does not serve.
 
@@ -5614,7 +5614,7 @@ gets `UNSUPPORTED` like any op droidtop does not serve.
   "Not supported by this version" and never called, but the rest of the
   plugin still works.
 
-**Contract 3 (proposed 2026-10-22, approved 2026-10-23, Droidtop/tracker#602, built 2026-10-23).**
+**Contract 3 (proposed 2026-10-22, approved 2026-10-23, mytop-project/tracker#602, built 2026-10-23).**
 A plugin whose manifest says `"contractVersion": 3` needs facets: a droidtop built before them refuses to install it
 ("contractVersion 3 is newer than this build of droidtop understands (2)") and keeps the version it has, so a plugin
 that moved its settings or panel to facets is never installed where they cannot be drawn. droidtop installs contract
@@ -5637,55 +5637,55 @@ and replies onto facets, and contract 2 is retired under the rules above.
   `facts`. The unbuilt `apply` is gone. droidtop's own download-site
   sessions (G3) reach a page opened in its web view; no op exposes them.
 
-- 2026-10-16 (Droidtop/tracker#355 G5): a download whose name is already in
+- 2026-10-16 (mytop-project/tracker#355 G5): a download whose name is already in
   the game folder is kept beside it as "Name (2).ext" (an unpacked game as
   "Name (2)"), never replacing it and never failing after the download; a
   set of several files whose names are taken still stops, since its files
   name each other.
 
-- 2026-10-16 (Droidtop/tracker#520): an `apps.bridge` entry may carry
+- 2026-10-16 (mytop-project/tracker#520): an `apps.bridge` entry may carry
   `app`, `packages` and `get`; `needs: "app"` on a node or a tile. droidtop
   draws the missing-app notice itself.
 
-- 2026-10-16 (Droidtop/tracker#553): `power.get_state` (D7), under
+- 2026-10-16 (mytop-project/tracker#553): `power.get_state` (D7), under
   `power.state`. An open process reaches the shared-storage folders its
   granted `files.shared` entries declare by path (5.3, "Shared folders by
   path").
 
-- 2026-10-16 (Droidtop/tracker#563): widgets (C10) are built for Android
+- 2026-10-16 (mytop-project/tracker#563): widgets (C10) are built for Android
   app widgets: `ui.widget@1` `snapshot` and `action` with the value, list,
   gauge, media and image templates, and C2 and C3 tiles on a widget.
   `context.surface` `android.widget` is new; a tile's `surfaces` decides
   whether it may be on one.
 
-- 2026-10-16 (Droidtop/tracker#559): theme tokens (G7): `ui.get_theme`,
+- 2026-10-16 (mytop-project/tracker#559): theme tokens (G7): `ui.get_theme`,
   `theme` in `host.get_info`, and the event `host.theme_changed`, for UI a
   plugin draws itself.
 
-- 2026-10-16 (Droidtop/tracker#556, #553): paired devices (D21):
+- 2026-10-16 (mytop-project/tracker#556, #553): paired devices (D21):
   `devices.list_paired`, `devices.announce` and the event
   `devices.changed`, under the new `devices.paired`. A plugin sees, on each
   paired computer or handheld, only what the same plugin id announced there;
   never an address, a key or another plugin's value.
 
-- 2026-10-15 (Droidtop/tracker#553): `net.get_links` (D12), under
+- 2026-10-15 (mytop-project/tracker#553): `net.get_links` (D12), under
   `net.sockets`.
-- 2026-10-15 (Droidtop/tracker#553): the `net.sockets` permission, the
+- 2026-10-15 (mytop-project/tracker#553): the `net.sockets` permission, the
   network hole of the open process type that `gpu.render` now shares
   (§5.3, "Open processes: one hole per permission").
 
-- 2026-10-15 (Droidtop/tracker#521 item 1): the `danger` tone for a
+- 2026-10-15 (mytop-project/tracker#521 item 1): the `danger` tone for a
   view's `notice` and for `ui.prompt confirm`.
-- 2026-10-15 (Droidtop/tracker#521 items 2 and 8): manifest presentation
+- 2026-10-15 (mytop-project/tracker#521 items 2 and 8): manifest presentation
   fields `summary`, `publisher`, `homepage`, `category`, `icon`,
   `screenshots` (1.2), drawn by droidtop in an "About" group, with
   `summary` and `publisher` also on a catalog index's plugin entry; every
   plugin panel ends with droidtop's own Permissions row.
-- 2026-10-15 (Droidtop/tracker#521 items 5 and 7): typed `info` and
+- 2026-10-15 (mytop-project/tracker#521 items 5 and 7): typed `info` and
   `row` values (`bool`, `number` with `unit`, `enum`) written by droidtop;
   `needs` on any view node, drawn as an inert "Off" row while that
   permission is turned off.
-- 2026-10-15 (Droidtop/tracker#521 items 3, 6, 9, 10): a `provides`
+- 2026-10-15 (mytop-project/tracker#521 items 3, 6, 9, 10): a `provides`
   entry's `label` follows the point's name ("Status tiles and widgets:
   VPN"); a view's optional top-level `empty` sentence under droidtop's own
   "Nothing here yet" notice with Refresh; a job's completion `notice`, and
@@ -5693,7 +5693,7 @@ and replies onto facets, and contract 2 is retired under the rules above.
   `disclaimer` is drawn under droidtop's caution card "Notice from the
   list" (reserved, with "The list's notice changed").
 
-- 2026-10-15 (Droidtop/tracker#544): the error code `BROWSER_CHECK_REQUIRED`
+- 2026-10-15 (mytop-project/tracker#544): the error code `BROWSER_CHECK_REQUIRED`
   and the error field `detail`; a failure `message` is one plain sentence
   (§1.3); droidtop draws Sign in / Open the site for `SIGN_IN_REQUIRED` and
   `BROWSER_CHECK_REQUIRED`, and a `web.session` plugin's account row, from
@@ -5704,7 +5704,7 @@ and replies onto facets, and contract 2 is retired under the rules above.
   `version` and droidtop reading the app from Android (F1); tile entries'
   `whileGame` and `gamePackages` (C2).
 
-- 2026-10-14 (Droidtop/tracker#485): the `notice` view node and a reply's
+- 2026-10-14 (mytop-project/tracker#485): the `notice` view node and a reply's
   `data.notice`; `host.viewFeatures` in every call envelope; error replies
   may carry `title`, `subtitle`, `permission` and `action`, and the new code
   `SIGN_IN_REQUIRED`; `ui.prompt@1 confirm`; `ui.toast` is drawn as
@@ -5886,7 +5886,7 @@ the tracker honest.
 - **Network:**
   - P2-4: `net.http`/`net.download` broker with domain allowlists (built,
     #378);
-  - P2-5: a web-session API (G3) for #9 (built 2026-10-09, Droidtop/tracker#380);
+  - P2-5: a web-session API (G3) for #9 (built 2026-10-09, mytop-project/tracker#380);
   - P2-6: an OAuth helper (G2);
   - P2-7: GitHub request API (G4) folded into #16's token store.
 - **Library:**
@@ -5965,18 +5965,18 @@ answer.
 - **Q4. Should the contained tier be the default for official plugins
   too,** once the spike proves it, with full trust only where a plugin
   needs it? The recommendation is yes. **Decided 2026-10-08
-  (Droidtop/tracker#378): contained is the default for every contract 2
+  (mytop-project/tracker#378): contained is the default for every contract 2
   plugin, official ones included.**
-- **Q5. Should Linux apps' own notifications reach droidtop?** (Droidtop/tracker#221, 2026-11-06.) §1.12's
+- **Q5. Should Linux apps' own notifications reach droidtop?** (mytop-project/tracker#221, 2026-11-06.) §1.12's
   notification bridge carries a plugin's notifications into Desktop. The other direction, a container app's
   `org.freedesktop.Notifications` shown by droidtop and readable by plugins, needs a listener on the container's
   session bus, which is code in the container. The recommendation is a droidtop feature of its own if wanted, not a
   plugin permission.
-- **Q6. Should droidtop be offered for every file while Desktop is on?** (Droidtop/tracker#221, 2026-11-06.) Plugins'
+- **Q6. Should droidtop be offered for every file while Desktop is on?** (mytop-project/tracker#221, 2026-11-06.) Plugins'
   Open with is offered for the files droidtop already takes (`.exe`, `.msi`, `.deb`, `.rpm`, `.AppImage`). For a
   plugin to open other files, droidtop would declare a filter for any file, and appear in every app's Open with list
   while Desktop is on. The recommendation is to wait for a real plugin that needs it.
-- **Q7. May a plugin read the clipboard in the background?** (Droidtop/tracker#221, 2026-11-06.) D6 and T5 allow a
+- **Q7. May a plugin read the clipboard in the background?** (mytop-project/tracker#221, 2026-11-06.) D6 and T5 allow a
   read only during a call the person started, and §1.12's bridge keeps that. A clipboard history or a sync to
   another device would need reads on `clipboard.changed` with nobody pressing anything. The recommendation is no,
   or a separate critical permission for it, if a real plugin asks.

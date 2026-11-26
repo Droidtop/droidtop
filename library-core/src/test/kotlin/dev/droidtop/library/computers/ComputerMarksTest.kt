@@ -7,7 +7,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The person's organization of a game, as the marks it travels as (Droidtop/tracker#469 part 1). */
+/** The person's organization of a game, as the marks it travels as (mytop-project/tracker#469 part 1). */
 @RunWith(RobolectricTestRunner::class)
 class ComputerMarksTest {
     @Test

@@ -158,7 +158,7 @@ object PcFolderClassifier {
      * A title's leading article is asked about second: a program is named
      * after its game without the "The" more often than with it (`The
      * Sample/SampleSE.exe` beside a `Maker.exe`), and the whole title still
-     * wins where a program carries it (Droidtop/tracker#308).
+     * wins where a program carries it (mytop-project/tracker#308).
      */
     private fun namedAfter(layer: List<ListedFile>, folderName: String): ListedFile? {
         val title = GameTitleParser.parseName(folderName).title

@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The launch watchdog's decision (Droidtop/tracker#270, #271, #168): what it claims and what it never does. */
+/** The launch watchdog's decision (mytop-project/tracker#270, #271, #168): what it claims and what it never does. */
 class LaunchWatchdogTest {
     private fun look(
         elapsedMs: Long,
@@ -179,7 +179,7 @@ class LaunchWatchdogTest {
 
     @Test
     fun enginehostReturningAtOnceIsLeavingNotFailing() {
-        // Cancel on Enginehost's no-sandbox warning hands straight back (Droidtop/tracker#289): not a crash.
+        // Cancel on Enginehost's no-sandbox warning hands straight back (mytop-project/tracker#289): not a crash.
         assertTrue(LaunchWatchPolicy.leftBeforePlaying(EngineHost.PACKAGE_NAME, LaunchTrouble.EXITED_AT_ONCE))
         // Anything else of Enginehost's is still trouble, and an emulator returning at once still is.
         for (trouble in LaunchTrouble.entries - LaunchTrouble.EXITED_AT_ONCE) {

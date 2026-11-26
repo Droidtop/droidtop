@@ -13,7 +13,7 @@ import kotlinx.serialization.json.putJsonObject
 /**
  * How an image says its own program runs, from the image config's `config` object (OCI image spec,
  * "Properties": `Env`, `Entrypoint`, `Cmd`, `WorkingDir`, `User`). docs/SPEC.md 3 "The image's own program",
- * Droidtop/tracker#555 D6a: a Docker image's program is started the way Docker starts it.
+ * mytop-project/tracker#555 D6a: a Docker image's program is started the way Docker starts it.
  */
 data class ImageRunConfig(
     val env: List<String> = emptyList(),
@@ -21,7 +21,7 @@ data class ImageRunConfig(
     val cmd: List<String> = emptyList(),
     val workingDir: String? = null,
     val user: String? = null,
-    /** `ExposedPorts`: the ports the image's program says it listens on, as notes (Droidtop/tracker#555 D6). */
+    /** `ExposedPorts`: the ports the image's program says it listens on, as notes (mytop-project/tracker#555 D6). */
     val ports: List<ExposedPort> = emptyList(),
 ) {
     /**

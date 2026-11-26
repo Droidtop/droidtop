@@ -61,7 +61,7 @@ class ClipboardBridge(
 
     /**
      * The text last synced either way, and whether Android marked it sensitive (a password manager's copy), for
-     * plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221). Written on the main thread, read from a binder thread.
+     * plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221). Written on the main thread, read from a binder thread.
      */
     @Volatile
     private var current: Pair<String, Boolean>? = null

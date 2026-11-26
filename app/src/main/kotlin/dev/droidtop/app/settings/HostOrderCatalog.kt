@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
 /**
- * Host order (Droidtop/tracker#838): the hosts droidtop tries first when it picks an update's download itself, most
+ * Host order (mytop-project/tracker#838): the hosts droidtop tries first when it picks an update's download itself, most
  * wanted first. A press moves a host to the top; a link droidtop serves without a page (a debrid account, a host's own
  * API) is always tried before any of them, whatever the order.
  */

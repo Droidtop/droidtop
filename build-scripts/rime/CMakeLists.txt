@@ -1,4 +1,4 @@
-# librime.so for the keyboard's Chinese input (Droidtop/tracker#903 H8; built by
+# librime.so for the keyboard's Chinese input (mytop-project/tracker#903 H8; built by
 # .github/workflows/rime-engine.yml, which publishes it as a prerelease).
 #
 # Trime (osfans/trime, GPL-3.0-or-later) already builds librime and its

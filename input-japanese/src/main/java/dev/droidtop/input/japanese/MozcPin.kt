@@ -1,7 +1,7 @@
 package dev.droidtop.input.japanese
 
 /**
- * input-japanese/mozc-engine.pin (Droidtop/tracker#903 H7c), as the build hands it over in BuildConfig.MOZC_PIN: the
+ * input-japanese/mozc-engine.pin (mytop-project/tracker#903 H7c), as the build hands it over in BuildConfig.MOZC_PIN: the
  * release Mozc came from, and the dictionary's archive, size and SHA-256s that a download must match. The same file
  * fetches libmozc.so at build time (build-scripts/fetch-mozc-engine.sh), so the library and its dictionary cannot come
  * from different releases. Pure.
@@ -17,7 +17,7 @@ class MozcPin(
     val dataUrl: String get() = "$RELEASES/$tag/$DATA_GZ"
 
     companion object {
-        const val RELEASES = "https://github.com/Droidtop/droidtop/releases/download"
+        const val RELEASES = "https://github.com/mytop-project/droidtop/releases/download"
         const val DATA_GZ = "mozc.data.gz"
 
         private val TAG = Regex("[A-Za-z0-9._-]+")

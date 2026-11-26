@@ -8,7 +8,7 @@ import org.junit.Test
 import kotlin.math.pow
 import kotlin.random.Random
 
-/** Dynamic (wallpaper): the keyboard's roles from a Material You palette (Droidtop/tracker#903 H12b). */
+/** Dynamic (wallpaper): the keyboard's roles from a Material You palette (mytop-project/tracker#903 H12b). */
 class DynamicKeyColorsTest {
 
     /** A tone family like Android's: tone t at lightness L* = 100 - t / 10, tinted toward [hue] by [chroma]. */

@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 /**
- * One kernel-mode service in a Wine prefix's registry (docs/SPEC.md 5b, "Kernel drivers"; Droidtop/tracker#607): a
+ * One kernel-mode service in a Wine prefix's registry (docs/SPEC.md 5b, "Kernel drivers"; mytop-project/tracker#607): a
  * driver an installer registered, by its service [name], its file ([fileName], from the service's ImagePath) and
  * Windows' start type ([start]: 4 is disabled). [product] names the anti-cheat or DRM it belongs to when
  * [KnownDrivers] knows the file.
@@ -18,7 +18,7 @@ data class KernelDriver(val name: String, val type: Int, val start: Int?, val im
 }
 
 /**
- * Reads, never writes, the kernel drivers in a Wine prefix (Droidtop/tracker#607, the read-only half). Every kernel
+ * Reads, never writes, the kernel drivers in a Wine prefix (mytop-project/tracker#607, the read-only half). Every kernel
  * or file-system driver service a game's installer left in the prefix is found here, except Wine's own; nothing is
  * changed. Keeping a driver's file out of the prefix and its service disabled is the prefix layer's
  * (docs/SPEC.md 5b, #584 piece 3), not this.
@@ -127,7 +127,7 @@ object KernelDrivers {
 }
 
 /**
- * The anti-cheat and DRM drivers droidtop can name (Droidtop/tracker#607). It only names a driver in the Drivers list,
+ * The anti-cheat and DRM drivers droidtop can name (mytop-project/tracker#607). It only names a driver in the Drivers list,
  * the record and the game's page; whether a driver is kept out never depends on it.
  */
 object KnownDrivers {
@@ -152,7 +152,7 @@ object KnownDrivers {
 }
 
 /**
- * Each Windows game's kernel-driver choices (Droidtop/tracker#607, owner 2026-10-23): the drivers it has been seen to
+ * Each Windows game's kernel-driver choices (mytop-project/tracker#607, owner 2026-10-23): the drivers it has been seen to
  * install, the ones the person approved, and its default for the rest, which is deny (a placeholder) until the
  * person changes it after a warning. By library id. Disk: IO only.
  */

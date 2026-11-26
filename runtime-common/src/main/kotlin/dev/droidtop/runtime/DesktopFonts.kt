@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * Fonts for all languages in the desktop (Droidtop/tracker#390, docs/SPEC.md
+ * Fonts for all languages in the desktop (mytop-project/tracker#390, docs/SPEC.md
  * 3d "Fonts for all languages"): the distro's Noto CJK and emoji packages,
  * about 100 MB, installed by a job in Downloads and installs rather than by
  * the boot plan, so the download is seen, waits for an unmetered network

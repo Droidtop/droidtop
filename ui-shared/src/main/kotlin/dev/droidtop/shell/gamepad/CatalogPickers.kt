@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The system's folder and document pickers for a catalog's [FolderPickItem] and [DocumentPickItem], one for every
- * renderer: Gaming's Settings ([CatalogNavigator]) and the companion's catalog host (Droidtop/tracker#786, S2a2) open
+ * renderer: Gaming's Settings ([CatalogNavigator]) and the companion's catalog host (mytop-project/tracker#786, S2a2) open
  * them the same way. The renderer owns the picker, as those items promise: a folder's read permission is taken and
  * kept, and the item's own [FolderPickItem.onPicked] / [DocumentPickItem.onPicked] runs off the main thread.
  * [onStatus] gets the row's line while it works and what it said after (null when a folder pick succeeded with

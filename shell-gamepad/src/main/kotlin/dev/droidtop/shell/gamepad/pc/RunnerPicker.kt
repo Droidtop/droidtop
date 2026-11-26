@@ -54,7 +54,7 @@ internal fun RunnerPicker(
     overridden: Boolean,
     onPick: (GameLaunchStrategy?) -> Unit,
     onDismiss: () -> Unit,
-    // "Run once with" offers the same choices for one launch (docs/SPEC.md 7i, Droidtop/tracker#636).
+    // "Run once with" offers the same choices for one launch (docs/SPEC.md 7i, mytop-project/tracker#636).
     title: String = "Runs with",
 ) {
     var showWhyNot by remember { mutableStateOf(false) }
@@ -149,7 +149,7 @@ internal fun EnginePicker(
 }
 
 /**
- * "Rescrape with…" (Droidtop/tracker#67): every source one game can be looked up in, built-in and plugin, for this
+ * "Rescrape with…" (mytop-project/tracker#67): every source one game can be looked up in, built-in and plugin, for this
  * game only; the chosen source in Scraper settings stays as it is. A source that cannot run says why, dimmed.
  */
 @Composable

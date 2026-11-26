@@ -136,7 +136,7 @@ class TaskPolicyTest {
 
     @Test
     fun `when Clear all keeps everything it says what it kept and why`() {
-        // Droidtop/tracker#252, console 3061: Firefox on the companion's own screen was kept, and the page said "Nothing to close".
+        // mytop-project/tracker#252, console 3061: Firefox on the companion's own screen was kept, and the page said "Nothing to close".
         val firefox = RunningApp("org.mozilla.firefox", "Firefox", 0, taskId = null, visible = true)
         assertTrue(TaskPolicy.clearAllTargets(listOf(firefox), emptySet(), keepDisplays = setOf(0)).isEmpty())
         assertEquals(

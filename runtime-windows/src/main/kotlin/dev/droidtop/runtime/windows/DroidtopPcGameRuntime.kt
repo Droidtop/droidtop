@@ -90,7 +90,7 @@ class DroidtopPcGameRuntime(
     // libraries, and a Wine build that runs there directly
     // (WineOptionPlan.runsOnX86Host); a device set up before either is
     // offered Set up again, which fetches the libraries and moves the shared
-    // environment to such a build (Droidtop/tracker#242).
+    // environment to such a build (mytop-project/tracker#242).
     override val isProvisioned: Boolean
         get() {
             val shared = runCatching { sharedContainer(ContainerManager(context)) }.getOrNull() ?: return false
@@ -100,7 +100,7 @@ class DroidtopPcGameRuntime(
 
     /**
      * droidtop's own environment: the one every game without a prefix of its own runs in ([PcContainers.sharedId]).
-     * Never another game's prefix: with none, setup makes it (Droidtop/tracker#928).
+     * Never another game's prefix: with none, setup makes it (mytop-project/tracker#928).
      */
     private fun sharedContainer(manager: ContainerManager): Container? =
         manager.containers.let { all -> PcContainers.sharedId(all.map { it.id to it.name })?.let { id -> all.firstOrNull { it.id == id } } }
@@ -108,7 +108,7 @@ class DroidtopPcGameRuntime(
     /**
      * A failed setup step: the whole exception goes to the log (the screen
      * gets [line] only), because "Attempt to get length of null array" with
-     * no frame was all the console ever reported (Droidtop/tracker#249).
+     * no frame was all the console ever reported (mytop-project/tracker#249).
      */
     private fun failed(step: String, error: Throwable?, line: String): PcProvisionResult {
         android.util.Log.w(TAG, "Windows setup: $step failed", error)
@@ -270,7 +270,7 @@ class DroidtopPcGameRuntime(
         // (XServerScreen.setImagefsContainerVariant), which droidtop never
         // runs; without it ImageFs.variant reads "" and every later setup,
         // here and in installIfNeededFuture, sees a mismatch and installs
-        // the whole image again (Droidtop/tracker#249: the second
+        // the whole image again (mytop-project/tracker#249: the second
         // "Download now" ran the full install a second time).
         imageFs.createVariantFile(wanted.containerVariant)
 
@@ -380,7 +380,7 @@ class DroidtopPcGameRuntime(
             // decision reads it ([isProvisioned], the game page's Set up
             // row): a prefix whose config did not land on disk loads as
             // nothing, and reporting success then is the silent "Set up"
-            // loop of Droidtop/tracker#249.
+            // loop of mytop-project/tracker#249.
             is WineEngineReadiness.Ready -> if (isProvisioned) {
                 WineOptions.setupDone(context)
                 PcProvisionResult(true, "Windows environment ready")
@@ -479,9 +479,9 @@ class DroidtopPcGameRuntime(
         // it for this launch only (docs/SPEC.md 5a); the shared prefix's
         // saved settings are not touched.
         // The game's own folder rides along so it stays reachable when a whole-volume drive is not linked
-        // (WineStorageGrants, Droidtop/tracker#584).
+        // (WineStorageGrants, mytop-project/tracker#584).
         // The redistributables the game ships that this prefix hasn't run yet (docs/SPEC.md 9, "Redistributable
-        // installers"; Droidtop/tracker#916): the game screen installs them, after the licence, before the game.
+        // installers"; mytop-project/tracker#916): the game screen installs them, after the licence, before the game.
         val redists = withContext(Dispatchers.IO) {
             runCatching { dev.droidtop.runtime.windows.redist.RedistPlan.pending(gameRoot, container.rootDir) }.getOrDefault(emptyList())
         }
@@ -502,7 +502,7 @@ class DroidtopPcGameRuntime(
         }
 
         // A .NET Framework game gets Wine Mono where neither its prefix nor its Wine build has one
-        // (docs/SPEC.md 9, "Wine Mono for .NET Framework games"; Droidtop/tracker#895). Checked on the game's own
+        // (docs/SPEC.md 9, "Wine Mono for .NET Framework games"; mytop-project/tracker#895). Checked on the game's own
         // program, before the Steamworks shim takes its place below.
         withContext(Dispatchers.IO) {
             runCatching { WineMono.prepare(context, container, executable) }
@@ -551,7 +551,7 @@ class DroidtopPcGameRuntime(
     }
 
     /**
-     * The "Prepare for first launch" run of [entryId] (docs/SPEC.md 9, "Prepare for first launch"; Droidtop/tracker#866):
+     * The "Prepare for first launch" run of [entryId] (docs/SPEC.md 9, "Prepare for first launch"; mytop-project/tracker#866):
      * the launch [launchWindows] would make, started out of sight and silent by [WinePrecache], so the translation cache
      * holds the game's start-up code before the person's first real start. Refuses while a game is on screen, when the
      * cache is off for this game, and when droidtop cannot tell which program starts the game. Returns the summary.
@@ -664,7 +664,7 @@ class DroidtopPcGameRuntime(
     /**
      * [program] in [container], in the environment the game starts in: its own home when it has one, and on an arm64
      * device its x86 binaries through FEX (docs/SPEC.md 3c). A Ren'Py game's own launcher runs as it is, told which of
-     * its lib/ folders to use and to start that binary through FEX (lib-runners' RenPyLinuxLaunch).
+     * its lib/ folders to use and to start that binary through FEX (mytop-runners' RenPyLinuxLaunch).
      */
     private suspend fun linuxExec(
         runtime: ContainerRuntime,
@@ -893,9 +893,9 @@ object PcContainers {
 
     /**
      * The one rule a game's prefix is resolved by, from the ids of the prefixes on the device ([existing], in their
-     * order): the managed prefix the person chose (docs/SPEC.md 5a "Per-game prefixes", piece 1; Droidtop/tracker#584)
+     * order): the managed prefix the person chose (docs/SPEC.md 5a "Per-game prefixes", piece 1; mytop-project/tracker#584)
      * when it still exists, else the game's own, else the [shared] one ([sharedId]), else none: never whichever prefix
-     * is listed first, which was another game's own (Droidtop/tracker#928). [forGame] and [usage] both read it, so the
+     * is listed first, which was another game's own (mytop-project/tracker#928). [forGame] and [usage] both read it, so the
      * Prefixes list counts exactly the games that launch in each. Pure.
      */
     internal fun resolveId(chosen: String?, ownId: String?, existing: List<String>, shared: String?): String? = when {

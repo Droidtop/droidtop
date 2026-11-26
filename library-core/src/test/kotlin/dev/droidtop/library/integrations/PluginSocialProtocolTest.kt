@@ -12,7 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A plugin's `social.provider@1` replies as droidtop reads them (docs/plugin-api.md C19, Droidtop/tracker#327). */
+/** A plugin's `social.provider@1` replies as droidtop reads them (docs/plugin-api.md C19, mytop-project/tracker#327). */
 class PluginSocialProtocolTest {
     private fun obj(vararg kv: Pair<String, Any?>) = JSONObject().apply { kv.forEach { (k, v) -> put(k, v) } }
 

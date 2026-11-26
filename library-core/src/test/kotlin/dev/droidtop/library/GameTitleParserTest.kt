@@ -63,7 +63,7 @@ class GameTitleParserTest {
         Row("SampleVN-1.0-eng", "Sample VN", version = "1.0", language = "en"),
         Row("SampleVN-1.0-jpn", "Sample VN", version = "1.0", language = "ja"),
         Row("SampleVN-1.0-mtl", "Sample VN", version = "1.0", language = "mtl"),
-        // A title written as one run of words is read as the words (Droidtop/tracker#282); one with no
+        // A title written as one run of words is read as the words (mytop-project/tracker#282); one with no
         // lower-case letter, or with spaces, is left as it is.
         Row("PrincessEvangileFull", "Princess Evangile Full"),
         Row("SingleAgain", "Single Again"),
@@ -252,7 +252,7 @@ class GameTitleParserTest {
         assertFalse(EngineFolderNames.matches("Game of Something"))
     }
 
-    // --- folder noise (Droidtop/tracker#282) -----------------------------
+    // --- folder noise (mytop-project/tracker#282) -----------------------------
 
     @Test
     fun `a build folder is never the title and the game above it names it`() {

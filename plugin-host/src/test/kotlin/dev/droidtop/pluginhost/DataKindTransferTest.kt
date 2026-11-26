@@ -14,7 +14,7 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * Data kinds (docs/plugin-api.md 3 H3, Droidtop/tracker#793): a copy carries files beside its records, written in
+ * Data kinds (docs/plugin-api.md 3 H3, mytop-project/tracker#793): a copy carries files beside its records, written in
  * droidtop's staging folder, checked against their size and SHA-256, and made current with the records in one
  * rename; droidtop moves a whole copy to an equivalent plugin and only reads the source.
  */

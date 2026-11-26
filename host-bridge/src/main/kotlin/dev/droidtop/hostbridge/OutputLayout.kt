@@ -52,7 +52,7 @@ data class AbsoluteMotion(val x: Long, val y: Long, val extentWidth: Long, val e
 
 /**
  * Where a point on an Android surface showing one compositor output lands in the compositor's layout
- * (Droidtop/tracker#908, step D1b). Pure, so it is tested on the JVM (OutputLayoutTest).
+ * (mytop-project/tracker#908, step D1b). Pure, so it is tested on the JVM (OutputLayoutTest).
  *
  * host-bridge's virtual pointer is not tied to an output, so wlroots maps its absolute motion onto the box around
  * every output in the layout (wlr_cursor.c's wlr_cursor_absolute_to_layout_coords with no mapping). With one output

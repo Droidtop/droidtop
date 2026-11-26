@@ -155,7 +155,7 @@ data class WebSessionDownload(
     val size: Long?,
     val referer: String?,
     val cookie: String?,
-    /** Further headers droidtop sends for it, never shown to a plugin: a file host's API gives the person's own account here (Droidtop/tracker#638). */
+    /** Further headers droidtop sends for it, never shown to a plugin: a file host's API gives the person's own account here (mytop-project/tracker#638). */
     val headers: Map<String, String> = emptyMap(),
     /** The file's SHA-256 when the host said it, checked once the file is whole. */
     val sha256: String? = null,

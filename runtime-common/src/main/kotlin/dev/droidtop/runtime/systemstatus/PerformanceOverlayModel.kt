@@ -19,7 +19,7 @@ enum class OverlayLevel(val key: String, val label: String) {
 }
 
 /**
- * The corner of the game's screen the overlay sits in (Droidtop/tracker#812, DroidDeck's HUD settings, #363). It is
+ * The corner of the game's screen the overlay sits in (mytop-project/tracker#812, DroidDeck's HUD settings, #363). It is
  * never touchable, so it is placed from the Quick Menu rather than dragged.
  */
 enum class OverlayCorner(val key: String, val label: String) {
@@ -36,7 +36,7 @@ enum class OverlayCorner(val key: String, val label: String) {
     }
 }
 
-/** How big the overlay's text is, in sp (Droidtop/tracker#812). */
+/** How big the overlay's text is, in sp (mytop-project/tracker#812). */
 enum class OverlaySize(val key: String, val label: String, val sp: Float) {
     SMALL("small", "Small", 10f),
     MEDIUM("medium", "Medium", 12f),

@@ -36,7 +36,7 @@ data class ParsedGogGame(
  */
 object GOGApiClient {
 
-    // The stores' shared client (Droidtop/tracker#766: one HTTP client per job in this module).
+    // The stores' shared client (mytop-project/tracker#766: one HTTP client per job in this module).
     private val httpClient get() = dev.droidtop.stores.util.StoreHttp.http
 
     /**

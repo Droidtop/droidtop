@@ -34,7 +34,7 @@ import dev.droidtop.shell.gamepad.currentShellWindow
  * the same whichever mode opened it. Everything a screen shows and does lives in its catalog.
  *
  * It was `ContainersActivity`, hard-wired to the container manager; one host for every screen
- * replaces a host per screen (Droidtop/tracker#346).
+ * replaces a host per screen (mytop-project/tracker#346).
  */
 class CatalogScreenActivity : AppCompatActivity() {
     // Re-read when the screen comes back to the front: the desktop may have
@@ -44,7 +44,7 @@ class CatalogScreenActivity : AppCompatActivity() {
     // Opened from Standard's home screen (a long press on droidtop's icon, a notification) in a task of
     // its own: leaving it must land back on that home screen. Left to Android, the task's end resumes
     // the HOME component, droidtop's trampoline, which forwards to the default mode, so B from Social
-    // landed in Gaming (rig, build 1535, Droidtop/tracker#346).
+    // landed in Gaming (rig, build 1535, mytop-project/tracker#346).
     private var returnToStandard = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +67,7 @@ class CatalogScreenActivity : AppCompatActivity() {
             finish()
             return
         }
-        // On Desktop's bar while it is open (Droidtop/tracker#750): droidtop is otherwise left out of the running list.
+        // On Desktop's bar while it is open (mytop-project/tracker#750): droidtop is otherwise left out of the running list.
         @Suppress("DEPRECATION")
         dev.droidtop.runtime.tasks.OwnScreens.opened(
             dev.droidtop.runtime.tasks.OwnScreen(taskId, screen.title, windowManager.defaultDisplay.displayId),

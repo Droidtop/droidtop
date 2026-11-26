@@ -18,7 +18,7 @@ import java.io.File
  * columns were asked for. An emulator that stats the URI with a larger
  * projection (NetherSX2's `FileHelper.statFile` reads past column 1: "Failed
  * to read row 0, column 1 from a window with 1 rows, 1 columns", rig,
- * Droidtop/tracker#270) got a one-column cursor, threw, and never booted. This
+ * mytop-project/tracker#270) got a one-column cursor, threw, and never booted. This
  * answers the whole document column set ([FileDocumentColumns.ALL_COLUMNS]) and exactly the
  * columns asked for, in the order asked, with null for one it does not know,
  * the way a documents provider does.

@@ -5,7 +5,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A plugin's store (docs/plugin-api.md 3 A13, Droidtop/tracker#220): its id and its `library` answer. */
+/** A plugin's store (docs/plugin-api.md 3 A13, mytop-project/tracker#220): its id and its `library` answer. */
 class PluginStoresTest {
     @Test fun `a store id is short and plain, never one already taken, and the first of a pair wins`() {
         assertEquals(

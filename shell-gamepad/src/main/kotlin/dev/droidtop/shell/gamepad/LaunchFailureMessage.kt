@@ -4,7 +4,7 @@ import dev.droidtop.library.ProgramNotIdentified
 import dev.droidtop.library.consoles.NoEmulatorInstalled
 
 /**
- * Maps launch failures to one short sentence (Droidtop/tracker#171).
+ * Maps launch failures to one short sentence (mytop-project/tracker#171).
  * Raw exception details stay in the shell log; a [dev.droidtop.library.LaunchRefused] carries its own sentence.
  */
 object LaunchFailureMessage {
@@ -16,9 +16,9 @@ object LaunchFailureMessage {
     fun userMessage(game: String?, cause: Throwable?): String = when {
         cause is NoEmulatorInstalled ->
             "No ${cause.systemName} emulator is installed yet."
-        // Droidtop/tracker#271: what droidtop saw in RetroArch's cores folder, with Get the core beside it.
+        // mytop-project/tracker#271: what droidtop saw in RetroArch's cores folder, with Get the core beside it.
         cause is dev.droidtop.library.consoles.RetroArchCores.Missing -> cause.message ?: "RetroArch does not have this game's core."
-        // Droidtop/tracker#308: what is wrong, never emulator advice.
+        // mytop-project/tracker#308: what is wrong, never emulator advice.
         cause is ProgramNotIdentified ->
             "droidtop can't tell which program starts \"${game?.takeIf { it.isNotBlank() } ?: cause.title}\"."
         // A refusal written for the person, naming what to do (library-core's LaunchRefused): shown as it is.

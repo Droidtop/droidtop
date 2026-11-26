@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A container's "What it can reach" lines (docs/SPEC.md 3d; Droidtop/tracker#787 slice 1). */
+/** A container's "What it can reach" lines (docs/SPEC.md 3d; mytop-project/tracker#787 slice 1). */
 class ContainerReachTest {
     private fun lines(
         mounts: EnvironmentMounts = EnvironmentMounts(),

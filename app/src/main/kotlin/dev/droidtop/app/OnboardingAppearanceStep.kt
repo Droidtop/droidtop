@@ -128,7 +128,7 @@ import java.io.File
  * AND the Appearance step is on screen ([stepShown]), so an explicit pick
  * always wins. Finishing anywhere else it is offered by [ThemeOffer] in
  * Gaming ("Your theme is ready: Use it / Later"), never swapped in under
- * a person who has moved on (Droidtop/tracker#532). The clone itself
+ * a person who has moved on (mytop-project/tracker#532). The clone itself
  * still finishes and shows up as installed in Browse themes either way.
  */
 internal object OnboardingThemeDownload {
@@ -308,7 +308,7 @@ internal fun AppearanceStep(
         }
         // PC games draw as their box art; whether each also says its name under it (owner, 2026-10-17: "A toggle
         // for 'show name under image' would be a good idea. Default to on, or ask in onboarding"; PC Games only,
-        // Droidtop/tracker#578). Asked here, on, and changed later in PC Games' List options.
+        // mytop-project/tracker#578). Asked here, on, and changed later in PC Games' List options.
         var namesUnder by remember { mutableStateOf(true) }
         val namesScope = rememberCoroutineScope()
         LaunchedEffect(Unit) {

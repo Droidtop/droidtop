@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * "What they are" under Child processes (docs/SPEC.md "Child processes and Android's limit", Droidtop/tracker#816,
+ * "What they are" under Child processes (docs/SPEC.md "Child processes and Android's limit", mytop-project/tracker#816,
  * "measure and cut"): droidtop's child processes by program, most first, so a Desktop session's or a Wine game's count
  * can be read on the device and the biggest of droidtop's own helpers cut. The whole list is logged under
  * `droidtop.ChildProcesses` each time the page opens. Absent before Android 12 and with none running.

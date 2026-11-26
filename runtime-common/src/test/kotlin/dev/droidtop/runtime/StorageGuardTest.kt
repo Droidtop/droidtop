@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The storage-full line droidtop will not start below (docs/SPEC.md 10c, "Storage full"; Droidtop/tracker#849). */
+/** The storage-full line droidtop will not start below (docs/SPEC.md 10c, "Storage full"; mytop-project/tracker#849). */
 class StorageGuardTest {
     @Test
     fun `the line is 64 MB`() {

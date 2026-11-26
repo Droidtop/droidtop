@@ -61,13 +61,13 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
     MODE_CHANGED("mode.changed", 1, "Mode changed"),
 
     /**
-     * A device was paired or forgotten, or what one announced changed (docs/plugin-api.md D21, Droidtop/tracker#556):
+     * A device was paired or forgotten, or what one announced changed (docs/plugin-api.md D21, mytop-project/tracker#556):
      * the plugin reads `devices.list_paired` again. Only to a plugin holding `devices.paired`. No args.
      */
     DEVICES_CHANGED("devices.changed", 1, "Paired devices changed"),
 
     /**
-     * The role tokens changed (docs/SPEC.md 7k "Light and dark", Droidtop/tracker#559): Light or dark, Android's night
+     * The role tokens changed (docs/SPEC.md 7k "Light and dark", mytop-project/tracker#559): Light or dark, Android's night
      * mode, or the Gaming theme. A plugin that draws its own UI reads `ui.get_theme` again. Args: `theme`.
      */
     THEME_CHANGED("host.theme_changed", 1, "Theme changed"),
@@ -81,20 +81,20 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
 
     /**
      * A merged copy of one of the plugin's contexts was made current here (docs/plugin-api.md F8, protocol 2,
-     * Droidtop/tracker#794): it differs from what the plugin last published. The plugin reads it with `context.copy`
+     * mytop-project/tracker#794): it differs from what the plugin last published. The plugin reads it with `context.copy`
      * and brings it in when that is safe. Only to the plugin that owns the context. Args: `context`, `generation`.
      */
     CONTEXT_RECEIVED("context.received", 1, "A synced copy of the plugin's data arrived"),
 
     /**
-     * Settings the person changed on the plugin's declared settings page (Droidtop/tracker#880), told the next time the
+     * Settings the person changed on the plugin's declared settings page (mytop-project/tracker#880), told the next time the
      * plugin runs, never while the page is open. The plugin reads the values with `settings.get`. Args: `ids`, the
      * changed settings, comma-separated.
      */
     SETTINGS_CHANGED("settings.changed", 1, "Its settings changed"),
 
     /**
-     * A Desktop window opened, closed or took the focus (docs/plugin-api.md 1.12, Droidtop/tracker#221), from
+     * A Desktop window opened, closed or took the focus (docs/plugin-api.md 1.12, mytop-project/tracker#221), from
      * host-bridge's window list ([WindowEvents]). Only to a plugin holding `windows.read`, and only for windows of the
      * apps that permission reaches. Args: `id` (droidtop's window id), `appId`, `title`, `output`.
      */
@@ -103,7 +103,7 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
     WINDOW_FOCUSED("window.focused", 1, "A desktop window took the focus"),
 
     /**
-     * The desktop's clipboard changed, in Android or the container (docs/plugin-api.md 1.12, Droidtop/tracker#221). Only
+     * The desktop's clipboard changed, in Android or the container (docs/plugin-api.md 1.12, mytop-project/tracker#221). Only
      * to a plugin holding `clipboard.read`. No args: the text is read with `clipboard.get_text`, so each read is audited.
      */
     CLIPBOARD_CHANGED("clipboard.changed", 1, "The clipboard changed"),

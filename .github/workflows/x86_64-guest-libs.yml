@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 env:
-  # Droidtop/proton-wine-tux at the commit whose android_sysvshm is built in.
+  # mytop-project/proton-wine-tux at the commit whose android_sysvshm is built in.
   PROTON_WINE_TUX_REF: e75b52091062a02ac2c9c5d876ae00840274cf07
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
       - name: Checkout android_sysvshm from proton-wine-tux
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: Droidtop/proton-wine-tux
+          repository: mytop-project/proton-wine-tux
           ref: ${{ env.PROTON_WINE_TUX_REF }}
           path: proton-wine-tux
           sparse-checkout: android/android_sysvshm

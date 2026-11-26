@@ -65,7 +65,7 @@ internal fun SelectableRow(
     // The ring is the pad's cursor, drawn only while a pad or keyboard is
     // driving (docs/SPEC.md 6e): on a touch screen a ring on one answer
     // beside the tick on another read as "the default" (first tester,
-    // Droidtop/tracker#159). The choice itself is the tick.
+    // mytop-project/tracker#159). The choice itself is the tick.
     val ring = focused && PadModality.showsFocus
     Row(
         modifier = Modifier

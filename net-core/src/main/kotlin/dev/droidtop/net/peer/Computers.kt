@@ -9,7 +9,7 @@ import java.io.File
 
 /**
  * A device paired with this one through droidtop-agent: a computer (droidtop-agent, or a desktop manager such as
- * Pythia) or another handheld running droidtop ([kind], Droidtop/tracker#556).
+ * Pythia) or another handheld running droidtop ([kind], mytop-project/tracker#556).
  */
 data class Computer(
     /** Its id: the public key droidtop pinned at pairing, in hex. */
@@ -90,7 +90,7 @@ object Computers {
      */
     fun list(context: Context): List<Computer> = devices(context).filter { !it.handheld }
 
-    /** Every paired device, computers and handhelds (Droidtop/tracker#556). Reads a small file the first time: never on the main thread. */
+    /** Every paired device, computers and handhelds (mytop-project/tracker#556). Reads a small file the first time: never on the main thread. */
     @Synchronized
     fun devices(context: Context): List<Computer> {
         cache?.let { return it }
@@ -178,7 +178,7 @@ object Computers {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ON, on).apply()
     }
 
-    /** The discovery server: [DEFAULT_DISCOVERY] for Syncthing's, or an https address (droidtop's own, Droidtop/tracker#364). */
+    /** The discovery server: [DEFAULT_DISCOVERY] for Syncthing's, or an https address (droidtop's own, mytop-project/tracker#364). */
     fun discoveryServer(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SERVER, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_DISCOVERY
 

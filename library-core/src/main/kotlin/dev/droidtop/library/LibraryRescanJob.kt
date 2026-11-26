@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * "Rescan library" and "Rescan PC game folders" as a job in the one jobs center (docs/SPEC.md "Jobs and their
- * results", Droidtop/tracker#595): the walk shows under Downloads and installs and on the Home strip with Cancel, and
+ * results", mytop-project/tracker#595): the walk shows under Downloads and installs and on the Home strip with Cancel, and
  * its progress stays when the menu that started it closes (a rescan of a slow card takes minutes). One rescan at a
  * time: starting one while another runs follows the running one. The walk is [LibraryRescan.walk], the handlers :app
  * registers.

@@ -49,14 +49,14 @@ fun DroidtopTheme(
         return
     }
     // Light or dark is the Appearance setting's, for every root (docs/SPEC.md 7k, "Light and dark"); the colours are
-    // the ones outside Gaming ("Colours outside Gaming", Droidtop/tracker#827), with their Material scheme and notice
+    // the ones outside Gaming ("Colours outside Gaming", mytop-project/tracker#827), with their Material scheme and notice
     // colours, the ones a Gaming surface draws with when no theme is held. Every root used to force dark, the companion
-    // among them (rig 1931, Droidtop/tracker#559).
+    // among them (rig 1931, mytop-project/tracker#559).
     rememberLightAppearance()
     val palette = GamingTheme.outsidePalette
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
         MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography) {
-            // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
+            // No full-screen input method over droidtop's own fields (mytop-project/tracker#485 comment 6224857113).
             ProvideShellCanvas { dev.droidtop.ui.shared.NoFullscreenTextInput(content) }
         }
     }

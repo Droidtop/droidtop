@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which pointer events take the finger gestures (Droidtop/tracker#684, rig 2638: the emulator's touchscreen is also a stylus). */
+/** Which pointer events take the finger gestures (mytop-project/tracker#684, rig 2638: the emulator's touchscreen is also a stylus). */
 class TouchRoutingTest {
     private val router = DesktopInputRouter()
 

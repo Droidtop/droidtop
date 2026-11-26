@@ -103,7 +103,7 @@ object ComputersCatalog {
             if (computers.isNotEmpty()) {
                 add(CatalogGroup(id = "computers_paired", title = "Paired", items = computers.map { computerRow(it) }))
             }
-            // Handhelds paired with this one (Droidtop/tracker#556): nothing syncs with them by itself, plugins do.
+            // Handhelds paired with this one (mytop-project/tracker#556): nothing syncs with them by itself, plugins do.
             val handhelds = Computers.devices(context).filter { it.handheld }
             if (handhelds.isNotEmpty()) {
                 add(CatalogGroup(id = "computers_handhelds", title = "Handhelds", items = handhelds.map { handheldRow(it) }))
@@ -374,7 +374,7 @@ object ComputersCatalog {
                                 runCatching { PairedDevices.changed(ctx.applicationContext) }
                             }
                         },
-                        // Its page has nothing left to show: back to the list (Droidtop/tracker#531).
+                        // Its page has nothing left to show: back to the list (mytop-project/tracker#531).
                         leaves = true,
                     ),
                 ),

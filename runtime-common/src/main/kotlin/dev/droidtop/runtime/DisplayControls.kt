@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The one write path for each display's brightness, power and refresh rate (docs/SPEC.md "The companion's tabs",
- * Displays; Droidtop/tracker#414 slice C14). Every surface that changes them comes here: the catalog's Brightness row
+ * Displays; mytop-project/tracker#414 slice C14). Every surface that changes them comes here: the catalog's Brightness row
  * (the Quick Menu, the companion's System tab and pins), the companion's own dimming and screen off, and System >
  * Display's cards.
  *

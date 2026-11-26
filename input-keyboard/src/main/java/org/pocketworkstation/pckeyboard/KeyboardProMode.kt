@@ -7,7 +7,7 @@ import android.preference.PreferenceGroup
 import org.xmlpull.v1.XmlPullParser
 
 /**
- * Pro mode (Droidtop/tracker#337; docs/SPEC.md 6a). The owner, 2026-10-08: "It is extra important that we keep Hacker
+ * Pro mode (mytop-project/tracker#337; docs/SPEC.md 6a). The owner, 2026-10-08: "It is extra important that we keep Hacker
  * Keyboard flexibility, though we can probably put it behind a pro mode toggle?"
  *
  * With pro mode off the settings screen is short: size, layout and theme, languages, sound and vibration, capitals,
@@ -141,7 +141,7 @@ object KeyboardProMode {
 
     const val PRESET_KEY = "pref_keyboard_preset"
 
-    /** The layout first setup asked for (Droidtop/tracker#903): [AUTOMATIC] or a [Preset] name; unset before it asks. */
+    /** The layout first setup asked for (mytop-project/tracker#903): [AUTOMATIC] or a [Preset] name; unset before it asks. */
     const val LAYOUT_CHOICE_KEY = "pref_keyboard_layout_choice"
     const val AUTOMATIC = "automatic"
 
@@ -150,7 +150,7 @@ object KeyboardProMode {
     fun presetKeys(): Set<String> = Preset.entries.flatMap { it.values.keys }.toSet()
 
     /**
-     * Automatic (Droidtop/tracker#903, the owner: "the default layout is derived from screen size and dpi"): every option
+     * Automatic (mytop-project/tracker#903, the owner: "the default layout is derived from screen size and dpi"): every option
      * a preset sets goes back to its default, so the keyboard's own rules choose (four rows held upright, all five held
      * sideways, split on a handheld, `KeyboardForm`). Nothing else changes.
      */

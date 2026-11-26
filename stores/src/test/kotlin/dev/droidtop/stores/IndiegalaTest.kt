@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Indiegala: its collection, a product's downloads and the kept library (Droidtop/tracker#335). The answers are in the
+ * Indiegala: its collection, a product's downloads and the kept library (mytop-project/tracker#335). The answers are in the
  * shape Lacro59's playnite-indiegala-plugin reads (`GalaData.cs`, `ApiGameDetails.cs`), written here.
  */
 class IndiegalaTest {

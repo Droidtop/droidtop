@@ -7,7 +7,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /**
- * A network of droidtop's engine (docs/SPEC.md 3d, "Networks"; Droidtop/tracker#555 D14): a named group of
+ * A network of droidtop's engine (docs/SPEC.md 3d, "Networks"; mytop-project/tracker#555 D14): a named group of
  * containers. Every container already shares the device's network, so a network here joins containers by name only;
  * it isolates nothing, which [ContainerNetworks] and the API say. [members] are container ids, [aliases] the names a
  * member was given on it (recorded; they do not resolve yet).

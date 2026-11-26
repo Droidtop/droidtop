@@ -64,7 +64,7 @@ suspend fun scrapeSystemArtwork(
     val resumeIndex = resumeAfter?.let { after -> romFiles.indexOfFirst { it.absolutePath == after.absolutePath } } ?: -1
     val candidates = if (resumeIndex >= 0) romFiles.drop(resumeIndex + 1) else romFiles
     val missing = candidates.filter { romFile ->
-        // Only box art counts: a game with nothing but a screenshot still needs its cover (Droidtop/tracker#632).
+        // Only box art counts: a game with nothing but a screenshot still needs its cover (mytop-project/tracker#632).
         val noArt = !EsDeArtwork.hasCover(gamesRoot, system.id, romFile.nameWithoutExtension)
         val noMeta = romFile.absolutePath !in existingMetadataIds
         when (filter) {
@@ -133,7 +133,7 @@ suspend fun scrapeSystemArtwork(
     var hashMatched = 0
     var thumbnailed = 0
     var miximaged = 0
-    // The games the pass did not fill, by name (Droidtop/tracker#374).
+    // The games the pass did not fill, by name (mytop-project/tracker#374).
     val misses = ScrapeMisses()
     // Metadata plugins (docs/plugin-api.md 3 A3): asked per game for what the selected source did not find,
     // never for list rendering. Null when none is running, which is the usual case: nothing is bound then.
@@ -158,7 +158,7 @@ suspend fun scrapeSystemArtwork(
             val localMd5 = if (screenScraperSystemId != null) {
                 dev.droidtop.library.scraper.RomHash.md5OrNull(romFile)
             } else null
-            // The file's own hash is what the game is, whatever the source answers (Droidtop/tracker#318).
+            // The file's own hash is what the game is, whatever the source answers (mytop-project/tracker#318).
             localMd5?.let { md5 ->
                 dev.droidtop.library.identity.LibraryIdentities.claim(
                     context, romFile.absolutePath, dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM.name,
@@ -198,7 +198,7 @@ suspend fun scrapeSystemArtwork(
                 screenScraperResult == null -> null
                 localMd5 != null && screenScraperResult.romMd5 == localMd5 -> {
                     hashMatched++
-                    // For the calibration set when recording is on (Droidtop/tracker#318): a hash match is a certain answer.
+                    // For the calibration set when recording is on (mytop-project/tracker#318): a hash match is a certain answer.
                     screenScraperResult.name?.let { name ->
                         dev.droidtop.library.identity.MatchRecorder.romByHash(context, romFile.absolutePath, system.id, romFile.length(), localMd5, "ScreenScraper", name)
                     }
@@ -376,7 +376,7 @@ suspend fun scrapeSystemArtwork(
             // side of this database.
             // The selected source found this game: its answer replaces the scraped text the game had,
             // so a field it does not supply is not left holding an earlier, other source's (or another
-            // game's) value (Droidtop/tracker#251: a match on Pokemon Crystal that supplied no description
+            // game's) value (mytop-project/tracker#251: a match on Pokemon Crystal that supplied no description
             // or date left an old TheGamesDB fan game's description and date in place).
             // The one selected source that found it (exactly one source is asked per pass).
             val matchedBy = when {

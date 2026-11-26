@@ -16,7 +16,7 @@ import dev.droidtop.runtime.launcherimport.BackupReader
 import dev.droidtop.runtime.launcherimport.ImportCheck
 
 /**
- * Settings > Import from Nova or Apex (docs/SPEC.md, Launcher mode "Import from Nova or Apex"; Droidtop/tracker#564):
+ * Settings > Import from Nova or Apex (docs/SPEC.md, Launcher mode "Import from Nova or Apex"; mytop-project/tracker#564):
  * the system's file picker, then a summary of what comes across, what changes on the way and what does not come
  * across with the reason for each, and only then, on Import, [LauncherImport.apply].
  */

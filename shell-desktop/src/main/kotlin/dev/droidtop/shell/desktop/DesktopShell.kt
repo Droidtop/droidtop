@@ -148,7 +148,7 @@ fun DesktopShell(
     primaryOutput: DisplayOutput?,
     /**
      * The session's window actions: raise, minimize and restore for whichever
-     * compositor it started (Droidtop/tracker#145, #391). Null with no session.
+     * compositor it started (mytop-project/tracker#145, #391). Null with no session.
      */
     windows: DesktopWindows? = null,
     sessionMessage: DesktopSessionMessage = DesktopSessionMessage.Idle,
@@ -161,27 +161,27 @@ fun DesktopShell(
     onLaunchFailure: (String) -> Unit = {},
     /** Starts the desktop session: the button on the not-started and failed screens. */
     onStartSession: () -> Unit = {},
-    /** Opens Desktop setup: the button on the not-set-up and failed screens (Droidtop/tracker#370). */
+    /** Opens Desktop setup: the button on the not-set-up and failed screens (mytop-project/tracker#370). */
     onOpenSetup: () -> Unit = {},
-    /** Start > System's Restart desktop, Stop desktop and Lock screen (Droidtop/tracker#687); null leaves the row out. */
+    /** Start > System's Restart desktop, Stop desktop and Lock screen (mytop-project/tracker#687); null leaves the row out. */
     onRestartSession: (() -> Unit)? = null,
     onStopSession: (() -> Unit)? = null,
     onLockScreen: (() -> Unit)? = null,
     /**
      * The desktop's outputs, the primary's first ([DesktopOutput]): with more than one, the primary's touch names its
-     * own (Droidtop/tracker#908, step D3), the bar lists only the windows on the primary's output, and a window can
+     * own (mytop-project/tracker#908, step D3), the bar lists only the windows on the primary's output, and a window can
      * be moved to another screen (step D4). Empty with no session.
      */
     outputs: List<DesktopOutput> = emptyList(),
     /**
      * The primary's output was given a new size ([HostBridge.setOutputSize]): pixels and scale. The session places the
-     * outputs right of it again (Droidtop/tracker#908, step D3).
+     * outputs right of it again (mytop-project/tracker#908, step D3).
      */
     onPrimarySized: (width: Int, height: Int, scale: Double) -> Unit = { _, _, _ -> },
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
     // The Quick Menu is the tray's, and the windows sheet the taskbar's window list, each a sheet a pad
-    // drives (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350).
+    // drives (docs/SPEC.md 2b "Desktop chrome with a pad", mytop-project/tracker#350).
     var quickMenuOpen by remember { mutableStateOf(false) }
     var windowsOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
@@ -207,7 +207,7 @@ fun DesktopShell(
     LaunchedEffect(focusedWindow) { dev.droidtop.runtime.DesktopFocus.changed() }
     FollowTextFields(hostBridge)
     LaunchedEffect(windows, toplevels) { windows?.forget(toplevels) }
-    // Which output each window is on (Droidtop/tracker#908, step D4): the bar lists the primary's, the second screen's
+    // Which output each window is on (mytop-project/tracker#908, step D4): the bar lists the primary's, the second screen's
     // bar its own; the windows sheet lists them all. With one output every window is the bar's, as before.
     val outputNames = remember(outputs) { outputs.map { it.outputName } }
     val screens = rememberWindowScreens(outputs)
@@ -218,7 +218,7 @@ fun DesktopShell(
     // A library entry launches the way it launches everywhere (Library.launch, SPEC 2b). A PC or
     // engine game first takes Gaming's primary-action rule (a store game that is not installed offers
     // the install) and has Gaming's page and menu, opened from the Start menu row's menu
-    // (Droidtop/tracker#349). Both live here, not in the Start menu, which closes as they open.
+    // (mytop-project/tracker#349). Both live here, not in the Start menu, which closes as they open.
     val context = LocalContext.current
     var pageId by remember { mutableStateOf<String?>(null) }
     val openDownloads: () -> Unit = { context.startActivity(Place.openIntent(context, Place.DOWNLOADS)) }
@@ -290,7 +290,7 @@ fun DesktopShell(
             if (entry != null) currentPlay(entry) else launchById(id)
         }
     }
-    // Open on Android (Droidtop/tracker#388): a link or shared-storage file the desktop asked to open, started from this
+    // Open on Android (mytop-project/tracker#388): a link or shared-storage file the desktop asked to open, started from this
     // activity as Start starts an Android app, so the app it opens in comes to the front.
     LaunchedEffect(Unit) {
         DesktopLaunchRequests.viewRequests.collect { intent ->
@@ -311,22 +311,22 @@ fun DesktopShell(
         DesktopLaunchRequests.startMenuRequests.collect { startMenuOpen = true }
     }
 
-    // Desktop's chrome wears the Gaming theme (Droidtop/tracker#555 D4): the bar, its sheets and the Quick Menu
+    // Desktop's chrome wears the Gaming theme (mytop-project/tracker#555 D4): the bar, its sheets and the Quick Menu
     // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material. With
-    // the Custom droidtop theme chosen for the colours outside Gaming, it wears that instead (Droidtop/tracker#827).
+    // the Custom droidtop theme chosen for the colours outside Gaming, it wears that instead (mytop-project/tracker#827).
     dev.droidtop.shell.gamepad.GamingTheme(outsideGaming = true) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // The bar takes its height from the desktop rather than covering it (Droidtop/tracker#682): the viewport is
+        // The bar takes its height from the desktop rather than covering it (mytop-project/tracker#682): the viewport is
         // laid out in the rest, so the compositor's output is exactly what shows and no window's edge is under the bar.
         val density = androidx.compose.ui.platform.LocalDensity.current
         var barHeightPx by remember { mutableStateOf(0) }
         val barHeight = with(density) { barHeightPx.toDp() }
-        // Desktop mode's settings, read off the main thread and followed while the shell shows (Droidtop/tracker#764).
+        // Desktop mode's settings, read off the main thread and followed while the shell shows (mytop-project/tracker#764).
         val shellContext = LocalContext.current
         val prefs by remember(shellContext) { DesktopPrefs.changes(shellContext).flowOn(Dispatchers.IO) }
             .collectAsState(initial = DesktopPrefs.Values())
         val barAtTop = prefs.taskbarAtTop
-        // The seat's input method, held or left to a container's own as the setting says (Droidtop/tracker#809).
+        // The seat's input method, held or left to a container's own as the setting says (mytop-project/tracker#809).
         LaunchedEffect(hostBridge, prefs.containerInputMethod) {
             withContext(Dispatchers.IO) { hostBridge?.setInputMethodTaken(!prefs.containerInputMethod) }
         }
@@ -344,7 +344,7 @@ fun DesktopShell(
             hostBridge = hostBridge,
             toplevels = barToplevels,
             androidApps = androidApps,
-            // A Linux pin made before its app had an icon takes the icon it has now (Droidtop/tracker#689).
+            // A Linux pin made before its app had an icon takes the icon it has now (mytop-project/tracker#689).
             pins = remember(pins.list, linuxApps) { withLinuxIcons(pins.list, linuxApps) },
             windowIcons = remember(linuxApps) { windowIcons(linuxApps) },
             onOpenPin = openPin,
@@ -451,7 +451,7 @@ private fun BoxScope.LaunchFailureNotice(message: String, onDismiss: () -> Unit)
 }
 
 /**
- * Desktop's search (docs/SPEC.md 12a "One search", Droidtop/tracker#351): the same dialog the PC library, the
+ * Desktop's search (docs/SPEC.md 12a "One search", mytop-project/tracker#351): the same dialog the PC library, the
  * console lists and Standard's drawer open, with this surface's local rows: the library's entries (the
  * scan the Start menu observes, only while the search is open) and the container's own desktop entries as the
  * apps. A Linux app starts in the session, a game takes the one launch rule, a download source's result opens
@@ -471,7 +471,7 @@ private fun DesktopSearch(
     val apps by rememberUpdatedState(linuxApps)
     val launch by rememberUpdatedState(onLaunchLinuxApp)
     // The search's rows hold a bitmap, not a picture to load: the icons are decoded once, by the image loader (off
-    // the main thread, PNG or SVG alike), while the search is open (Droidtop/tracker#689; rig 2026-10-29: SVG
+    // the main thread, PNG or SVG alike), while the search is open (mytop-project/tracker#689; rig 2026-10-29: SVG
     // icons had none here).
     val context = androidx.compose.ui.platform.LocalContext.current
     val icons by produceState(emptyMap<String, android.graphics.Bitmap>(), linuxApps) {
@@ -499,10 +499,10 @@ private fun DesktopSearch(
 }
 
 /**
- * The taskbar's window list as a sheet a pad drives (Droidtop/tracker#350): A raises a window (restoring it
+ * The taskbar's window list as a sheet a pad drives (mytop-project/tracker#350): A raises a window (restoring it
  * first when it is minimized) or opens an Android app, X closes it, and the rest of the rules are the taskbar's own.
  *
- * It lists the windows of every screen. With the desktop on a second screen (Droidtop/tracker#908, step D4) each
+ * It lists the windows of every screen. With the desktop on a second screen (mytop-project/tracker#908, step D4) each
  * window's line also names the screen it is on, and Y offers "Move to <screen>", one row per other screen, in a list
  * of its own that goes back to this one; with one screen there is no Y.
  */

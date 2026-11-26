@@ -344,7 +344,7 @@ object ThemeAssets {
         val screenAspectRatio: Float,
         /** The appearance: it picks the colour scheme when the person chose none ([colorSchemeFor]). */
         val light: Boolean,
-        /** "Tint themes to my colours": the accent the theme's own colours are swapped for, or null (Droidtop/tracker#844). */
+        /** "Tint themes to my colours": the accent the theme's own colours are swapped for, or null (mytop-project/tracker#844). */
         val tint: Int?,
     )
 
@@ -570,7 +570,7 @@ object ThemeAssets {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
         }?.let { applyThemePatchesOverlay(context, it, systemId) }
-            // The theme's own views wear the tint too, not only droidtop's chrome over them (Droidtop/tracker#844).
+            // The theme's own views wear the tint too, not only droidtop's chrome over them (mytop-project/tracker#844).
             ?.let { parsed -> cacheKey.tint?.let { GamingThemeMapping.tintTheme(parsed, it) } ?: parsed }
         // NEVER cache a failed parse -- a transient failure (mid-
         // extraction race on first launch was the real, confirmed case)
@@ -617,7 +617,7 @@ object ThemeAssets {
      * 25.2 MB in 1,239 files, 28.8 MB on disk once each file is rounded up to whole blocks; Slate is 20.9 MB on disk.
      * Summing the assets' own sizes would mean opening every one of them (a compressed asset has no length without
      * reading it), so this is the estimate, with room to spare for the theme dir an older build left beside the new one.
-     * A cache with less than this is not written to at all (Droidtop/tracker#849).
+     * A cache with less than this is not written to at all (mytop-project/tracker#849).
      */
     private const val EXTRACTION_SPACE_BYTES = 40L * 1_000_000L
 
@@ -625,7 +625,7 @@ object ThemeAssets {
      * The bundled theme [assetFolder] extracted into the cache, or null when it cannot be. Null, rather than the
      * folder, once an extraction has failed in this process ([ExtractionFailures]): a full disk made every later
      * load delete the half-written copy and extract the whole theme again under [extractionLock], while the first
-     * composition waited on that lock (Droidtop/tracker#849). A complete extraction from an older build, if one is
+     * composition waited on that lock (mytop-project/tracker#849). A complete extraction from an older build, if one is
      * still there, is used instead of none.
      */
     private fun extractedBundledThemeDir(context: Context, assetFolder: String): File? {
@@ -674,7 +674,7 @@ object ThemeAssets {
             if (markerCurrent()) return themeDir
             // A caller that waited on the lock while another's extraction failed does not start one of its own.
             if (!ExtractionFailures.shouldTry(assetFolder)) return previousExtraction()
-            // Too little room is known before anything is written: one statfs (Droidtop/tracker#849).
+            // Too little room is known before anything is written: one statfs (mytop-project/tracker#849).
             val room = context.cacheDir.usableSpace
             if (room < EXTRACTION_SPACE_BYTES) {
                 Log.w("droidtop.ThemeAssets", "Not extracting bundled theme '$assetFolder': $room bytes free in the cache, $EXTRACTION_SPACE_BYTES needed")
@@ -721,7 +721,7 @@ object ThemeAssets {
             }
             // A file that cannot be written (a full disk) fails the whole
             // extraction instead of leaving a tree with holes in it that
-            // the marker would then call complete (Droidtop/tracker#849).
+            // the marker would then call complete (mytop-project/tracker#849).
             destDir.parentFile?.mkdirs()
             input.use { source ->
                 destDir.outputStream().use { output -> source.copyTo(output) }

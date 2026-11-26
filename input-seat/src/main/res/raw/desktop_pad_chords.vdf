@@ -1,4 +1,4 @@
-// droidtop's Desktop pad chords (Droidtop/tracker#383), written for droidtop, CC BY 4.0.
+// droidtop's Desktop pad chords (mytop-project/tracker#383), written for droidtop, CC BY 4.0.
 // Steam's controller layout format, so Steam loads it as it is. The face buttons and the D-pad are keys for the
 // container: A Enter, B Escape, X Backspace, Y Tab, the D-pad the arrow keys. Held, L2 puts them on the chord groups.
 "controller_mappings"

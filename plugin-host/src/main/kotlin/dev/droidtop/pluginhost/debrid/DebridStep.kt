@@ -9,7 +9,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * The debrid step of a torrent or magnet job (docs/SPEC.md "Download rules", Droidtop/tracker#638): before any peer is
+ * The debrid step of a torrent or magnet job (docs/SPEC.md "Download rules", mytop-project/tracker#638): before any peer is
  * contacted, the person's debrid accounts are asked, cheapest first ([DebridChoice]), and the first that has it whole serves
  * it: its files come down as direct links into the job's own folder, so placing, updates and saves are as for any
  * torrent, and no peer is contacted and nothing is seeded. When none has it, the job either waits for the first

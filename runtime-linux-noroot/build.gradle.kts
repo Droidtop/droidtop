@@ -33,7 +33,7 @@ dependencies {
     // backup restore (BackupHelper.kt) -- HostAudioServer reuses it rather
     // than adding a second archive library, to unpack the same
     // pulseaudio-gamenative-*.tzst asset runtime-windows already ships
-    // (docs/SPEC.md 3d, Droidtop/tracker#95).
+    // (docs/SPEC.md 3d, mytop-project/tracker#95).
     implementation("com.github.alesimula:murine-aircompressor:2.0.9")
 
     testImplementation(libs.junit)

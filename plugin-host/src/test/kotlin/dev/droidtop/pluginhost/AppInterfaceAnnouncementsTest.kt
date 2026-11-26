@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** An app that carries a plugin is told to the person once per version, and never when added or refused (Droidtop/tracker#547). */
+/** An app that carries a plugin is told to the person once per version, and never when added or refused (mytop-project/tracker#547). */
 class AppInterfaceAnnouncementsTest {
     @Test
     fun `an app not added yet is told once per version`() {

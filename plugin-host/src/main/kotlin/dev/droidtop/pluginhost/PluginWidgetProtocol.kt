@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * What a widget shows (docs/plugin-api.md 3 C10, Droidtop/tracker#563): one of a closed set of templates, each of which
+ * What a widget shows (docs/plugin-api.md 3 C10, mytop-project/tracker#563): one of a closed set of templates, each of which
  * droidtop draws with views an Android app widget can hold, so a plugin's widget sits on any launcher's page without a
  * line of plugin code running there. [action] is the id a tap on the whole widget sends back (`action {id}`).
  */

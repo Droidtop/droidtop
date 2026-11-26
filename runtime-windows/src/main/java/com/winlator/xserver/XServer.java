@@ -301,7 +301,7 @@ public class XServer {
 
     /**
      * Advertises "GLX" ([GLXExtension]) for a session whose OpenGL is Mesa's xlib libGL, which does GLX on the
-     * client side (x86_64 software graphics, Droidtop/tracker#309). Call before the guest connects.
+     * client side (x86_64 software graphics, mytop-project/tracker#309). Call before the guest connects.
      */
     public void advertiseClientSideGlx() {
         if (extensions.get(GLXExtension.MAJOR_OPCODE) == null) extensions.put(GLXExtension.MAJOR_OPCODE, new GLXExtension());

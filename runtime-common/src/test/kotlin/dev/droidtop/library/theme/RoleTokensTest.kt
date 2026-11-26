@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The role tokens plugin-drawn UI reads (docs/SPEC.md 7k "Light and dark", Droidtop/tracker#559). */
+/** The role tokens plugin-drawn UI reads (docs/SPEC.md 7k "Light and dark", mytop-project/tracker#559). */
 class RoleTokensTest {
     @Test
     fun `every token comes from the palette, in the order SPEC gives`() {

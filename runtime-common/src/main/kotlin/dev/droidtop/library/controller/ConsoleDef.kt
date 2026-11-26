@@ -36,7 +36,7 @@ data class ConsoleDef(
 
 /**
  * Where the shell's input pipeline finds this device's row of the console table without depending on `:library-core`
- * (Droidtop/tracker#827 F1a): the table itself (`HardwareDatabase`, which fetches through the platform databases)
+ * (mytop-project/tracker#827 F1a): the table itself (`HardwareDatabase`, which fetches through the platform databases)
  * stays there, and droidtop installs it here at its start. Null until then, and on a device with no row.
  */
 object ConsoleLookup {

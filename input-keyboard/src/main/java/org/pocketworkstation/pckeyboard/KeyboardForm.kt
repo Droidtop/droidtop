@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import kotlin.math.roundToInt
 
 /**
- * The shape of the key grid on the screen (docs/SPEC.md 6a, "One-handed and split", Droidtop/tracker#342): the
+ * The shape of the key grid on the screen (docs/SPEC.md 6a, "One-handed and split", mytop-project/tracker#342): the
  * full width, a narrower grid at the left or right edge for one hand, or the grid split with a gap in the middle
  * so each thumb has a half (a handheld held in landscape). The key layouts themselves are untouched: the same
  * keys are scaled and moved once they are loaded ([layout], called from `Keyboard.applyForm`). Pure but [forScreen].
@@ -12,7 +12,7 @@ object KeyboardForm {
     /** The shape chosen for portrait, and for both orientations before there was one per orientation. */
     const val PREF = "pref_keyboard_form"
 
-    /** The shape chosen for landscape (Droidtop/tracker#903 H1); unset until someone picks one there. */
+    /** The shape chosen for landscape (mytop-project/tracker#903 H1); unset until someone picks one there. */
     const val PREF_LANDSCAPE = "pref_keyboard_form_landscape"
 
     /** A screen whose short side is under this many inches is held in the hands: 600dp at Android's 160 dpi. */
@@ -37,7 +37,7 @@ object KeyboardForm {
     }
 
     /**
-     * The shape for one orientation (Droidtop/tracker#903 H1): the one chosen for it, else, with nothing chosen,
+     * The shape for one orientation (mytop-project/tracker#903 H1): the one chosen for it, else, with nothing chosen,
      * split in landscape on a [handheld], so each thumb reaches its half of the full 5-row grid, and the full width
      * everywhere else. Blank or [AUTO] means unset. A shape chosen before there was one per orientation is carried into
      * landscape once, by [migrate]. Pure.
@@ -89,7 +89,7 @@ object KeyboardForm {
     /**
      * [widthFraction] of the keyboard's width the keys use, [gapFraction] of it opened in the middle, whether a
      * grid narrower than the screen sits at the [atEnd] (right) edge rather than the start (left), and [heightScale] of
-     * Hacker's own key height the rows take (the floating mode's resize, Droidtop/tracker#903 H12c; 1 everywhere else).
+     * Hacker's own key height the rows take (the floating mode's resize, mytop-project/tracker#903 H12c; 1 everywhere else).
      */
     data class Form(
         val id: String,
@@ -110,7 +110,7 @@ object KeyboardForm {
     private val ALL = listOf(FULL, SPLIT, LEFT, RIGHT)
 
     /**
-     * One-handed at [widthFraction] of the screen (the one-handed mode's stored width, Droidtop/tracker#903 H12c), at
+     * One-handed at [widthFraction] of the screen (the one-handed mode's stored width, mytop-project/tracker#903 H12c), at
      * the right edge when [atEnd]. [LEFT] and [RIGHT] are the key grid shape setting's fixed 70%.
      */
     @JvmStatic
@@ -118,7 +118,7 @@ object KeyboardForm {
 
     /**
      * Each half's width in a thumb split, in inches: about what a thumb reaches from the edge of a tablet held in both
-     * hands (Droidtop/tracker#903 H12c).
+     * hands (mytop-project/tracker#903 H12c).
      */
     const val THUMB_HALF_INCHES = 3.0f
 
@@ -132,7 +132,7 @@ object KeyboardForm {
     const val THUMB_MIN_WIDTH_INCHES = 2 * THUMB_HALF_INCHES / (1f - 0.2f)
 
     /**
-     * The thumb split for a screen [widthPx] wide at [xdpi] (Droidtop/tracker#903 H12c): the halves at the outer
+     * The thumb split for a screen [widthPx] wide at [xdpi] (mytop-project/tracker#903 H12c): the halves at the outer
      * edges, each [THUMB_HALF_INCHES] wide, the middle left open, at most [THUMB_MAX_GAP] of the width. It is H1's
      * split with a wider gap, laid out by the same [layout]. Null where the screen is no wider than
      * [THUMB_MIN_WIDTH_INCHES] (a handheld, a phone), whose split is H1's own, or reports no believable dpi. Pure.
@@ -156,7 +156,7 @@ object KeyboardForm {
 
     /**
      * Scales the rows' [y] and [height] (in place) by [scale] and returns the grid's new total height: the floating
-     * mode's resize corner (Droidtop/tracker#903 H12c). A scale of 1 changes nothing. Pure.
+     * mode's resize corner (mytop-project/tracker#903 H12c). A scale of 1 changes nothing. Pure.
      */
     @JvmStatic
     fun scaleHeights(y: IntArray, height: IntArray, total: Int, scale: Float): Int {

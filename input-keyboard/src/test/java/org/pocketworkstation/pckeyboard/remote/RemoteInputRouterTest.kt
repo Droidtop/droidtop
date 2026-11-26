@@ -7,9 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Where text from another device lands (docs/SPEC.md, "Type from another device", Droidtop/tracker#645): droidtop's own
+ * Where text from another device lands (docs/SPEC.md, "Type from another device", mytop-project/tracker#645): droidtop's own
  * field first, else droidtop's input method's editor, else a notice; password fields; KDE Connect's key names. Moved
- * with the router from `:library-core`'s RemoteInputTest when the keyboard and input module took it (Droidtop/tracker#903).
+ * with the router from `:library-core`'s RemoteInputTest when the keyboard and input module took it (mytop-project/tracker#903).
  */
 class RemoteInputRouterTest {
     private val own = FakeTarget()

@@ -4,7 +4,7 @@ import java.math.BigDecimal
 import java.math.MathContext
 
 /**
- * The number pad's "=" (docs/SPEC.md 6a, "Modes", Droidtop/tracker#903 H12c): the sum just before the cursor, worked
+ * The number pad's "=" (docs/SPEC.md 6a, "Modes", mytop-project/tracker#903 H12c): the sum just before the cursor, worked
  * out. Pure and JVM tested.
  *
  * Numbers with a decimal point (or a decimal comma), the four operators in their keyboard spelling (+ - * /) or their

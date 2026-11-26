@@ -16,7 +16,7 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 /**
  * An offer the shell makes once (fetch box art, a theme is ready, set up Windows): a title, what it would do, and
  * two choices drawn by the one dialog component ([DialogChoices]). The way out ([decline]) comes first and has the
- * focus, so a mashed A starts nothing (DESIGN-LANGUAGE "Modals", Droidtop/tracker#669); B is the way out too, and
+ * focus, so a mashed A starts nothing (DESIGN-LANGUAGE "Modals", mytop-project/tracker#669); B is the way out too, and
  * the footer names it so. No legend in the body: the footer is the one place controls are named.
  */
 @Composable

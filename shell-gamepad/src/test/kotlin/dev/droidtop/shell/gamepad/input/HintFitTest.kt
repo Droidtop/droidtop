@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The hint bar's fit rule (docs/SPEC.md 7j, "The hint bar fits"; Droidtop/tracker#485 F2a). */
+/** The hint bar's fit rule (docs/SPEC.md 7j, "The hint bar fits"; mytop-project/tracker#485 F2a). */
 class HintFitTest {
     private val hints = listOf(
         GamepadAction.A to "Open",
@@ -47,7 +47,7 @@ class HintFitTest {
         assertTrue(noShoulders.any { it.action == GamepadAction.SELECT })
         val tiny = HintFit.fit(hints, 1f, width)
         assertTrue(tiny.none { it.action == GamepadAction.L })
-        // Select's pill can be the only touch route to what it opens (Droidtop/tracker#839): its glyph stays, tappable.
+        // Select's pill can be the only touch route to what it opens (mytop-project/tracker#839): its glyph stays, tappable.
         assertEquals(HintFit.Shown(GamepadAction.SELECT, null), tiny.single { it.action == GamepadAction.SELECT })
         assertTrue(tiny.any { it.action == GamepadAction.A } && tiny.any { it.action == GamepadAction.B })
     }
@@ -57,7 +57,7 @@ class HintFitTest {
         assertEquals(false, HintFit.layout(hints, 1000f, width).wraps)
         val last = width(HintFit.at(hints, HintFit.Stage.SELECT_AS_GLYPH))
         assertEquals(false, HintFit.layout(hints, last, width).wraps)
-        // Gaming Home at Largest text in portrait (Droidtop/tracker#770): Y, L2 and X still show, on a second line.
+        // Gaming Home at Largest text in portrait (mytop-project/tracker#770): Y, L2 and X still show, on a second line.
         val home = listOf(GamepadAction.Y to "Search", GamepadAction.L2 to "Options", GamepadAction.X to "Play now") + hints
         val wrapped = HintFit.layout(home, 1f, width)
         assertTrue(wrapped.wraps)

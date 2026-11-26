@@ -60,7 +60,7 @@ object WineOptionsCatalog {
         val overGame = !shared && !state.ownPrefix
         val items = buildList<CatalogItem> {
             // Before setup the rows below are the device's defaults and the
-            // choices made for setup to use (Droidtop/tracker#372); a game's
+            // choices made for setup to use (mytop-project/tracker#372); a game's
             // page has no other way to start it.
             if (!state.setUp && !shared) {
                 val setup = withContext(Dispatchers.IO) { WindowsSetup.current(context) }
@@ -83,7 +83,7 @@ object WineOptionsCatalog {
                             // A count of this game's own settings over the
                             // shared prefix, not of prefixes: "1 of its own"
                             // under this title read as if a prefix had been
-                            // made (rig run, Droidtop/tracker#242).
+                            // made (rig run, mytop-project/tracker#242).
                             value = when (state.ownChoices) {
                                 0 -> "Shared settings"
                                 1 -> "Shared, 1 setting changed for this game"
@@ -167,7 +167,7 @@ object WineOptionsCatalog {
                     id = "wine_options_sources",
                     title = "Where these come from",
                     subtitle = "Wine, DXVK, VKD3D, FEXCore, Box64 and drivers from droidtop's component catalog " +
-                        "(github.com/Droidtop/droidtop-components): re-hosted unmodified, or linked where their makers publish them, " +
+                        "(github.com/mytop-project/droidtop-components): re-hosted unmodified, or linked where their makers publish them, " +
                         "each download checked against its SHA-256; software Vulkan and the x86_64 libraries built by droidtop's CI",
                 ),
             )
@@ -183,7 +183,7 @@ object WineOptionsCatalog {
     }
 
     /**
-     * The game's touchscreen gestures, a page of their own (Droidtop/tracker#618 C8): each gesture Off or what it does,
+     * The game's touchscreen gestures, a page of their own (mytop-project/tracker#618 C8): each gesture Off or what it does,
      * the game's own choice over its prefix's, laid over it at launch.
      */
     private suspend fun touchscreenItem(context: Context, entryId: String, title: String?): CatalogItem {
@@ -256,7 +256,7 @@ object WineOptionsCatalog {
 /**
  * The one "Set up Windows games" row (or "Reinstall" once it exists): Settings > Library > Windows games and
  * the Wine and graphics page before setup both draw it, with the state in the value column and a question
- * before the long download starts (Droidtop/tracker#299, #367, #372). The same [WindowsSetup.provision] path
+ * before the long download starts (mytop-project/tracker#299, #367, #372). The same [WindowsSetup.provision] path
  * launch and the game page use.
  */
 internal fun windowsSetupItem(provisioned: Boolean, state: WindowsSetup.State): AsyncActionItem = AsyncActionItem(

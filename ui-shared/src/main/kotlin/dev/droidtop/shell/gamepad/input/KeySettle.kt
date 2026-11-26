@@ -2,7 +2,7 @@ package dev.droidtop.shell.gamepad.input
 
 /**
  * Keeps a key that follows a press the screen has just acted on from reaching that screen before the change the
- * press made has happened (docs/SPEC.md 6e, "2b", Droidtop/tracker#359).
+ * press made has happened (docs/SPEC.md 6e, "2b", mytop-project/tracker#359).
  *
  * A press that opens a menu only sets state; the menu's window composes, joins the overlay stack
  * ([OverlayKeys]) and gets focus frames later. Two keys sent back to back (a script's "Start, Down" in one adb

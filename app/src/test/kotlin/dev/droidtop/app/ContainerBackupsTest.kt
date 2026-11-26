@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808). */
+/** Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808). */
 class ContainerBackupsTest {
     private val day = 86_400_000L
 

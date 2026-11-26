@@ -6,7 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 
 /**
- * Hacker Keyboard Reborn's modern key drawing (Droidtop/tracker#903 H2): each key a flat rounded plate in the
+ * Hacker Keyboard Reborn's modern key drawing (mytop-project/tracker#903 H2): each key a flat rounded plate in the
  * keyboard's colours instead of a theme's 9-patch, with function keys (modifiers, Esc, Tab, F-keys, the icon keys) a
  * shade apart from the letters, a latched modifier lit in the accent, and a pressed key in the focused shade. It draws
  * the same keys, labels, hints and icons; only the plates and their colours change.

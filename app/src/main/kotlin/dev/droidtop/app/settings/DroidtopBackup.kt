@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * "Back up droidtop" and "Restore droidtop" (docs/SPEC.md "Data", decided 2026-09-24, Droidtop/tracker#625): one zip
+ * "Back up droidtop" and "Restore droidtop" (docs/SPEC.md "Data", decided 2026-09-24, mytop-project/tracker#625): one zip
  * archive with what a person did in droidtop, so a new device picks up where the old one was.
  *
  * What it holds: the settings ([settings.json][SETTINGS], the same JSON "Back up settings" wrote), the game records
@@ -38,7 +38,7 @@ object DroidtopBackup {
 
     /** The trees of `filesDir` an archive carries, as the archive names them. */
     private val FILE_TREES = listOf("library/games")
-    // The person's own ratings and statuses (Droidtop/tracker#722) travel with the play log.
+    // The person's own ratings and statuses (mytop-project/tracker#722) travel with the play log.
     private val FILES = listOf("play-log.json", dev.droidtop.library.settings.GameMarks.FILE)
 
     /**

@@ -25,7 +25,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * `emulator.bios@1` (docs/plugin-api.md 3 A11, docs/SPEC.md "Emulator setup helper", Droidtop/tracker#415): a plugin that
+ * `emulator.bios@1` (docs/plugin-api.md 3 A11, docs/SPEC.md "Emulator setup helper", mytop-project/tracker#415): a plugin that
  * can supply BIOS files. The emulator setup helper offers "Get the BIOS for this system" only while one is installed and
  * allowed; the plugin says which files it can supply (`list`) and hands over a download (`acquire`), and droidtop does the
  * rest: it names the target from its own BIOS database, never from the plugin, checks the bytes, and writes the file into

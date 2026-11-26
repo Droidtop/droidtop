@@ -33,7 +33,7 @@ import dev.droidtop.library.settings.UiMode
 
 /**
  * The Quick Menu's sections: the icon rail (docs/SPEC.md "Quick Menu: a
- * branching panel", Droidtop/tracker#258). Order is rail order. The rail is
+ * branching panel", mytop-project/tracker#258). Order is rail order. The rail is
  * for quick management and for the two places kept here, Social and
  * Plugins; the other destinations are the left menu's, and Get games leads
  * Downloads and Updates.
@@ -41,9 +41,9 @@ import dev.droidtop.library.settings.UiMode
 enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
     APPS(QuickGlyph.APPS, ControlPanel.APPS),
     NOTIFICATIONS(QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
-    // The Social place in the sheet: friends and their games, then conversations, a chat opening in place (Droidtop/tracker#644).
+    // The Social place in the sheet: friends and their games, then conversations, a chat opening in place (mytop-project/tracker#644).
     SOCIAL(QuickGlyph.PEOPLE, ControlPanel.SOCIAL),
-    // The radios, out of what was one System wall of about 20 tiles (owner, 2026-10-23, Droidtop/tracker#610).
+    // The radios, out of what was one System wall of about 20 tiles (owner, 2026-10-23, mytop-project/tracker#610).
     CONNECTIONS(QuickGlyph.NETWORK, ControlPanel.CONNECTIONS),
     // Everything else the System tab held: switching mode, power, screenshot, the app in front.
     SYSTEM(QuickGlyph.POWER, ControlPanel.SYSTEM),
@@ -52,7 +52,7 @@ enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
     DISPLAY(QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
     DOWNLOADS(QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
     PLUGINS(QuickGlyph.PLUGIN, ControlPanel.PLUGINS),
-    // The person's own name and picture (Droidtop/tracker#586).
+    // The person's own name and picture (mytop-project/tracker#586).
     PROFILE(QuickGlyph.PROFILE, ControlPanel.PROFILE),
     ;
 
@@ -97,7 +97,7 @@ object QuickTiles {
      */
     val AUDIO_IDS = listOf(
         GamingSettingsCatalog.ID_SYSTEM_VOLUME,
-        // The interface sounds' own volume, beside the media volume (Droidtop/tracker#836).
+        // The interface sounds' own volume, beside the media volume (mytop-project/tracker#836).
         GamingSettingsCatalog.ID_NAVIGATION_SOUNDS,
         GamingSettingsCatalog.ID_AUDIO_OUTPUT,
         GamingSettingsCatalog.ID_SYSTEM_DND,
@@ -133,7 +133,7 @@ object QuickTiles {
      * The sections the rail shows now: those [mode] allows on the Quick Menu ([ControlAccess], the one
      * restriction model), Plugins only when a plugin is installed or plugins can be managed, Social only where its
      * place opens ([hasSocial]: not in Kiosk and Kid, which hide the places). The running game has no section: what
-     * can be done with it is L2's (Droidtop/tracker#740, [RunningGameSheet]).
+     * can be done with it is L2's (mytop-project/tracker#740, [RunningGameSheet]).
      */
     fun visibleSections(
         hasPlugins: Boolean,
@@ -151,7 +151,7 @@ object QuickTiles {
 
     /**
      * Where the menu opens when nothing asks for a section, the same tab every time (owner-approved menu
-     * review M7, 2026-10-23, Droidtop/tracker#621: it opened on Notifications or Power and mode depending on
+     * review M7, 2026-10-23, mytop-project/tracker#621: it opened on Notifications or Power and mode depending on
      * whether notification access was granted, so R2 did not land anywhere predictable): Power and mode.
      * The running game's controls are L2's sheet now, not a section here.
      */
@@ -192,7 +192,7 @@ object QuickTiles {
      * lives in Settings (it is configuration), so the tab takes a view of
      * it by id, the same item, never a copy. The two display roles are the
      * Display tab's ([DISPLAY_IDS]); they were listed here too and always
-     * filtered out again (Droidtop/tracker#571 row 30).
+     * filtered out again (mytop-project/tracker#571 row 30).
      */
     val CONFIGURATION_IDS = listOf(
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
@@ -217,7 +217,7 @@ object QuickTiles {
     const val ID_SEARCH = "quick_search"
 
     /**
-     * [groups] with the Search tile leading Power and mode (Droidtop/tracker#621 M4: Search is not a left-menu row;
+     * [groups] with the Search tile leading Power and mode (mytop-project/tracker#621 M4: Search is not a left-menu row;
      * Y and this tile open it). [open] opens the one search. Pure.
      */
     fun withSearch(groups: List<CatalogGroup>, open: () -> Unit): List<CatalogGroup> {
@@ -236,7 +236,7 @@ object QuickTiles {
     const val ID_PREVIOUS_TRACK = "quick_previous_track"
 
     /**
-     * [groups] led by what is playing (Droidtop/tracker#716), as the companion's Now playing card shows it: the track,
+     * [groups] led by what is playing (mytop-project/tracker#716), as the companion's Now playing card shows it: the track,
      * whose A plays or pauses it, then Next track and Previous track, each only when the session offers it. None for
      * [now] null (nothing playing, or no notification access). [control] carries a press to the session. Pure.
      */

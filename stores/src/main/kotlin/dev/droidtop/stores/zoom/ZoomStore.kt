@@ -25,7 +25,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * ZOOM Platform as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335): the account's DRM-free games,
+ * ZOOM Platform as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335): the account's DRM-free games,
  * installed the way Humble's are ([SingleFileInstall], once per installer file: ZOOM may split one installer into
  * several). Signed in on ZOOM's own page, which returns with a launcher token; the token is all droidtop keeps.
  * Download links are fresh for each install. ZOOM names no versions, so an update is a change in the installer files'

@@ -3,7 +3,7 @@ package dev.droidtop.runtime.launcherimport
 import dev.droidtop.runtime.HomeAction
 
 /**
- * Fits an [ImportPlan] to this device before anything changes (Droidtop/tracker#564): only apps that are installed,
+ * Fits an [ImportPlan] to this device before anything changes (mytop-project/tracker#564): only apps that are installed,
  * widgets whose provider is, an icon pack that is; a folder left with one app becomes that app, Launcher3 keeping
  * no folder of one. Everything it drops is a note, so the summary says what did not come across and why. Pure.
  */

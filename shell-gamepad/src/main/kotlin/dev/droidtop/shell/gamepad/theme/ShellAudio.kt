@@ -9,7 +9,7 @@ import kotlinx.coroutines.delay
 /**
  * The themed `video` elements' part of the launch audio hand-off
  * ([AudioHandOff], docs/SPEC.md "Launch audio hand-off",
- * Droidtop/tracker#160). Their ExoPlayers play audible by default
+ * mytop-project/tracker#160). Their ExoPlayers play audible by default
  * (VideoComponent.cpp:254-255), and a paused ExoPlayer still holds its
  * AudioTrack, so on a hand-off each one is faded to silence over
  * [FADE_MS] and then released. While [AudioHandOff.handedOff] is true the

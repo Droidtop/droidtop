@@ -16,10 +16,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * The emoji panel (docs/SPEC.md 6a, "Emoji panel and search", Droidtop/tracker#342): a row of group buttons (Recent
+ * The emoji panel (docs/SPEC.md 6a, "Emoji panel and search", mytop-project/tracker#342): a row of group buttons (Recent
  * first), a grid of the group's emoji, and Search and Back. Takes the key grid's place like the other tool panels.
  * Emoji are listed from [EmojiAssets] once loaded; a tap calls [onPick]. With [gifs], GIFs and Stickers tabs follow
- * Kaomoji (Droidtop/tracker#903 H5, GifPanel.kt).
+ * Kaomoji (mytop-project/tracker#903 H5, GifPanel.kt).
  */
 internal class EmojiBrowser(
     context: Context,
@@ -29,18 +29,18 @@ internal class EmojiBrowser(
     private val onBack: () -> Unit,
     private val gifs: GifTabs? = null,
 ) : LinearLayout(context) {
-    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
+    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, mytop-project/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
     private val adapter = EmojiAdapter(context, colors.text)
     private val grid = GridView(context)
     private val groupRow = LinearLayout(context)
     private var catalog: EmojiCatalog? = null
     private var selected: String = RECENT
-    // An emoji's skin tones, shown above the grid on a long press (Droidtop/tracker#903 H4).
+    // An emoji's skin tones, shown above the grid on a long press (mytop-project/tracker#903 H4).
     private val toneRow = LinearLayout(context)
     private val toneScroll = HorizontalScrollView(context)
 
-    // The GIFs or Stickers tab while one is shown (Droidtop/tracker#903 H5); null on an emoji tab.
+    // The GIFs or Stickers tab while one is shown (mytop-project/tracker#903 H5); null on an emoji tab.
     private var gifKind: GifKind? = null
     private val gifAdapter by lazy { GifGridAdapter(context, colors.text) }
 
@@ -156,14 +156,14 @@ internal class EmojiBrowser(
     }
 
     private fun select(id: String, animate: Boolean = true) {
-        // The new group slides in from its side of the row (Droidtop/tracker#903 H12a): Recent first, Kaomoji last.
+        // The new group slides in from its side of the row (mytop-project/tracker#903 H12a): Recent first, Kaomoji last.
         val from = order(selected)
         val to = order(id)
         selected = id
         gifKind = null
         if (grid.adapter !== adapter) grid.adapter = adapter
         toneScroll.visibility = GONE
-        // Kaomoji are wide: fewer, wider cells in smaller type (Droidtop/tracker#903 H4).
+        // Kaomoji are wide: fewer, wider cells in smaller type (mytop-project/tracker#903 H4).
         val wide = id == Kaomoji.GROUP
         grid.columnWidth = dp(if (wide) 128 else 46)
         adapter.wide = wide
@@ -241,7 +241,7 @@ internal class EmojiBrowser(
 }
 
 /**
- * The emoji search (Droidtop/tracker#342): a line showing the query typed on the keyboard itself and a row of
+ * The emoji search (mytop-project/tracker#342): a line showing the query typed on the keyboard itself and a row of
  * matches. While it is open it takes the keyboard's keys ([KeyboardCapture]); a match is picked with a tap, Enter or
  * Done closes it. Sits between the tool strip and the key grid, so the grid stays usable.
  */
@@ -326,7 +326,7 @@ internal class EmojiSearchBar(
                 cells += this
                 results.addView(this)
             }
-            // In the skin tone last picked (Droidtop/tracker#903 H4).
+            // In the skin tone last picked (mytop-project/tracker#903 H4).
             val shown = EmojiTones.shown(entry, ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0))
             cell.text = shown
             cell.visibility = View.VISIBLE

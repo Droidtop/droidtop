@@ -10,7 +10,7 @@ import dev.droidtop.library.search.LibraryArtwork
 import kotlinx.coroutines.runBlocking
 
 /**
- * The games of a Shelf widget in its grid layout (Droidtop/tracker#563): a collection the launcher asks for one cell at
+ * The games of a Shelf widget in its grid layout (mytop-project/tracker#563): a collection the launcher asks for one cell at
  * a time. The list and the art are read in [Factory.onDataSetChanged], which Android runs on a binder thread and lets
  * block; a cell is then only built from what was read. A tap fills the widget's template with the game's id, so it
  * plays through [GameLaunchActivity].

@@ -4,7 +4,7 @@ import dev.droidtop.library.consoles.BiosFileSpec
 import java.io.File
 
 /**
- * Where a source's download goes when it is a BIOS file (Droidtop/tracker#558): an emulator looks for it in the games
+ * Where a source's download goes when it is a BIOS file (mytop-project/tracker#558): an emulator looks for it in the games
  * folder's `bios` folder under the name droidtop's BIOS database gives it, never among the games. A BIOS file from Game
  * sources was put in the folder the screen named, which for the BIOS and firmware plugin was the games root itself
  * (RP5, build 1923: Roms/ps2-0230a-20080220.bin, no Roms/bios). Pure: the caller reads the database and the roots.

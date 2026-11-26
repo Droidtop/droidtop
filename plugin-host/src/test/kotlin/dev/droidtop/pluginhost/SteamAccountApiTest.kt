@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** The Steam account for plugins (docs/plugin-api.md 3 G8, Droidtop/tracker#379): Steam's limits kept by droidtop, and the ops' arguments. */
+/** The Steam account for plugins (docs/plugin-api.md 3 G8, mytop-project/tracker#379): Steam's limits kept by droidtop, and the ops' arguments. */
 class SteamAccountApiTest {
     @Test
     fun `no more than thirty free licences go in any rolling hour`() {

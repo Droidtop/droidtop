@@ -40,7 +40,7 @@ object PageViews {
      * case, never Android's ALL-CAPS, [fill] with a hairline [outline], [ink] at 16sp medium, at least
      * [PageMetrics.ButtonHeight] tall, [PageMetrics.ButtonCorner] corners, and none of Material's raised elevation.
      * For a View surface whose labels and visibility change at run time (the companion's Input tab,
-     * Droidtop/tracker#524), where a Compose host per button would be the heavier change.
+     * mytop-project/tracker#524), where a Compose host per button would be the heavier change.
      */
     fun styleSecondary(button: android.widget.Button, fill: Int, ink: Int, outline: Int) {
         val density = button.resources.displayMetrics.density

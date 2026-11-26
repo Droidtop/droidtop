@@ -127,7 +127,7 @@ internal fun AppSettingsCatalogs.pluginsScreen() = CatalogScreen(
     subtitle = "Run only after you approve them",
     groups = { context -> pluginsGroups(context) },
     // A plugin's id opens its page, where it is approved: every "approve it" hint, notice and job leads straight there
-    // (Droidtop/tracker#759). "permissions:<id>" opens its Permissions screen (a denied plugin view's way to change it).
+    // (mytop-project/tracker#759). "permissions:<id>" opens its Permissions screen (a denied plugin view's way to change it).
     forDeepLink = { link ->
         if (link.startsWith(AcquireContentSources.PERMISSIONS_LINK)) {
             pluginPermissionsScreen(link.removePrefix(AcquireContentSources.PERMISSIONS_LINK))
@@ -185,9 +185,9 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
             id = "plugins_installed",
             title = if (installed.isEmpty() && unreadable.isEmpty()) null else "Installed",
             items = buildList {
-                // A plugin droidtop cannot read is listed, never hidden (Droidtop/tracker#854: Enginehost was nowhere).
+                // A plugin droidtop cannot read is listed, never hidden (mytop-project/tracker#854: Enginehost was nowhere).
                 val unreadableRows = unreadable.map { unreadableRow(it) }
-                // One search over the installed plugins and every catalog (Droidtop/tracker#513).
+                // One search over the installed plugins and every catalog (mytop-project/tracker#513).
                 if (installed.isNotEmpty() || listings.isNotEmpty()) {
                     add(
                         TextInputItem(
@@ -214,7 +214,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     return@buildList
                 }
                 // A newer version is counted and shown whatever the row's one state word is: "Wants new access" outranks
-                // "Update available", and on the console F95's update showed nowhere on this list (Droidtop/tracker#792).
+                // "Update available", and on the console F95's update showed nowhere on this list (mytop-project/tracker#792).
                 val newer = installed.associate { record -> record.manifest.id to PluginCatalog.offerFor(listings, record, userKeys)?.release?.version }
                 // A newer release under a key the person has not trusted yet is said too, never as an update (#882).
                 val held = installed.associate { record -> record.manifest.id to PluginCatalog.heldOfferFor(listings, record, userKeys)?.release?.version }
@@ -226,8 +226,8 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     Triple(record, pluginState(record, grants, runtimeNeed, update != null, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, newerVersion = update, heldVersion = held[record.manifest.id]))
                 }
                 val updates = newer.values.count { it != null }
-                // Droidtop/tracker#513: what needs the person first, and the list narrowed to it.
-                // The updates are in the one Updates list, with Update all there (docs/SPEC.md 10b, Droidtop/tracker#570);
+                // mytop-project/tracker#513: what needs the person first, and the list narrowed to it.
+                // The updates are in the one Updates list, with Update all there (docs/SPEC.md 10b, mytop-project/tracker#570);
                 // this page points at it rather than keeping a second Update all.
                 if (updates > 0) {
                     add(
@@ -248,7 +248,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                         onSelect = { _, value -> pluginFilter = PluginListFilter.entries.firstOrNull { it.name == value } ?: PluginListFilter.ALL },
                     ),
                 )
-                // Kinds (docs/plugin-api.md 1.2, "Categories", Droidtop/tracker#179): only the kinds installed plugins have.
+                // Kinds (docs/plugin-api.md 1.2, "Categories", mytop-project/tracker#179): only the kinds installed plugins have.
                 fun kindOf(record: dev.droidtop.pluginhost.PluginRecord) = dev.droidtop.pluginhost.PluginPresentation.category(record.manifest.presentation.category)
                 val kinds = dev.droidtop.pluginhost.PluginPresentation.CATEGORIES.filter { kind -> installed.any { kindOf(it) == kind } }
                 if (kinds.size > 1) {
@@ -293,7 +293,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     subtitle = "Which app opens which link",
                     registryId = dev.droidtop.library.integrations.LinkRouter.HANDLERS_ID,
                 ),
-                // Other apps that asked to start a game (Droidtop/tracker#124): their answers live with the plugins' grants.
+                // Other apps that asked to start a game (mytop-project/tracker#124): their answers live with the plugins' grants.
                 NestedScreenItem(
                     id = "plugins_external_launch",
                     title = "Apps that start games",
@@ -313,7 +313,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
     )
 }
 
-/** The catalogs' plugins that answer the Plugins page's search and are not installed (Droidtop/tracker#513). */
+/** The catalogs' plugins that answer the Plugins page's search and are not installed (mytop-project/tracker#513). */
 private fun catalogSearchGroup(context: Context): CatalogGroup? {
     val query = pluginSearch.takeIf { it.isNotBlank() } ?: return null
     val rows = PluginCatalogScreen.searchRows(context, query)
@@ -327,7 +327,7 @@ private fun catalogSearchGroup(context: Context): CatalogGroup? {
 }
 
 /**
- * "In your apps" (docs/plugin-api.md 1.3, docs/SPEC.md 12a; Droidtop/tracker#547): the installed apps that carry a
+ * "In your apps" (docs/plugin-api.md 1.3, docs/SPEC.md 12a; mytop-project/tracker#547): the installed apps that carry a
  * plugin, found with PackageManager and checked by droidtop's own reading of their signatures. Adding one installs
  * it like any plugin: it waits for approval in Installed, with the same grants, Permissions screen and Activity. An
  * app already added is in Installed, and shows here again only when the app changed and its new version waits.
@@ -380,7 +380,7 @@ internal fun AppSettingsCatalogs.appInterfaceRow(app: dev.droidtop.pluginhost.Ap
         val record = result.getOrElse { return "${app.appLabel} can't be added: ${it.message}" }
         pluginsChanged(ctx)
         if (record.trust == PluginTrustState.APPROVED) return "${app.appLabel} is updated"
-        // Its page is one press away, not a list to look through (Droidtop/tracker#759).
+        // Its page is one press away, not a list to look through (mytop-project/tracker#759).
         Notices.flash(
             "${app.appLabel} is waiting for your approval",
             source = app.appLabel,
@@ -414,7 +414,7 @@ internal fun AppSettingsCatalogs.appInterfaceRow(app: dev.droidtop.pluginhost.Ap
     }
 }
 
-/** The Plugins place's first group (Droidtop/tracker#513): getting plugins, above the installed list. */
+/** The Plugins place's first group (mytop-project/tracker#513): getting plugins, above the installed list. */
 internal fun AppSettingsCatalogs.getPluginsGroup(catalogsSummary: String?) = CatalogGroup(
     id = "plugins_add",
     title = "Get plugins",
@@ -445,7 +445,7 @@ internal fun AppSettingsCatalogs.getPluginsGroup(catalogsSummary: String?) = Cat
 )
 
 /**
- * Where plugins come from, on one page (Droidtop/tracker#513): the catalogs, the plugin repositories and the keys
+ * Where plugins come from, on one page (mytop-project/tracker#513): the catalogs, the plugin repositories and the keys
  * droidtop trusts were three entries whose counts contradicted each other ("None added" beside a trusted key).
  */
 internal fun AppSettingsCatalogs.pluginSourcesScreen() = CatalogScreen(
@@ -480,7 +480,7 @@ internal fun AppSettingsCatalogs.pluginSourcesScreen() = CatalogScreen(
     },
 )
 
-/** What the Plugins list shows (Droidtop/tracker#513), kept while droidtop runs. */
+/** What the Plugins list shows (mytop-project/tracker#513), kept while droidtop runs. */
 internal enum class PluginListFilter(val label: String, val none: String) {
     ALL("All", "is installed"),
     NEEDS_APPROVAL("Needs approval", "waits for approval"),
@@ -497,7 +497,7 @@ internal enum class PluginListFilter(val label: String, val none: String) {
 
 @Volatile private var pluginFilter = PluginListFilter.ALL
 
-/** What the Plugins page's search holds (Droidtop/tracker#513): it narrows the installed cards and lists catalog matches. */
+/** What the Plugins page's search holds (mytop-project/tracker#513): it narrows the installed cards and lists catalog matches. */
 @Volatile private var pluginSearch = ""
 
 /** The kind the installed list is narrowed to (docs/plugin-api.md 1.2, "Categories"), or [ALL_KINDS]. */
@@ -564,13 +564,13 @@ internal fun AppSettingsCatalogs.pluginCard(
         // What it is, in its own line; its trust and access are the chip and its page's header (#514), never stitched on.
         subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
         inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
-        // The installed version, and the newer one whenever a catalog has it (Droidtop/tracker#792).
-        // Approved under a key its origin has since moved on from (Droidtop/tracker#887): said quietly, never a warning.
+        // The installed version, and the newer one whenever a catalog has it (mytop-project/tracker#792).
+        // Approved under a key its origin has since moved on from (mytop-project/tracker#887): said quietly, never a warning.
         valueLabel = {
             "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: heldVersion?.let { " · $it out, new key to review" } ?: "") +
                 (if (UserOriginKeys.predecessorInForce(userKeys[m.origin], record.approvedKeySha256)) " · signed with an older key" else "")
         },
-        // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
+        // An app's plugin is trusted by its app's signature, not an origin key (mytop-project/tracker#547).
         chip = if (m.kind == PluginKind.APP_INTERFACE) {
             if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else dev.droidtop.library.settings.RowTag.UNOFFICIAL
         } else if (isUnofficial(m.origin, userKeys)) dev.droidtop.library.settings.RowTag.UNOFFICIAL else null,
@@ -628,7 +628,7 @@ internal fun AppSettingsCatalogs.pluginDetailScreen(pluginId: String, label: Str
 )
 
 /**
- * One plugin's page (Droidtop/tracker#512): a header saying which plugin it is (its icon, name, maker and version, its
+ * One plugin's page (mytop-project/tracker#512): a header saying which plugin it is (its icon, name, maker and version, its
  * trust and its state), the bar with the one thing to do now (Approve, Update, Try again, Turn on), and More holding
  * the rest, Deny and Uninstall in danger with a confirm. The sections follow, what it does first.
  */
@@ -656,7 +656,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
             else -> "Disabled"
         }
         val trustLine = if (m.kind == PluginKind.APP_INTERFACE) {
-            // An app's plugin: trusted by the app's own signature, checked again before every run (Droidtop/tracker#547).
+            // An app's plugin: trusted by the app's own signature, checked again before every run (mytop-project/tracker#547).
             val key = PluginDangers.groupsOfFour(record.approvedKeySha256)
             if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) "Official: signed by its maker's release key, $key" else "Unofficial: signed by a key you trust, $key"
         } else if (!PluginOriginKeys.isOfficial(m.origin) && !userKeys.containsKey(m.origin)) {
@@ -743,7 +743,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
         // "Version" below says which), otherwise another go. Switching it back on clears the reason; it stops again if it fails again.
         // A stopped plugin's way forward (Update, or Try again) is the page's primary button.
-        // A main job the person left blocked (Droidtop/tracker#519): high-risk points start unticked, and a plugin whose
+        // A main job the person left blocked (mytop-project/tracker#519): high-risk points start unticked, and a plugin whose
         // point is off looks broken ("search finds nothing") unless its page says why, with the way to turn it on.
         if (record.trust == PluginTrustState.APPROVED) {
             m.v2.provides.map { it.point }.distinct().forEach { point ->
@@ -768,10 +768,10 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
             }
         }
         // The headline above is a plain sentence; what the plugin actually reported is one press away,
-        // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167), in the Developer menu's
+        // for its developer or a bug report (docs/SPEC.md 12a, mytop-project/tracker#167), in the Developer menu's
         // rows (docs/SPEC.md 7, "Developer menu").
         val detail = record.disabledDetail
-        // Always, not only with the Developer menu: "no status shown without its reason" (Droidtop/tracker#883 §3.7).
+        // Always, not only with the Developer menu: "no status shown without its reason" (mytop-project/tracker#883 §3.7).
         if (record.disabledReason != null && detail != null) {
             add(
                 NestedScreenItem(
@@ -834,7 +834,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
             pluginsChanged(ctx)
         }
 
-        // Approving with full access ticked asks in red first (Droidtop/tracker#481, D1); Cancel approves nothing.
+        // Approving with full access ticked asks in red first (mytop-project/tracker#481, D1); Cancel approves nothing.
         suspend fun approveAsking(ctx: Context, root: Boolean): String {
             // An update from a different maker asks first (D3), then full access does (D1).
             if (!PluginDangers.askDifferentMaker(record)) return "Not approved"
@@ -881,7 +881,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
     // state of each one, and a second list saying "Asks first" beside "7 allowed, 0 ask" contradicts it.
     val consentGroups = pluginConsentGroups(context, record, userKeys, catalogNames, ticks = approvalTicks)
         .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
-    // The lists are their own page, one row under the header (Droidtop/tracker#512): the page leads with who the
+    // The lists are their own page, one row under the header (mytop-project/tracker#512): the page leads with who the
     // plugin is and what to do, not with eight rows of permissions. Approval's ticks are the plugin's one tick buffer,
     // so what is ticked there is what Approve on the bar allows.
     val consentGroup: CatalogGroup? = consentGroups.takeIf { it.isNotEmpty() }?.let { groups ->
@@ -971,7 +971,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         ),
     )
 
-    // What the plugin is for, first (Decky's model, Droidtop/tracker#316): its Quick Menu panel, its settings, its
+    // What the plugin is for, first (Decky's model, mytop-project/tracker#316): its Quick Menu panel, its settings, its
     // own app and the app it manages. The panel is the same screen the Quick Menu's Plugins section opens, so the
     // Standard and Desktop modes, which have no Quick Menu, reach it here.
     val useGroup = buildList<CatalogItem> {
@@ -1069,7 +1069,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
     val runtimeGroup: List<CatalogItem> = listOfNotNull(runtimeItem(context, m.kind, m.label, runtimeNeed))
 
     // Opening a plugin's page checks again when the last check is old, so its Update shows what is out now
-    // (Droidtop/tracker#792); the page redraws when the check ends.
+    // (mytop-project/tracker#792); the page redraws when the check ends.
     dev.droidtop.app.update.UpdateChecks.refreshIfStale(context)
     val updateGroup = buildList<CatalogItem> {
         val listings = catalogListings
@@ -1091,7 +1091,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 )
             },
         )
-        // Its own release line, or its catalog's (SPEC 12a "Channels", Droidtop/tracker#179).
+        // Its own release line, or its catalog's (SPEC 12a "Channels", mytop-project/tracker#179).
         if (listings.any { listing -> listing.index.pluginById(m.id) != null }) {
             val channels = dev.droidtop.library.integrations.PluginChannels.forContext(context)
             val listedIn = listings.firstOrNull { it.index.pluginById(m.id) != null }?.source
@@ -1112,7 +1112,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         }
     }
 
-    // The plugin's own facts in droidtop's layout (docs/plugin-api.md 1.2 "Presentation", Droidtop/tracker#521 item 2),
+    // The plugin's own facts in droidtop's layout (docs/plugin-api.md 1.2 "Presentation", mytop-project/tracker#521 item 2),
     // so a plugin never writes its maker or its site into its description.
     val about = m.presentation
     val aboutGroup = listOfNotNull(
@@ -1201,7 +1201,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
 }
 
 /**
- * An app's engine cores as it last listed them (`engines.cores`, docs/plugin-api.md 3 A7b, Droidtop/tracker#752):
+ * An app's engine cores as it last listed them (`engines.cores`, docs/plugin-api.md 3 A7b, mytop-project/tracker#752):
  * installed ones first, then what its catalog can install. Null for a plugin that never listed any.
  */
 internal fun AppSettingsCatalogs.engineCoresGroup(context: Context, pluginId: String): CatalogGroup? {
@@ -1326,7 +1326,7 @@ internal fun AppSettingsCatalogs.pluginPageTop(
         CatalogChip(state, ok = state == "Running"),
         CatalogChip(
             when {
-                // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547), as its row in the
+                // An app's plugin is trusted by its app's signature, not an origin key (mytop-project/tracker#547), as its row in the
                 // list says: the console showed droidtop Browser, signed by its pinned key, as "NOT TRUSTED" here (2026-11-22).
                 m.kind == PluginKind.APP_INTERFACE -> if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) "Official" else "Unofficial"
                 isUnofficial(m.origin, userKeys) -> "Unofficial"
@@ -1381,7 +1381,7 @@ internal fun AppSettingsCatalogs.pluginPageTop(
             label = if (offer.release.version == m.version) "Reinstall" else "Update to ${offer.release.version}",
             role = ButtonRole.PRIMARY,
             // Said at once and where its bar is, then how it ended: the press used to show nothing until the download and
-            // install were over, and a refusal read like any other line (Droidtop/tracker#882).
+            // install were over, and a refusal read like any other line (mytop-project/tracker#882).
             run = {
                 later { ctx ->
                     Notices.flash("Updating", source = m.label, context = ctx)
@@ -1471,7 +1471,7 @@ private const val CAUTION_TITLE = "Could reach past droidtop's checks"
 internal val noticeScope = kotlinx.coroutines.MainScope()
 
 /**
- * U4 (docs/SPEC.md 7, "Developer menu", "Notices"; Droidtop/tracker#481): a plugin running with full access says so quietly on its page
+ * U4 (docs/SPEC.md 7, "Developer menu", "Notices"; mytop-project/tracker#481): a plugin running with full access says so quietly on its page
  * after it was allowed, with the way back. Limit access takes the grant away when the plugin can run with normal
  * protection, and otherwise turns the plugin off, since it cannot run any other way.
  */
@@ -1593,7 +1593,7 @@ internal fun AppSettingsCatalogs.pluginActivityGroups(context: Context, pluginId
             ).joinToString(" - "),
         )
     }
-    // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, Droidtop/tracker#61).
+    // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, mytop-project/tracker#61).
     val days = PluginAudit.countsForContext(context).days(pluginId).take(COUNT_DAYS_SHOWN)
     val dayRows = days.map { (day, counts) ->
         ActionItem(
@@ -1679,7 +1679,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
     val dayFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT)
     val counts = PluginAudit.countsForContext(context)
     fun item(row: PermissionRow): CatalogItem {
-        // A logged call has its time; an everyday one is only counted per day (Droidtop/tracker#60, #61), so its day.
+        // A logged call has its time; an everyday one is only counted per day (mytop-project/tracker#60, #61), so its day.
         val lastUsed = audit.lastUsed(pluginId, row.id)?.let { "Last used ${format.format(java.util.Date(it))}" }
             ?: counts.lastDay(pluginId, row.id)?.let { day ->
                 runCatching {
@@ -1693,7 +1693,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
             title = row.label,
             subtitle = listOfNotNull(row.reason, wanted, lastUsed).joinToString(" - ").ifEmpty { null },
             options = listOf(
-                // State chips with tones (Droidtop/tracker#519): what a state costs shows at a glance.
+                // State chips with tones (mytop-project/tracker#519): what a state costs shows at a glance.
                 dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),
                 dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first", dev.droidtop.library.settings.NoticeTone.Caution),
                 dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked", dev.droidtop.library.settings.NoticeTone.Danger),
@@ -1702,7 +1702,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
             onSelect = { ctx, value ->
                 val state = GrantState.fromId(value)
                 if (row.id == PluginTiers.FULL_TRUST && state == GrantState.GRANTED) {
-                    // Droidtop/tracker#481, D1: allowed only through the red dialog; the screen reads again on the grant.
+                    // mytop-project/tracker#481, D1: allowed only through the red dialog; the screen reads again on the grant.
                     noticeScope.launch {
                         if (PluginDangers.askFullAccess(record, update = false)) {
                             withContext(Dispatchers.IO) { PluginGrants.forContext(ctx).set(pluginId, row.id, GrantState.GRANTED) }
@@ -1791,7 +1791,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
         }
     }
     // A plugin that signs in to a download site droidtop also keeps a sign-in for borrows droidtop's, unless the
-    // person turns that off here (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648 slice 5).
+    // person turns that off here (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648 slice 5).
     val sharedSites = dev.droidtop.pluginhost.DownloadSites.declaresAny(context, dev.droidtop.pluginhost.WebSessions.declaredDomains(record.manifest.v2.permissions))
     val sharingItem = sharedSites.takeIf { it.isNotEmpty() }?.let { sites ->
         ToggleItem(
@@ -1900,7 +1900,7 @@ internal fun AppSettingsCatalogs.pluginConsentGroups(
         return ToggleItem(
             id = "plugin_${m.id}_${scope}tick_$grantKey",
             title = l.title,
-            // Sentences, never fragments joined with " - " (Droidtop/tracker#516).
+            // Sentences, never fragments joined with " - " (mytop-project/tracker#516).
             subtitle = PluginConsent.sentences(lead, l.detail, trail, if (l.highRisk) "High risk: allow it only for a plugin you trust" else null),
             current = grantKey in ticks,
             onToggle = { _, on -> if (on) ticks.add(grantKey) else ticks.remove(grantKey) },
@@ -2013,7 +2013,7 @@ internal suspend fun AppSettingsCatalogs.appKeysGroup(context: Context): Catalog
 
 /**
  * Stops trusting the signer [origin] the person added: what "Keys you trust" and "Keys and accounts" both do
- * (Droidtop/tracker#12), so the plugins it signed are flagged the same way from either. The line to show.
+ * (mytop-project/tracker#12), so the plugins it signed are flagged the same way from either. The line to show.
  */
 internal fun AppSettingsCatalogs.stopTrustingOrigin(context: Context, origin: String): String =
     if (UserOriginKeys.remove(UserOriginKeys.storeFile(context), origin)) {
@@ -2088,7 +2088,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     }
                 },
             ),
-            // The app keys the person trusted for an app's plugin (Droidtop/tracker#547): each for one app alone.
+            // The app keys the person trusted for an app's plugin (mytop-project/tracker#547): each for one app alone.
             appKeysGroup(context),
             CatalogGroup(
                 id = "plugin_keys_source",
@@ -2130,7 +2130,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                         // the whole ~124-char base64 squeezed this row's
                         // title and description out of the row once one
                         // was saved (the Origin id row above kept both,
-                        // Droidtop/tracker#51), so the row shows a
+                        // mytop-project/tracker#51), so the row shows a
                         // truncated prefix and the buffer keeps the full
                         // key "Add this key" below reads.
                         value = pendingKeyManualKey.take(16) + if (pendingKeyManualKey.length > 16) "…" else "",

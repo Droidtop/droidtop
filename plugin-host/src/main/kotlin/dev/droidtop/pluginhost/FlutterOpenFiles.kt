@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 /**
  * The files a Flutter plugin opened through the broker (`hostOpen`, docs/plugin-api.md 5.3 "What a contained plugin's
- * own folder holds", Droidtop/tracker#375): `PluginContext.openFile` hands over a descriptor, and Dart's `dart:io` opens
+ * own folder holds", mytop-project/tracker#375): `PluginContext.openFile` hands over a descriptor, and Dart's `dart:io` opens
  * paths only, so each one gets a path. At most [MAX] at a time; `hostClose` lets one go. Pure, so the slots and the
  * reply are tested without a device; [FlutterDroidtopPlugin] gives the descriptor its path.
  */

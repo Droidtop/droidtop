@@ -169,7 +169,7 @@ class ContainerTerminalTest {
         assertTrue(message.contains("No package manager"))
     }
 
-    // ---- droidtop's own terminal (Droidtop/tracker#909) ----
+    // ---- droidtop's own terminal (mytop-project/tracker#909) ----
 
     /** Runs [argv] with [input] on stdin and [path] as PATH, and returns its exit code, stdout and stderr. */
     private fun run(argv: List<String>, input: String, path: String? = null): Triple<Int, String, String> {

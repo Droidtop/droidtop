@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Settings search ranks titles above descriptions, as Android Settings does (Droidtop/tracker#505). */
+/** Settings search ranks titles above descriptions, as Android Settings does (mytop-project/tracker#505). */
 class SettingsSearchRankTest {
     private val screen = CatalogScreen(id = "rank_test", title = "Settings", groups = { _ -> emptyList() })
 

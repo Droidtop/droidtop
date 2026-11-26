@@ -14,7 +14,7 @@ import okhttp3.internal.platform.PlatformRegistry
  * InitializationProvider for the whole app, so it never ran: anything that
  * needed the list (cookie domains, the Windows runtime's old DNS-over-HTTPS
  * lookups) failed with "Unable to load PublicSuffixDatabase.list resource"
- * (BlueStacks rig, Droidtop/tracker#242). Setting the context is exactly what
+ * (BlueStacks rig, mytop-project/tracker#242). Setting the context is exactly what
  * PlatformInitializer.create does; nothing else is started.
  */
 object OkHttpPlatform {

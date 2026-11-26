@@ -71,7 +71,7 @@ interface BrokerEnvironment {
     fun openLink(uri: String, title: String?): String?
 
     /**
-     * droidtop's own fallback for a link it could not hand on (docs/plugin-api.md 3 F2, Droidtop/tracker#544 item 3):
+     * droidtop's own fallback for a link it could not hand on (docs/plugin-api.md 3 F2, mytop-project/tracker#544 item 3):
      * the link is put on the clipboard and droidtop says, in its own words, why and what to do. True when copied.
      */
     fun linkFallback(pluginLabel: String, uri: String, why: String): Boolean = false
@@ -128,7 +128,7 @@ interface BrokerEnvironment {
 
     /**
      * droidtop's own sign-ins for the download sites among [declared] that it shares with [pluginId], by domain
-     * (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): none where there is no list.
+     * (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648): none where there is no list.
      */
     fun sharedSites(pluginId: String, declared: List<String>): Map<String, String> = emptyMap()
 
@@ -213,7 +213,7 @@ interface BrokerEnvironment {
     /** Plugin contexts kept in step with the person's paired computers (docs/plugin-api.md 3 F8); null in a host without them. */
     fun contexts(): PluginContexts? = null
 
-    /** The declared settings' store (Droidtop/tracker#880); null where there is none (a test environment). */
+    /** The declared settings' store (mytop-project/tracker#880); null where there is none (a test environment). */
     fun settings(): PluginSettings? = null
 
     /** D4: the tokens of the documents each plugin was handed. */
@@ -232,14 +232,14 @@ interface BrokerEnvironment {
     fun media(): MediaLibrary? = null
 
     /**
-     * An Open view's link opened out of sight first ([HiddenWebSession], Droidtop/tracker#783). Null where there is no
+     * An Open view's link opened out of sight first ([HiddenWebSession], mytop-project/tracker#783). Null where there is no
      * hidden view or no droidtop screen to run it behind, and then [webSession] shows the page as before.
      */
     fun hiddenWebSession(request: WebSessionRequest, expiredText: List<String>): HiddenWebSession.Outcome? = null
 
     /**
      * A GET loaded by droidtop's web view instead of its HTTP client, for a host that shows a browser check
-     * (Droidtop/tracker#600, [WebFetch]). Null where there is no web view, and then the request goes as before.
+     * (mytop-project/tracker#600, [WebFetch]). Null where there is no web view, and then the request goes as before.
      */
     fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? = null
 
@@ -420,7 +420,7 @@ object HostApis {
                 .put("installId", env.installId(record.manifest.id))
                 .put("theme", if (env.roleTokens().light) "light" else "dark")
         },
-        // Droidtop/tracker#559: the role tokens UI a plugin draws itself follows (docs/SPEC.md 7k, "Light and dark"),
+        // mytop-project/tracker#559: the role tokens UI a plugin draws itself follows (docs/SPEC.md 7k, "Light and dark"),
         // the same colours as droidtop's own pages; no permission, since they say nothing about the person.
         HostOp("ui", "get_theme") { env, _, _ -> dev.droidtop.library.theme.RoleTokens.toJson(env.roleTokens()) },
         HostOp("plugins", "list_available") { env, record, args ->
@@ -952,7 +952,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             if (audited) {
                 env.audit(pluginId, AuditEntry(env.nowMs(), permission ?: request.api, request.api, request.op, runCatching { hostOp.target(request.args) }.getOrDefault(""), emptyList(), result))
             } else {
-                // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, Droidtop/tracker#61).
+                // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, mytop-project/tracker#61).
                 env.countCall(pluginId, permission ?: "${request.api} ${request.op}")
             }
         }
@@ -990,7 +990,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
                     env.noteWanted(pluginId, permission)
                     refuse("${record.manifest.label} needs you to allow \"$label\".")
                 }
-                // Not now lasts this run of droidtop (Droidtop/tracker#518): the same page does not ask on every visit.
+                // Not now lasts this run of droidtop (mytop-project/tracker#518): the same page does not ask on every visit.
                 if (env.notNow(pluginId, permission)) refuse(putOff)
                 val answer = env.prompt(GrantPromptRequest(pluginId, record.manifest.label, permission, label, reason, tier))
                 when (answer) {

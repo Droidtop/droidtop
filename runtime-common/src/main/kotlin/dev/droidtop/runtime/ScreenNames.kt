@@ -33,7 +33,7 @@ data class ScreenFacts(
 )
 
 /**
- * The names droidtop gives screens (docs/SPEC.md 4c, "Screen names", Droidtop/tracker#162). Pure, so the rules are
+ * The names droidtop gives screens (docs/SPEC.md 4c, "Screen names", mytop-project/tracker#162). Pure, so the rules are
  * unit-tested with made-up display lists; [ScreenNaming] applies them to the live ones.
  *
  * 1. A name the person gave the screen in Settings > Displays, kept per [ScreenFacts.uniqueId].

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Conversations from other apps' notifications, the reply action choice and the include rules (docs/SPEC.md "Social: messages from your apps", Droidtop/tracker#329). */
+/** Conversations from other apps' notifications, the reply action choice and the include rules (docs/SPEC.md "Social: messages from your apps", mytop-project/tracker#329). */
 class AppMessagesModelTest {
     private fun note(
         key: String,

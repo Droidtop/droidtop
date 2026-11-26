@@ -14,7 +14,7 @@ import org.pocketworkstation.pckeyboard.Slab.Move
 import org.pocketworkstation.pckeyboard.Slab.Output
 import org.pocketworkstation.pckeyboard.Slab.ShiftState
 
-/** The text-entry slab's model (docs/SPEC.md 4c, "The text-entry slab"; Droidtop/tracker#485 S7 slice 6). */
+/** The text-entry slab's model (docs/SPEC.md 4c, "The text-entry slab"; mytop-project/tracker#485 S7 slice 6). */
 class SlabTest {
     private fun typed(text: String) = Output.Type(text)
 
@@ -170,7 +170,7 @@ class SlabTest {
 
     @Test
     fun `a whole keyboard holds a key with what is latched, and lets the one-shots go after`() {
-        // Droidtop/tracker#567: a PC game sees a held arrow or letter for as long as the finger is on it.
+        // mytop-project/tracker#567: a PC game sees a held arrow or letter for as long as the finger is on it.
         val latched = Slab.press(Slab.State(extras = true, shift = ShiftState.ONCE), Action.Ctrl, 0).first
         assertEquals(
             Output.Hold(KeyEvent.KEYCODE_A, listOf(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_SHIFT_LEFT)),

@@ -27,7 +27,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Epic's download path off the network (Droidtop/tracker#732): a chunk file decoded and checked as the download does,
+ * Epic's download path off the network (mytop-project/tracker#732): a chunk file decoded and checked as the download does,
  * an install's files skipped on resume only when whole, which failures fetch fresh links, and a binary manifest read
  * back into the chunk plan. The chunks and manifests are written here in Epic's format (Legendary's layout), not taken
  * from a store.

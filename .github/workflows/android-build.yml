@@ -42,7 +42,7 @@ on:
 # Read-only by default. Only the publish job, which runs no build code, gets
 # a token that can write releases: Gradle, its plugins and the vendor-deps
 # build run in the build job and must not be able to publish the release the
-# in-app updater installs (Droidtop/enginehost
+# in-app updater installs (mytop-project/enginehost
 # docs/security/2026-09-24-ci-supply-chain.md, H3).
 permissions:
   contents: read
@@ -136,7 +136,7 @@ jobs:
 
       - name: Report the runner's cores and memory
         # What gradle.properties budgets the daemon heaps against
-        # (Droidtop/tracker#283): the log carries the real numbers.
+        # (mytop-project/tracker#283): the log carries the real numbers.
         run: |
           nproc
           free -m
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload on-device check APK
         # The rig checks run by hand with am instrument against an installed droidtop signed with the same key (the
-        # priv.packages check, Droidtop/tracker#130). Not part of droidtop-apk, so no channel ever carries it.
+        # priv.packages check, mytop-project/tracker#130). Not part of droidtop-apk, so no channel ever carries it.
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: droidtop-android-test
@@ -268,8 +268,8 @@ jobs:
         # NDK's platform libraries (scripts/check-native-links.py). Release
         # 2967 shipped a libwinlator_11.so without the functions
         # libvortekrenderer.so imports, and every vortek game crashed at its
-        # first frame (Droidtop/tracker#857). The allocator a game can preload
-        # must export what it replaces (Droidtop/tracker#894).
+        # first frame (mytop-project/tracker#857). The allocator a game can preload
+        # must export what it replaces (mytop-project/tracker#894).
         if: ${{ !cancelled() }}
         run: |
           apk_dir="$RUNNER_TEMP/apk-libs"
@@ -294,7 +294,7 @@ jobs:
       - name: Sandbox host libraries packaged
         # Wine's tree attaches through libsbx_child.so and execs through the
         # library's helper, both run from nativeLibraryDir (docs/SPEC.md 5b,
-        # Droidtop/tracker#584): each must be in the APK once per ABI. The
+        # mytop-project/tracker#584): each must be in the APK once per ABI. The
         # helper is an executable named lib*.so, which only this step proves
         # the packaging picked up.
         if: ${{ !cancelled() }}

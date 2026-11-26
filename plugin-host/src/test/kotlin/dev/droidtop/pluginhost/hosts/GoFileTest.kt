@@ -15,7 +15,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * GoFile through its own API (Droidtop/tracker#638 part 5): its links, the guest token, a folder with nested folders,
+ * GoFile through its own API (mytop-project/tracker#638 part 5): its links, the guest token, a folder with nested folders,
  * the MD5 of each file, and every refusal. The replies are recorded from gofile.io/api (2026-10-24), the failing ones
  * from the live API: a guest token's listing answers 401 `error-notPremium`.
  */

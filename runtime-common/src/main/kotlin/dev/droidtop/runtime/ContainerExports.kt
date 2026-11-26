@@ -5,7 +5,7 @@ import java.io.File
 
 /**
  * One application of a sibling container shown in the desktop's menus, distrobox-export style
- * (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5).
+ * (docs/SPEC.md 3d "Exported apps", mytop-project/tracker#555 D5).
  */
 data class ExportedApp(
     val containerId: String,
@@ -28,7 +28,7 @@ data class ExportedApp(
  * container wrote is ever run: the token only names an export droidtop itself published.
  *
  * Command-line programs are not exported this way: a request carries no arguments and no terminal, so they
- * wait for the container-enter path (Droidtop/tracker#555 D7).
+ * wait for the container-enter path (mytop-project/tracker#555 D7).
  */
 object ContainerExports {
     /** Exported entries start with this, so neither the library's entries (`droidtop-`) nor these remove the other's. */

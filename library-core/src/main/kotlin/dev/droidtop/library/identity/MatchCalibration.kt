@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The calibration set for [MatchScore] (Droidtop/tracker#318 §3.3): games with the right ids and what every source
+ * The calibration set for [MatchScore] (mytop-project/tracker#318 §3.3): games with the right ids and what every source
  * answered when asked, so the scorer is graded offline with no network and the same answer every run. [MatchRecorder]
  * writes the lines during a scrape; a reviewing agent fills `truth` and `review` from the facts and answers recorded,
  * and a person only overrides (owner, 2026-10-24: "it shouldn't require my manual intervention for every game, unless

@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * The Desktop widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): start or go back to droidtop's
+ * The Desktop widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): start or go back to droidtop's
  * Desktop, saying whether its session is running, open the containers, and run the apps containers exported to the
  * desktop, two at most, through the one export launch ([ExportLaunch]: the running session, else Desktop starts one).
  * Gated by Desktop mode: its provider is enabled only while Desktop is on ([ModeStartup]), which is how Android hides a

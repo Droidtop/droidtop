@@ -20,7 +20,7 @@ import org.json.JSONObject
 
 /**
  * The games the person does not own that Recommendations can suggest (docs/SPEC.md 12a "Recommendations API",
- * Droidtop/tracker#52): IGDB's `similar_games` of the games they play most, with each one's genre, developer and
+ * mytop-project/tracker#52): IGDB's `similar_games` of the games they play most, with each one's genre, developer and
  * IGDB `total_rating` and how many ratings it rests on. It needs the person's own IGDB credentials (the PC source's);
  * without them the pool stays empty and Recommendations offers the library's unplayed games only, as before.
  *

@@ -1,5 +1,5 @@
 /*
- * droidtop's media decode server for Wine games (Droidtop/tracker#601, the enginehost-ffmpeg handoff).
+ * droidtop's media decode server for Wine games (mytop-project/tracker#601, the enginehost-ffmpeg handoff).
  *
  * Slice 1: the process shape and the wire, with a stub decoder. It listens on a Unix socket, forks one process per
  * stream (a crash or kill ends only that stream), and answers protocol.h. The stub "decodes" any input into the same

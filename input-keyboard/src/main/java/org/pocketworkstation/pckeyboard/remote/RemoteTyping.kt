@@ -13,7 +13,7 @@ import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
 
 /**
  * Typing from another device as the keyboard and input module owns it (docs/SPEC.md, "Type from another device",
- * Droidtop/tracker#645, #903): the one [RemoteInputRouter] of this process, wired to droidtop's own fields and to
+ * mytop-project/tracker#645, #903): the one [RemoteInputRouter] of this process, wired to droidtop's own fields and to
  * droidtop's input method. Every remote source asks [router] for it: the phone page's session (`RemoteInput`, whose
  * transport, pairing and confirm stay with `HandoffServer` in `:library-core`) and KDE Connect's remote keyboard.
  * Nothing here decides whether a request may type; that is the session's, before it gets here.

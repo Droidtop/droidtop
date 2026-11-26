@@ -22,7 +22,7 @@ import dev.droidtop.library.settings.WordsForTests
  * shelf that would repeat the whole library is left out.
  */
 class PcShelvesTest {
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 
@@ -126,7 +126,7 @@ class PcShelvesTest {
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names)?.text)
         // A system with no name reads as its id in capitals.
         assertEquals("Retro · GBA", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
-        // A long system name fits the badge (Droidtop/tracker#942): without its maker, else the system id.
+        // A long system name fits the badge (mytop-project/tracker#942): without its maker, else the system id.
         assertEquals("PlayStation 2", shortSystemName("Sony PlayStation 2", "ps2"))
         assertEquals("Mega Drive", shortSystemName("Sega Mega Drive", "megadrive"))
         assertEquals("NES", shortSystemName("Nintendo Entertainment System", "nes"))
@@ -228,7 +228,7 @@ class PcShelvesTest {
 
     @Test
     fun `Card size steps a capsule from the window's tier, in whole dp`() {
-        // On the console's 1280dp canvas: 172dp at Standard (List options > Card size, Droidtop/tracker#363).
+        // On the console's 1280dp canvas: 172dp at Standard (List options > Card size, mytop-project/tracker#363).
         assertEquals(129f, capsuleWidthFor(1280f, CardSize.SMALLEST).value, 0.001f)
         assertEquals(150f, capsuleWidthFor(1280f, CardSize.SMALL).value, 0.001f)
         assertEquals(172f, capsuleWidthFor(1280f, CardSize.STANDARD).value, 0.001f)
@@ -447,7 +447,7 @@ class PcShelvesTest {
 
     @Test
     fun `Home's most played row takes games played at least twice, most first, and needs two of them`() {
-        // Owner, 2026-10-23: Home shows "the user's most common games" (Droidtop/tracker#611).
+        // Owner, 2026-10-23: Home shows "the user's most common games" (mytop-project/tracker#611).
         val a = game("/a", lastPlayed = now - 10).copy(playCount = 5)
         val b = game("/b", lastPlayed = now - 5).copy(playCount = 2)
         val once = game("/once", lastPlayed = now - 1).copy(playCount = 1)

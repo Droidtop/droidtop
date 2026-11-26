@@ -167,7 +167,7 @@ internal class PcFlavour(context: Context) {
                 )
             }
         }
-        // Plugins that provide artwork (docs/plugin-api.md 3 A4, Droidtop/tracker#714), after droidtop's own sources: they
+        // Plugins that provide artwork (docs/plugin-api.md 3 A4, mytop-project/tracker#714), after droidtop's own sources: they
         // fill only the roles those left empty, and the scrape's own write downloads and checks what they name.
         val pluginArt = dev.droidtop.runtime.util.runCatchingCancellable {
             kotlinx.coroutines.runBlocking { dev.droidtop.library.integrations.PluginArtwork.matches(app, entry, ids, identity.name) }

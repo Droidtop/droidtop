@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Debrid as a step of torrent jobs (Droidtop/tracker#638): the hash, the two services, and which one serves. */
+/** Debrid as a step of torrent jobs (mytop-project/tracker#638): the hash, the two services, and which one serves. */
 class DebridTest {
     private val hash = "3888fbc0f39f807569ae7aa8d21d16a8b4fec56f"
     private val ref = TorrentRef(hash, "magnet:?xt=urn:btih:$hash")
@@ -422,7 +422,7 @@ class DebridTest {
         }
     }
 
-    /** A hoster TorBox has not fetched yet, served once it has (Droidtop/tracker#638: Bare Witness's GoFile mirror). */
+    /** A hoster TorBox has not fetched yet, served once it has (mytop-project/tracker#638: Bare Witness's GoFile mirror). */
     private class Fetching(private val calls: MutableList<String>) : DebridProvider {
         override val name = "TorBox"
         override val id = "torbox"

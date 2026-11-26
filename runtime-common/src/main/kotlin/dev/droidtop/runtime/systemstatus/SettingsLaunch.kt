@@ -7,7 +7,7 @@ import android.util.Log
 /**
  * The one way droidtop starts an Android system settings screen (grants, panels, App info, Home choice). It
  * only adds a debug line, tag [TAG], naming the code that asked and the screen asked for, so a settings screen
- * that opens when nobody pressed anything can be traced to its caller from logcat (Droidtop/tracker#368).
+ * that opens when nobody pressed anything can be traced to its caller from logcat (mytop-project/tracker#368).
  * Behaviour is exactly [Context.startActivity].
  */
 object SettingsLaunch {

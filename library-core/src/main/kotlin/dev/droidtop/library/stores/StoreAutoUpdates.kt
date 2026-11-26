@@ -50,7 +50,7 @@ object StoreAutoUpdates {
 
     /**
      * Starts updating an installed store game in place: the one starter, for this sweep and for an Update pressed on
-     * the Updates page (Droidtop/tracker#570). A store installs into "<its folder in a game folder>/<game>", so the
+     * the Updates page (mytop-project/tracker#570). A store installs into "<its folder in a game folder>/<game>", so the
      * folder above the game is the root. False when the job could not start (no such store in this build, no folder).
      */
     fun startUpdate(context: Context, key: String, title: String, installPath: String, sizeBytes: Long, automatic: Boolean = false): Boolean {

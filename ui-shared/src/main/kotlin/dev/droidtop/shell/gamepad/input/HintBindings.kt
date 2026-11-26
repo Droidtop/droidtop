@@ -58,10 +58,10 @@ fun rememberHintList(bindings: List<HintBinding>): List<Pair<GamepadAction, Stri
 
 /**
  * The two menus every Gaming screen has, as the pills its footer begins with
- * (docs/SPEC.md 7j, "Gaming controls", Droidtop/tracker#273): Start is the
+ * (docs/SPEC.md 7j, "Gaming controls", mytop-project/tracker#273): Start is the
  * left menu (navigation), R2 the Quick Menu (quick management). One list for
  * every row that names them: the shell's footer, a layer that keeps them
- * reachable, the end of a theme's own help row on Retro Games (Droidtop/tracker#510).
+ * reachable, the end of a theme's own help row on Retro Games (mytop-project/tracker#510).
  */
 val ShellMenuHints: List<HintBinding> = listOf(
     HintBinding(GamepadAction.START, "Menu"),
@@ -141,7 +141,7 @@ class FocusedHints {
     /**
      * Whether a tooltip drawn from [window] (the root view of the window its content is in) may show: with no layer
      * open every one may; with one open only those inside the topmost layer, because a tip is a popup window of its
-     * own and the page's would otherwise stay drawn over the Quick Menu or a dialog (Droidtop/tracker#535).
+     * own and the page's would otherwise stay drawn over the Quick Menu or a dialog (mytop-project/tracker#535).
      */
     fun tipsAllowedFor(window: Any?): Boolean = layers.isEmpty() || layers.last().window === window
 

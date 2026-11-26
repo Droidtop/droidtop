@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A pad's buttons by Steam's names (Droidtop/tracker#618). */
+/** A pad's buttons by Steam's names (mytop-project/tracker#618). */
 class PadInputsTest {
     @Test
     fun `face buttons, the d-pad, shoulders, triggers and stick clicks have Steam's names`() {

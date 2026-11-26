@@ -19,7 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The card's accessibility (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485, final design test 6): one
+ * The card's accessibility (docs/SPEC.md 7k, "Notices"; mytop-project/tracker#485, final design test 6): one
  * node, tone first, polite for a group notice or a banner and not for a row, with Info and the action
  * as custom actions that do what they say.
  */

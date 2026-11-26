@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/** A source result's detail page drawn from its item bundles (docs/SPEC.md 12a, "A source's item page"; Droidtop/tracker#737). */
+/** A source result's detail page drawn from its item bundles (docs/SPEC.md 12a, "A source's item page"; mytop-project/tracker#737). */
 @RunWith(RobolectricTestRunner::class)
 class SourceItemPageTest {
     private val context get() = RuntimeEnvironment.getApplication()
@@ -78,8 +78,8 @@ class SourceItemPageTest {
 
     @Test
     fun `a release in parts is one download row, its parts counted`() {
-        // Two mirrors under one heading are one row (Droidtop/tracker#838), which opens its hosts with Try in order first
-        // (Droidtop/tracker#859).
+        // Two mirrors under one heading are one row (mytop-project/tracker#838), which opens its hosts with Try in order first
+        // (mytop-project/tracker#859).
         val downloads = page()!!.groups[1].items
         val repack = downloads.single() as dev.droidtop.library.settings.NestedScreenItem
         assertEquals("Repack", repack.title)

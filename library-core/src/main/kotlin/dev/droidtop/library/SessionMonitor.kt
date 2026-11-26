@@ -72,7 +72,7 @@ internal object SessionLiveness {
  * ([SessionLiveness]) and, when the evidence says it is gone, ends the session ([LaunchDisplay.clearRunning]), which
  * every surface (the left menu's Resume, the Quick Menu's Game section, the companion's Game tab and Now card, the
  * game-awake lock) already observes. It replaces three separate force-stopped polls, none of which saw a launch that
- * was cancelled or crashed (Droidtop/tracker#289). Off the main thread; nothing runs while no game is running.
+ * was cancelled or crashed (mytop-project/tracker#289). Off the main thread; nothing runs while no game is running.
  */
 object SessionMonitor {
     private const val TAG = "droidtop.SessionMonitor"

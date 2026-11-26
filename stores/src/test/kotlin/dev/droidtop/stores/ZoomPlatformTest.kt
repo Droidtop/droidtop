@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** ZOOM Platform: the sign-in token, the library pages, the installer files, the kept library and updates (Droidtop/tracker#335). */
+/** ZOOM Platform: the sign-in token, the library pages, the installer files, the kept library and updates (mytop-project/tracker#335). */
 class ZoomPlatformTest {
     @Test
     fun `the sign-in return address carries the launcher token`() {

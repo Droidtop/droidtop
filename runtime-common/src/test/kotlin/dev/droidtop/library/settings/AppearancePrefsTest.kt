@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/SPEC.md 7k, "Light and dark" (Droidtop/tracker#559): the setting decides, and Follow Android reads night mode. */
+/** docs/SPEC.md 7k, "Light and dark" (mytop-project/tracker#559): the setting decides, and Follow Android reads night mode. */
 class AppearancePrefsTest {
     private val night = Configuration.UI_MODE_TYPE_NORMAL or Configuration.UI_MODE_NIGHT_YES
     private val day = Configuration.UI_MODE_TYPE_NORMAL or Configuration.UI_MODE_NIGHT_NO

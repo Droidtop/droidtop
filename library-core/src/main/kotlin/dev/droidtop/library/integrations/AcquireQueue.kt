@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * A source's Download as a job of the download queue (Droidtop/tracker#354; the owner: "It's Steam's downloader flow,
+ * A source's Download as a job of the download queue (mytop-project/tracker#354; the owner: "It's Steam's downloader flow,
  * button on the page only provide controls for that specific game's part of the download queue, and it just tells the
  * download queue what you do"). The page's press is [PluginViews.acquire]: one Downloads job from that moment. The job
  * asks the source ([PluginViews.acquireInQueue]), then fetches, places and indexes what it answered, whether or not

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Every native library in the APK can resolve the symbols it imports (Droidtop/tracker#857, 2026-11-05).
+"""Every native library in the APK can resolve the symbols it imports (mytop-project/tracker#857, 2026-11-05).
 
 Release 2967 crashed every Windows game on the console at its first Present: libvortekrenderer.so imports
 ArrayList_add from "libwinlator.so", which GameNative's prebuilt libwinlator_11.so provides (it carries that SONAME),
@@ -18,7 +18,7 @@ Several APK libraries can share a SONAME; all of them count, so the check proves
 which one wins at run time.
 
 A library whose whole job is to define symbols for another process names them with --exports lib.so:sym,sym. Each ABI's
-copy must be in the APK and export every one of them. The preloaded allocator (libmimalloc.so, Droidtop/tracker#894)
+copy must be in the APK and export every one of them. The preloaded allocator (libmimalloc.so, mytop-project/tracker#894)
 does nothing if a build hides its malloc and free, and a missing import is not how that would show.
 
 Usage: check-native-links.py <unzipped APK root, holding lib/<abi>/> <NDK sysroot> [--api N] [--other-process lib.so]...

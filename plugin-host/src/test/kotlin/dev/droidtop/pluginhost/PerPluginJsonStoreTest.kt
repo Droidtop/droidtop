@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#766: one per-plugin store, and a corrupt file is set aside, never read as empty and written over. */
+/** mytop-project/tracker#766: one per-plugin store, and a corrupt file is set aside, never read as empty and written over. */
 class PerPluginJsonStoreTest {
     private val dir: File = Files.createTempDirectory("store").toFile()
     private val store = PerPluginJsonStore(dir, ".counts.json")

@@ -9,7 +9,7 @@ import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 
 /**
- * Hacker Keyboard Reborn's motion on the device (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
+ * Hacker Keyboard Reborn's motion on the device (mytop-project/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
  * the duration scale read from Android's settings, and the helpers that move the keyboard's views. The rules are
  * [KeyMotion]'s.
  *
@@ -40,7 +40,7 @@ object KeyboardMotion {
 }
 
 /**
- * The pressed key's scale and tint (Droidtop/tracker#903 H12a): read by `LatinKeyboardBaseView` while it draws each
+ * The pressed key's scale and tint (mytop-project/tracker#903 H12a): read by `LatinKeyboardBaseView` while it draws each
  * key. A key's change of [Keyboard.Key.pressed] is noticed when the key is drawn (every press and release invalidates
  * it), stamped on the key itself, and the key is kept in a fixed list until its movement settles, so each frame only
  * does arithmetic: nothing is allocated. The pressed colour is drawn at once on touch-down; only the shrink, and the
@@ -101,7 +101,7 @@ class KeyPressMotion {
 }
 
 /**
- * The key preview and the long-press popup growing out of the key and shrinking back into it (Droidtop/tracker#903
+ * The key preview and the long-press popup growing out of the key and shrinking back into it (mytop-project/tracker#903
  * H12a). The popup windows themselves have no window animation; their content moves, so the movement follows
  * [KeyboardMotion] like everything else.
  */
@@ -155,7 +155,7 @@ object PopupMotion {
 }
 
 /**
- * Tool panels sliding in place over the keys, and the keys fading under them (Droidtop/tracker#903 H12a): emoji with
+ * Tool panels sliding in place over the keys, and the keys fading under them (mytop-project/tracker#903 H12a): emoji with
  * its kaomoji tab, clipboard history and macros, in the input method and in every keyboard droidtop embeds. A panel
  * leaving is drawn in its container's overlay, where it takes no touches, so a tap right after it closes reaches the
  * keys.

@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Legacy Games: the account, its purchases and giveaways, installer links (Droidtop/tracker#335). Answers written here in the shape the MIT clients read. */
+/** Legacy Games: the account, its purchases and giveaways, installer links (mytop-project/tracker#335). Answers written here in the shape the MIT clients read. */
 class LegacyGamesTest {
     @Test
     fun `the sign-in is the e-mail and password as a basic token, and the login answer names the account`() {

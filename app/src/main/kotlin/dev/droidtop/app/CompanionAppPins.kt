@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.android.launcher3.allapps.RecentAppsStore
 
 /**
- * Apps and shortcuts pinned on the companion's Home (docs/SPEC.md "The companion's tabs", Apps; Droidtop/tracker#414
+ * Apps and shortcuts pinned on the companion's Home (docs/SPEC.md "The companion's tabs", Apps; mytop-project/tracker#414
  * slice C20): a tap opens the app (or runs the shortcut) on the main screen, and "Here" opens it on the companion's
  * own screen, also a TalkBack action. Shortcuts come from Android's launcher API, which answers only while droidtop is
  * the home app (Standard), so without that no shortcut is offered.

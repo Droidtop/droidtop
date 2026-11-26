@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Accessibility card's writes (AccessibilityControls.kt, Droidtop/tracker#414 slice C22). */
+/** The Accessibility card's writes (AccessibilityControls.kt, mytop-project/tracker#414 slice C22). */
 class AccessibilityControlsTest {
     @Test fun `wm density's answer reads as physical and override`() {
         assertEquals(420 to null, AccessibilityControls.parseDensity("Physical density: 420\n"))

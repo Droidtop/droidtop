@@ -3,7 +3,7 @@ package dev.droidtop.library.stores
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Where a store's own mark is read from its home page (docs/SPEC.md 7j "Game sources", Droidtop/tracker#503). */
+/** Where a store's own mark is read from its home page (docs/SPEC.md 7j "Game sources", mytop-project/tracker#503). */
 class StoreMarksTest {
     @Test
     fun touchIconsComeFirstThenIconsByDeclaredSizeThenTheFavicon() {

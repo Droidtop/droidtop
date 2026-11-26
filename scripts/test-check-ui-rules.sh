@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fixture test for scripts/check-ui-rules.sh (docs/SPEC.md 7k, "Notices";
-# Droidtop/tracker#485, final design test 7): each rule fails on a file that
+# mytop-project/tracker#485, final design test 7): each rule fails on a file that
 # breaks it, an allowlisted path does not, and a clean tree passes.
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"

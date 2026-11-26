@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A zero-delay burst (Start then Down in one adb call, Droidtop/tracker#359): the Down is dispatched before the
+ * A zero-delay burst (Start then Down in one adb call, mytop-project/tracker#359): the Down is dispatched before the
  * menu the Start opened has joined the overlay stack, and must not reach the library.
  */
 class KeySettleTest {

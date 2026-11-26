@@ -20,7 +20,7 @@ object ElevatedAccessCatalog {
     fun rows(context: Context): List<CatalogItem> = listOfNotNull(hostRow(context), choiceRow(context), allowRow(), wirelessRow(context))
 
     /**
-     * The enhancement provider host (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): set it up, update it, or
+     * The enhancement provider host (docs/SPEC.md "Enhancement providers", mytop-project/tracker#852): set it up, update it, or
      * replace one droidtop did not make. Once it is current the row says so; its plugin page is where it is approved.
      */
     private fun hostRow(context: Context): CatalogItem? {
@@ -91,7 +91,7 @@ object ElevatedAccessCatalog {
             id = "accounts_elevated_access",
             title = "Elevated access",
             // Nothing answering is said, with the one step that changes it, rather than a backend that cannot act
-            // (Droidtop/tracker#851).
+            // (mytop-project/tracker#851).
             subtitle = if (active == null) shell.unavailableReason() else null,
             options = shown.map { ChoiceOption(it.id, label(it, active?.label)) },
             current = current.id,

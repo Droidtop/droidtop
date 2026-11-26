@@ -3,7 +3,7 @@ package dev.droidtop.library.debrid
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The person's order of their debrid accounts, which settles a tie between accounts a job costs the same (Droidtop/tracker#638). */
+/** The person's order of their debrid accounts, which settles a tie between accounts a job costs the same (mytop-project/tracker#638). */
 class DebridAccountsTest {
     @Test
     fun theStoredOrderComesFirstAndAServiceItDoesNotNameYetFollows() {

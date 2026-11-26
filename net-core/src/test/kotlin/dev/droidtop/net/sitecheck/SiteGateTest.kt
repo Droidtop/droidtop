@@ -18,7 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** One check per site, the browser's try before the person, and a request that waits finds the pass (Droidtop/tracker#751). */
+/** One check per site, the browser's try before the person, and a request that waits finds the pass (mytop-project/tracker#751). */
 class SiteGateTest {
     private class MemoryStorage(var text: String? = null) : SiteClearanceStore.Storage {
         override fun read() = text

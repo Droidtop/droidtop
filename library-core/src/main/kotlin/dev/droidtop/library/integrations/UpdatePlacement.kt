@@ -64,7 +64,7 @@ object UpdatePlacement {
     }
 
     /**
-     * The offer that follows a placed update (Droidtop/tracker#624): the version it follows, by name and size, can be
+     * The offer that follows a placed update (mytop-project/tracker#624): the version it follows, by name and size, can be
      * removed from the game's Versions, where its saves are moved first ([OldVersions]). Null when the job
      * is not an update's or that folder is gone. Walks the old folder for its size: on the job's thread.
      */

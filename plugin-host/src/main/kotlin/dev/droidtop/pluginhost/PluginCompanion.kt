@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
 
 /**
- * What a plugin's panel declares it does on the companion screen (docs/plugin-api.md 3 C15, Droidtop/tracker#414,
+ * What a plugin's panel declares it does on the companion screen (docs/plugin-api.md 3 C15, mytop-project/tracker#414,
  * slice C9): a `companion` list on its `ui.panel` entry, read from the manifest alone and shown on one line beside the
  * panel, so a person sees it before opening it.
  * - `keep_on`: the companion screen stays on while the panel shows (a chat, a stream's controls).
@@ -40,7 +40,7 @@ object CompanionAbilities {
 
     /**
      * Whether [manifest]'s panel declares [ability]: on its `ui.panel` entry, or on a `ui.facets` entry that declares
-     * the `companion.tab` target (a plugin on facets, Droidtop/tracker#602).
+     * the `companion.tab` target (a plugin on facets, mytop-project/tracker#602).
      */
     fun declares(manifest: PluginManifest, ability: String): Boolean =
         manifest.v2.provides.any { (it.point == PANEL_POINT || declaresCompanionTab(it)) && ability in of(it) }

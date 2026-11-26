@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** "Save and load from here: Set up" on the Game tab (CompanionRetroArchSetup.kt, Droidtop/tracker#414 slice C11). */
+/** "Save and load from here: Set up" on the Game tab (CompanionRetroArchSetup.kt, mytop-project/tracker#414 slice C11). */
 class CompanionRetroArchSetupTest {
     @Test fun `the line shows only for RetroArch, with the plugin to be had and a step missing`() {
         // Not RetroArch: never.

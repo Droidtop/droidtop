@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * The clipboard, kept from one Wayland client (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#787 slice
+ * The clipboard, kept from one Wayland client (docs/SPEC.md 3d "Clipboard per container", mytop-project/tracker#787 slice
  * 2). A container whose clipboard is off reaches the compositor only through droidtop's proxy, and this is the proxy's
  * whole decision, without sockets in it: which messages pass. Pure, one instance per client connection.
  *

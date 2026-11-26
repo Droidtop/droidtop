@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#783: a download link's expired page is told by the words the plugin declared, and nothing else. */
+/** mytop-project/tracker#783: a download link's expired page is told by the words the plugin declared, and nothing else. */
 class HiddenWebSessionTest {
     private fun webPlugin(entry: JSONObject) = TestPlugins.record(
         TestPlugins.manifest(id = "acme.web") { it.put("permissions", JSONArray().put(entry)) },

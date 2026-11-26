@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The person's Steam account for a plugin (docs/plugin-api.md 3 G8, Droidtop/tracker#379): droidtop runs every call on
+ * The person's Steam account for a plugin (docs/plugin-api.md 3 G8, mytop-project/tracker#379): droidtop runs every call on
  * the Steam session it already holds, so a plugin claims free licences, redeems keys and shows games as played with
  * no sign-in of its own and never sees a password, token or cookie. Every op needs `steam.account`, a dangerous
  * permission, and is written to the plugin's activity log. droidtop, not the plugin, keeps Steam's limits

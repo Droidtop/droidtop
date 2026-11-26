@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * "Run a program in a Wine prefix" (docs/SPEC.md 7i, "Manage"; Droidtop/tracker#636), offered on every kind
+ * "Run a program in a Wine prefix" (docs/SPEC.md 7i, "Manage"; mytop-project/tracker#636), offered on every kind
  * of game: pick a program, the game's own folder first, then the prefix it runs attached to (the game's own,
  * the shared one, or another on this device). It runs where it is, through [WinePrefixTools.runIn], and may
  * write the game's folder: the case it is for is MGQ Paradox's translation updater, run under Wine beside an

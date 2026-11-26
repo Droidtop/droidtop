@@ -1,5 +1,5 @@
 // pixel_swizzle.h against its own reference, on the build machine: the SSSE3 path with -mssse3, the plain one without
-// (Droidtop/tracker#950). The NEON path is the same rule; the Android build compiles it for arm64-v8a.
+// (mytop-project/tracker#950). The NEON path is the same rule; the Android build compiles it for arm64-v8a.
 // Android checks runs: g++ -O2 [-mssse3] -I host-bridge/native/src host-bridge/native/test/pixel_swizzle_test.cpp
 #include "pixel_swizzle.h"
 #include <cstdio>

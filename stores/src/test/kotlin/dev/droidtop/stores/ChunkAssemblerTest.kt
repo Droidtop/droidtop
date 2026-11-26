@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The chunked-install bookkeeping GOG and Epic share (Droidtop/tracker#766). */
+/** The chunked-install bookkeeping GOG and Epic share (mytop-project/tracker#766). */
 class ChunkAssemblerTest {
     private data class Part(val file: String, val chunks: List<String>)
 

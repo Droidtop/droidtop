@@ -10,7 +10,7 @@ import kotlinx.coroutines.delay
 
 /**
  * Fonts for all languages as a job in Downloads and installs
- * (Droidtop/tracker#390, docs/SPEC.md 3d): visible, pausable, held by the
+ * (mytop-project/tracker#390, docs/SPEC.md 3d): visible, pausable, held by the
  * download policy's network rule like every download (docs/SPEC.md "Download
  * rules"; it is about 100 MB, so the default keeps it off mobile data), and resuming
  * where the download stopped ([DesktopFonts.installScript]). It needs the

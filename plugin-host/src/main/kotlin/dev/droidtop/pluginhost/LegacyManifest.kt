@@ -2,7 +2,7 @@ package dev.droidtop.pluginhost
 
 /**
  * The capabilities extension points map to (docs/plugin-api.md 6). Contract 1
- * plugins are no longer served (Droidtop/tracker#766), but the capability call
+ * plugins are no longer served (mytop-project/tracker#766), but the capability call
  * path they used still carries a contract 2 plugin's calls for these points
  * ([DroidtopPlugin.invoke], [DroidtopPlugin.startJob]), so a manifest's
  * `provides` implies the capabilities here.

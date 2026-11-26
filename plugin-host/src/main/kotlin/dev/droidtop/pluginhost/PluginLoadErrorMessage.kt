@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 /**
  * One place that maps raw plugin-load failure reasons (kept full in
  * logcat, tag `droidtop.plugin`) to the plain sentence shown to a user.
- * Each kind from Droidtop/tracker#167: missing runtime, didn't signal
+ * Each kind from mytop-project/tracker#167: missing runtime, didn't signal
  * ready (plugin needs an update from its developer), timed out, crashed,
  * and incompatible API version.
  */

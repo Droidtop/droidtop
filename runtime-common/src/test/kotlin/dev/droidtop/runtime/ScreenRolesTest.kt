@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** What each screen is for (docs/SPEC.md 4c, Droidtop/tracker#776): no screen is assumed better. */
+/** What each screen is for (docs/SPEC.md 4c, mytop-project/tracker#776): no screen is assumed better. */
 class ScreenRolesTest {
     private fun screen(id: Int, builtIn: Boolean, name: String = "Screen $id") =
         ScreenFacts(id, "u$id", name, if (builtIn) ScreenClass.BUILT_IN else ScreenClass.EXTERNAL, 1080, 1920)
@@ -74,7 +74,7 @@ class ScreenRolesTest {
     }
 }
 
-/** Desktop's own answer per screen (Droidtop/tracker#908 step D5): asked once, remembered, never assumed. */
+/** Desktop's own answer per screen (mytop-project/tracker#908 step D5): asked once, remembered, never assumed. */
 class DesktopScreenChoiceTest {
     private fun screen(id: Int, builtIn: Boolean) =
         ScreenFacts(id, "u$id", "Screen $id", if (builtIn) ScreenClass.BUILT_IN else ScreenClass.EXTERNAL, 1080, 1920)

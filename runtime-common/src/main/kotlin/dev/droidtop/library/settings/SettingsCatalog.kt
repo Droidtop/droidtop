@@ -55,13 +55,13 @@ enum class CatalogIcon {
     INPUT, CONTROLLER, KEYBOARD,
     DISPLAY, SYSTEM_UPDATES, ANDROID_SETTINGS,
     INTEGRATIONS, SEARCH,
-    // The places' own glyphs (Place.icon, Droidtop/tracker#705): Social and Downloads had none of their own.
+    // The places' own glyphs (Place.icon, mytop-project/tracker#705): Social and Downloads had none of their own.
     SOCIAL, DOWNLOADS,
 }
 
 /**
  * The words a row's tag may say ([CatalogItem.chip]): a short, fixed set, so every tag is a word or two and the same
- * fact always reads the same (Droidtop/tracker#677). The sentence behind a tag belongs in the row's subtitle.
+ * fact always reads the same (mytop-project/tracker#677). The sentence behind a tag belongs in the row's subtitle.
  */
 enum class RowTag(val label: String, val tone: NoticeTone? = null) {
     /** A plugin from a catalog or an app that is not droidtop's own. */
@@ -74,7 +74,7 @@ enum class RowTag(val label: String, val tone: NoticeTone? = null) {
     SET_BY_THEME("Set by theme"),
 
     /**
-     * A catalog plugin whose release this droidtop cannot run (owner, 2026-11-12, Droidtop/tracker#932: "include
+     * A catalog plugin whose release this droidtop cannot run (owner, 2026-11-12, mytop-project/tracker#932: "include
      * incompatible modules, add a red 'Incompatible with your version : (reason)' tag"); the reason is on the row.
      */
     INCOMPATIBLE("Incompatible with your version", NoticeTone.Danger),
@@ -90,7 +90,7 @@ sealed interface CatalogItem {
 
     /**
      * A picture drawn in place of [icon] when it is there: a file in droidtop's own storage (a store's cached mark,
-     * Droidtop/tracker#503), or the http(s) address of one (a source's box art on Get new games, Droidtop/tracker#612),
+     * mytop-project/tracker#503), or the http(s) address of one (a source's box art on Get new games, mytop-project/tracker#612),
      * which the renderer fetches and caches. [icon] stays the fallback while it is missing. Renderers load it off the
      * main thread.
      */
@@ -122,13 +122,13 @@ sealed interface CatalogItem {
     val progressLook: JobLook? get() = JobLook.of(progress)
 
     /**
-     * How many parts that job is counted in (a release in parts, several files, Droidtop/tracker#738): its bar is drawn
+     * How many parts that job is counted in (a release in parts, several files, mytop-project/tracker#738): its bar is drawn
      * as that many segments, filled part by part. 0 or 1 is one plain bar; more than [JobLook.MAX_PARTS] is one bar too.
      */
     val progressParts: Int get() = 0
 
     /**
-     * A job row's compact status (Droidtop/tracker#886): the icon before its bar and the fixed-width value after it
+     * A job row's compact status (mytop-project/tracker#886): the icon before its bar and the fixed-width value after it
      * ("1.2/3.4 GB"), drawn in tabular figures so nothing in the row moves while it counts. Null for every other row.
      */
     val progressIcon: JobIcon? get() = null
@@ -140,20 +140,20 @@ sealed interface CatalogItem {
     /**
      * A short tag drawn beside the title, on the row itself ("Unofficial" on a plugin from a catalog that is not
      * droidtop's): a fact the person must see without opening anything, never a tooltip. One of a fixed set of words
-     * ([RowTag]), never free text, so a tag never takes the title's room (Droidtop/tracker#677). Null draws none.
+     * ([RowTag]), never free text, so a tag never takes the title's room (mytop-project/tracker#677). Null draws none.
      */
     val chip: RowTag? get() = null
 
     /**
      * True when [subtitle] is the row's one-line summary, shown under the title on every surface at all times (a
-     * plugin card, a catalog row: Droidtop/tracker#514), not an explanation kept on the focus line and in Info.
+     * plugin card, a catalog row: mytop-project/tracker#514), not an explanation kept on the focus line and in Info.
      */
     val summaryShown: Boolean get() = false
 }
 
 /**
  * One choice of a [ChoiceItem]. [tone] marks a choice whose cost the person should see at a glance (a plugin's
- * Ask first is caution, Blocked is danger; Droidtop/tracker#519); null is neutral. When any option of an item has a
+ * Ask first is caution, Blocked is danger; mytop-project/tracker#519); null is neutral. When any option of an item has a
  * tone, renderers draw its value as a state chip in that tone, neutral ones included, so the states read as one set.
  */
 data class ChoiceOption(val value: String, val label: String, val tone: NoticeTone? = null)
@@ -174,7 +174,7 @@ class ChoiceItem(
     override val chip: RowTag? = null,
     /**
      * A choice whose options are text sizes: the scale an option's value stands for, so renderers draw a live sample
-     * line at it (Text size, Droidtop/tracker#673). Null for every other choice.
+     * line at it (Text size, mytop-project/tracker#673). Null for every other choice.
      */
     val sampleScale: ((String) -> Float?)? = null,
 ) : CatalogItem {
@@ -264,12 +264,12 @@ class ActionItem(
     override val iconFile: String? = null,
     /** The safe answer's name when [confirmTitle] asks ("Keep downloading"); null reads "Cancel". */
     val confirmKeep: String? = null,
-    // What A does. A row given none is a fact or a state, not an action (Droidtop/tracker#587): no renderer promises A
+    // What A does. A row given none is a fact or a state, not an action (mytop-project/tracker#587): no renderer promises A
     // on it ([inert]), and pressing it does nothing.
     val run: (Context) -> Unit = NOTHING,
     // Once [run] is done the screen it is on has nothing left to show (Forget this computer: the computer is gone), so
     // the surface goes back one screen instead of leaving a page about something that no longer exists
-    // (Droidtop/tracker#531).
+    // (mytop-project/tracker#531).
     val leaves: Boolean = false,
 ) : CatalogItem {
     /** Whether this row has nothing to do: a value, an empty state, a line that says what happened. */
@@ -424,14 +424,14 @@ class CatalogScreen(
      * work the index must not pay for: Console systems walks every games
      * root and game-counts every store and engine folder, which made
      * "Indexing settings..." sit there for 10-40 s on a real device
-     * (Droidtop/tracker#136). Rows the index can do without -- per-folder,
+     * (mytop-project/tracker#136). Rows the index can do without -- per-folder,
      * per-platform, per-container instance rows -- belong to the screen,
      * not to settings search. Null = the index reads [groups] itself.
      */
     val indexGroups: (suspend (Context) -> List<CatalogGroup>)? = null,
     /**
      * The settings search also reads the pages this screen's rows open, one level past its usual depth: Plugins, so
-     * each plugin's page (its Approve, its Permissions) can be found by searching (Droidtop/tracker#759). For a short
+     * each plugin's page (its Approve, its Permissions) can be found by searching (mytop-project/tracker#759). For a short
      * list of fixed pages only, never a screen that grows with someone's library.
      */
     val indexesItsPages: Boolean = false,
@@ -461,11 +461,11 @@ class CatalogScreen(
     /**
      * Whether what this screen shows and does needs the network (Updates, a store's page, the plugin catalogs): while
      * the device is offline the Gaming renderer heads it with one "You're offline" notice, so its actions are not
-     * pressed only to fail (Droidtop/tracker#594).
+     * pressed only to fail (mytop-project/tracker#594).
      */
     val needsNetwork: Boolean = false,
     /**
-     * A plugin's panel (Droidtop/tracker#515): every host draws it in the one panel frame, the plugin's icon
+     * A plugin's panel (mytop-project/tracker#515): every host draws it in the one panel frame, the plugin's icon
      * ([iconFile]) before its title, and each row's subtitle as one line under it (the whole text in Info), so the
      * Quick Menu, the companion and the Standard and Desktop windows show the same panel the same way.
      */
@@ -503,7 +503,7 @@ class NestedScreenItem(
     override val iconFile: String? = null,
     override val summaryShown: Boolean = false,
     // Opens as a popup over this screen, not pushed in its place: a facet's small screen, such as a plugin's page call
-    // (docs/plugin-api.md 1.10, Droidtop/tracker#939). Gaming's navigator draws it so; other renderers push it.
+    // (docs/plugin-api.md 1.10, mytop-project/tracker#939). Gaming's navigator draws it so; other renderers push it.
     val popup: Boolean = false,
 ) : CatalogItem {
     init {
@@ -603,7 +603,7 @@ object SettingsScreenRegistry {
     /**
      * Rebuilds a pushed screen stack from the ids a renderer saved across
      * an Activity recreate (the one the Text size setting triggers,
-     * Droidtop/tracker#87 and #139): live [CatalogScreen]s carry builder
+     * mytop-project/tracker#87 and #139): live [CatalogScreen]s carry builder
      * lambdas and cannot go into saved state, so what is saved is the
      * ids. Resolves them in order and stops at the first id nothing
      * registers -- a screen some surface pushed inline, or one its owner

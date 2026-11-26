@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** First setup's layout question (Droidtop/tracker#903): Automatic clears what any preset sets. */
+/** First setup's layout question (mytop-project/tracker#903): Automatic clears what any preset sets. */
 class KeyboardLayoutChoiceTest {
     @Test fun automaticClearsEveryOptionAPresetWrites() {
         val keys = KeyboardProMode.presetKeys()

@@ -52,7 +52,7 @@ internal object HltbClient {
     private const val BASE = "https://howlongtobeat.com/"
     private const val FALLBACK_PATH = "api/s/"
     private const val TIMEOUT_MS = 20_000
-    private const val USER_AGENT = "droidtop (Android game launcher; https://github.com/Droidtop/droidtop)"
+    private const val USER_AGENT = "droidtop (Android game launcher; https://github.com/mytop-project/droidtop)"
 
     /** At most this many of the home page's scripts are read for the search path. */
     private const val MAX_SCRIPTS = 24

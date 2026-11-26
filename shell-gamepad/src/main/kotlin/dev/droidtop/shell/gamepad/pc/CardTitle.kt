@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
 /**
- * A card's title as it breaks across its two lines (Droidtop/tracker#942: "HeartOfTheMachine" showed as "HeartOfTheMachin"
+ * A card's title as it breaks across its two lines (mytop-project/tracker#942: "HeartOfTheMachine" showed as "HeartOfTheMachin"
  * and an orphaned "e"). A title made of words run together (a folder name in camel case, "HeartOfTheMachine",
  * "Stardew_Valley", "game.v2") gets a break opportunity where each word starts, so the line breaks between words. Nothing
  * visible is added: the opportunity is a zero-width space. A title that already has spaces breaks at them and is left as

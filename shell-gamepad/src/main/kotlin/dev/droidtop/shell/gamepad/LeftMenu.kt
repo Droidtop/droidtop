@@ -62,7 +62,7 @@ import dev.droidtop.ui.shared.Motion
 
 /**
  * One place the left menu can take the user: a section, Home included, which is a section of its own since
- * 2026-10-23 (Droidtop/tracker#611; it was PC Games in another view).
+ * 2026-10-23 (mytop-project/tracker#611; it was PC Games in another view).
  */
 internal data class LeftMenuEntry(val section: GamingSection, val label: String) {
     val key: String get() = section.name
@@ -85,7 +85,7 @@ internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSec
 
 /**
  * What a row of the left menu is, by its place in the list: the running game's Resume, then the destinations. Search
- * is not a row (Droidtop/tracker#621 M4): it is not a destination, and Y and the Quick Menu's Search tile open it.
+ * is not a row (mytop-project/tracker#621 M4): it is not a destination, and Y and the Quick Menu's Search tile open it.
  */
 internal sealed interface LeftMenuRow {
     object Resume : LeftMenuRow
@@ -108,7 +108,7 @@ internal sealed interface Attention {
 }
 
 /**
- * What each destination has waiting (DroidDeck's rail badge, ui/FrontEndRail.kt at 9310d19; Droidtop/tracker#643: "a
+ * What each destination has waiting (DroidDeck's rail badge, ui/FrontEndRail.kt at 9310d19; mytop-project/tracker#643: "a
  * filling ring while active, a dot when something needs the person"): Downloads a dot while a job has failed or waits
  * for the person's pick ([needYou]), else a ring filling as its running jobs ([running], each one's fraction or
  * negative when it does not know) get on together. Social's unread dot is on the Quick Menu's rail, where Social is.
@@ -126,7 +126,7 @@ internal fun leftMenuAttention(running: List<Float>, needYou: Int): Map<GamingSe
 
 /**
  * The left menu: press Start anywhere in the Gaming shell (docs/SPEC.md
- * 7j, "Gaming controls", Droidtop/tracker#258). It is where things LIVE
+ * 7j, "Gaming controls", mytop-project/tracker#258). It is where things LIVE
  * and how you get to them -- the destinations -- while the Quick Menu on
  * the right (R2) is quick management only.
  *
@@ -151,7 +151,7 @@ internal fun leftMenuAttention(running: List<Float>, needYou: Int): Map<GamingSe
 @Composable
 internal fun LeftMenu(
     entries: List<LeftMenuEntry>,
-    // Where the person is; null over a game (the in-game overlay, Droidtop/tracker#740), where no row is "here" and
+    // Where the person is; null over a game (the in-game overlay, mytop-project/tracker#740), where no row is "here" and
     // the cursor starts on Resume.
     current: GamingSection?,
     runningTitle: String?,
@@ -198,7 +198,7 @@ internal fun LeftMenu(
         // handler below is the only place that says what a row does.
         val press = rememberGamepadTouch()
         // Keyed on where the person is: the cursor starts on the row the "you are here" pill marks, even when the
-        // place changes while the menu is composed (Droidtop/tracker#493: the pill on Apps, the cursor on Plugins).
+        // place changes while the menu is composed (mytop-project/tracker#493: the pill on Apps, the cursor on Plugins).
         var focusIndex by remember(current, rowsAbove) { mutableIntStateOf(current?.let { leftMenuStartIndex(entries, it, rowsAbove) } ?: 0) }
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
@@ -226,7 +226,7 @@ internal fun LeftMenu(
                             is LeftMenuRow.Destination -> entries.getOrNull(row.index)?.let(onSelect)
                         }
                         // X plays, so on the running game's card it resumes it; elsewhere it does nothing (proposal
-                        // 6.D, Droidtop/tracker#644 slice 4).
+                        // 6.D, mytop-project/tracker#644 slice 4).
                         GamepadAction.X -> if (leftMenuRowAt(focusIndex, running) == LeftMenuRow.Resume) onResume()
                         GamepadAction.B, GamepadAction.START -> close()
                         GamepadAction.R2 -> onOpenQuickMenu()
@@ -275,7 +275,7 @@ internal fun LeftMenu(
 }
 
 /**
- * A side-menu row's focus: the one row focus every menu has ([rowFocus], Droidtop/tracker#644: the accent at 22 percent
+ * A side-menu row's focus: the one row focus every menu has ([rowFocus], mytop-project/tracker#644: the accent at 22 percent
  * and a 4 dp accent bar at the leading edge, no ring, no flash, nothing growing), and [current]'s "you are here" pill on
  * that edge while the cursor is elsewhere. A pointer over the row moves the cursor to it.
  */
@@ -293,7 +293,7 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHov
         .hoverable(source)
         .rowFocus(shown, current = current)
         // No indication of its own: the cursor above is the one selection. The default one drew a grey plate on the
-        // row under the pointer or with Android's focus while the cursor sat on another (Droidtop/tracker#639).
+        // row under the pointer or with Android's focus while the cursor sat on another (mytop-project/tracker#639).
         .padRow(silent = true, interactionSource = source, onClick = onClick)
 }
 
@@ -326,7 +326,7 @@ private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Atten
                 modifier = Modifier.size(SideMenu.IconSize),
             )
             Spacer(Modifier.width(SideMenu.IconGap))
-            // Two lines, so a long name ("Downloads and Updates") is said whole, never cut (Droidtop/tracker#639); the row
+            // Two lines, so a long name ("Downloads and Updates") is said whole, never cut (mytop-project/tracker#639); the row
             // grows past its 48dp for it.
             Text(
                 entry.label,

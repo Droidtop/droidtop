@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H8b: the engine's round trip, against a scripted librime. */
+/** mytop-project/tracker#903 H8b: the engine's round trip, against a scripted librime. */
 class RimeEngineTest {
     /**
      * A librime with a three-word dictionary. What is typed is [input]; picking a candidate moves its reading from

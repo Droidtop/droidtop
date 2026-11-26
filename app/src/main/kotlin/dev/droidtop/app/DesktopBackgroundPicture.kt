@@ -13,7 +13,7 @@ import dev.droidtop.runtime.DesktopPanel
 import java.io.File
 
 /**
- * A picture behind the Linux desktop (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694). The person picks an
+ * A picture behind the Linux desktop (docs/SPEC.md 2b "Desktop appearance", mytop-project/tracker#694). The person picks an
  * image in the system's picker; droidtop reads it once, off the main thread, scaled to at most [MAX_SIDE] pixels on its
  * longer side, and keeps it as a PNG beside the panel's config ([DesktopPanel.BACKGROUND_PICTURE_FILE]), where the
  * container reads it. A PNG because sway's background program draws PNG in every build, whatever the picture was.

@@ -6,7 +6,7 @@ import org.junit.Test
 /**
  * A folder game's version comes from its folder name by the one parse
  * ([GameTitleParser]) that also strips it off the title (docs/SPEC.md 7g,
- * Droidtop/tracker#397 slice E). The shapes the plan names, each a row;
+ * mytop-project/tracker#397 slice E). The shapes the plan names, each a row;
  * anything else has no version.
  */
 class FolderVersionParseTest {

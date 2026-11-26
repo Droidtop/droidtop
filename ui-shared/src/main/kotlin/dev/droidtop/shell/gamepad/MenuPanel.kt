@@ -102,7 +102,7 @@ fun MenuPanel(
     val scrollStepPx = with(androidx.compose.ui.platform.LocalDensity.current) { PANEL_SCROLL_STEP.toPx() }
     // A dialog window does not bound its content to the screen: without
     // an explicit cap a long menu is centred and clipped at both edges
-    // (title and last row cut, Droidtop/tracker#295) and its scroll never
+    // (title and last row cut, mytop-project/tracker#295) and its scroll never
     // starts. The cap is the screen less the edge margin each side.
     val window = LocalShellWindow.current
     // A panel is a window of its own (a Dialog), so it hosts its own sliding ring.
@@ -163,7 +163,7 @@ internal const val MoreFadeDp = 36
 /**
  * A sheet's own name at its top: one heading style for every sheet, and a heading and the window's pane title to a
  * screen reader, so TalkBack names the sheet as it opens and its first stop is the name, not the hint row under the
- * rows (Droidtop/tracker#91, rig 2026-11-04: TalkBack's first focus on the mode switcher was "Controls: A Select,
+ * rows (mytop-project/tracker#91, rig 2026-11-04: TalkBack's first focus on the mode switcher was "Controls: A Select,
  * B Cancel").
  */
 @Composable
@@ -227,7 +227,7 @@ internal fun Modifier.fadeWhileMoreBelow(scroll: androidx.compose.foundation.Scr
 
 /**
  * The ends of a scrolling row fading out on the side it can still scroll to, so a tab or chip cut at the edge reads
- * as "more this way" (Droidtop/tracker#661): a row of tabs never ends mid-letter with nothing to say so. Drawn in the
+ * as "more this way" (mytop-project/tracker#661): a row of tabs never ends mid-letter with nothing to say so. Drawn in the
  * draw phase; the row is composited offscreen only while a fade shows.
  */
 fun Modifier.fadeWhileMoreSideways(state: androidx.compose.foundation.lazy.LazyListState): Modifier =
@@ -285,7 +285,7 @@ private fun MoreBelowArrow(modifier: Modifier = Modifier) {
 fun menuMove(index: Int, count: Int, press: PadPress): Int {
     val next = menuStep(index, count, if (press.action == GamepadAction.UP) -1 else 1)
     moveCue(next != index, press.repeat)
-    // The panel this menu is in scrolls on a press that went nowhere (MenuPanel, Droidtop/tracker#381).
+    // The panel this menu is in scrolls on a press that went nowhere (MenuPanel, mytop-project/tracker#381).
     MenuRowEnd.atEdge = next == index
     return next
 }
@@ -299,7 +299,7 @@ internal object MenuRowEnd {
 }
 
 /**
- * Which way a panel scrolls for a press (Droidtop/tracker#381): +1 down, -1 up, 0 not at all. Only Up or Down that
+ * Which way a panel scrolls for a press (mytop-project/tracker#381): +1 down, -1 up, 0 not at all. Only Up or Down that
  * went nowhere among the rows ([atEdge]) scrolls, and only where there is more that way, so a menu whose rows all
  * fit keeps its bump and a long result below the rows is reached with the D-pad, not only a touch swipe.
  */

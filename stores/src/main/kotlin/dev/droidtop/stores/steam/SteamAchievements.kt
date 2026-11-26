@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A Steam game's achievements and the signed-in account's progress, read-only, for its page (Droidtop/tracker#230;
+ * A Steam game's achievements and the signed-in account's progress, read-only, for its page (mytop-project/tracker#230;
  * owner, 2026-10-23: "read-only and for display"). Read over the session droidtop already holds
  * (`SteamUserStats.getUserStats`, GameNative's AchievementWatcher read), never written: droidtop sets no stat and
  * unlocks nothing. Kept ten minutes per game, so opening a page again does not ask Steam again.

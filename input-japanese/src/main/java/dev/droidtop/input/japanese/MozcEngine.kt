@@ -6,7 +6,7 @@ import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.Output
 import org.pocketworkstation.pckeyboard.InputEngine
 
 /**
- * Japanese through Google's Mozc, behind the engine seam (Droidtop/tracker#903 H7c; docs/SPEC.md 6a, "The engine
+ * Japanese through Google's Mozc, behind the engine seam (mytop-project/tracker#903 H7c; docs/SPEC.md 6a, "The engine
  * seam"). Every call is one Mozc command ([MozcCommands]) evaluated synchronously on the main thread, as SPEC's
  * threading rule says (8 ms a call), and the answer is read back as the seam's composing text and candidates
  * ([MozcOutput]). The library and its dictionary load on [runtime]'s own thread; until they have, [state] says

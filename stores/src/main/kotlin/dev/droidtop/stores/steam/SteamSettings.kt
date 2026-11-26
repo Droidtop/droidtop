@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The rows Steam adds to its page in the Stores place (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313): the person's standing (Online, Invisible,
+ * "Stores", mytop-project/tracker#313): the person's standing (Online, Invisible,
  * or Offline, which closes the connection), cloud saves, and whether a
  * message notifies. The explanation of each is its tooltip, not a line of text.
  */

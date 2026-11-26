@@ -36,7 +36,7 @@ class PluginHostBroker(private val core: BrokerCore) : IPluginHostBroker.Stub() 
 /**
  * Names the plugin and the op behind bursts of large broker calls. Android warns "Large reply transaction" for
  * anything over about 200 KB without saying whose it is (the one search showed dozens of 320 KB replies a second,
- * Droidtop/tracker#485): this logs, at most once every [WINDOW_MS] per plugin, how many large calls it made and the
+ * mytop-project/tracker#485): this logs, at most once every [WINDOW_MS] per plugin, how many large calls it made and the
  * last one's api, op and sizes, so a rig run's logcat names the plugin and the op instead of leaving it a guess.
  */
 internal object BrokerTraffic {
@@ -306,7 +306,7 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     }.getOrDefault(false)
 
     /**
-     * The notification bridge into Desktop (docs/plugin-api.md 1.12, Droidtop/tracker#221): while a Desktop session runs,
+     * The notification bridge into Desktop (docs/plugin-api.md 1.12, mytop-project/tracker#221): while a Desktop session runs,
      * a plugin's notification is also droidtop's own notice on the desktop, led by the plugin's name, so it is seen
      * where the person is working, and kept in Recent. Only for a plugin that is on in Desktop (its mode switch).
      */

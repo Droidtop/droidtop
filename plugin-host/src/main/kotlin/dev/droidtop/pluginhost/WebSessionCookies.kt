@@ -5,7 +5,7 @@ import android.webkit.CookieManager
 /**
  * A web session's cookies in droidtop's one cookie store, for as long as a view of it is open: the visible
  * [WebSessionActivity] and the hidden [HiddenWebSession] put the same ones in and take the same ones out, so a page
- * gets the same session in either (Droidtop/tracker#783). Call on the main thread.
+ * gets the same session in either (mytop-project/tracker#783). Call on the main thread.
  */
 internal object WebSessionCookies {
     /** Puts [request]'s session in for its domains, and droidtop's own signed-in download [sites] for theirs. */
@@ -13,7 +13,7 @@ internal object WebSessionCookies {
         cookies.setAcceptCookie(true)
         request.domains.forEach { purge(cookies, it) }
         request.session?.cookies?.forEach { (domain, header) -> inject(cookies, domain, header) }
-        // droidtop's own signed-in download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648), for their
+        // droidtop's own signed-in download sites (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648), for their
         // domains only and only while the view is open.
         sites?.forEach { (domain, header) ->
             purge(cookies, domain)

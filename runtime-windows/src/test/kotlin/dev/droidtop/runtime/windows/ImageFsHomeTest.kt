@@ -11,7 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** Droidtop/tracker#249: the unfinished setup is cleared under the home the installer really uses, and nowhere else. */
+/** mytop-project/tracker#249: the unfinished setup is cleared under the home the installer really uses, and nowhere else. */
 class ImageFsHomeTest {
     @get:Rule val tmp = TemporaryFolder()
 

@@ -94,7 +94,7 @@ object Measure {
     val rowIcon = 32.dp
 
     /**
-     * A press target's least size where the pad drives (Droidtop/tracker#740): the shell's own 48dp of the canvas, as
+     * A press target's least size where the pad drives (mytop-project/tracker#740): the shell's own 48dp of the canvas, as
      * every row, pill and rail tab was through 2026-10-28. The finger-sized target (ShellWindow's minTouchTarget, 0.3
      * inch on the panel) is for touch only: on the console's panel it is about 80dp of the canvas, and as the Quick
      * Menu rail's tab size it took the menu's density away ("It's like the QAM has a ridiculously high scaling or
@@ -115,7 +115,7 @@ object Measure {
 }
 
 /**
- * The corner scale, from the approved visual language (Droidtop/tracker#644, coordination/design/DESIGN-LANGUAGE.md
+ * The corner scale, from the approved visual language (mytop-project/tracker#644, coordination/design/DESIGN-LANGUAGE.md
  * "Shape"): 8 dp on rows, buttons and chips that are not pills; 12 dp on sheets, cards, dialogs and art tiles; one soft
  * plate for a large generic focused surface; pills for chips and badges. Nothing in between.
  * A `RoundedCornerShape(N.dp)` in a Gaming screen is a defect.
@@ -161,7 +161,7 @@ object Elevation {
  * row), so it reads as a panel over the page rather than a wall; rows
  * [RowHeight] tall with [RowPaddingStart] and [RowPaddingEnd]. The row under
  * the cursor and the destination the person is on are the one row focus every
- * menu has (rowFocus, Droidtop/tracker#644); a destination with something
+ * menu has (rowFocus, mytop-project/tracker#644); a destination with something
  * waiting carries an accent dot ([AttentionDot]) or a job ring.
  */
 object SideMenu {
@@ -187,7 +187,7 @@ object SideMenu {
  * measure: the category column takes [ColumnFraction] of the page and never
  * less than [ColumnMinWidth], on a plate of its own ([MenuTokens.Card]). The
  * entry under the cursor and the category being shown are the one row focus
- * (rowFocus, Droidtop/tracker#644). Scrolling keeps the selected row
+ * (rowFocus, mytop-project/tracker#644). Scrolling keeps the selected row
  * [ScrollRoomAbove] of the list's height clear above it and [ScrollRoomBelow]
  * below (Steam's 250 and 60 of 800), so the cursor is never against an edge.
  */
@@ -302,7 +302,7 @@ object TypeRole {
 }
 
 /**
- * The scale itself, from the approved visual language (Droidtop/tracker#644, coordination/design/DESIGN-LANGUAGE.md
+ * The scale itself, from the approved visual language (mytop-project/tracker#644, coordination/design/DESIGN-LANGUAGE.md
  * "Type"), re-expressed in Material's roles for a 1080p handheld read at arm's length:
  *
  * - Display 32 Bold (headlineMedium): a game's name over its art, a page title.
@@ -331,7 +331,7 @@ val DroidtopTypography: Typography = Typography().let { stock ->
 }
 
 /**
- * The compact ladder (owner, 2026-10-29, Droidtop/tracker#739: "text in the QAM is still really big on the internal
+ * The compact ladder (owner, 2026-10-29, mytop-project/tracker#739: "text in the QAM is still really big on the internal
  * screen"): the scale one rung down, for a pane narrower than [NarrowPane.WIDTH_DP]. Row titles and body are Label
  * 15, supporting lines and labels Caption 13 (the floor), and a pane's own title stays Title 24; the families are the
  * theme's, untouched.
@@ -392,7 +392,7 @@ object NarrowPane {
  * screens that use them are ordinary Android screens a person can reach
  * with the system in either colour state.
  *
- * The dark palette is droidtop's own visual language (Droidtop/tracker#644,
+ * The dark palette is droidtop's own visual language (mytop-project/tracker#644,
  * coordination/design/DESIGN-LANGUAGE.md "Surfaces" and "Colour"), the
  * same values as GamingThemeColors.DEFAULT: a blue-grey ground, surfaces
  * one step apart, text that is not pure white, one azure accent. Material's
@@ -518,7 +518,7 @@ object MenuTokens {
      * The plate under a control floating over art (the status cluster, the Start and R2 pills): the overlay surface,
      * nearly opaque, so the muted text on it keeps the 4.5:1 the palette holds it to over any artwork. It was [Surface]
      * at 58%, the ink itself, so text and plate came from the same end of the scale: pale text on a pale pill over light
-     * art (rig, droidtop 0.2.0-dev.1931, Droidtop/tracker#559).
+     * art (rig, droidtop 0.2.0-dev.1931, mytop-project/tracker#559).
      */
     val FloatingPlate: Color get() = GamingTheme.palette.overlaySurface.copy(alpha = 0.92f)
     val OnSurface: Color get() = GamingTheme.palette.onSurface
@@ -527,7 +527,7 @@ object MenuTokens {
     val Placeholder: Color get() = GamingTheme.palette.placeholder
     val Accent: Color get() = GamingTheme.palette.accent
     /**
-     * The one danger colour: the notice palette's danger ink (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485), the
+     * The one danger colour: the notice palette's danger ink (docs/SPEC.md 7k, "Notices"; mytop-project/tracker#485), the
      * same ink a danger notice, the status glyph's error mark and the danger dialog use, kept to contrast on this
      * palette's ground. It replaced the theme's own `danger` role here, so a failed capsule and a danger notice can no
      * longer be two reds.
@@ -538,7 +538,7 @@ object MenuTokens {
 
     /**
      * Ink on an [Affirmative] fill (a switch's knob when on): black or white, whichever reads on it. The knob was
-     * [OnSurface], near black in a light appearance, on a dark green track (rig 2026-10-16, Droidtop/tracker#559).
+     * [OnSurface], near black in a light appearance, on a dark green track (rig 2026-10-16, mytop-project/tracker#559).
      * 0.179 is the relative luminance where black and white give the same contrast.
      */
     val OnAffirmative: Color get() = if (Affirmative.luminance() > 0.179f) Color.Black else Color.White
@@ -565,7 +565,7 @@ object MenuTokens {
     /**
      * What a side panel lays over the page behind it (the left menu, the Quick Menu): the theme's [Scrim] in a dark
      * appearance; in a light one, black at [LIGHT_VEIL_ALPHA]. The light scrim is the pale ground at 80 percent,
-     * which washed the page out rather than setting it back (rig 2026-10-16, Droidtop/tracker#559); a modal
+     * which washed the page out rather than setting it back (rig 2026-10-16, mytop-project/tracker#559); a modal
      * dialog's own dim was already black ([ModalScrim]).
      */
     val Veil: Color get() = GamingTheme.palette.let { if (it.colors.isLight) Color.Black.copy(alpha = LIGHT_VEIL_ALPHA) else it.scrim }
@@ -635,7 +635,7 @@ object MenuTokens {
     /**
      * The least height of a row in a scrolling settings list ([uniformRowHeight]): one touch target. Its one-line
      * title and padding make it about 52dp at the default text size, so a landscape page holds five or six rows
-     * where [RowMinHeight]'s 72dp held three (Droidtop/tracker#664).
+     * where [RowMinHeight]'s 72dp held three (mytop-project/tracker#664).
      */
     val ListRowMinHeight = 48.dp
 
@@ -643,7 +643,7 @@ object MenuTokens {
     val RowVerticalPadding = 14.dp
 
     /**
-     * A row's vertical padding in a pane (ShellWindow.inPane, Droidtop/tracker#363): a one-line title (bodyLarge, 24dp)
+     * A row's vertical padding in a pane (ShellWindow.inPane, mytop-project/tracker#363): a one-line title (bodyLarge, 24dp)
      * and 12dp each side make the 48dp press target, where [RowVerticalPadding] made about 52dp.
      */
     val PaneRowVerticalPadding = 12.dp

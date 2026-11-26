@@ -106,7 +106,7 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
                 try {
                     runCatching {
                         process.attachScreen(pluginId, entrypoint, library, surface, shared?.first, if (shared != null) capacity else 0L, width, height, density)
-                            // Touch and keys go one-way and carry the token this checked call returns (Droidtop/tracker#511).
+                            // Touch and keys go one-way and carry the token this checked call returns (mytop-project/tracker#511).
                             ?: run { inputToken = process.inputToken(); null }
                     }.getOrElse { it.message ?: "the plugin's process did not answer" }
                 } finally {

@@ -77,7 +77,7 @@ object EngineHost {
         current?.let { stopQuietly(it) }
         running = null
         rpcEndpoint = null
-        // One retry before the person's action fails (Droidtop/tracker#930): at the start of a burst (the first
+        // One retry before the person's action fails (mytop-project/tracker#930): at the start of a burst (the first
         // launch after an install, Update all) the engine's process was refused its lockdown (EALREADY) and died, and
         // Android restarted the service about a second later; both times a later try worked.
         var port = freeLoopbackPort()

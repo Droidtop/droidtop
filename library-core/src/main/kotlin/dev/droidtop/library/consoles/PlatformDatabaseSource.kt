@@ -24,7 +24,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  */
 object PlatformDatabaseSource {
     const val DEFAULT_BASE_URL =
-        "https://raw.githubusercontent.com/droidtop/droidtop-platforms/main"
+        "https://raw.githubusercontent.com/mytop-project/droidtop-platforms/main"
 
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     const val KEY_BASE_URL = "pref_platform_database_base_url"

@@ -122,7 +122,7 @@ class SecondScreenOrchestrator(
          * the cooldown above: a relocation recreates or moves this Activity, and a fresh instance (or the
          * configuration change a move delivers) must not read as a new topology. Reset there, they let a relocation
          * that does not stick retry at once and for ever: the cold start with two screens attached that "constantly
-         * reinitializes both screens" (Droidtop/tracker#785).
+         * reinitializes both screens" (mytop-project/tracker#785).
          */
         @Volatile
         private var lastDisplayIds: Set<Int> = emptySet()
@@ -168,7 +168,7 @@ class SecondScreenOrchestrator(
     /**
      * The shell's configuration changed. A foldable changing the shape of the screen the shell is on gets a fresh,
      * uncooled pass. A change that comes from the shell having moved to another display (a relocation) does not: it
-     * only re-runs the pass, so the cooldown and the attempt count keep bounding relocations (Droidtop/tracker#785).
+     * only re-runs the pass, so the cooldown and the attempt count keep bounding relocations (mytop-project/tracker#785).
      */
     fun onConfigurationChanged() {
         val here = host.currentDisplayId()
@@ -282,7 +282,7 @@ class SecondScreenOrchestrator(
     /** Starts the collect loop; call from lifecycleScope.launch { orchestrator.observe() }. */
     suspend fun observe() {
         combine(
-            // Once the displays settle: attaching a screen sends a burst of display events (Droidtop/tracker#785).
+            // Once the displays settle: attaching a screen sends a burst of display events (mytop-project/tracker#785).
             displayOutputs.observe().settled(DualScreenOrchestration.DISPLAY_SETTLE_MS),
             roleRefresh,
             DisplayArrangement.refresh,
@@ -319,7 +319,7 @@ class SecondScreenOrchestrator(
                     return@collectLatest
                 }
 
-                // What each screen is for, as the person answered (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): no
+                // What each screen is for, as the person answered (docs/SPEC.md 4c, ScreenRoles; mytop-project/tracker#776): no
                 // screen is assumed better. The one screen paired with the built-in one is the main screen when the
                 // menus are elsewhere, else the companion's; a screen nobody answered for gets nothing of droidtop's.
                 val arrangement = withContext(Dispatchers.IO) { ScreenRoles.arrangement(context, outputs) }
@@ -417,7 +417,7 @@ class SecondScreenOrchestrator(
                 ), desktopOn)
                 relocate(step, second?.androidDisplayId, now)
                 // The placement's word that the shell stays where it is: what What's new waits for before it opens,
-                // so no move covers it (Droidtop/tracker#824).
+                // so no move covers it (mytop-project/tracker#824).
                 dev.droidtop.runtime.ShellPlacement.settle(stays = move == DualScreenOrchestration.ShellMove.NONE)
 
                 host.setDualScreenBroken(

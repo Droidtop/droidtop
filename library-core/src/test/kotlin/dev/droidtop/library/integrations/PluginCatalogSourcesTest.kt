@@ -284,7 +284,7 @@ class PluginCatalogSourcesTest {
 
     @Test
     fun `a newer release under a key the person has not trusted is held, never offered`() {
-        // Droidtop/tracker#882: gamegrab-sources re-signed under a new root; F95zone 0.4.0-22 showed no update at all.
+        // mytop-project/tracker#882: gamegrab-sources re-signed under a new root; F95zone 0.4.0-22 showed no update at all.
         val listing = PluginCatalog.Listing(added.copy(acceptedDisclaimer = 2), PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!)
         val record = installedTool("0.9")
         val oldKey = mapOf("acme" to UserOriginKey("acme", otherSpki, null))
@@ -304,7 +304,7 @@ class PluginCatalogSourcesTest {
 
     @Test
     fun `a key the catalog marks superseded is followed only for trust that came from this catalog`() {
-        // Droidtop/tracker#887, the owner: "the place that provides the "superceded" notice has to be the same source the
+        // mytop-project/tracker#887, the owner: "the place that provides the "superceded" notice has to be the same source the
         // plugin came from for it to be trusted".
         val named = PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!.origins[0]
         val marked = named.copy(superseded = mapOf(sha(otherSpki) to sha(spki)))

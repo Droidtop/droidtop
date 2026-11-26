@@ -290,7 +290,7 @@ public class Keyboard {
         /** The current pressed state of this key */
         public boolean pressed;
         /**
-         * droidtop patch (Droidtop/tracker#903 H12a): the press motion's state, kept by KeyPressMotion while the key
+         * droidtop patch (mytop-project/tracker#903 H12a): the press motion's state, kept by KeyPressMotion while the key
          * is drawn: when {@link #pressed} last changed as drawn, and the scale and pressed tint it had then.
          */
         long motionAt;
@@ -914,7 +914,7 @@ public class Keyboard {
     }
 
     /**
-     * droidtop patch (Droidtop/tracker#342): scales and splits the loaded keys for the one-handed and split forms
+     * droidtop patch (mytop-project/tracker#342): scales and splits the loaded keys for the one-handed and split forms
      * ({@link KeyboardForm}). Called once, right after the layout is loaded and before anything reads positions.
      */
     void applyForm(KeyboardForm.Form form) {
@@ -935,7 +935,7 @@ public class Keyboard {
             key.width = widths[i];
             key.gap = gaps[i];
         }
-        // The floating mode's height (Droidtop/tracker#903 H12c): every row scaled alike, the total with them.
+        // The floating mode's height (mytop-project/tracker#903 H12c): every row scaled alike, the total with them.
         if (form.getHeightScale() != 1f) {
             final int[] ys = new int[n];
             final int[] heights = new int[n];

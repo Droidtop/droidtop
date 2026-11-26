@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * droidtop's widgets as the manifest declares them (Droidtop/tracker#563). The rig found seven of the nine
+ * droidtop's widgets as the manifest declares them (mytop-project/tracker#563). The rig found seven of the nine
  * missing from Standard's widget picker (2026-10-16, build 0.2.0-dev.1994): the launcher hid droidtop's own
  * package except for a hand list of classes. These tie the manifest, [DroidtopWidgets.PROVIDERS] and the
  * launcher's rule ([LauncherSelfFilter]) together.

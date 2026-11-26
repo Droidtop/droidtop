@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * The container's application icons, for droidtop's own chrome (docs/SPEC.md 2b "Linux app icons",
- * Droidtop/tracker#689): the Start menu's Linux apps, their taskbar pins, search and the bar's window buttons.
+ * mytop-project/tracker#689): the Start menu's Linux apps, their taskbar pins, search and the bar's window buttons.
  *
  * An entry's `Icon` names a file in the container's icon themes. One exec resolves the icons droidtop has not
  * seen yet: for each, the first PNG or SVG in hicolor, then Adwaita, then every other installed theme, in any of

@@ -6,7 +6,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /**
- * A pod: Podman's group of containers (docs/SPEC.md 3d, "Pods"; Droidtop/tracker#555 D12). A pod's containers share
+ * A pod: Podman's group of containers (docs/SPEC.md 3d, "Pods"; mytop-project/tracker#555 D12). A pod's containers share
  * one network, and droidtop's containers already share the device's, so here a pod is a named group the podman front
  * starts, stops and removes together; its containers' ports are the device's, as every container's are. [members] are
  * container ids.

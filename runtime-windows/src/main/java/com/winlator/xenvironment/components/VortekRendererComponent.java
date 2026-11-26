@@ -129,7 +129,7 @@ public class VortekRendererComponent extends EnvironmentComponent implements Con
             Drawable drawable = window.getContent();
             Texture texture = drawable.getTexture();
             if (!(texture instanceof GPUImage)) {
-                // As PresentExtension does: no renderer (a hidden session, Droidtop/tracker#899) means no GL texture to free.
+                // As PresentExtension does: no renderer (a hidden session, mytop-project/tracker#899) means no GL texture to free.
                 XServerRenderer renderer = this.xServer.getRenderer();
                 if (texture != null && renderer != null) renderer.getRendererView().queueEvent(() -> VortekRendererComponent.destroyTexture(texture));
                 drawable.setTexture(new GPUImage(drawable.width, drawable.height));

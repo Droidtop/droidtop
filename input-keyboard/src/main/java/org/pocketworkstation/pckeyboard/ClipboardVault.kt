@@ -9,7 +9,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Seals the clipboard history for its file (Droidtop/tracker#772): AES-GCM under a key that lives in the Android
+ * Seals the clipboard history for its file (mytop-project/tracker#772): AES-GCM under a key that lives in the Android
  * Keystore and never leaves it, so the file holds no copied text in the clear. A sealed blob is a version byte, the
  * 12-byte IV and the ciphertext with its tag ([frame]). Background thread only (the Keystore does disk and IPC).
  */

@@ -13,7 +13,7 @@ import java.util.Locale
 import java.util.zip.GZIPInputStream
 
 /**
- * The keyboard's own dictionaries, one per language (Droidtop/tracker#339; docs/SPEC.md 6a "Dictionaries"): an open
+ * The keyboard's own dictionaries, one per language (mytop-project/tracker#339; docs/SPEC.md 6a "Dictionaries"): an open
  * `.combined` wordlist the person adds is converted on the device ([CombinedWordlist], [DictionaryWriter]) into the
  * engine's format and kept in the keyboard's files, `keyboard-dictionaries/main_<language>.dict`. [loadInto] gives one
  * to [Suggest] when it has no main dictionary of its own. All file work runs on one background thread; the main thread
@@ -31,7 +31,7 @@ object KeyboardDictionaries {
     /** The file a language's dictionary is kept in: by its language code ("en" for en_US), lower case. */
     fun fileFor(context: Context, language: String): File = File(dir(context), "main_${code(language)}.dict")
 
-    /** The words glide typing guesses from for a language (Droidtop/tracker#341), kept beside its dictionary. */
+    /** The words glide typing guesses from for a language (mytop-project/tracker#341), kept beside its dictionary. */
     fun glideFileFor(context: Context, language: String): File = File(dir(context), "glide_${code(language)}.txt")
 
     /** How many of a wordlist's words glide typing keeps: the most frequent, so working out their paths stays quick. */
@@ -176,7 +176,7 @@ object KeyboardDictionaries {
 }
 
 /**
- * The keyboard settings' Dictionaries row (Droidtop/tracker#339): the languages with a dictionary, each removable,
+ * The keyboard settings' Dictionaries row (mytop-project/tracker#339): the languages with a dictionary, each removable,
  * and "Add from a file" for a `.combined` wordlist (plain or .gz) the person has, converted in the background. What
  * is going on and what was done show on the row itself; a failure is a dialog that says why (droidtop's UI rules: no
  * toasts).

@@ -72,7 +72,7 @@ fun ShellChip(
     // when the caller says it is the selected one. Null is the chip
     // driving itself through Compose focus, as every other caller uses it.
     selected: Boolean? = null,
-    // The chip's own menu on a long press, the one L2 opens on it (Droidtop/tracker#621); null for none.
+    // The chip's own menu on a long press, the one L2 opens on it (mytop-project/tracker#621); null for none.
     onLongClick: (() -> Unit)? = null,
     // False where the strip draws the chosen tab's plate itself, gliding between tabs ([ViewStrip]).
     plate: Boolean = true,
@@ -91,7 +91,7 @@ fun ShellChip(
         large && filled -> MenuTokens.OnSurface
         ring -> MenuTokens.OnSelected
         // At rest a filled chip is the accent, so its text is the accent's ink: the selected ink is picked against
-        // the selected fill, and a theme whose two differ drew Play's word in its own fill (Droidtop/tracker#820).
+        // the selected fill, and a theme whose two differ drew Play's word in its own fill (mytop-project/tracker#820).
         filled -> MenuTokens.OnAccent
         else -> MenuTokens.OnSurface
     }

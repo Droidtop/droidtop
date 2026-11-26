@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Desktop bar's pure decisions (Droidtop/tracker#731): pad routes, the row choice, titles and icons. */
+/** The Desktop bar's pure decisions (mytop-project/tracker#731): pad routes, the row choice, titles and icons. */
 class DesktopBarTest {
     @Test
     fun `four pad buttons are droidtop's, the rest stay with the container`() {

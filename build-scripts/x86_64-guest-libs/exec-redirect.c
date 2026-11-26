@@ -37,7 +37,7 @@
  *     harmless bug, and one of them killed a game on the BlueStacks rig the
  *     moment DXVK made its swapchain ("fdsan: attempted to close file
  *     descriptor 409, expected to be unowned, actually owned by DIR*",
- *     Droidtop/tracker#242). Every process this preload is loaded into
+ *     mytop-project/tracker#242). Every process this preload is loaded into
  *     reports the first such close in logcat and carries on.
  *
  * No allocation on the exec paths: they can run in a forked child.
@@ -231,7 +231,7 @@ int posix_spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t 
  * the runtime APEX's copy (/apex/com.android.runtime/bin/linker64), so the
  * answer is that path, not LINKER. Comparing with LINKER alone never matched
  * there, and Wine looked for ntdll.so under /apex/com.android.runtime/lib
- * (Droidtop/tracker#242, BlueStacks Android 13).
+ * (mytop-project/tracker#242, BlueStacks Android 13).
  */
 static int is_linker(const char *path) {
     static char canonical[PATH_MAX];

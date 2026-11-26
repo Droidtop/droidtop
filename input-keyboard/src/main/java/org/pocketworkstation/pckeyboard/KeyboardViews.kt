@@ -10,7 +10,7 @@ internal fun View.dp(value: Int): Int = (value * resources.displayMetrics.densit
 
 /**
  * The keyboard panels' one flat text button (the tool strip's tools, the emoji panel's tabs and its search's Done;
- * Droidtop/tracker#772): [label] in [colors]' text colour on no background, 13 sp, as small as its text plus
+ * mytop-project/tracker#772): [label] in [colors]' text colour on no background, 13 sp, as small as its text plus
  * [paddingDp] at the sides, and never a focus target, so a tap leaves focus on the field being typed into.
  */
 internal fun flatButton(

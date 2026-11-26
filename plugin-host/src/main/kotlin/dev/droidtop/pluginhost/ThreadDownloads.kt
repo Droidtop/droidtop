@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * A forum thread's download post read into the `download` bundle droidtop already reads (docs/plugin-api.md 1.10;
- * Droidtop/tracker#838, the owner: "Downloads still don't auto-pick links. We need to implement a thread parser"). One
+ * mytop-project/tracker#838, the owner: "Downloads still don't auto-pick links. We need to implement a thread parser"). One
  * parser for every source plugin, behind `sources.parse_thread`, so a plugin in any language gives droidtop the same
  * entries and droidtop picks the build, the system and the mirror itself.
  *
@@ -47,7 +47,7 @@ object ThreadDownloads {
         val entries: List<Entry>,
         val problem: Problem?,
         val facts: Facts = Facts.NONE,
-        /** The post's named sections beside its links ("Overview", "Installation"), in its order (Droidtop/tracker#845). */
+        /** The post's named sections beside its links ("Overview", "Installation"), in its order (mytop-project/tracker#845). */
         val sections: List<Section> = emptyList(),
         /** The first post as plain text, for the game page's Show thread; null when there is none. */
         val post: String? = null,
@@ -57,7 +57,7 @@ object ThreadDownloads {
     data class Section(val title: String, val body: String)
 
     /**
-     * What a first post says of the game besides its links (Droidtop/tracker#845): its platforms ("OS: Windows,
+     * What a first post says of the game besides its links (mytop-project/tracker#845): its platforms ("OS: Windows,
      * Linux"), its languages and its content notes ("Censored: No" is "Uncensored"). Empty for what it does not say.
      */
     data class Facts(val platforms: List<String>, val languages: List<String>, val contentNotes: List<String>) {
@@ -213,7 +213,7 @@ object ThreadDownloads {
                 val text = link.text.replace("*", "").trim()
                 // A link named for a platform ("Win", "Linux") on a line whose label names none is that platform's
                 // download, and its host is the address's: such a thread read as one host called "Win"
-                // (Droidtop/tracker#859).
+                // (mytop-project/tracker#859).
                 val forPlatform = lineRole == Role.BUILD && systemsOf(clean).isEmpty() && onlyPlatform(text)
                 val systems = when {
                     lineRole != Role.BUILD -> emptyList()
@@ -284,7 +284,7 @@ object ThreadDownloads {
             ),
         )
         read.problem?.let { put("problem", it.id).put("message", it.sentence) }
-        // What the first post says of the game, for the source's metadata facet (Droidtop/tracker#845).
+        // What the first post says of the game, for the source's metadata facet (mytop-project/tracker#845).
         val facts = JSONObject().apply {
             if (read.facts.platforms.isNotEmpty()) put("platforms", JSONArray(read.facts.platforms))
             if (read.facts.languages.isNotEmpty()) put("languages", JSONArray(read.facts.languages))

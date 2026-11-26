@@ -119,7 +119,7 @@ object LaunchDisplay {
      * is for -- unlike [launchContext], which is scoped to a single
      * [Library.launch] call and cleared the moment that call returns,
      * this persists for as long as [parkedDisplayId] does, so the Quick
-     * Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82) knows WHICH
+     * Menu's Game tab (docs/SPEC.md, mytop-project/tracker#82) knows WHICH
      * entry to show resume/quit for after the user has come back to the
      * shell (a Home press, per [parkedDisplayId]'s own doc comment). The
      * shell checks the resolved package's stopped flag while the Quick
@@ -154,7 +154,7 @@ object LaunchDisplay {
     var runningPackageName: String? = null
         set(value) {
             field = value
-            // Mirrored for the parts that cannot see the library: Standard's taskbar folds over the game (Droidtop/tracker#700).
+            // Mirrored for the parts that cannot see the library: Standard's taskbar folds over the game (mytop-project/tracker#700).
             dev.droidtop.runtime.RunningGame.packageName = value
         }
 
@@ -284,7 +284,7 @@ object LaunchDisplay {
      * already stopped treating as parked.
      */
     fun clearRunning(stopWatching: Boolean = true) {
-        // Who ended the session, for a return to the game that found none (Droidtop/tracker#86).
+        // Who ended the session, for a return to the game that found none (mytop-project/tracker#86).
         runningFlow.value?.let { Log.i("droidtop.ReturnToGame", "session for ${it.context.gameId} cleared", Throwable("cleared here")) }
         if (stopWatching) LaunchWatchdog.cancel()
         parkedDisplayId = null
@@ -303,7 +303,7 @@ object LaunchDisplay {
      * The one point where an app is actually dispatched, after the display
      * chooser if there is one, so it is also the one point where droidtop
      * hands its audio over (docs/SPEC.md "Launch audio hand-off",
-     * Droidtop/tracker#160): any navigation sample still sounding plays
+     * mytop-project/tracker#160): any navigation sample still sounding plays
      * out, then every output stream of droidtop's own is closed, and only
      * then does the other app start. Opening the chooser hands nothing
      * over.
@@ -319,7 +319,7 @@ object LaunchDisplay {
                 Log.e("droidtop.LaunchDisplay", "Launch failed", e)
                 AudioHandOff.reopen("launch failed")
                 // A launch that never started is not a running game: without this the left menu offered Resume for it
-                // and the Game tab named it (docs/SPEC.md "The running game's session", Droidtop/tracker#171, #289).
+                // and the Game tab named it (docs/SPEC.md "The running game's session", mytop-project/tracker#171, #289).
                 clearRunning()
                 onLaunchFailed?.invoke(e)
             }
@@ -379,7 +379,7 @@ object LaunchDisplay {
         // "The launch watchdog"); a plain app switch is not, since it has nothing to be stuck on.
         // Nor is a game screen of droidtop's own (a Windows game's WineGameActivity): it reports
         // how its game ended itself, with Wine's exit code and output, where the watchdog could only
-        // say that droidtop closed and point at emulator setup (Droidtop/tracker#302).
+        // say that droidtop closed and point at emulator setup (mytop-project/tracker#302).
         if (packageName != null && runningGame != null && packageName != context.packageName) {
             // An installed app's library entry is the package itself: it is opened, not handed a game file.
             val opensFile = runningGame?.gameId != packageName

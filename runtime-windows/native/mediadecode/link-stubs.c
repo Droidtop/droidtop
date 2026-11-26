@@ -1,5 +1,5 @@
 /*
- * Link-time stand-ins for the base image's GStreamer and GLib (Droidtop/tracker#601). libgstdroidtopff.so is loaded
+ * Link-time stand-ins for the base image's GStreamer and GLib (mytop-project/tracker#601). libgstdroidtopff.so is loaded
  * by the image's own GStreamer inside Wine's process, so it must name the image's libraries as NEEDED, but droidtop
  * builds against headers only. CMake compiles this file three times, as libgstreamer-1.0.so.0, libgobject-2.0.so.0
  * and libglib-2.0.so.0, each with the symbols of its library (-DSTUB_GST, -DSTUB_GOBJECT, -DSTUB_GLIB). The plugin

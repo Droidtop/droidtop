@@ -11,7 +11,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Declared settings (Droidtop/tracker#880, docs/plugin-api.md 1.10): rows read from the manifest, values kept by
+ * Declared settings (mytop-project/tracker#880, docs/plugin-api.md 1.10): rows read from the manifest, values kept by
  * droidtop and checked against their row, pushed text, and what changed since the plugin last heard.
  */
 class DeclaredSettingsTest {

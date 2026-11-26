@@ -4,7 +4,7 @@ import android.content.Context
 
 /**
  * The companion screen's own "Lock to landscape" (docs/SPEC.md "Companion layout and per-mode orientation",
- * Droidtop/tracker#213). Owner, 2026-10-01: the Retroid add-on does not rotate and its own "lock to landscape"
+ * mytop-project/tracker#213). Owner, 2026-10-01: the Retroid add-on does not rotate and its own "lock to landscape"
  * button is usually on, "but we should include a 'lock to landscape' option in droidtop too, for other systems".
  * Off by default: the companion then follows the device and the active mode's Screen orientation, as before.
  */

@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * What the person declined for a plugin in this run of droidtop, and what the broker last refused it (Droidtop/tracker
+ * What the person declined for a plugin in this run of droidtop, and what the broker last refused it (mytop-project/tracker
  * #518). In memory only: droidtop's next start asks again.
  *
  * - Not now lasts the session: one page that calls a permission the person put off does not ask on every visit. The

@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A job's smoothed pace and its calm time left (docs/SPEC.md 7j "Places", Droidtop/tracker#643). */
+/** A job's smoothed pace and its calm time left (docs/SPEC.md 7j "Places", mytop-project/tracker#643). */
 class JobPaceTest {
 
     private fun job(id: String, percent: Int = -1, paused: Boolean = false, numbers: JobNumbers? = null) =

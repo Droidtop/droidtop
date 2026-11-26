@@ -34,7 +34,7 @@ data class BatteryEstimate(val minutes: Int, val toFull: Boolean) {
 }
 
 /**
- * Time to empty or full from battery broadcasts (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414). Pure,
+ * Time to empty or full from battery broadcasts (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414). Pure,
  * so the rules are tested: only readings since the charger was last plugged in or out count; nothing is said before
  * [MIN_SAMPLES] readings spanning [MIN_SPAN_MS]; the current is smoothed ([ALPHA], an exponential average) so a
  * menu's spike does not swing the estimate; without a current, the level's own slope stands in.

@@ -9,7 +9,7 @@ import dev.droidtop.shell.standard.HomeRolePrefs
 
 /**
  * Back to the mode the person is in (docs/SPEC.md 2c, "A mode never opens another"; owner, 2026-10-24,
- * Droidtop/tracker#639: "we absolutely should NOT be seeing jumps between modes"): Gaming's or Desktop's own screen
+ * mytop-project/tracker#639: "we absolutely should NOT be seeing jumps between modes"): Gaming's or Desktop's own screen
  * brought to the front, or the Android home screen droidtop holds. A notification that means only "back to droidtop"
  * uses it. MainActivity with no mode named opens the DEFAULT mode, so a person in Desktop with Gaming as their default
  * was sent to Gaming.

@@ -11,7 +11,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The libpod API droidtop serves on `podman.sock` (docs/SPEC.md 3d, "The libpod API"; Droidtop/tracker#555 D15), so a
+ * The libpod API droidtop serves on `podman.sock` (docs/SPEC.md 3d, "The libpod API"; mytop-project/tracker#555 D15), so a
  * podman a container installed (remote whenever CONTAINER_HOST is set, as Podman's own clients are) reaches droidtop's
  * one engine. Its paths are `/v{X.Y.Z}/libpod/...`; every other path on the socket is Docker's API, as on Podman's own
  * service. A request is read into the same [DockerApi.Call]s the Docker API asks for and answered from the same facts
@@ -203,7 +203,7 @@ object LibpodApi {
         val image = string(o, "image") ?: return refuse(400, "a container needs an image")
         if (!EngineCli.PODMAN.validReference(image)) return refuse(400, "not an image reference: $image")
         if (bool("privileged")) return refuse(400, "droidtop's containers never run privileged")
-        // entrypoint and work_dir are taken (Droidtop/tracker#715).
+        // entrypoint and work_dir are taken (mytop-project/tracker#715).
         val entrypoint = strings("entrypoint").takeIf { o["entrypoint"] is JsonArray }?.let { list -> if (list == listOf("")) emptyList() else list }
         val workdir = string(o, "work_dir")
         if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "work_dir must be an absolute folder: $workdir")
@@ -227,7 +227,7 @@ object LibpodApi {
         ).forEach { (key, what) -> if (given(key)) return notYet(what) }
 
         // mounts: a bind mount of a folder the person mapped, named or given by where it appears in the container, goes
-        // through the same rule as -v and volumes (Droidtop/tracker#715, as the Docker API's Mounts); tmpfs stays not built.
+        // through the same rule as -v and volumes (mytop-project/tracker#715, as the Docker API's Mounts); tmpfs stays not built.
         val mountSpecs = list("mounts").map { el ->
             val m = el as? JsonObject ?: return refuse(400, "a mounts entry is not an object")
             val type = string(m, "type") ?: "bind"

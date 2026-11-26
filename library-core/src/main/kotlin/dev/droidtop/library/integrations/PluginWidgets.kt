@@ -14,7 +14,7 @@ import dev.droidtop.pluginhost.WidgetTemplate
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Plugins on Android app widgets (docs/plugin-api.md 3 C10 and C2, Droidtop/tracker#563): what droidtop's one widget
+ * Plugins on Android app widgets (docs/plugin-api.md 3 C10 and C2, mytop-project/tracker#563): what droidtop's one widget
  * renderer asks of plugins. A plugin supplies data only, a C10 `ui.widget` snapshot from a fixed set of templates or
  * a C2/C3 tile's state, and droidtop draws it; a tap comes back here through a broadcast and is a call through the
  * broker, off the main thread. No plugin code runs in a launcher's process.

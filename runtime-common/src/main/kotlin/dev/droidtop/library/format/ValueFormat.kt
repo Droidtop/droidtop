@@ -5,7 +5,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * The one formatter for values a person reads (docs/SPEC.md 7k, "Values"; Droidtop/tracker#485 slice F2a):
+ * The one formatter for values a person reads (docs/SPEC.md 7k, "Values"; mytop-project/tracker#485 slice F2a):
  * sizes, play and remaining times, percentages, counts, clock times, "how long ago" and the plain state
  * words. Every surface (Gaming, Desktop, the companion, Standard's Preference rows, a plugin's typed
  * values) formats through here, so "1.2 GB" and "2 h 5 min" read the same everywhere and a change to
@@ -36,7 +36,7 @@ object ValueFormat {
     }
 
     /**
-     * Amounts as a fraction, the compact status of a transfer (owner, 2026-11-05, Droidtop/tracker#886: "a fraction
+     * Amounts as a fraction, the compact status of a transfer (owner, 2026-11-05, mytop-project/tracker#886: "a fraction
      * display (downloaded over total)"): "1.2/3.4 GB" with one unit after the total, both units when they differ
      * ("640 MB/3.4 GB"), and the amount alone while the total is not known ("640 MB"). No "of", no sentence.
      */

@@ -22,7 +22,7 @@ object Notices {
 
     /**
      * One flash. [mark] draws a job's own mark in place of the tone's glyph (a check that draws in, a cross that shakes;
-     * Droidtop/tracker#643). [group] gathers flashes of one kind into one card: a flash of the same group while one is
+     * mytop-project/tracker#643). [group] gathers flashes of one kind into one card: a flash of the same group while one is
      * still waiting updates that card, its [count] going up and its text becoming [groupLine]'s, instead of queueing a
      * second ("3 downloads finished", not three cards). [opens] is what a press on the card shows in place: the job's
      * page, or Downloads for a group.

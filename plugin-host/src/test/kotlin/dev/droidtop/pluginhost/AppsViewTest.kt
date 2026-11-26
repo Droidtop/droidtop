@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `apps.view` (docs/plugin-api.md 3 F2, Droidtop/tracker#418): which links, and only during a call the person started. */
+/** `apps.view` (docs/plugin-api.md 3 F2, mytop-project/tracker#418): which links, and only during a call the person started. */
 class AppsViewTest {
     private val magnet = "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn=Some+Game+%5BRPG%5D"
 

@@ -198,7 +198,7 @@ class GOGStore : StoreLibrary {
 
     override val hasCloudSaves = true
 
-    /** [gameId]'s achievements and this account's progress, read-only (Droidtop/tracker#230, [GOGAchievements]). */
+    /** [gameId]'s achievements and this account's progress, read-only (mytop-project/tracker#230, [GOGAchievements]). */
     override suspend fun achievements(context: Context, gameId: String): Result<dev.droidtop.library.stores.StoreAchievements>? =
         GOGAchievements.read(context, gameId)
 

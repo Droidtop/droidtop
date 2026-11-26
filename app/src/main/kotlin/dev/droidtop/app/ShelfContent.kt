@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * What a Shelf widget shows (Droidtop/tracker#563), chosen in its maker ([ShelfConfigureActivity]) and kept by the
+ * What a Shelf widget shows (mytop-project/tracker#563), chosen in its maker ([ShelfConfigureActivity]) and kept by the
  * widget's id ([WidgetConfigs]): a [Kind] with its argument (a collection's or a system's id), a [Layout], the [Art]
  * a grid shows and the [TextSize] of its names.
  */

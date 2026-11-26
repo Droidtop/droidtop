@@ -8,7 +8,7 @@ import android.view.KeyEvent
 import android.view.View
 
 /**
- * A pad on the input method's own keyboard (Droidtop/tracker#338; docs/SPEC.md 6a "A pad on the keyboard"). While the
+ * A pad on the input method's own keyboard (mytop-project/tracker#338; docs/SPEC.md 6a "A pad on the keyboard"). While the
  * keyboard shows, Android hands a key event to the input method before the app, and this takes the pad's: the D-pad
  * moves a focus ring over the keys ([KeyFocus]) and A presses the key under it; the other buttons mean what they mean
  * on droidtop's text-entry slab (SPEC 4c, [Slab.button]), so a pad types the same way everywhere: X Backspace (held,
@@ -16,15 +16,15 @@ import android.view.View
  * [FaceKeys], so a Nintendo-layout pad's swap holds. A physical keyboard is not taken: it types, and its arrows move
  * the app's caret, as before. The ring shows only while the pad drives and goes with a touch.
  *
- * Above the keys (Droidtop/tracker#903 H12c): Up from the top row takes the ring onto the tool strip, then the mode's
+ * Above the keys (mytop-project/tracker#903 H12c): Up from the top row takes the ring onto the tool strip, then the mode's
  * own controls (one-handed's switch side and back to full, floating's Dock); Left and Right step along them, A presses
  * one, Down or B goes back to the keys. A panel a tool opens (the Modes chooser, clipboard, emoji, macros) takes the pad
  * while it is open: every direction steps through its buttons, A presses, B closes it. So every mode is reached by the
  * pad the way it is by touch, through the strip's Modes button, with no chord of its own. In the clipboard panel
- * (Droidtop/tracker#903 H12d) the ring steps through the clips first, then the header's buttons: A pastes the clip,
+ * (mytop-project/tracker#903 H12d) the ring steps through the clips first, then the header's buttons: A pastes the clip,
  * X opens its menu (Paste, Pin or Unpin, Delete), and B closes the menu, or the panel when no menu is open.
  *
- * The candidate bar (Droidtop/tracker#903 H6): Up from the tool strip, or from the top row when there is no strip,
+ * The candidate bar (mytop-project/tracker#903 H6): Up from the tool strip, or from the top row when there is no strip,
  * takes the ring onto the candidates ([CandidateView], [CandidateBar]). Left and Right step along them and onto the
  * expand button, A picks one as a tap does (or opens the grid), and in the grid every direction moves, Up and Down
  * across pages; Down from the row goes back to the tools, B closes the grid and then goes back to the keys.

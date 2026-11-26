@@ -163,7 +163,7 @@ data class PluginRecord(
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
                 subscribedEvents = subscribedEvents,
-                // A contract 1 record (installed before Droidtop/tracker#766) keeps none: it is never run.
+                // A contract 1 record (installed before mytop-project/tracker#766) keeps none: it is never run.
                 v2 = if (contractVersion >= PLUGIN_MANIFEST_MIN_CONTRACT_VERSION) V2Declarations.fromJson(json) else V2Declarations.EMPTY,
                 presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
                 app = AppTarget.fromJson(json.optJSONObject("app")),

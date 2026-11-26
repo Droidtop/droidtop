@@ -475,7 +475,7 @@ object GitHubAccountCatalog {
             subtitle = "Origin ${entry.origin}, key ${fingerprintOf(entry.keyBase64)}",
             groups = { context ->
                 // What the last check saw: no network here, a screen's rows are rebuilt on every change. Its updates are the
-                // ones the Updates page lists for this repository, from the same answer (Droidtop/tracker#837).
+                // ones the Updates page lists for this repository, from the same answer (mytop-project/tracker#837).
                 val (last, latest, updates) = withContext(Dispatchers.IO) {
                     Triple(
                         PluginRepoUpdates.lastResult(context, repo),
@@ -519,7 +519,7 @@ object GitHubAccountCatalog {
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading...")
                                     PluginRepoUpdates.installFromRepo(ctx, entry, assetName) { pluginId ->
-                                        // Approving happens on the plugin's own page; the notice opens it (Droidtop/tracker#759).
+                                        // Approving happens on the plugin's own page; the notice opens it (mytop-project/tracker#759).
                                         dev.droidtop.library.settings.Notices.flash(
                                             "A new plugin is waiting for your approval",
                                             context = ctx,

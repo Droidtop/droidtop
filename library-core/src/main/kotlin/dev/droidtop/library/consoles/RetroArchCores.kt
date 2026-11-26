@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Getting the libretro core a RetroArch launch needs into RetroArch (docs/SPEC.md 7e2c, Droidtop/tracker#271).
+ * Getting the libretro core a RetroArch launch needs into RetroArch (docs/SPEC.md 7e2c, mytop-project/tracker#271).
  *
  * One source of truth (coordinator, 2026-10-15): the RetroArch package is the one droidtop's preset launches, and
  * the core is fetched by the RetroArch manager plugin (`droidtop.retroarch`), whose `download_core` job droidtop
@@ -222,7 +222,7 @@ object RetroArchCores {
             onProgress = { _, line -> onStatus(line) },
             userInitiated = true,
         ) ?: run {
-            // Its page is one press away, never a path to look for (Droidtop/tracker#759).
+            // Its page is one press away, never a path to look for (mytop-project/tracker#759).
             dev.droidtop.library.settings.Notices.flash(
                 "The RetroArch manager is waiting for your approval",
                 source = "RetroArch",

@@ -66,7 +66,7 @@ internal object WinePrefixPreparation {
      * caller is already off the main thread.
      */
     suspend fun prepare(context: Context, prefix: Container, screenInfo: ScreenInfo): EnvVars {
-        // What each step costs on a launch, in one line (Droidtop/tracker#950 items 5 and 6): the numbers that decide
+        // What each step costs on a launch, in one line (mytop-project/tracker#950 items 5 and 6): the numbers that decide
         // which steps move off the game press to when a Wine environment is installed or updated.
         val steps = StepTimes()
         val imageFs = ImageFs.find(context)
@@ -168,11 +168,11 @@ internal object WinePrefixPreparation {
                 sharpnessDenoise = prefix.getExtra("sharpnessDenoise", "100").toIntOrNull() ?: 100,
             ),
         ) }
-        // XAudio2's classes back on their own DLLs where the prefix template put them on xapofx (Droidtop/tracker#898).
+        // XAudio2's classes back on their own DLLs where the prefix template put them on xapofx (mytop-project/tracker#898).
         runCatching { WineXAudioRegistry.repair(File(prefix.rootDir, ".wine/system.reg")) }
             .onSuccess { if (it > 0) Timber.i("Repaired %d XAudio2 class registrations in prefix %s", it, prefix.id) }
             .onFailure { Timber.w(it, "Could not check XAudio2's registration in prefix %s", prefix.id) }
-        // The Visual C++ 2015-2022 runtime's "installed" record, where Wine's DLLs are there without it (Droidtop/tracker#899).
+        // The Visual C++ 2015-2022 runtime's "installed" record, where Wine's DLLs are there without it (mytop-project/tracker#899).
         runCatching { WineVcRuntimes.ensure(File(prefix.rootDir, ".wine")) }
             .onSuccess { if (it > 0) Timber.i("Wrote %d Visual C++ runtime records in prefix %s", it, prefix.id) }
             .onFailure { Timber.w(it, "Could not check the Visual C++ runtime record in prefix %s", prefix.id) }

@@ -1,5 +1,5 @@
 /*
- * GIFs and stickers from the person's own folders (docs/SPEC.md 6a, "GIFs and stickers", Droidtop/tracker#903 H5): the
+ * GIFs and stickers from the person's own folders (docs/SPEC.md 6a, "GIFs and stickers", mytop-project/tracker#903 H5): the
  * Android side of GifLibrary.kt. The insert through the editor's content channel follows CleverKeys' KeyboardReceiver
  * (`insertGif`, `commitGifMedia`), https://github.com/tribixbite/CleverKeys at c8cbb74b, GPL-3.0 (Copyright (C)
  * tribixbite and contributors); its first-frame thumbnail memory cap follows GifGridManager's. The folder index, the
@@ -417,7 +417,7 @@ class ImeMediaTarget(private val ime: InputMethodService) : MediaTarget {
 }
 
 /**
- * The keyboard settings' "GIF and sticker folders" row (Droidtop/tracker#903 H5): the picked folders, each removable,
+ * The keyboard settings' "GIF and sticker folders" row (mytop-project/tracker#903 H5): the picked folders, each removable,
  * Add folder (the system's folder picker) and Rescan. What is going on shows on the row; a refusal is a dialog (no
  * toasts). Mirrors the Dictionaries row (DictionaryRow).
  */

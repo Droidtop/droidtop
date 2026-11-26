@@ -11,10 +11,10 @@ import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The process's clipboard history (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): the model
+ * The process's clipboard history (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340): the model
  * ([ClipboardHistory]) kept in memory, recorded from the primary clip as it changes (no polling), saved to a file in
  * the app's private storage, encrypted with a key that stays in the Android Keystore ([ClipboardVault],
- * Droidtop/tracker#772). Encoding, sealing and every file read and write run on one background thread; the main
+ * mytop-project/tracker#772). Encoding, sealing and every file read and write run on one background thread; the main
  * thread only touches memory.
  *
  * Android lets the focused app or the current input method read the clipboard (SPEC 6d), so recording works while

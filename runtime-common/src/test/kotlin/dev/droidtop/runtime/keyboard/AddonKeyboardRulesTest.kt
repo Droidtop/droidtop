@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Typing on the add-on display (docs/SPEC.md 4c, Droidtop/tracker#314). */
+/** Typing on the add-on display (docs/SPEC.md 4c, mytop-project/tracker#314). */
 class AddonKeyboardRulesTest {
     @Test
     fun `Android draws a keyboard on the built-in display and on displays set local, nowhere else`() {
@@ -26,7 +26,7 @@ class AddonKeyboardRulesTest {
 
     @Test
     fun `with a companion, typing goes there even for a field on the built-in screen`() {
-        // Owner, 2026-10-23 (Droidtop/tracker#612): typing "should always land on the lowest screen".
+        // Owner, 2026-10-23 (mytop-project/tracker#612): typing "should always land on the lowest screen".
         assertTrue(AddonKeyboardRules.droidtopServesField(0, emptySet(), KeyboardPlacement.COMPANION))
         assertTrue(AddonKeyboardRules.droidtopServesField(15, setOf(15), KeyboardPlacement.COMPANION))
         assertFalse(AddonKeyboardRules.droidtopServesField(0, emptySet(), KeyboardPlacement.NOT_CONTROLLED))
@@ -154,7 +154,7 @@ class AddonKeyboardRulesTest {
         val c = KeyboardPlacement.COMPANION
         assertEquals(null, AddonKeyboardRules.companionFallback(c, 5, setOf(0), true))
         assertEquals(CompanionFallback.COMPANION_KEYBOARD_OFF, AddonKeyboardRules.companionFallback(c, 5, setOf(0), false))
-        // The console run on 3061 (Droidtop/tracker#523): no companion counted as started on a screen other than the field's.
+        // The console run on 3061 (mytop-project/tracker#523): no companion counted as started on a screen other than the field's.
         assertEquals(CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN, AddonKeyboardRules.companionFallback(c, 5, emptySet(), true))
         assertEquals(CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN, AddonKeyboardRules.companionFallback(c, 0, setOf(0), true))
         assertEquals(null, AddonKeyboardRules.companionFallback(KeyboardPlacement.SAME_SCREEN, 5, emptySet(), false))

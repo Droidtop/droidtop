@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Not now for the session, and the last refusal a page names (Droidtop/tracker#518). */
+/** Not now for the session, and the last refusal a page names (mytop-project/tracker#518). */
 class PluginRefusalsTest {
     @Test
     fun `Not now lasts until the person chooses on the Permissions page`() {

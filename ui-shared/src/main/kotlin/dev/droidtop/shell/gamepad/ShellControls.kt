@@ -72,7 +72,7 @@ fun ShellSlider(fraction: Float, selected: Boolean, modifier: Modifier = Modifie
 
 /**
  * The shell's one progress bar ([ProgressLook]): the shared job bar ([dev.droidtop.ui.shared.JobProgress],
- * Droidtop/tracker#643) in Gaming's roles, a thin track in the scrim role filled in the accent, Steam's black track
+ * mytop-project/tracker#643) in Gaming's roles, a thin track in the scrim role filled in the accent, Steam's black track
  * and blue fill. The fill glides between reports; a negative [fraction] (a job under way whose size is not known yet)
  * is the checking shimmer. [modifier] gives it its width. A download's row, a capsule being installed and Home's
  * download cards all draw it.
@@ -88,7 +88,7 @@ fun ShellProgressBar(
 }
 
 /**
- * The shell's one loading indicator (Droidtop/tracker#671): [ShellProgressBar]'s checking shimmer, for something
+ * The shell's one loading indicator (mytop-project/tracker#671): [ShellProgressBar]'s checking shimmer, for something
  * under way with no measure (a list being built, a source being asked). Every waiting place draws this, never a
  * stock spinner; [modifier] may give another width ([ProgressLook.InlineLoadingWidth] beside a line of text).
  */

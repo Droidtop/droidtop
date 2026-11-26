@@ -86,7 +86,7 @@ struct ToplevelsSink {
 std::unordered_map<jint, std::shared_ptr<ToplevelsSink>> g_toplevelsSinks;
 
 /**
- * The Kotlin end of the text-field focus notification (Droidtop/tracker#685):
+ * The Kotlin end of the text-field focus notification (mytop-project/tracker#685):
  * HostBridge's onTextFieldFocus(boolean). Same shape and lifetime as
  * ToplevelsSink, and called from the dispatch thread the same way.
  */
@@ -353,7 +353,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnect(JNIEnv* env, jobject thiz,
         LOGI("onToplevelsChanged not found — the taskbar's window list will not update");
     }
 
-    // Text fields (Droidtop/tracker#685): set before connect(), which asks
+    // Text fields (mytop-project/tracker#685): set before connect(), which asks
     // for the seat's input method.
     auto textFieldSink = std::make_shared<TextFieldSink>();
     textFieldSink->bridgeRef = env->NewGlobalRef(thiz);
@@ -422,7 +422,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
     g_clients.erase(key);
 }
 
-// Whether the compositor ended the connection (Droidtop/tracker#688). A
+// Whether the compositor ended the connection (mytop-project/tracker#688). A
 // client that is gone (never connected, or disconnected by droidtop) is not
 // lost: only the compositor's side closing counts.
 extern "C" JNIEXPORT jboolean JNICALL

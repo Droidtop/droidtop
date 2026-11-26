@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The Windows environment's setup, as one state and one way to start it
- * (Droidtop/tracker#299). Settings' "Set up Windows games" row, A on a
+ * (mytop-project/tracker#299). Settings' "Set up Windows games" row, A on a
  * Windows game that is not ready, the game menu's setup row and the game
  * page's primary button all start [provision] and all read [State], so
  * none of them can disagree about whether it is installing, finished or

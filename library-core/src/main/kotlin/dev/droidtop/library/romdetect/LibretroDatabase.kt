@@ -23,7 +23,7 @@ import androidx.room.RoomDatabase
  * (one indexed query against `libretro-db.sqlite`, the ~13MB community
  * database Lemuroid ships, bundled as droidtop's asset), after
  * [SerialScanner]'s header read. Matching by a ROM's whole-content CRC32
- * is Droidtop/tracker#780.
+ * is mytop-project/tracker#780.
  *
  * `system` values in this real database use [SystemID.dbname]'s own
  * convention (Lemuroid's real system id space, e.g. "nes"/"md"/"scd"),

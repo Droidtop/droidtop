@@ -3,7 +3,7 @@ package dev.droidtop.runtime.tasks
 import android.content.Context
 
 /**
- * The classes of risky action Settings > Risky actions switches (docs/SPEC.md "Risky actions", Droidtop/tracker#248).
+ * The classes of risky action Settings > Risky actions switches (docs/SPEC.md "Risky actions", mytop-project/tracker#248).
  * A risky action changes another app or the system through the privileged helper; each class has its own switch,
  * all of them behind a master switch, all off until the person turns them on.
  */

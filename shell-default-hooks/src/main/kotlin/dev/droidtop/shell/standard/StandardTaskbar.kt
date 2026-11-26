@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Standard mode's taskbar for tablet-sized and larger displays (docs/SPEC.md
- * 2c "Taskbar on large screens", Droidtop/tracker#88): a strip along the
+ * 2c "Taskbar on large screens", mytop-project/tracker#88): a strip along the
  * bottom of every such display, above whatever app is up, with the launcher's
  * pinned apps, the apps opened since it started, an Apps button that opens
  * the drawer, and Recents. A dot marks an app that is still running.
@@ -70,7 +70,7 @@ import kotlinx.coroutines.launch
  *
  * Window events arrive on the main thread; what one means (an activity or not, a home app or not, whether droidtop is
  * Home, which apps still run) is worked out on Launcher3's helper thread, and the bar is redrawn only when what it
- * shows changed (Droidtop/tracker#771).
+ * shows changed (mytop-project/tracker#771).
  */
 class StandardTaskbar(private val service: AccessibilityService) {
     private data class Entry(
@@ -99,7 +99,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     /**
      * Whether the last switch read Android's own task list exactly (More controls): the open list is then the running
      * apps ([TaskbarPolicy.openFromTasks]) and a long press closes the app; otherwise the list is the windows this bar
-     * saw come to the front and a long press only takes the app off the bar (Droidtop/tracker#702).
+     * saw come to the front and a long press only takes the app off the bar (mytop-project/tracker#702).
      */
     private var tasksExact = false
     private var desktopInFront = false
@@ -107,7 +107,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     /** The mode in use when the last window came to the front (`Modes.lastMode`): the bar is Standard's alone. */
     private var modeInUse = ""
 
-    /** The displays whose bar the person folded with Hide; each display keeps its own (Droidtop/tracker#700). */
+    /** The displays whose bar the person folded with Hide; each display keeps its own (mytop-project/tracker#700). */
     private val hiddenOn = HashSet<Int>()
 
     /** Per display, the app the person pressed Show for while the bar had folded over it: it stays up for that app. */
@@ -154,7 +154,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
      * The bar's inks, all from the colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"), the Gaming
      * theme's by default: the plate, its text, the divider, the focus fill and the accent of the running dot and the
      * focus ring. They were fixed dark-plate constants, so a light theme never reached the bar
-     * (Droidtop/tracker#701). Followed while attached; a change redraws every bar.
+     * (mytop-project/tracker#701). Followed while attached; a change redraws every bar.
      */
     private var inks = dev.droidtop.library.theme.TaskbarInks.of(dev.droidtop.library.theme.OutsideGamingColors.current(service))
     private var accentWatch: kotlinx.coroutines.Job? = null
@@ -273,7 +273,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
             running = alive
             tasksExact = fromTasks != null
             if (fromTasks != null) {
-                // The one task list (Droidtop/tracker#702): every running app, not only the ones seen since the bar started.
+                // The one task list (mytop-project/tracker#702): every running app, not only the ones seen since the bar started.
                 openKeys = TaskbarPolicy.openFromTasks(openKeys, fromTasks.map { it.first }, frontPackage?.takeIf { appInFront })
                 fromTasks.forEach { (key, component) -> if (key in openKeys && key !in openEntries) loadOpenEntry(key, component) }
             } else {
@@ -295,7 +295,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     }.getOrNull()?.takeIf { it.fidelity == dev.droidtop.runtime.tasks.Fidelity.EXACT }
 
     /**
-     * A long press on an open app while the task list is exact (Droidtop/tracker#702): it is closed the strongest way
+     * A long press on an open app while the task list is exact (mytop-project/tracker#702): it is closed the strongest way
      * droidtop can, as the Quick Menu's Running apps closes it, and leaves the bar unless the close failed; what came
      * of it is said unless it simply closed.
      */
@@ -454,7 +454,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     }
 
     private fun openDrawer(displayId: Int) {
-        // Standard's drawer, from Standard's bar: never a way into Standard from another mode (Droidtop/tracker#639).
+        // Standard's drawer, from Standard's bar: never a way into Standard from another mode (mytop-project/tracker#639).
         if (modeInUse != Mode.LAUNCHER.id) return
         val intent = Intent(Intent.ACTION_ALL_APPS)
             .setClassName(service.packageName, StandardComponents.LAUNCHER)
@@ -496,7 +496,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
         private var drawn: List<Any>? = null
 
         // The shared status readout (clock, network, battery), made once and moved into each rebuilt bar; its tap is
-        // the Quick Menu over this display, the same one R2 and the Desktop tray open (Droidtop/tracker#701).
+        // the Quick Menu over this display, the same one R2 and the Desktop tray open (mytop-project/tracker#701).
         private var status: dev.droidtop.ui.shared.StatusViews.Readout? = null
 
         fun show(pinned: List<Entry>, open: List<Entry>, running: Set<String>, collapsed: Boolean) {

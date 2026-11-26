@@ -1,11 +1,11 @@
-// Chinese typing through RIME (Droidtop/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME").
+// Chinese typing through RIME (mytop-project/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME").
 //
 // An engine behind :input-keyboard's InputEngine seam, kept out of that module, as :input-japanese is: :input-keyboard
 // does not depend on this one, :app registers RimeChinese at start (Seams.kt), and so the keyboard, and the standalone
 // Hacker Keyboard Reborn built from it, carry no engine. This module depends on :input-keyboard only for the seam.
 //
 // - librime.so (both ABIs) is rime/librime 56737cd2 with the lua, octagram and predict plugins, built by
-//   Droidtop/tracker#903 H8a (.github/workflows/rime-engine.yml) and released on this repository as the prerelease
+//   mytop-project/tracker#903 H8a (.github/workflows/rime-engine.yml) and released on this repository as the prerelease
 //   rime-engine-56737cd2. build-scripts/fetch-rime-engine.sh puts it, with rime_api.h, in rime/ (git-ignored) against
 //   rime-engine.pin; the android-setup action runs it before Gradle. It exports only librime's C API.
 // - droidtop's own JNI over it, src/main/cpp (libdroidtop_rime.so), is built here with CMake against that rime_api.h,

@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.update
 
 /**
  * The moments a plugin would run without droidtop's protection, and the one red dialog that asks first
- * (docs/SPEC.md 12a, "Full access asks in red"; Droidtop/tracker#481, final design on tracker#485, D1-D4).
+ * (docs/SPEC.md 12a, "Full access asks in red"; mytop-project/tracker#481, final design on tracker#485, D1-D4).
  * Owner, 2026-10-10: "Running plugins unsandboxed should be possible, but big red warnings and a recommendation
  * that users not install unsandboxed plugins". Cancel is first and focused, so a mashed A never allows anything;
  * the risky button is a deliberate move and a press. Nothing is silently best-effort: a contained plugin whose

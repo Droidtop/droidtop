@@ -12,7 +12,7 @@
 #define HOSTBRIDGE_SWIZZLE_SSSE3 1
 #endif
 
-// One row of a captured desktop frame onto Android's window (Droidtop/tracker#950, item 1). wl_shm's XRGB8888 and
+// One row of a captured desktop frame onto Android's window (mytop-project/tracker#950, item 1). wl_shm's XRGB8888 and
 // ARGB8888 are native-endian 0xAARRGGBB, so the bytes are B,G,R,X on a little-endian device; Android's
 // WINDOW_FORMAT_RGBA_8888 wants R,G,B,A. The fourth byte is written opaque: the desktop output is opaque, and in the
 // XRGB8888 frames a pixman compositor sends it is undefined. Kept free of Wayland and Android types so it reads, and

@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The record page's downloads as the console showed them on Thief of Hearts (Droidtop/tracker#859): one host under
+ * The record page's downloads as the console showed them on Thief of Hearts (mytop-project/tracker#859): one host under
  * two names, a section heading drawn as a row, two links that read the same, and a build's hosts to choose from.
  */
 class RecordHostsTest {

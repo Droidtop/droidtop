@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 
 /**
- * "Your theme is ready: <name>" with "Use it" and "Later" (docs/SPEC.md 7f, Droidtop/tracker#532): raised by
+ * "Your theme is ready: <name>" with "Use it" and "Later" (docs/SPEC.md 7f, mytop-project/tracker#532): raised by
  * [dev.droidtop.library.theme.ThemeOffer.pending] when a theme finished downloading while nobody was choosing one, so
  * the look of the shell never changes under the person. B is Later. Same panel and pad handling as every modal here.
  */

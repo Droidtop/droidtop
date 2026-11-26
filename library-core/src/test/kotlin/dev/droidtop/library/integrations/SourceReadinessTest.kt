@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which source plugins can answer a search, and how the ones that cannot are told (docs/SPEC.md 12a "One search", Droidtop/tracker#485). */
+/** Which source plugins can answer a search, and how the ones that cannot are told (docs/SPEC.md 12a "One search", mytop-project/tracker#485). */
 class SourceReadinessTest {
     private fun of(
         trust: PluginTrustState = PluginTrustState.APPROVED,

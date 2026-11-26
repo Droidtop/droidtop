@@ -4,7 +4,7 @@ package dev.droidtop.pluginhost
  * What a plugin's own download (`net.download`, docs/plugin-api.md D2) is called on its job row. The plugin's `title`
  * when it gave one, kept to one short line. Without one, "Download" and the file's name, but never a path into the
  * plugin's data and never a name that is only a hash: the Quick Menu's Downloads tab read "Download
- * dl/8f6bd4fd62d6e3bb.json" (rig, build 2778, Droidtop/tracker#739). Such a file is "Download data"; the row already
+ * dl/8f6bd4fd62d6e3bb.json" (rig, build 2778, mytop-project/tracker#739). Such a file is "Download data"; the row already
  * names the plugin beside it. Pure, so it is a JVM test.
  */
 object DownloadTitle {

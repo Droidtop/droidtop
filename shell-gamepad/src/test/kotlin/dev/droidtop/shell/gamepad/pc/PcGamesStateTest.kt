@@ -28,7 +28,7 @@ class PcGamesStateTest {
 
     @Test
     fun `Home and PC Games keep a place each`() {
-        // Home is a section of its own with a state of its own (Droidtop/tracker#611): PC Games' grid view and
+        // Home is a section of its own with a state of its own (mytop-project/tracker#611): PC Games' grid view and
         // cursor no longer go when Home is shown, and the other way round.
         val home = PcGamesState()
         val pc = PcGamesState().apply { view = PcView.OVERVIEW }

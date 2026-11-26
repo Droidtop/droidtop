@@ -7,7 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A feature that needs explaining once, to someone who had droidtop before it arrived (docs/SPEC.md 7b, "Update
- * onboarding", Droidtop/tracker#727). Declared in code where the feature is wired up and registered with
+ * onboarding", mytop-project/tracker#727). Declared in code where the feature is wired up and registered with
  * [FeatureSteps]; the changelog says what changed, a step says what to do about it.
  *
  * [arrived] is the changelog fragment it came with (`changelog.d/<arrived>.md`): the version it arrived in, named the

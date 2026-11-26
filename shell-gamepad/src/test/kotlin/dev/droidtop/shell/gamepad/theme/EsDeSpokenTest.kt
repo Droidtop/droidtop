@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-/** What TalkBack reads for a themed list's entry under the cursor (Droidtop/tracker#728). */
+/** What TalkBack reads for a themed list's entry under the cursor (mytop-project/tracker#728). */
 class EsDeSpokenTest {
     @Before
     fun installWords() = WordsForTests.install()

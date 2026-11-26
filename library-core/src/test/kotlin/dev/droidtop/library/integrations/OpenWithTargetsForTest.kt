@@ -7,7 +7,7 @@ import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What "open with" offers on a game (Droidtop/tracker#418): its manual and its video, only while the files exist. */
+/** What "open with" offers on a game (mytop-project/tracker#418): its manual and its video, only while the files exist. */
 class OpenWithTargetsForTest {
     private val dir: File = Files.createTempDirectory("openwith").toFile()
 

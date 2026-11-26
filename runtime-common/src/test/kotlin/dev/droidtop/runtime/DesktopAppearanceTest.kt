@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Linux desktop's look against droidtop's Light or dark (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694). */
+/** The Linux desktop's look against droidtop's Light or dark (docs/SPEC.md 2b "Desktop appearance", mytop-project/tracker#694). */
 class DesktopAppearanceTest {
     @Test
     fun `dark puts GTK 3 and libadwaita dark, light leaves Adwaita as it is`() {

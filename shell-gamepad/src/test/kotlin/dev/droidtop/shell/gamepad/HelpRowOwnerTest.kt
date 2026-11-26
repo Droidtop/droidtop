@@ -28,7 +28,7 @@ class HelpRowOwnerTest {
 
     @Test
     fun `hints switched off never hide the touch route from a person touching`() {
-        // Droidtop/tracker#839: the bar is the touch route to the pad buttons, and the Start menu has no other.
+        // mytop-project/tracker#839: the bar is the touch route to the pad buttons, and the Start menu has no other.
         assertEquals(
             HelpRowOwner.SHELL,
             esDeHelpRowOwner(showHints = false, touchFirst = true, claim = HelpRowClaim.NONE, padDriving = false),

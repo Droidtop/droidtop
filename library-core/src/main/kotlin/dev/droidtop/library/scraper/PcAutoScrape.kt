@@ -10,7 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568; the owner, 2026-10-16:
+ * PC and engine games get their details by themselves (docs/SPEC.md 7h, mytop-project/tracker#568; the owner, 2026-10-16:
  * "can we add an automatic scraping system? We have LOTS of games with no metadata", then "make sure pc game scraping
  * and stuff is enabled"). On by default: shortly after droidtop starts and after a store's library is read, the
  * one library scrape job runs over the PC and engine games (`LibraryScrapeJob.start(pcOnly = true)`), with the

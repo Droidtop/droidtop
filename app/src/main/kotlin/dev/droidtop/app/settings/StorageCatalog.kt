@@ -59,7 +59,7 @@ internal fun hiddenRowTitle(count: Int): String = "$count hidden ${if (count == 
 
 /**
  * The Storage page of Game sources (docs/SPEC.md 7j "Places",
- * Droidtop/tracker#227 and #397 slice E): the room each game folder has,
+ * mytop-project/tracker#227 and #397 slice E): the room each game folder has,
  * then Retro (each console system's games, from the library's index, drawn
  * at once and never moved), then PC: each store's installed games biggest
  * first with the size the store recorded and an Uninstall through the

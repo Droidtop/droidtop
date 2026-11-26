@@ -11,7 +11,7 @@
          foreground service on API 34+; POST_NOTIFICATIONS is required on
          API 33+ for the foreground-service notification itself to show. -->
     <!--
-      Not droidtop's (Droidtop/tracker#550, build review of v0.2.0-dev.2898): the manifest merger implies it for a
+      Not droidtop's (mytop-project/tracker#550, build review of v0.2.0-dev.2898): the manifest merger implies it for a
       library that declares no SDK level. droidtop reads no phone state; the SIM operator's name it shows for metered
       networks (MeteredGrants) needs no permission.
     -->
@@ -124,7 +124,7 @@
         tools:replace="android:label,android:icon,android:roundIcon,android:name">
 
         <!--
-          droidtop's own language (Settings, System, Language; Droidtop/tracker#627): AppCompat keeps the choice
+          droidtop's own language (Settings, System, Language; mytop-project/tracker#627): AppCompat keeps the choice
           itself before Android 13, which keeps it per app from then on.
         -->
         <service
@@ -227,7 +227,7 @@
         </activity>
 
         <!--
-          Another app asking droidtop to start a game (Droidtop/tracker#124): the same
+          Another app asking droidtop to start a game (mytop-project/tracker#124): the same
           action, exported, behind a per-app Allow, Ask first or Blocked answer on the
           plugin API's grant model (ExternalGameLaunch). The internal entry above stays
           unexported; another app cannot resolve it. Translucent, so the first-use sheet
@@ -293,7 +293,7 @@
           same shape as ContinuePlayingWidgetProvider above.
         -->
         <!--
-          The Library search and Quick launch widgets (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563),
+          The Library search and Quick launch widgets (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563),
           drawn by DroidtopWidgets like the two above. Quick launch's configure activity picks its game; a launcher
           starts it for the widget it is placing, so it is exported with the configure action only.
         -->
@@ -406,7 +406,7 @@
         </activity>
 
         <!--
-          The Plugin widget (Droidtop/tracker#563): one plugin's ui.widget or tile, drawn by droidtop's renderer.
+          The Plugin widget (mytop-project/tracker#563): one plugin's ui.widget or tile, drawn by droidtop's renderer.
           Its configure activity picks the source; a launcher starts it for the widget it places.
         -->
         <receiver
@@ -511,7 +511,7 @@
           launch resolve through onNewIntent against the ONE existing
           instance instead of stacking another.
 
-          android:taskAffinity="" (Droidtop/tracker#785): a task of its own.
+          android:taskAffinity="" (mytop-project/tracker#785): a task of its own.
           Sharing MainActivity's affinity, starting it on the built-in
           display with FLAG_ACTIVITY_NEW_TASK found the shell's task and
           brought that task, shell included, back to the built-in display
@@ -529,7 +529,7 @@
 
         <!--
           The Linux desktop's second output on another display (docs/SPEC.md 2b and 4,
-          Droidtop/tracker#908 step D3), opened there by DesktopSecondScreen.show with
+          mytop-project/tracker#908 step D3), opened there by DesktopSecondScreen.show with
           setLaunchDisplayId. A task of its own per display (taskAffinity "" and
           FLAG_ACTIVITY_MULTIPLE_TASK), so starting it never brings the shell's task
           along, the loop the companion's entry above describes. Configuration
@@ -696,9 +696,9 @@
           and never into an older droidtop screen. Not excluded from recents:
           Android removes a hidden task as soon as another task comes to the
           front, so Settings opened from Desktop was gone after HOME and could
-          not be on the bar (Droidtop/tracker#750, rig 2638).
+          not be on the bar (mytop-project/tracker#750, rig 2638).
         -->
-        <!-- The image picker for the desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
+        <!-- The image picker for the desktop's background picture (DesktopBackgroundPicture, mytop-project/tracker#694). -->
         <activity
             android:name="dev.droidtop.app.DesktopPictureActivity"
             android:exported="false"
@@ -716,7 +716,7 @@
         </activity>
 
         <!--
-          Every link droidtop answers goes to one router (docs/SPEC.md 12a "Links", Droidtop/tracker#459):
+          Every link droidtop answers goes to one router (docs/SPEC.md 12a "Links", mytop-project/tracker#459):
           droidtop's own action links (droidtop://call?v=2&..., and the older add-catalog and
           install-plugin forms), every https link as a general web-link handler that names no site
           (plugins register the sites they handle; a link nothing claims goes on to the browser), and
@@ -976,7 +976,7 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
-        <!-- Every kind of update, checked on droidtop's own schedule (docs/SPEC.md 10b, Droidtop/tracker#570). -->
+        <!-- Every kind of update, checked on droidtop's own schedule (docs/SPEC.md 10b, mytop-project/tracker#570). -->
         <service
             android:name="dev.droidtop.app.update.UpdateCheckJobService"
             android:exported="false"
@@ -1010,7 +1010,7 @@
             android:name=".KdeConnectTouchpadActivity"
             android:exported="false" />
 
-        <!-- The terminal into a container on Android (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909).
+        <!-- The terminal into a container on Android (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909).
              Turning the screen, a keyboard coming or going and the like resize the terminal rather than recreate the
              screen, whose shell would end with it; the soft keyboard resizes it too. -->
         <activity
@@ -1083,7 +1083,7 @@
         </service>
         <!--
           The new build's first word after droidtop replaced itself: opens Home again when the update was asked
-          for (docs/SPEC.md 10b, Droidtop/tracker#202). The system sends MY_PACKAGE_REPLACED to this package only.
+          for (docs/SPEC.md 10b, mytop-project/tracker#202). The system sends MY_PACKAGE_REPLACED to this package only.
         -->
         <receiver
             android:name="dev.droidtop.app.update.UpdateRelaunchReceiver"

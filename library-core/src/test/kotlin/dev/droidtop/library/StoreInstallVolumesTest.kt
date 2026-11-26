@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The free-space answer a store install or update is asked with
- * (Droidtop/tracker#227): the fit check and the consent sheet's own
+ * (mytop-project/tracker#227): the fit check and the consent sheet's own
  * wording. The game-folder list and the StatFs read behind [installVolumes]
  * need a device; what is tested here is the decision and the sentence,
  * both pure.
@@ -131,7 +131,7 @@ class StoreInstallVolumesTest {
 
     @Test
     fun `a volume's meter is its used share, and none when its size is unknown`() {
-        // The Storage page's meter beside "X free of Y" (Droidtop/tracker#363).
+        // The Storage page's meter beside "X free of Y" (mytop-project/tracker#363).
         assertEquals(0.75f, usedFraction(InstallVolume("Internal storage", "/storage/emulated/0", 25L, 100L))!!, 0.0001f)
         assertEquals(1f, usedFraction(InstallVolume("Card", "/storage/0000-0000", 0L, 100L))!!, 0.0001f)
         assertNull(usedFraction(InstallVolume("Gone", "/mnt/gone", 0L, 0L)))

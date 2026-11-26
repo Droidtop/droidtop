@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Indiegala's library as its own Galaxy-style client reads it (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), after
+ * Indiegala's library as its own Galaxy-style client reads it (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after
  * Lacro59's playnite-indiegala-plugin (MIT; `Services/IndiegalaApi.cs`, `Models/GalaClient/GalaData.cs`,
  * `Models/Api/ApiGameDetails.cs`): the account's showcase collection from `login_new/user_info`, then each product's
  * details from `developers.indiegala.com/get_product_info`, which carry the DRM-free download links. Both calls send the

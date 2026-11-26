@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The one search's calculator row (Droidtop/tracker#704). */
+/** The one search's calculator row (mytop-project/tracker#704). */
 class SearchCalculatorTest {
     @Test
     fun `sums answer with their value`() {

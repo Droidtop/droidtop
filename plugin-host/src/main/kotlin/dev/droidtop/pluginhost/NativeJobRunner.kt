@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 /**
  * What a job droidtop runs itself (not a plugin) hands [PluginJobsCenter]
  * so it shows in the same list and gets the same Pause, Resume and Cancel
- * (docs/SPEC.md 12a "Jobs", Droidtop/tracker#174). `args` are the job's own
+ * (docs/SPEC.md 12a "Jobs", mytop-project/tracker#174). `args` are the job's own
  * stable arguments; `checkpoint` is null on a fresh start and otherwise the
  * last value the job passed to `report` before it was paused or the process
  * died; `report(percent, statusLine, checkpoint)` publishes progress, and a

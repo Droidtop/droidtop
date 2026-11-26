@@ -18,7 +18,7 @@ import org.pocketworkstation.pckeyboard.InputEngines
 import org.pocketworkstation.pckeyboard.KeyboardThreads
 
 /**
- * Mozc in this process (Droidtop/tracker#903 H7c): its dictionary, its library and the one lock around its calls.
+ * Mozc in this process (mytop-project/tracker#903 H7c): its dictionary, its library and the one lock around its calls.
  * Mozc keeps one session handler per process (mozcjni.cc's g_session_handler, made once by onPostLoad), so this is a
  * process singleton that every [MozcEngine] shares.
  *

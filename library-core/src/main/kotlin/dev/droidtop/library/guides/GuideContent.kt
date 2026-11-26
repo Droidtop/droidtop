@@ -8,7 +8,7 @@ import dev.droidtop.library.LibraryEntry
 import java.io.File
 
 /**
- * What every guide reader reads (docs/SPEC.md 7i "Guides", Droidtop/tracker#817): the pad's in the game menu, the
+ * What every guide reader reads (docs/SPEC.md 7i "Guides", mytop-project/tracker#817): the pad's in the game menu, the
  * companion's pane beside the running game. One list of a game's guides, one way to read a text guide, one way to draw
  * a PDF's pages, so the readers differ only in how they are driven. Everything here reads files: call it off the main
  * thread.

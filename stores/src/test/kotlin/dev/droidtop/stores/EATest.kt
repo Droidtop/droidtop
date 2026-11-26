@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** The EA app: the token, the owned base games and their products (Droidtop/tracker#335). Answers written here in the shape Lutris's ea_app service reads. */
+/** The EA app: the token, the owned base games and their products (mytop-project/tracker#335). Answers written here in the shape Lutris's ea_app service reads. */
 class EATest {
     @Test
     fun `the token comes from the auth answer, and an answer without one is a sign-in gone`() {

@@ -120,7 +120,7 @@ fun MenuHeader(title: String, subtitle: String? = null, modifier: Modifier = Mod
 @Composable
 fun MenuSectionLabel(text: String, modifier: Modifier = Modifier) {
     // In a pane (the Quick Menu's tabs) a label sits on a hairline, closer to its rows and a step smaller
-    // (DroidDeck's compact SettingsGroup, Droidtop/tracker#363): the pane holds more rows.
+    // (DroidDeck's compact SettingsGroup, mytop-project/tracker#363): the pane holds more rows.
     if (LocalShellWindow.current.inPane) {
         Column(modifier.padding(top = 10.dp, bottom = 4.dp)) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(MenuTokens.SectionLabel.copy(alpha = 0.3f)))
@@ -163,7 +163,7 @@ fun MenuRow(
     // list does, rather than every row reading identically (settings
     // polish pass, 2026-09-25).
     icon: CatalogIcon? = null,
-    // A picture in place of [icon] (a store's cached mark, Droidtop/tracker#503).
+    // A picture in place of [icon] (a store's cached mark, mytop-project/tracker#503).
     iconFile: String? = null,
     onClick: (() -> Unit)? = null,
     // Long-press is the touch route to Y on a row (the same convention
@@ -177,7 +177,7 @@ fun MenuRow(
     // at least [uniformRowHeight] tall, one title line and its summary lines
     // plus padding, so single-line rows (nearly all) share one height and a
     // page shows five or six of them, and a title that wraps to its second
-    // line grows the row rather than being cut (Droidtop/tracker#664). What
+    // line grows the row rather than being cut (mytop-project/tracker#664). What
     // does not fit two lines is ellipsized (the full text is on the focus
     // line and in the Info sheet).
     uniformHeight: Boolean = false,
@@ -218,16 +218,16 @@ fun MenuRow(
     // A job's progress (CatalogItem.progress): a thin bar under the title, the title then one line so
     // the row keeps its height. Null: not a job.
     progress: Float? = null,
-    // How that job's bar moves (CatalogItem.progressLook, Droidtop/tracker#643); a finished job's row, which has no
+    // How that job's bar moves (CatalogItem.progressLook, mytop-project/tracker#643); a finished job's row, which has no
     // bar, draws its check or cross beside the title.
     progressLook: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
-    // A job counted in parts (CatalogItem.progressParts): its bar in that many segments (Droidtop/tracker#738).
+    // A job counted in parts (CatalogItem.progressParts): its bar in that many segments (mytop-project/tracker#738).
     progressParts: Int = 0,
-    // A job's compact status (CatalogItem.progressIcon/progressValue, Droidtop/tracker#886): the icon before the bar
+    // A job's compact status (CatalogItem.progressIcon/progressValue, mytop-project/tracker#886): the icon before the bar
     // and the fixed-width value after it ("1.2/3.4 GB").
     progressIcon: dev.droidtop.library.settings.JobIcon? = null,
     progressValue: String? = null,
-    // One status glyph beside the title (CatalogItem.statusMark, Droidtop/tracker#644): a plugin that needs you.
+    // One status glyph beside the title (CatalogItem.statusMark, mytop-project/tracker#644): a plugin that needs you.
     statusMark: dev.droidtop.library.settings.StatusMark? = null,
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
@@ -235,13 +235,13 @@ fun MenuRow(
     // A short tag on the row beside its title (CatalogItem.chip, one of RowTag's words): "Unofficial". A fact, drawn on
     // the row, not a tooltip.
     chip: String? = null,
-    // The tag's tone (RowTag.tone): a red "Incompatible with your version" (Droidtop/tracker#932); neutral when null.
+    // The tag's tone (RowTag.tone): a red "Incompatible with your version" (mytop-project/tracker#932); neutral when null.
     chipTone: NoticeTone? = null,
     // The value drawn as a state chip (ChoiceItem.toned): in [valueTone]'s colours, or neutral when it has none
-    // (Droidtop/tracker#519).
+    // (mytop-project/tracker#519).
     valueChip: Boolean = false,
     // The value is a place (a folder, a path): one line, cut in the middle, so its start (the volume) and its end
-    // (the folder that is the game) both show (Droidtop/tracker#672).
+    // (the folder that is the game) both show (mytop-project/tracker#672).
     valuePath: Boolean = false,
     valueTone: NoticeTone? = null,
     // The row has Info (a sentence beyond its title): a 20dp glyph says so, and a screen reader hears
@@ -343,7 +343,7 @@ fun MenuRow(
                 }
                 if (chip != null) {
                     Spacer(Modifier.width(Space.Sm))
-                    // Capped, so a tag never takes the title's room (Droidtop/tracker#677); the words are RowTag's.
+                    // Capped, so a tag never takes the title's room (mytop-project/tracker#677); the words are RowTag's.
                     val palette = LocalNoticePalette.current
                     StatusChip(
                         chip,
@@ -356,7 +356,7 @@ fun MenuRow(
             if (progress != null) {
                 Row(Modifier.padding(top = Space.Sm), verticalAlignment = Alignment.CenterVertically) {
                     // ↓ ▬▬▬▭ 1.2/3.4 GB: what it does as an icon, how far as the bar, how much as a value of one fixed
-                    // width, so nothing in the row moves while it counts (owner, 2026-11-05, Droidtop/tracker#886).
+                    // width, so nothing in the row moves while it counts (owner, 2026-11-05, mytop-project/tracker#886).
                     progressIcon?.let { icon ->
                         JobIconGlyph(icon, MenuTokens.OnSurfaceMuted, Modifier.size(16.dp))
                         Spacer(Modifier.width(Space.Sm))
@@ -366,7 +366,7 @@ fun MenuRow(
                         Spacer(Modifier.width(Space.Sm))
                         CompactValue(progressValue, MaterialTheme.typography.labelSmall.tabularFigures(), MenuTokens.OnSurfaceMuted)
                     } else if (selected && progress >= 0f && progressLook == dev.droidtop.library.settings.JobLook.ACTIVE) {
-                        // The percent only where the cursor is, in figures that keep their width (Droidtop/tracker#643:
+                        // The percent only where the cursor is, in figures that keep their width (mytop-project/tracker#643:
                         // "Percent only on focus, in tabular figures").
                         Spacer(Modifier.width(Space.Sm))
                         Text(
@@ -460,7 +460,7 @@ fun MenuRow(
                     modifier = Modifier.valueShare().then(
                         if (columnWidth != null) {
                             // The shared width is a minimum, not a box: a value measured narrower than it draws
-                            // (the rig wrapped "Review" as "Revie/w", Droidtop/tracker#480) still gets the room it needs.
+                            // (the rig wrapped "Review" as "Revie/w", mytop-project/tracker#480) still gets the room it needs.
                             Modifier.widthIn(min = columnWidth, max = MenuTokens.ValueColumnMaxWidth)
                         } else {
                             Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
@@ -507,7 +507,7 @@ fun MenuRow(
  * A row's value column never takes more than [MenuTokens.ValueMaxShare] of the width left to it. The shared value
  * column is up to [MenuTokens.ValueColumnMaxWidth] wide, and the Quick Menu's pane is about as wide as that, so a
  * long value pushed the title to zero width and an info row read as a bare value (rig, build 1715, Quick Menu >
- * Plugins > Sample, Droidtop/tracker#316). Capping the outer constraint leaves the inner width modifiers to settle
+ * Plugins > Sample, mytop-project/tracker#316). Capping the outer constraint leaves the inner width modifiers to settle
  * inside it, so it must come FIRST in the chain: after a fixed width it capped that width instead of the row's, and
  * a touch row's arrows (two 48 dp targets) left its value one letter wide ("A", "B" on a plugin's Permissions
  * screen at 1920x1080, rig, build 1768).
@@ -594,7 +594,7 @@ val LocalValueColumnWidth = androidx.compose.runtime.compositionLocalOf<androidx
  * CURRENT type scale (sp through the font scale the Text size setting
  * drives), so it grows with the setting. It used to make room for two title
  * lines on every row, which left single-line rows twice their height and
- * three rows to a page (Droidtop/tracker#664); a wrapped title now grows its
+ * three rows to a page (mytop-project/tracker#664); a wrapped title now grows its
  * own row.
  */
 @Composable

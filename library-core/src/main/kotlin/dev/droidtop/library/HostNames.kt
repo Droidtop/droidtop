@@ -1,7 +1,7 @@
 package dev.droidtop.library
 
 /**
- * One name per file host (Droidtop/tracker#859): a host a thread names by another of its domains is that host.
+ * One name per file host (mytop-project/tracker#859): a host a thread names by another of its domains is that host.
  * BZZHR (bzzhr.co) is BuzzHeavier's short domain, so a build that lists both offered one host twice under two names.
  * Matching ignores case and a ".co"/".com"-style ending, as threads write hosts either way. Pure.
  */

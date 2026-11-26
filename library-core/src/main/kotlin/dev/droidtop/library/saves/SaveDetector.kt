@@ -28,7 +28,7 @@ import java.io.File
  * Enginehost's save root for an engine family, where droidtop looks for the saves of a game Enginehost ran
  * (`<volume>/Enginehost/saves`, enginehost `SaveLocationStore.defaultRoot` + `saveRootFor`). The person may move it,
  * per family; Enginehost keeps that choice to itself, so this is the default until the Enginehost adapter plugin's
- * `saves.roots@1` answers with the real folders (Droidtop/tracker#546, design v3 D12).
+ * `saves.roots@1` answers with the real folders (mytop-project/tracker#546, design v3 D12).
  */
 object EnginehostSaveRoots {
     @Suppress("DEPRECATION")

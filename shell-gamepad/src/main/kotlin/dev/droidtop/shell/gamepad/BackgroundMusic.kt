@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Gaming's background music (Droidtop/tracker#725): the tracks of the person's music folder, shuffled and looped, while
+ * Gaming's background music (mytop-project/tracker#725): the tracks of the person's music folder, shuffled and looped, while
  * the shell is in front and no game runs, at the volume of Settings > Shell behaviour > Background music (0, the
  * default, is off). It asks Android for audio focus as music, so another app's music or video pauses it until that
  * ends, and a short sound that asks to duck it (a notification) lowers it for a moment. It plays well under full

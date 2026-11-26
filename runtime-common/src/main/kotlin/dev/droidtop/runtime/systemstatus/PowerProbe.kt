@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * What the companion's System > Power card can show and change on this device (docs/SPEC.md "The companion's tabs",
- * Power and performance; Droidtop/tracker#414 slice C16), found by looking, never assumed per model:
+ * Power and performance; mytop-project/tracker#414 slice C16), found by looking, never assumed per model:
  * - each CPU cluster's clock and governor from cpufreq (`/sys/devices/system/cpu/cpufreq/policy*`), and the GPU's clock
  *   from the paths kernels use for it; a value Android hides from apps is left out, never drawn as zero;
  * - a fan mode and a charge limit, where the device keeps them as Android settings (`settings list`, through the helper

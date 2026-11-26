@@ -35,14 +35,14 @@ class CompanionCatalogPanelTest {
     @Test fun cardsCarryTheQuickMenusItemsInTheSameOrder() {
         val cards = companionSystemCards(::quick, performance, privacy)
         assertEquals(listOf("system", "display", "sound", "connections", "controllers", "power", "storage", "privacy"), cards.map { it.id })
-        // The Android settings row is Device's "Android's pages" on the companion (Droidtop/tracker#786 S3).
+        // The Android settings row is Device's "Android's pages" on the companion (mytop-project/tracker#786 S3).
         assertEquals(
             quick(QuickSection.SYSTEM).map { it.id } - GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
             cards.first { it.id == "system" }.items.map { it.id },
         )
-        // Brightness is drawn by the built-in screen's card above Display's rows (Droidtop/tracker#786 S7).
+        // Brightness is drawn by the built-in screen's card above Display's rows (mytop-project/tracker#786 S7).
         assertEquals(quick(QuickSection.DISPLAY).map { it.id } - ON_SCREEN_CARD, cards.first { it.id == "display" }.items.map { it.id })
-        // Media volume is the Sound card's own Media slider (Droidtop/tracker#786 S8).
+        // Media volume is the Sound card's own Media slider (mytop-project/tracker#786 S8).
         assertEquals(quick(QuickSection.AUDIO).map { it.id } - ON_STREAM_SLIDERS, cards.first { it.id == "sound" }.items.map { it.id })
         // Every Quick Menu item is on the companion exactly once.
         val all = cards.flatMap { card -> card.items.map { it.id } }
@@ -77,7 +77,7 @@ class CompanionCatalogPanelTest {
         assertEquals(mapOf("b1" to "Keys"), companionHeadings(groups))
     }
 
-    // Droidtop/tracker#786 S8: what Do Not Disturb lets through sits right under its row, titled.
+    // mytop-project/tracker#786 S8: what Do Not Disturb lets through sits right under its row, titled.
     @Test fun dndCategoriesFollowTheDndRowUnderTheirHeading() {
         val alarms = ActionItem(id = "pref_dnd_allows_alarms", title = "Alarms", run = {})
         val calls = ActionItem(id = "pref_dnd_allows_calls", title = "Calls", run = {})
@@ -91,14 +91,14 @@ class CompanionCatalogPanelTest {
         assertTrue(companionSystemCards(::quick, performance, privacy).first { it.id == "sound" }.headings.isEmpty())
     }
 
-    // Droidtop/tracker#786 S9: Controllers carries the pad rows and shows with no pad (it draws "None connected").
+    // mytop-project/tracker#786 S9: Controllers carries the pad rows and shows with no pad (it draws "None connected").
     @Test fun controllersCardCarriesThePadRows() {
         val swap = ActionItem(id = "pref_controller_swap_ab", title = "Swap A and B", run = {})
         assertEquals(listOf(swap.id), companionSystemCards(::quick, performance, privacy, controllers = listOf(swap)).first { it.id == "controllers" }.items.map { it.id })
         assertTrue(companionSystemCards(::quick, performance, privacy).any { it.id == "controllers" })
     }
 
-    // Droidtop/tracker#786 S7: font and display size are on Accessibility, not twice.
+    // mytop-project/tracker#786 S7: font and display size are on Accessibility, not twice.
     @Test fun fontAndDisplaySizeAreOnAccessibilityOnly() {
         val font = ActionItem(id = dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT, title = "Font size", run = {})
         val withFont: (QuickSection) -> List<dev.droidtop.library.settings.CatalogItem> = { section ->

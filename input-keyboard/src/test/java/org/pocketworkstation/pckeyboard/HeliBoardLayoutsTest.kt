@@ -8,7 +8,7 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * The 4-row layouts made from HeliBoard's (Droidtop/tracker#342): each generated res/xml-<locale>/kbd_qwerty.xml
+ * The 4-row layouts made from HeliBoard's (mytop-project/tracker#342): each generated res/xml-<locale>/kbd_qwerty.xml
  * holds its source layout's letters, row by row, between the template's Shift and Delete, so a source edited without
  * running layouts-src/heliboard-to-kbd.py again fails here.
  */

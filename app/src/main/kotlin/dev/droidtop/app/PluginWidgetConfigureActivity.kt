@@ -27,7 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The Plugin widget's configure activity (Droidtop/tracker#563): picks which plugin source the widget shows, from
+ * The Plugin widget's configure activity (mytop-project/tracker#563): picks which plugin source the widget shows, from
  * [PluginWidgets.sources] (manifests only; no plugin is loaded to list them). Opened by the launcher when the widget is
  * placed or reconfigured, and by a tap on a widget whose source is unset or gone. Leaving without a pick cancels the
  * placement, as the AppWidget contract asks.

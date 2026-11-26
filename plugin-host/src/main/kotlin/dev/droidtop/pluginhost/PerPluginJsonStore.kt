@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 /**
  * One file per plugin in [dir], `<pluginId><suffix>`, written whole through [AtomicWrite]: the store behind the vault,
- * the picked-file tokens, the call counts, the grants and the activity log (Droidtop/tracker#766). It replaced a copy of
+ * the picked-file tokens, the call counts, the grants and the activity log (mytop-project/tracker#766). It replaced a copy of
  * the same read, write and delete in each of them.
  *
  * A file that does not parse is never read as empty and then written over, which lost a plugin's whole vault index when

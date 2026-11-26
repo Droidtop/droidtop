@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * The overlay stack owns the keys from the moment an overlay is pushed
- * (docs/SPEC.md 6e, Droidtop/tracker#359): the library behind a game menu
+ * (docs/SPEC.md 6e, mytop-project/tracker#359): the library behind a game menu
  * never sees the opening A's release or the first D-pad press.
  */
 class OverlayKeysTest {

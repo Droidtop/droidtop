@@ -13,7 +13,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
- * "Prepare for first launch" (docs/SPEC.md 9; Droidtop/tracker#866, option 2): the game started out of sight and silent
+ * "Prepare for first launch" (docs/SPEC.md 9; mytop-project/tracker#866, option 2): the game started out of sight and silent
  * so its translation cache ([TranslationCache]) holds its start-up code before the person's first real start.
  *
  * The session is the one a real launch makes ([WineXSession], the same prefix and launch environment), with an

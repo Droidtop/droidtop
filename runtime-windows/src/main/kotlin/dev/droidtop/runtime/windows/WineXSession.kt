@@ -86,7 +86,7 @@ class WineXSession(
      * reads both streams of it and hands each line to this). Owned by the session for the run, and handed to
      * [start]'s callback when the guest ends: the screen drops its reference to the session the moment a person
      * stops the game, and reading the output through that reference after the kill found nothing, so a stopped
-     * run's record said "Last 0 lines" (Droidtop/tracker#601). Each line also goes to logcat under `droidtop.wine`.
+     * run's record said "Last 0 lines" (mytop-project/tracker#601). Each line also goes to logcat under `droidtop.wine`.
      */
     private val collector = RunLogCollector(echo = { line -> Log.i(WinePresentation.LOG_TAG, line) })
 
@@ -133,7 +133,7 @@ class WineXSession(
         // launch's.
         runCatching { FileUtils.clear(imageFs.tmpDir) }
 
-        // OpenGL on x86_64 software graphics (Droidtop/tracker#309): the X server answers the GLX question for the
+        // OpenGL on x86_64 software graphics (mytop-project/tracker#309): the X server answers the GLX question for the
         // client-side GLX of Mesa's xlib libGL, before the guest connects.
         if (X86_64Graphics.clientSideGlx(context, prefix)) xServer.advertiseClientSideGlx()
 
@@ -150,11 +150,11 @@ class WineXSession(
             XServerComponent(xServer, UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)),
         )
         environment.addComponent(NetworkInfoUpdateComponent())
-        // Venus on x86_64 (Droidtop/tracker#608): its vtest server, up before the guest starts.
+        // Venus on x86_64 (mytop-project/tracker#608): its vtest server, up before the guest starts.
         if (X86_64Graphics.usesVenus(context, prefix)) {
             environment.addComponent(VtestServerComponent(X86_64Graphics.vtestSocket(context)))
         }
-        // Video in Wine games (Droidtop/tracker#601): the sandboxed decode server, up before the guest starts.
+        // Video in Wine games (mytop-project/tracker#601): the sandboxed decode server, up before the guest starts.
         environment.addComponent(MediaDecodeServerComponent(WineMediaDecode.socket(context)))
 
         envVars.apply {
@@ -170,7 +170,7 @@ class WineXSession(
             // container was activated last.
             put("WINEPREFIX", File(prefix.rootDir, ".wine").absolutePath)
             // Proton's media converter, which Media Foundation decodes through, needs its files named
-            // (WineMediaConverter, Droidtop/tracker#897); set before the prefix's own variables, which win.
+            // (WineMediaConverter, mytop-project/tracker#897); set before the prefix's own variables, which win.
             runCatching { WineMediaConverter.prepare(context, prefix.rootDir) }
                 .onSuccess { it.forEach { (name, value) -> put(name, value) } }
                 .onFailure { Log.w("droidtop.wine", "Couldn't prepare the media converter's files: ${it.message}") }
@@ -269,7 +269,7 @@ class WineXSession(
             setFEXCorePreset(prefix.fexCorePreset)
             // Every mapped drive, so a game on an SD card is reachable
             // from inside the prefix rather than only from Android.
-            // As the grants allow them (WineStorageGrants, Droidtop/tracker#584).
+            // As the grants allow them (WineStorageGrants, mytop-project/tracker#584).
             bindingPaths = WineStorageGrants.drives(context, prefix).map { it.second }.toTypedArray()
             this.envVars = envVars
             setWorkingDir(WineWorkingDirectory.resolve(workingDir, imageFs.rootDir))
@@ -313,7 +313,7 @@ class WineXSession(
      * Ends the guest and everything started for it. Callable from the main
      * thread: the work (killing Wine and the audio daemon, then `wineserver -k`)
      * is process spawning and waiting, which on the main thread under memory
-     * pressure was an ANR with the game still running (Droidtop/tracker#357).
+     * pressure was an ANR with the game still running (mytop-project/tracker#357).
      * It runs on [teardown], one thread in order; the next launch waits for it
      * ([awaitTeardown]) so it never meets a half-stopped guest.
      */
@@ -325,7 +325,7 @@ class WineXSession(
             // A game left with Back is paused (SIGSTOP). Continue it first: a stopped wineserver
             // cannot answer `wineserver -k`, and the pause's own verifier must not stop anything
             // again. Then whatever Wine is still listed is killed, the sweep the next launch does
-            // anyway, so a stopped session does not wait for one (Droidtop/tracker#249, rig on 1894).
+            // anyway, so a stopped session does not wait for one (mytop-project/tracker#249, rig on 1894).
             runCatching { ProcessHelper.resumeAllWineProcesses() }
             runCatching { winHandler?.stop() }
             runCatching { environment.stopEnvironmentComponents() }

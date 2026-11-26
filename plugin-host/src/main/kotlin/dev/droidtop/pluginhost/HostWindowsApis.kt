@@ -35,7 +35,7 @@ object DesktopPluginBridge {
 }
 
 /**
- * E5, Windowing (docs/plugin-api.md 1.12, Droidtop/tracker#221): a plugin lists, focuses and closes Desktop windows,
+ * E5, Windowing (docs/plugin-api.md 1.12, mytop-project/tracker#221): a plugin lists, focuses and closes Desktop windows,
  * served from host-bridge's window list, nothing in the container. `windows.list` needs `windows.read`; `windows.focus`
  * and `windows.close` need `windows.control`. Both are dangerous, so every call is in the activity log. A permission
  * may be narrowed to apps (`"apps": ["org.mozilla.firefox"]`): droidtop then shows and acts on those apps' windows only.

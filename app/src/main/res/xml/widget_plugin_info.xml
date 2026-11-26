@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The Plugin widget (Droidtop/tracker#563): one plugin's ui.widget, quick tile or status tile, chosen when it is placed
+  The Plugin widget (mytop-project/tracker#563): one plugin's ui.widget, quick tile or status tile, chosen when it is placed
   and again from a long press where the launcher offers reconfiguring. Drawn by droidtop from the plugin's data; no
   plugin code runs in the launcher.
 -->

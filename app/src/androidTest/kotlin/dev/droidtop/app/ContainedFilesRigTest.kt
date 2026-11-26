@@ -30,7 +30,7 @@ import java.security.MessageDigest
 
 /**
  * A contained plugin's own folder on a real device (docs/plugin-api.md 5.3, "What a contained plugin's own folder
- * holds", Droidtop/tracker#375): files, listing, chmod, utimes, SharedPreferences, SQLite (rollback journal and WAL), the
+ * holds", mytop-project/tracker#375): files, listing, chmod, utimes, SharedPreferences, SQLite (rollback journal and WAL), the
  * quota's ENOSPC and the per-file EFBIG, each done the way a Flutter package's Android half does it, by Android's own
  * paths, from inside droidtop's isolated sandbox process. Run by hand with `am instrument`, never in CI:
  *

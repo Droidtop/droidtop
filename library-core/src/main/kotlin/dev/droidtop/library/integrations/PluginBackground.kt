@@ -95,7 +95,7 @@ object PluginBackground {
     private val restarts = ConcurrentHashMap<String, Job>()
 
     /**
-     * Each service's last failed run: the one row a failing service keeps in Downloads, with Retry (Droidtop/tracker#790).
+     * Each service's last failed run: the one row a failing service keeps in Downloads, with Retry (mytop-project/tracker#790).
      * On the console a service that failed on every start left a row per attempt.
      */
     private val lastFailed = ConcurrentHashMap<String, String>()

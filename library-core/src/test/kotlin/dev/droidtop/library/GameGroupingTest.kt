@@ -283,7 +283,7 @@ class GameGroupingTest {
 
     @Test
     fun `an update row names both versions in words, and an unknown one as unknown`() {
-        // Owner, 2026-10-24 (Droidtop/tracker#639): "show current and newest available version, in a way that makes it obvious which is which".
+        // Owner, 2026-10-24 (mytop-project/tracker#639): "show current and newest available version, in a way that makes it obvious which is which".
         assertEquals("Available: v0.38", GameUpdates.availableLabel("0.38"))
         assertEquals("Available: v0.38", GameUpdates.availableLabel("v0.38"))
         assertEquals("Installed: v0.37", GameUpdates.installedLabel("0.37"))
@@ -311,7 +311,7 @@ class GameGroupingTest {
 
     @Test
     fun `a card names its game in words, as the folder's own title does`() {
-        // Rig, build 2361 (Droidtop/tracker#282): the folder's title was split but the card's name was not.
+        // Rig, build 2361 (mytop-project/tracker#282): the folder's title was split but the card's name was not.
         val games = GameGrouping.group(
             listOf(
                 GameGrouping.Found("/games/AHouseInTheRift-0.8.09r1-pc"),

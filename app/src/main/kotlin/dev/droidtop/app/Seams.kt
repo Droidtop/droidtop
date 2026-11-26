@@ -6,7 +6,7 @@ import dev.droidtop.runtime.ContainerRuntime
 
 /**
  * Every seam droidtop's modules call back through, installed once per process from [DroidtopApplication.onCreate]
- * (Droidtop/tracker#763): the plugin broker's providers, the download and debrid hooks, and the library's runtimes. A
+ * (mytop-project/tracker#763): the plugin broker's providers, the download and debrid hooks, and the library's runtimes. A
  * seam is set here before anything can ask it, never as a side effect of something else starting. The catalog
  * provider's seams stay in SettingsCatalogInitProvider: the catalogs and the restored jobs that read them start
  * there, before onCreate.
@@ -16,13 +16,13 @@ internal object Seams {
         // A plugin's web sign-in follows the keyboard placement droidtop's own pages do (WebViewKeys, docs/SPEC.md 4c).
         dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = { view ->
             WebViewKeys.attach(view)
-            // No app-named X-Requested-With on a site's requests (Droidtop/tracker#600): XenForo, which F95zone runs,
+            // No app-named X-Requested-With on a site's requests (mytop-project/tracker#600): XenForo, which F95zone runs,
             // reads that header to tell its own in-page requests, and its log-in overlay failed in this view.
             if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
                 androidx.webkit.WebSettingsCompat.setRequestedWithHeaderOriginAllowList(view.settings, emptySet())
             }
         }
-        // droidtop's hidden web views run behind the screen in front, where a site's check finishes (Droidtop/tracker#783).
+        // droidtop's hidden web views run behind the screen in front, where a site's check finishes (mytop-project/tracker#783).
         ForegroundScreen.track(app)
         dev.droidtop.pluginhost.HiddenWebViews.window = { ForegroundScreen.content() }
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
@@ -38,8 +38,8 @@ internal object Seams {
         dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(app) }
         // A plugin's secret facet, shown on droidtop's own sheet when the person presses Show (docs/plugin-api.md 1.10).
         dev.droidtop.pluginhost.PluginSecrets.setSurface { PluginSecretSheetActivity.open(app) }
-        // The keyboard's modern themes follow droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562), and the
-        // keyboards droidtop embeds take droidtop's palette for that light or dark (Droidtop/tracker#772, #903 H2): the
+        // The keyboard's modern themes follow droidtop's Light or dark (docs/SPEC.md 7k, mytop-project/tracker#562), and the
+        // keyboards droidtop embeds take droidtop's palette for that light or dark (mytop-project/tracker#772, #903 H2): the
         // active ES-DE theme's while a Gaming screen holds one, else the colours outside Gaming (Device colours by
         // default). The input method takes them too when the person picks "Match droidtop" (#903 H12b).
         org.pocketworkstation.pckeyboard.KeyboardAppearance.host = object : org.pocketworkstation.pckeyboard.KeyboardAppearance.Host {
@@ -64,11 +64,11 @@ internal object Seams {
                 )
             }
         }
-        // Japanese typing through Mozc (Droidtop/tracker#903 H7c): the engine for the input language "ja" and its
+        // Japanese typing through Mozc (mytop-project/tracker#903 H7c): the engine for the input language "ja" and its
         // settings row, registered with the keyboard's engine seam. Nothing loads or downloads here; the dictionary
         // comes the first time Japanese is used.
         dev.droidtop.input.japanese.MozcJapanese.install()
-        // Chinese typing through RIME (Droidtop/tracker#903 H8b), the same way: its data comes the first time Chinese is used.
+        // Chinese typing through RIME (mytop-project/tracker#903 H8b), the same way: its data comes the first time Chinese is used.
         dev.droidtop.input.chinese.RimeChinese.install()
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
@@ -84,7 +84,7 @@ internal object Seams {
             library = { LibraryCore.library(app) },
             records = { LibraryCore.records(app) },
         )
-        // `engines.cores` (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): what Enginehost can run or get decides a game's
+        // `engines.cores` (docs/plugin-api.md 3 A7b, mytop-project/tracker#752): what Enginehost can run or get decides a game's
         // runner, so its list is asked once the plugin host has started (PluginHostStart), when its app connects through the door and when it says the list changed.
         dev.droidtop.pluginhost.PluginBrokers.enginesChanged = { pluginId ->
             dev.droidtop.library.integrations.EngineCoreList.changed(app, pluginId)
@@ -92,11 +92,11 @@ internal object Seams {
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
         // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
-        // The guided key setup, opened in place from a game page's sign-in row (Droidtop/tracker#143).
+        // The guided key setup, opened in place from a game page's sign-in row (mytop-project/tracker#143).
         dev.droidtop.library.scraper.ScraperKeySetupLink.open = { context, service ->
             context.startActivity(ScraperKeySetupActivity.intent(context, service).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-        // Debrid (Droidtop/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
+        // Debrid (mytop-project/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
         dev.droidtop.pluginhost.debrid.DebridStep.accounts = { context -> dev.droidtop.library.debrid.DebridAccounts.connected(context) }
         dev.droidtop.pluginhost.debrid.DebridStep.waitsForService = { context -> dev.droidtop.library.debrid.DebridAccounts.waits(context) }
         // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
@@ -109,7 +109,7 @@ internal object Seams {
         }
         dev.droidtop.pluginhost.debrid.DebridChoice.spreadMode = { dev.droidtop.library.debrid.DebridAccounts.spread(app) }
         dev.droidtop.pluginhost.debrid.DebridChoice.onKeyRefused = { id, message -> dev.droidtop.library.debrid.DebridAccounts.refused(app, id, message) }
-        // A source's own index goes with its plugin (Droidtop/tracker#937).
+        // A source's own index goes with its plugin (mytop-project/tracker#937).
         dev.droidtop.pluginhost.PluginStore.onUninstalled = { context, pluginId ->
             dev.droidtop.library.integrations.SourceIndex.forgetPlugin(context, pluginId)
         }
@@ -117,7 +117,7 @@ internal object Seams {
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
             listOfNotNull(
                 dev.droidtop.library.integrations.UpdatePlacement.copySaves(placed, args),
-                // The version it follows, offered for removal (Droidtop/tracker#624).
+                // The version it follows, offered for removal (mytop-project/tracker#624).
                 dev.droidtop.library.integrations.UpdatePlacement.removalOffer(args),
             ).joinToString(". ").ifEmpty { null }
         }
@@ -137,7 +137,7 @@ internal object Seams {
             )
         // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
-        // A screenshot taken during a game is filed under it too (Droidtop/tracker#596).
+        // A screenshot taken during a game is filed under it too (mytop-project/tracker#596).
         dev.droidtop.runtime.Capture.fileUnderGame = { context, name, bytes -> dev.droidtop.library.GameScreenshots.save(context, name, bytes) }
         // Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder"): the one install door.
         dev.droidtop.library.FolderInstalls.runner = { context, installer, title, onStatus ->

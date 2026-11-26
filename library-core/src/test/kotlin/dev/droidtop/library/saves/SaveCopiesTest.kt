@@ -11,7 +11,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * Saves between a game's copies (docs/SPEC.md 7o, "Saves between copies", Droidtop/tracker#745): only the files a
+ * Saves between a game's copies (docs/SPEC.md 7o, "Saves between copies", mytop-project/tracker#745): only the files a
  * save rule matched move, the target is backed up first and can be put back, and the source is only read.
  */
 class SaveCopiesTest {

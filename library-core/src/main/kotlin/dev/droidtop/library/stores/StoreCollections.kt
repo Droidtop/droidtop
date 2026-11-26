@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A store's own groupings (Steam collections) as droidtop collections
- * (docs/SPEC.md 7g, "Collections", Droidtop/tracker#232): after a store's
+ * (docs/SPEC.md 7g, "Collections", mytop-project/tracker#232): after a store's
  * library is read, each of its collections becomes a collection named
  * "<store>: <name>" whose members are that store's games, and a collection
  * the store no longer has goes. The copy is the store's: it is made again at
@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
  * collections are separate and are never touched.
  *
  * A store's favourites ([StoreCollection.favourites]) are not a collection:
- * they are favourites, so they join droidtop's own (Droidtop/tracker#756, where
+ * they are favourites, so they join droidtop's own (mytop-project/tracker#756, where
  * Steam's became a second "Favorites" tab beside droidtop's empty one). Only
  * added: a favourite the person set or kept is never taken away by a sync.
  */

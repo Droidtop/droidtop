@@ -34,7 +34,7 @@ import timber.log.Timber
 
 /**
  * Steam's friends and 1:1 chat as one of droidtop's social providers (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313, and "Social", #327): who is on and what they play, the unread
+ * "Stores", mytop-project/tracker#313, and "Social", #327): who is on and what they play, the unread
  * messages Steam holds, the recent history of a conversation, sending, and a
  * message arriving while the connection is kept.
  *

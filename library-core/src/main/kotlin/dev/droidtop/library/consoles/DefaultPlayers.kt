@@ -43,7 +43,7 @@ import android.content.Context
  *     ROM=<path>
  *
  * Two differences from that left every game black on the console
- * (Droidtop/tracker#271). The file name: RetroArch's own core downloader
+ * (mytop-project/tracker#271). The file name: RetroArch's own core downloader
  * saves `<core>_libretro_android.so` (the buildbot's zip names), and this
  * wrote `<core>_android.so`, a file that does not exist. And no
  * CONFIGFILE: RetroArch's native side (frontend/drivers/platform_unix.c,

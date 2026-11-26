@@ -6,7 +6,7 @@ import java.security.SecureRandom
 
 /**
  * The sandbox library's program-tree binding (docs/SPEC.md 5b "Containment and copy-on-write layers for Wine",
- * piece 0; Droidtop/tracker#584).
+ * piece 0; mytop-project/tracker#584).
  *
  * A [Session] is one broker listener for one tree of processes: droidtop starts it before the tree, puts [environment]
  * into the tree's first process and [libsbx_child.so][CHILD_LIBRARY] first on its LD_PRELOAD ([withChildPreload]),

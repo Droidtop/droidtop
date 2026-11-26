@@ -1,4 +1,4 @@
-// droidtop's JNI over librime (Droidtop/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME").
+// droidtop's JNI over librime (mytop-project/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME").
 //
 // librime.so (rime-engine.pin's release) exports only its C entry points; this library reaches it through
 // rime_get_api() alone and links no other symbol of it. The natives are dev.droidtop.input.chinese.RimeJni's,

@@ -27,7 +27,7 @@ import dev.droidtop.shell.gamepad.input.HintRow
 /**
  * One row of the mode switcher: what it says and what choosing it does. [icon] is a mode's glyph; [current] marks the
  * mode in use; [apart] is a row that is not a mode (a maintenance action), drawn below the modes under its own heading
- * (Droidtop/tracker#530).
+ * (mytop-project/tracker#530).
  */
 class ModeSwitcherChoice(
     val label: String,
@@ -46,7 +46,7 @@ class ModeSwitcherChoice(
  * hosting this has no shell footer of its own. [title] lets the same sheet ask a question ("Make droidtop your Home
  * app...") with its answers as the rows. [hideSystemBars] is for a sheet over a shell that hides Android's bars
  * (Gaming, Desktop): its window hides them too, so it draws as the shell's own sheet rather than a separate window
- * under Android's status bar (Droidtop/tracker#750, console 2026-10-29).
+ * under Android's status bar (mytop-project/tracker#750, console 2026-10-29).
  */
 @Composable
 fun ModeSwitcherSheet(
@@ -106,7 +106,7 @@ fun ModeSwitcherSheet(
                         icon = choice.icon,
                         selected = index == focus,
                         // To a screen reader each row is a button, and the mode in use says so as its state
-                        // (docs/SPEC.md "Accessibility of the custom dialogs", Droidtop/tracker#91).
+                        // (docs/SPEC.md "Accessibility of the custom dialogs", mytop-project/tracker#91).
                         modifier = Modifier.semantics {
                             role = Role.Button
                             if (choice.current) {

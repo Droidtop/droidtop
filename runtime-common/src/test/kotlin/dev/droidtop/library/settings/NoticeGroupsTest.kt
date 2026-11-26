@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Flashes of one kind gather into one card that counts up (docs/SPEC.md "Motion and visual status", Droidtop/tracker#643). */
+/** Flashes of one kind gather into one card that counts up (docs/SPEC.md "Motion and visual status", mytop-project/tracker#643). */
 class NoticeGroupsTest {
 
     private val line: (Int) -> String = { n -> "$n downloads finished" }

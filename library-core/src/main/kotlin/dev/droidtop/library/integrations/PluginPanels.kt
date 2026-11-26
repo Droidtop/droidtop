@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * Plugin panels (docs/plugin-api.md 3 C17, Droidtop/tracker#316): each plugin's control and configuration point,
+ * Plugin panels (docs/plugin-api.md 3 C17, mytop-project/tracker#316): each plugin's control and configuration point,
  * in the Quick Menu the way Decky Loader puts each plugin's panel in Steam's Quick Access Menu. The Quick Menu's
  * Plugins section is a list with one row per plugin; A opens that plugin's panel and B comes back to the list.
  *
@@ -65,7 +65,7 @@ object PluginPanels {
     /**
      * One plugin's Quick Menu presence: its `ui.panel` entry if it declared one, its tiles on the Quick Menu, and
      * [facets], its `ui.facets` entry when that declares the `quickmenu` target. [companionFacets] is its `ui.facets`
-     * entry when that declares `companion.tab` (Droidtop/tracker#602): the companion draws the panel from those facets.
+     * entry when that declares `companion.tab` (mytop-project/tracker#602): the companion draws the panel from those facets.
      */
     data class Panel(
         val record: PluginRecord,
@@ -122,7 +122,7 @@ object PluginPanels {
 
     /**
      * Every installed plugin, by name, as the Quick Menu's Plugins section and the companion's Plugins tab list them
-     * (Droidtop/tracker#644): a plugin with no panel, tiles or facets for [mode] is listed too, with an empty panel
+     * (mytop-project/tracker#644): a plugin with no panel, tiles or facets for [mode] is listed too, with an empty panel
      * whose page is its Settings, Permissions and App status rows. Reads manifests, grants and the catalogs as last
      * fetched (never the network); call it off the main thread.
      */
@@ -151,7 +151,7 @@ object PluginPanels {
     fun summary(panel: Panel): String? = panel.tiles.firstNotNullOfOrNull { tile -> PluginTiles.cached(tile)?.let(::tileValue) }
 
     /**
-     * The Quick Menu's Plugins section, the one home of plugin menus (Droidtop/tracker#644, "Quick Menu > Plugins"):
+     * The Quick Menu's Plugins section, the one home of plugin menus (mytop-project/tracker#644, "Quick Menu > Plugins"):
      * every installed plugin, one row each with its icon, its name and one status glyph ([PluginStatus]), A opening its
      * panel in the sheet (a plugin with no panel of its own still has its Settings, Permissions and App status rows
      * there); then Manage plugins.
@@ -200,7 +200,7 @@ object PluginPanels {
                             title = null,
                             items = listOf(
                                 // Getting plugins, updates, permissions: the Plugins screen, pushed here in every
-                                // surface (Droidtop/tracker#586).
+                                // surface (mytop-project/tracker#586).
                                 NestedScreenItem(
                                     id = "plugin_panels_manage",
                                     title = "Manage plugins",
@@ -240,7 +240,7 @@ object PluginPanels {
         val more: List<CatalogGroup> = if (withMore) moreGroups(context, record) else emptyList()
         val id = "plugin_panel_${panel.pluginId}_$surface"
         val entry = panel.entry
-        // The companion draws a plugin's `companion.tab` facets where it has them (Droidtop/tracker#602): about the
+        // The companion draws a plugin's `companion.tab` facets where it has them (mytop-project/tracker#602): about the
         // running game on the Game tab, else about the device.
         val surfaceMode = PluginModes.ofSurface(surface)
         val onGame = surfaceMode != null && surface == PluginModes.Surfaces.companionGame(surfaceMode)
@@ -337,7 +337,7 @@ object PluginPanels {
 
     /**
      * The ways from a panel into the plugin's other pages: its settings, its own app and the app it manages. First its
-     * version, and a newer one from a catalog with the press that installs it (Droidtop/tracker#792: the companion's page
+     * version, and a newer one from a catalog with the press that installs it (mytop-project/tracker#792: the companion's page
      * showed neither). Reads the catalogs as last fetched, never the network.
      */
     private fun moreGroups(context: Context, record: PluginRecord): List<CatalogGroup> {
@@ -373,7 +373,7 @@ object PluginPanels {
             if (PluginCapability.APP_STATUS in m.capabilities) {
                 add(NestedScreenItem(id = "plugin_panel_${m.id}_app_status", title = "App status", inline = PluginAppStatus.screenFor(record)))
             }
-            // Every panel's frame ends with the way to what the plugin may do (Droidtop/tracker#521 item 8): droidtop's own
+            // Every panel's frame ends with the way to what the plugin may do (mytop-project/tracker#521 item 8): droidtop's own
             // row on every host, so no plugin adds a "permissions" or "about" row of its own.
             add(
                 NestedScreenItem(

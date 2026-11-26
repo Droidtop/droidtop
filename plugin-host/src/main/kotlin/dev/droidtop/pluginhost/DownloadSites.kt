@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): a fixed set of
+ * droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648): a fixed set of
  * file hosts droidtop ships and the sites the person adds, each signed in to once in droidtop's web view. The person
  * signs in on the site's own page; droidtop never types a password. Each site's cookies are sealed in droidtop's vault,
  * one entry per site under [VAULT_ID], which no plugin can name (plugin ids never start with `@`), and never logged.
@@ -196,7 +196,7 @@ object DownloadSites {
 
     /**
      * The signed-in download sites among [declared] (a plugin's `web.session` sites) whose sign-in droidtop shares with
-     * [pluginId] (Droidtop/tracker#648 slice 5): every one, unless the person turned sharing off for that plugin. Disk.
+     * [pluginId] (mytop-project/tracker#648 slice 5): every one, unless the person turned sharing off for that plugin. Disk.
      */
     fun sharedWith(context: Context, pluginId: String, declared: List<String>): Map<String, String> {
         if (!sharing(context, pluginId)) return emptyMap()

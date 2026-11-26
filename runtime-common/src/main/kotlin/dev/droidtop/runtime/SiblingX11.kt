@@ -4,7 +4,7 @@ import java.util.zip.CRC32
 
 /**
  * X11 programs in a sibling container (docs/SPEC.md 3d "Clipboard per container", the Xwayland bullet;
- * Droidtop/tracker#910). Each sibling runs an X server of its own, xwayland-satellite: rootless Xwayland with
+ * mytop-project/tracker#910). Each sibling runs an X server of its own, xwayland-satellite: rootless Xwayland with
  * satellite as its window manager, so every X window is an ordinary xdg toplevel on the desktop. It runs inside the
  * sibling as a client of the sibling's own `WAYLAND_DISPLAY`, which with the clipboard off is the filtering socket
  * ([ClipboardFilters]), so X selections reach no further than that container's Wayland clipboard does. The primary's

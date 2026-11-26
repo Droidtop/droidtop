@@ -21,7 +21,7 @@ import java.io.File
  *
  * - An open process also reaches the shared-storage folders its granted `files.shared.read` / `files.shared.write`
  *   entries declare ([SharedFiles.brokerRules]), by path, as the same plugin reaches them through `files.shared` (docs/plugin-api.md
- *   3 D5): a sync engine (the Syncthing plugin, Droidtop/tracker#553) works on games, ROMs and saves in place. A
+ *   3 D5): a sync engine (the Syncthing plugin, mytop-project/tracker#553) works on games, ROMs and saves in place. A
  *   contained process does not: its isolated UID cannot reach shared storage, and the D5 ops are its way there.
  *
  * Plugin files keep coming as descriptors (the guarded hooks' virtual paths, local files of the library) and plugin data
@@ -72,7 +72,7 @@ internal object SandboxBroker {
     /**
      * The plugin's own stand-in for droidtop's private folder: credential-encrypted and device-encrypted halves. Its
      * config and cache folders ([PluginContext.configDir], [PluginContext.cacheDir]) are made here, before the process
-     * starts, so they are there in every tier (owner, 2026-11-17, Droidtop/tracker#741).
+     * starts, so they are there in every tier (owner, 2026-11-17, mytop-project/tracker#741).
      */
     fun appDataFor(context: Context, pluginId: String): Pair<File, File> {
         val data = PluginStore.dataDirFor(context, pluginId)

@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * "These files changed" (docs/SPEC.md 7g, "Targeted indexing", Droidtop/tracker#354): a report is written down
+ * "These files changed" (docs/SPEC.md 7g, "Targeted indexing", mytop-project/tracker#354): a report is written down
  * before anything else, indexed in batches, forgotten only once indexed, and still there after a restart.
  */
 class LibraryPathsTest {

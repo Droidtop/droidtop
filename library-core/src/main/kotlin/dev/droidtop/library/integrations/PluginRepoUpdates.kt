@@ -54,7 +54,7 @@ data class RepoPluginUpdate(val installed: PluginRecord, val repo: UserOriginKey
 
 /**
  * A newer version of an installed plugin that a trusted repository's latest release carries, which droidtop would not
- * take (Droidtop/tracker#882): signed with another key than the one trusted for its origin, or for another origin.
+ * take (mytop-project/tracker#882): signed with another key than the one trusted for its origin, or for another origin.
  * Updates lists it with [reason] and no Update: taking it would skip the person's own trust decision.
  */
 data class RepoHeldUpdate(val installed: PluginRecord, val repo: String, val version: String, val reason: String)
@@ -111,7 +111,7 @@ sealed interface RepoCheckResult {
  * this file only decides what to fetch and tells the person afterwards.
  * When plugins ask before installing, the pass reads the release the same
  * way and installs nothing: what it read is [pendingUpdates], which the
- * Updates page lists (Droidtop/tracker#837).
+ * Updates page lists (mytop-project/tracker#837).
  * Everything here is blocking: call it off the main thread.
  */
 object PluginRepoUpdates {
@@ -163,7 +163,7 @@ object PluginRepoUpdates {
 
     /**
      * Newer versions of installed plugins that a trusted repository carries and droidtop would not take, from what the
-     * last pass read, with why ([RepoHeldUpdate], Droidtop/tracker#882). Preferences and the key store only.
+     * last pass read, with why ([RepoHeldUpdate], mytop-project/tracker#882). Preferences and the key store only.
      */
     fun heldUpdates(
         context: Context,
@@ -343,7 +343,7 @@ object PluginRepoUpdates {
     /**
      * Checks every trusted repository. With auto-update on it installs what is newer; off, it only reads the release, so
      * Updates lists what is newer and the person installs it from there (it never ran at all before, and a repository's
-     * update showed nowhere: Droidtop/tracker#837). [metered] defers bundle downloads (the release listing is one small
+     * update showed nowhere: mytop-project/tracker#837). [metered] defers bundle downloads (the release listing is one small
      * request and still runs). [onResult] hears each notable result, for the notification. Skips quietly when a pass is
      * already running.
      */
@@ -386,7 +386,7 @@ object PluginRepoUpdates {
     }
 
     /**
-     * Follows [repo]'s superseded marker before its releases are read (Droidtop/tracker#887): when the origin's trust
+     * Follows [repo]'s superseded marker before its releases are read (mytop-project/tracker#887): when the origin's trust
      * came through this very repository ([UserOriginKey.repo]), and its key file now names another key and marks the
      * trusted one superseded by it, that key is trusted from now on, the old one recorded so its plugins keep their
      * approval. The person is told. Any other key change is left alone: the pass then refuses the new bundles, as before.
@@ -584,7 +584,7 @@ object PluginRepoUpdates {
      * Installs one bundle of the repository's latest release by hand: a plugin not installed yet, which arrives unapproved
      * like any new plugin, or an update the Updates page lists ([pendingUpdates]), which keeps its approval when it is
      * signed with the same key. [onInstalled] gets the id of a plugin that now waits for approval, for the caller to open
-     * its page, where it is approved (Droidtop/tracker#759). Blocking: off the main thread.
+     * its page, where it is approved (mytop-project/tracker#759). Blocking: off the main thread.
      */
     fun installFromRepo(
         context: Context,

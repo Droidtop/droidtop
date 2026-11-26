@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A declared setting's `when` is decided on states droidtop already knows, with no plugin call (Droidtop/tracker#880). */
+/** A declared setting's `when` is decided on states droidtop already knows, with no plugin call (mytop-project/tracker#880). */
 class PluginSettingsRowsTest {
     private val signedIn = PluginSettingsRows.States(signedIn = true, computerPaired = false, granted = setOf("web.session"))
     private val signedOut = signedIn.copy(signedIn = false)

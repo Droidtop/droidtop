@@ -103,7 +103,7 @@ class PluginRepoUpdatesTest {
         assertTrue(PluginRepoUpdates.isNotable(RepoCheckResult.Processed("v2", emptyList(), listOf("a: failed."))))
     }
 
-    // ----- pending updates from what the last pass read (Droidtop/tracker#837) -----
+    // ----- pending updates from what the last pass read (mytop-project/tracker#837) -----
 
     private fun installed(id: String, version: String, origin: String = "maker") = dev.droidtop.pluginhost.PluginRecord(
         manifest = dev.droidtop.pluginhost.PluginManifest(
@@ -233,7 +233,7 @@ class PluginRepoUpdatesTest {
         assertEquals("Tool 1.2.0 is available. Update it from Updates.", PluginRepoUpdates.describe(RepoUpdateOutcome.Available("Tool", "1.2.0")))
     }
 
-    // Droidtop/tracker#882: F95zone 0.4.0-22 with 0.7.3-54 out, and no row in Updates.
+    // mytop-project/tracker#882: F95zone 0.4.0-22 with 0.7.3-54 out, and no row in Updates.
 
     private fun held(installed: List<dev.droidtop.pluginhost.PluginRecord>, reads: Map<String, List<PluginRepoUpdates.HeldRead>>) =
         PluginRepoUpdates.held(installed, trusted) { repo -> reads[repo].orEmpty() }

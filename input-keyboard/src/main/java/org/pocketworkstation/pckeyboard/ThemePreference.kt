@@ -20,7 +20,7 @@ import android.widget.LinearLayout
 import org.xmlpull.v1.XmlPullParser
 
 /**
- * The keyboard's theme setting with a preview of each theme (Droidtop/tracker#903 H12b; docs/SPEC.md 6a, "Themes,
+ * The keyboard's theme setting with a preview of each theme (mytop-project/tracker#903 H12b; docs/SPEC.md 6a, "Themes,
  * light and dark"): the owner asked for "polish, new detailing, modern styling, extra modes, dynamic stuffs", and the
  * approved text for it, "Theme presets with a preview in HKR's settings". Each row shows a few keys drawn the way the
  * keyboard draws them, not a picture: a modern theme's plates by [KeyPlates.draw] in that theme's colours now

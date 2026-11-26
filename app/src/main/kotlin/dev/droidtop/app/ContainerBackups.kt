@@ -16,7 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808): each container can be backed
+ * Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808): each container can be backed
  * up daily or weekly to a folder the person picked, as "Back up its data" does by hand. One system job a day, only
  * while charging and with the battery not low, makes every backup that is due. A backup needs the container stopped,
  * since its files change while it runs, so a running container is skipped and said so on its row; droidtop never

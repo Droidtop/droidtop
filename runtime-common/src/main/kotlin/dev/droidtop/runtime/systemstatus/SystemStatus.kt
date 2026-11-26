@@ -366,7 +366,7 @@ object SystemControls {
 
     /**
      * The shell commands that switch [radio], for a `priv.shell` provider, the one each Android version answers
-     * first (Droidtop/tracker#581): `svc bluetooth` is gone from Android 13, where `cmd bluetooth_manager` does it, and
+     * first (mytop-project/tracker#581): `svc bluetooth` is gone from Android 13, where `cmd bluetooth_manager` does it, and
      * `cmd wifi set-wifi-enabled` is Android 11's own form of `svc wifi`. Tried in order until one exits 0.
      */
     fun radioCommands(radio: Radio, on: Boolean): List<List<String>> {

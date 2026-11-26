@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Battle.net: the account's games and the sign-in's return page (Droidtop/tracker#335). Answers written here in the shape Playnite's BattleNetLibrary reads. */
+/** Battle.net: the account's games and the sign-in's return page (mytop-project/tracker#335). Answers written here in the shape Playnite's BattleNetLibrary reads. */
 class BattleNetTest {
     @Test
     fun `the account's games are each title once, by Blizzard's title id`() {

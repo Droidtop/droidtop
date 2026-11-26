@@ -1,7 +1,7 @@
 package dev.droidtop.input
 
 /**
- * The companion pointer's second route (docs/SPEC.md "The companion's tabs", Input; Droidtop/tracker#811): the same
+ * The companion pointer's second route (docs/SPEC.md "The companion's tabs", Input; mytop-project/tracker#811): the same
  * [PointerOp]s played as Android's `input` shell command through the helper app (`priv.shell`), for a device where
  * droidtop's accessibility service is off or cannot reach the screen. A tap is `input tap`; a long press is a swipe that
  * stays in place for [LONG_PRESS_MS]; a scroll is a swipe; a drag is one stroke of `input motionevent` DOWN, MOVE and UP,

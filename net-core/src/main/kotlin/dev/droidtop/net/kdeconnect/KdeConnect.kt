@@ -21,8 +21,8 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * droidtop as a KDE Connect device (docs/SPEC.md 7q "KDE Connect", Droidtop/tracker#645): the official KDE Connect apps
- * on a phone or PC, and Pythia, find it, pair with it and talk to it. The device itself is lib-kdeconnect's, inside
+ * droidtop as a KDE Connect device (docs/SPEC.md 7q "KDE Connect", mytop-project/tracker#645): the official KDE Connect apps
+ * on a phone or PC, and Pythia, find it, pair with it and talk to it. The device itself is mytop-kdeconnect's, inside
  * droidtop's native library; this is its switch and its event loop, through `AgentNative.call("kdeconnect_<op>")`.
  *
  * It runs while the person has it on (Settings > Accounts and sources > KDE Connect), from droidtop's start, and is
@@ -36,7 +36,7 @@ object KdeConnect {
     private const val KEY_PLUGIN = "plugin_"
     private const val KEY_SEND_NOTIFICATIONS = "send_notifications"
 
-    /** lib-kdeconnect's plugins, each with a switch on the screen; all on by default, as in the official apps. */
+    /** mytop-kdeconnect's plugins, each with a switch on the screen; all on by default, as in the official apps. */
     val PLUGINS = listOf("ping", "share", "clipboard", "input", "battery", "findmyphone", "notifications")
 
     /** How long one `event` call waits in the library before the loop asks again. */
@@ -245,7 +245,7 @@ object KdeConnect {
         failure
     }
 
-    /** Moves the pointer of, scrolls or clicks on [id]: [input] in lib-kdeconnect's InputEvent form. */
+    /** Moves the pointer of, scrolls or clicks on [id]: [input] in mytop-kdeconnect's InputEvent form. */
     suspend fun pointer(id: String, input: JSONObject): String? = withContext(Dispatchers.IO) {
         AgentNative.failure(call("input_send", JSONObject().put("id", id).put("input", input)))
     }
@@ -310,7 +310,7 @@ object KdeConnect {
     }
 }
 
-/** A KDE Connect device as lib-kdeconnect's `devices` reports it. */
+/** A KDE Connect device as mytop-kdeconnect's `devices` reports it. */
 data class KdcDevice(
     val id: String,
     val name: String,

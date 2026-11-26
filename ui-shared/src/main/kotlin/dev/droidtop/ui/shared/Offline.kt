@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 
 /**
- * The one offline notice every network page shows while the device has no network (Droidtop/tracker#594): the catalog
+ * The one offline notice every network page shows while the device has no network (mytop-project/tracker#594): the catalog
  * screens that need it ([dev.droidtop.library.settings.CatalogScreen.needsNetwork]), and the pages drawn on their own
  * (the theme browser). Get games says the same title in its own row.
  */

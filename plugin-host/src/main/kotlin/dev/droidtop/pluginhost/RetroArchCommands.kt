@@ -6,7 +6,7 @@ import java.net.InetAddress
 import java.net.SocketTimeoutException
 
 /**
- * RetroArch's network commands (docs/plugin-api.md 3 B, `retroarch.command`; Droidtop/tracker#414 slice C10): one
+ * RetroArch's network commands (docs/plugin-api.md 3 B, `retroarch.command`; mytop-project/tracker#414 slice C10): one
  * line of text in a UDP datagram to RetroArch on this device, port 55355 (`DEFAULT_NETWORK_CMD_PORT`, command.h), which
  * RetroArch reads only while its `network_cmd_enable` is on. A contained plugin has no network of its own, so droidtop
  * sends the line for it, to the loopback address only, and only commands from [ALLOWED]: RetroArch's own hotkey names

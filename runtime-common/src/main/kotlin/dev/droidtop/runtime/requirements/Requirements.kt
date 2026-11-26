@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * What something droidtop does cannot work without, as one model (docs/SPEC.md "Permissions: what droidtop and its
- * plugins may do", §8; Droidtop/tracker#830, slice R1: the model, no UI). The owner, 2026-10-30: "We also need a
+ * plugins may do", §8; mytop-project/tracker#830, slice R1: the model, no UI). The owner, 2026-10-30: "We also need a
  * better system than the 'needs something' UI". A requirement has a stable [id], a [kind], the [feature] it is for,
  * its words (resources, never "Needs …": [missing] is what does not work yet, [allowed] the granted thing as a noun,
  * [action] one verb, [exact] the Android name for Info), a cheap [check] run off the main thread, the [fix] that grants

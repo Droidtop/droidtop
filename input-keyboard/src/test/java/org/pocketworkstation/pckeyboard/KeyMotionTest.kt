@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Hacker Keyboard Reborn's motion rules (Droidtop/tracker#903 H12a): reduce motion, the pressed key, new suggestions. */
+/** Hacker Keyboard Reborn's motion rules (mytop-project/tracker#903 H12a): reduce motion, the pressed key, new suggestions. */
 class KeyMotionTest {
     @Test fun anAnimatorScaleOfZeroOrAnimatorsSwitchedOffMeansNoMotion() {
         assertEquals(0f, KeyMotion.durationScale(0f, animatorsEnabled = true), 0f)

@@ -70,7 +70,7 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * ES-DE's own .wav resources (they aren't ours to redistribute) and never
  * invents audio; its fallback is its own bundled set, a CC0 pack under
  * `assets/ui-sounds/` named by role ([UiSound.packFile], [attachPack];
- * Droidtop/tracker#211), and a role neither supplies plays nothing.
+ * mytop-project/tracker#211), and a role neither supplies plays nothing.
  *
  * What plays is asked by ROLE ([UiSound], docs/SPEC.md "Interface
  * sounds"): Steam's cue vocabulary, each role mapped to the theme's sound
@@ -81,7 +81,7 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * plays with near-zero latency, exactly the job it exists for.
  * They play as [AudioAttributes.USAGE_GAME] at their own volume
  * ([volume]): heard whatever the ringer is, as the rest of the shell's
- * sound is (Droidtop/tracker#836).
+ * sound is (mytop-project/tracker#836).
  *
  * Real, honest simplification: ES-DE gates fast-scroll retriggering on
  * `isPlayingThemeNavigationSound` (GamelistBase's hold-to-fast-scroll
@@ -174,7 +174,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         .setAudioAttributes(
             AudioAttributes.Builder()
                 // Game audio, so the media volume carries them and a muted ringer does not: as sonification the RP5
-                // routed them to the system stream, silent while the ringer was muted (Droidtop/tracker#836). Their
+                // routed them to the system stream, silent while the ringer was muted (mytop-project/tracker#836). Their
                 // own level is [volume].
                 .setUsage(AudioAttributes.USAGE_GAME)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -252,7 +252,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     }
 
     /**
-     * The Navigation sounds volume, 0 to 1 ([SoundSync]; owner, 2026-10-30, Droidtop/tracker#836: "navigation sounds
+     * The Navigation sounds volume, 0 to 1 ([SoundSync]; owner, 2026-10-30, mytop-project/tracker#836: "navigation sounds
      * should get their own volume"): every sample plays at it, and at 0 no role plays. Hand-off bookkeeping still runs.
      */
     @Volatile var volume: Float = 0.4f

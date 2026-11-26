@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A running container's use read from /proc (docs/SPEC.md 3d, "Resource usage"; Droidtop/tracker#757 slice 3). */
+/** A running container's use read from /proc (docs/SPEC.md 3d, "Resource usage"; mytop-project/tracker#757 slice 3). */
 class ProcUsageTest {
     // Field 2 is the command, which may hold spaces and brackets; utime 120 and stime 30 are fields 14 and 15.
     private val stat = "4242 (Web Content (x)) S 1 4242 4242 0 -1 4194560 100 0 0 0 120 30 0 0 20 0 9 0 5000 1000000 2000 18446744073709551615"

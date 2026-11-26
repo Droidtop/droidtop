@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** droidtop's words for a plugin's failure, by its code, naming the feature (Droidtop/tracker#883 §3.7). */
+/** droidtop's words for a plugin's failure, by its code, naming the feature (mytop-project/tracker#883 §3.7). */
 class PluginFailureWordsTest {
     private fun words(code: PluginErrorCode?) = PluginFailureWords.of(code, "F95zone")
 

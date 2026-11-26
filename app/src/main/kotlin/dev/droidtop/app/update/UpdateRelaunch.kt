@@ -7,7 +7,7 @@ import android.util.Log
 
 /**
  * Brings droidtop back after it replaced itself (docs/SPEC.md 10b, "Coming back after an update";
- * Droidtop/tracker#202).
+ * mytop-project/tracker#202).
  *
  * Installing the new APK kills the running process and removes its tasks, so on the console (2026-10-14, build
  * 1773 to 1790) neither screen showed droidtop afterwards until Home was pressed. Home is exactly what is

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The one list of places, and where a link to one opens (Droidtop/tracker#346). */
+/** The one list of places, and where a link to one opens (mytop-project/tracker#346). */
 class PlaceTest {
 
     @Test
@@ -27,7 +27,7 @@ class PlaceTest {
 
     @Test
     fun `Updates is a page reached from Downloads and Updates, not a place of its own in the lists`() {
-        // The owner, 2026-10-30 (Droidtop/tracker#792): "An updates link should be in the Downloads and Updates tab. Not
+        // The owner, 2026-10-30 (mytop-project/tracker#792): "An updates link should be in the Downloads and Updates tab. Not
         // there directly, but a shortcut".
         assertEquals(Place.entries - Place.UPDATES, Place.visible(UiMode.FULL))
         assertEquals("Downloads and Updates", Place.DOWNLOADS.title)

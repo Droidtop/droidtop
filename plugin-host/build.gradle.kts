@@ -20,7 +20,7 @@ android {
             abiFilters += "x86_64"
         }
         // Only this module's bridge: the sandbox library's libsbx_child.so and sbx-exec are :sandbox-host's
-        // (Droidtop/tracker#584), and two modules packaging one library is a duplicate-path merge error.
+        // (mytop-project/tracker#584), and two modules packaging one library is a duplicate-path merge error.
         externalNativeBuild {
             cmake {
                 targets += "droidtoppy"
@@ -40,9 +40,9 @@ android {
         getByName("main") {
             resources.srcDir("../docs/view-limits")
             // The plugin host's Binder interface (IPluginRuntime and its callbacks), one file for droidtop and Enginehost:
-            // Droidtop/lib-plugins' android/aidl (Droidtop/tracker#867). Binder numbers a method by its place in the file,
+            // mytop-project/mytop-plugins' android/aidl (mytop-project/tracker#867). Binder numbers a method by its place in the file,
             // so two hand-kept copies drifted (Enginehost's IPluginRuntime still described contract 1).
-            aidl.srcDir("../vendor/lib-plugins/android/aidl")
+            aidl.srcDir("../vendor/mytop-plugins/android/aidl")
         }
         // The contracts droidtop and an app plugin both implement (docs/contracts, web-view.json first): the tests check
         // droidtop against them, and the app's CI checks the app against the same files.

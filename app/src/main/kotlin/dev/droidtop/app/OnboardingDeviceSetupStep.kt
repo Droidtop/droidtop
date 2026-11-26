@@ -59,7 +59,7 @@ internal fun deviceSetupAsks(context: Context): Boolean {
 }
 
 /**
- * DEVICE_SETUP (docs/SPEC.md "Device setup", Droidtop/tracker#816). The Android settings droidtop can change itself,
+ * DEVICE_SETUP (docs/SPEC.md "Device setup", mytop-project/tracker#816). The Android settings droidtop can change itself,
  * through Shizuku when it runs, else through wireless debugging, paired here with a code. Each item is asked first in
  * plain words and can be undone here or in Settings > Accounts and sources > Device setup. Every item is optional.
  */

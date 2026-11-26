@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The display burst a hot-plug sends reaches the second-screen pass once, settled (Droidtop/tracker#785). */
+/** The display burst a hot-plug sends reaches the second-screen pass once, settled (mytop-project/tracker#785). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettledTest {
 

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", the Xwayland bullet; Droidtop/tracker#910). */
+/** A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", the Xwayland bullet; mytop-project/tracker#910). */
 class SiblingX11Test {
     private fun manager(id: String) = PackageUpgrade.byId(id)!!
 

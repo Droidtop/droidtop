@@ -1,7 +1,7 @@
 package dev.droidtop.mapping
 
 /**
- * A pad's buttons by Steam's names (Droidtop/tracker#618 C3): the source and input a [MappingEngine] layout binds,
+ * A pad's buttons by Steam's names (mytop-project/tracker#618 C3): the source and input a [MappingEngine] layout binds,
  * for an Android key code. Pure; the codes are Android's `KeyEvent.KEYCODE_*` values, written out so this module keeps
  * no Android types. A Nintendo-layout face swap is the host's to apply before it asks.
  */

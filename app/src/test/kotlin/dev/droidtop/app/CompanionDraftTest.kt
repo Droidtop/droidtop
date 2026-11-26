@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion's message draft, fed the hardware-style key stream droidtop's keyboard sends (Droidtop/tracker#327). */
+/** The companion's message draft, fed the hardware-style key stream droidtop's keyboard sends (mytop-project/tracker#327). */
 class CompanionDraftTest {
     /** A US map for the letters, digits and space, enough to type with. */
     private val chars: (Int, Boolean) -> Char? = { code, shift ->

@@ -12,7 +12,7 @@ exactly two things:
 
 1. **Frame passthrough** — capture buffers from the primary container's
    headless outputs via `wlr-screencopy-unstable-v1` and present them on
-   Android `Surface`s, one capture per output (Droidtop/tracker#908). The
+   Android `Surface`s, one capture per output (mytop-project/tracker#908). The
    Desktop shows the primary output only today; see "Not yet implemented"
    below for what showing a second one still needs.
 2. **Input injection** — turn normalized events from `:input-seat` into
@@ -58,7 +58,7 @@ it is not the same as confirmed-working. Treat the implementation below as
   one whose clipboard does not cross. Starts a background dispatch thread
   (`wl_display_dispatch` loop) so screencopy's async frame-ready callbacks
   actually get delivered.
-- **Outputs** (Droidtop/tracker#908) — `WaylandGlobals::outputs` holds every
+- **Outputs** (mytop-project/tracker#908) — `WaylandGlobals::outputs` holds every
   `wl_output` in bind order, with its name (`HEADLESS-1` under sway; only
   from wl_output v4), current mode and scale, and drops one on the
   registry's `global_remove`, stopping its capture. The first is the
@@ -122,7 +122,7 @@ it is not the same as confirmed-working. Treat the implementation below as
   person's layout, and the text keyboard, which keeps the US map for keys
   Android derived from characters (`docs/SPEC.md` 6b "Keyboard layout").
 - **Windows / task manager** (`wlr-foreign-toplevel-management-unstable-v1`,
-  Droidtop/tracker#94) — `ToplevelState` tracks every toplevel the
+  mytop-project/tracker#94) — `ToplevelState` tracks every toplevel the
   compositor reports (title, app id, activated/minimized/maximized/
   fullscreen), committed atomically on each handle's `done` event.
   `snapshotToplevels()` hands a copy to any thread; `activateToplevel`/
@@ -133,7 +133,7 @@ it is not the same as confirmed-working. Treat the implementation below as
   `TaskbarWindowList` is the one consumer today, and it hides its minimize
   affordances while the session's compositor is sway: sway ignores
   set_minimized/unset_minimized outright while labwc implements them
-  (Droidtop/tracker#145), and the protocol has no capability query to
+  (mytop-project/tracker#145), and the protocol has no capability query to
   ask with. It also has no "move to another output" request — only
   activate/set_minimized/
   unset_minimized/close/set_fullscreen/set_rectangle — so that part of an
@@ -144,7 +144,7 @@ it is not the same as confirmed-working. Treat the implementation below as
 
 - **A second output is shown only when asked for.** Every output can be
   captured into its own `Surface` and take pointer input by name
-  (Droidtop/tracker#908 D1a, D1b); the app's `DesktopSecondScreen` shows one
+  (mytop-project/tracker#908 D1a, D1b); the app's `DesktopSecondScreen` shows one
   on another display (D3, `HostBridgeInput`'s named
   `injectPointerMotionAbsolute` for its touch), but nothing calls it on its
   own until D5, and `toplevel`'s output_enter/output_leave are not tracked

@@ -5,7 +5,7 @@ import java.io.RandomAccessFile
 
 /**
  * An app container's own program, run the way Docker runs it and kept by droidtop (docs/SPEC.md 3 "The image's own
- * program", Droidtop/tracker#555 D6b): started and stopped from the container page, its output in a log of capped
+ * program", mytop-project/tracker#555 D6b): started and stopped from the container page, its output in a log of capped
  * size, restarted when it fails if the person wants that, and started with the desktop if they want that.
  */
 object ContainerProgram {
@@ -39,7 +39,7 @@ object ContainerProgram {
     }
 
     /**
-     * When a container's own program is started again (docs/SPEC.md 3d, "Restart policies"; Droidtop/tracker#555 D12):
+     * When a container's own program is started again (docs/SPEC.md 3d, "Restart policies"; mytop-project/tracker#555 D12):
      * Docker's and Podman's `--restart` words, and the page's "Restart when it fails" ([OnFailure] on, [No] off). The
      * one setting the program runner reads.
      */
@@ -94,10 +94,10 @@ object ContainerProgram {
     fun hostLogFile(appStorageDir: File, containerId: String): File = File(File(appStorageDir, LOG_DIR_NAME), "$containerId.log")
 
     /**
-     * What `docker run` asked for beyond the image (Droidtop/tracker#555 D6d): [args] replace the image's `Cmd` (never
+     * What `docker run` asked for beyond the image (mytop-project/tracker#555 D6d): [args] replace the image's `Cmd` (never
      * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins.
      * [entrypoint] (`--entrypoint`) replaces the image's, and its `Cmd` too unless [args] are given, and [workingDir]
-     * (`-w`) the folder it starts in (Droidtop/tracker#715). Kept beside the container's log, so the page's Start it
+     * (`-w`) the folder it starts in (mytop-project/tracker#715). Kept beside the container's log, so the page's Start it
      * and the start with the desktop run the same program as the command.
      */
     data class RunOverrides(
@@ -107,7 +107,7 @@ object ContainerProgram {
         val labels: Map<String, String> = emptyMap(),
         val entrypoint: List<String>? = null,
         val workingDir: String? = null,
-        /** `-u`, the APIs' User: replaces the image's own `User` (Droidtop/tracker#715). */
+        /** `-u`, the APIs' User: replaces the image's own `User` (mytop-project/tracker#715). */
         val user: String? = null,
     ) {
         /** [config] as this container runs it. Pure. */

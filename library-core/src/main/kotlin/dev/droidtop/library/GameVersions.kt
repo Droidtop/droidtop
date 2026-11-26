@@ -85,7 +85,7 @@ object GameUpdates {
             ?: return null
         val here = versions.map(::normalize).filter { it.isNotEmpty() }
         if (here.isEmpty()) return null
-        // Compared in one form (Droidtop/tracker#859): a thread's "P3 Ep.10 v0.0.10" is the folder's "v0.0.10".
+        // Compared in one form (mytop-project/tracker#859): a thread's "P3 Ep.10 v0.0.10" is the folder's "v0.0.10".
         return if (here.any { comparable(it).equals(comparable(newest), ignoreCase = true) }) null else newest
     }
 
@@ -101,7 +101,7 @@ object GameUpdates {
         normalize(LABELLED.find(version.trim())?.groupValues?.get(2) ?: version)
 
     /**
-     * [available] as the record page shows it beside [installed] (Droidtop/tracker#859): in [installed]'s form, so
+     * [available] as the record page shows it beside [installed] (mytop-project/tracker#859): in [installed]'s form, so
      * "Available: P3 Ep.10 v0.0.10" beside "Installed: v0.0.9" reads "Available: v0.0.10" when the installed version
      * carries no label of its own. Unchanged when the installed one is unknown or labelled too. Pure.
      */
@@ -135,7 +135,7 @@ object GameUpdates {
 
     /**
      * The games with an update waiting, one per game, titled with the game's name: what Updates, the companion's Home
-     * and the Downloads widget all count (Droidtop/tracker#570, #571). A store row's update and a linked source's are
+     * and the Downloads widget all count (mytop-project/tracker#570, #571). A store row's update and a linked source's are
      * on the game ([LibraryGameGroup.displayEntry]), never on a scanned entry alone, so counting raw entries found
      * none. Not for the main thread: it groups the whole library.
      */
@@ -147,7 +147,7 @@ object GameUpdates {
 
     /**
      * The two versions an update row and the download sheet name, labelled so which is which is never a guess
-     * (owner, 2026-10-24, Droidtop/tracker#639: "the updates page should show current and newest available version,
+     * (owner, 2026-10-24, mytop-project/tracker#639: "the updates page should show current and newest available version,
      * in a way that makes it obvious which is which"). [availableLabel] is the emphasised one (a row's value column);
      * [installedLabel] the secondary one, and says "unknown" rather than nothing when the version here is not known.
      */
@@ -159,7 +159,7 @@ object GameUpdates {
         "Installed: " + (installed?.trim()?.takeIf { it.isNotEmpty() }?.let(::shown) ?: "unknown")
 
     /**
-     * The two versions as one step, installed first: "v0.37 → v0.38", the Updates page's rows (Droidtop/tracker#792).
+     * The two versions as one step, installed first: "v0.37 → v0.38", the Updates page's rows (mytop-project/tracker#792).
      * Always in this order, so which is which is never a guess (#639); an unknown installed version says so.
      */
     fun step(installed: String?, available: String): String {
@@ -285,7 +285,7 @@ object GameGrouping {
         val namePath: String = path,
         /**
          * The version the folder's own files declare ([LibraryEntry.filesVersion]),
-         * the folder's version only when its name names none (Droidtop/tracker#406).
+         * the folder's version only when its name names none (mytop-project/tracker#406).
          */
         val filesVersion: String? = null,
     )

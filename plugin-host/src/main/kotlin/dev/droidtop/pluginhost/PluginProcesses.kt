@@ -111,7 +111,7 @@ internal object PluginProcesses {
     /**
      * Counts one more user of [pluginId]'s process when one is running, without starting one: droidtop's web view open
      * for the plugin's site keeps it loaded, so the request the person is passing the check for goes on in the process
-     * that met it (Droidtop/tracker#783). Whether it counted; when it did, [release] lets go.
+     * that met it (mytop-project/tracker#783). Whether it counted; when it did, [release] lets go.
      */
     /** The runtime of [pluginId]'s process while it is bound and started; null otherwise. Never starts one. */
     fun running(pluginId: String): IPluginRuntime? = synchronized(lock) { byPlugin[pluginId]?.runtime }
@@ -143,7 +143,7 @@ internal object PluginProcesses {
      * [pluginId]'s code or trust changed (an install of other bytes, an uninstall, an approval or denial): whatever
      * process holds it stops holding it, so the next call loads what is on disk now. A process only loads a plugin once
      * ("already loaded is already loaded", [PluginProcessService]), so without this the old version answered until droidtop
-     * restarted (Droidtop/tracker#539). A contained plugin's own isolated process is ended; a plugin in a shared slot is
+     * restarted (mytop-project/tracker#539). A contained plugin's own isolated process is ended; a plugin in a shared slot is
      * unloaded and the slot goes on. No-op when no process holds it. Safe from any thread.
      */
     fun retire(pluginId: String) {

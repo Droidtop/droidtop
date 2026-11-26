@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The bookkeeping of a chunked store install, shared by GOG's Gen 2 and Epic's downloads (Droidtop/tracker#766): which
+ * The bookkeeping of a chunked store install, shared by GOG's Gen 2 and Epic's downloads (mytop-project/tracker#766): which
  * file positions each chunk fills, how many positions of each file are still to be written, and how many uses each
  * cached chunk has left. Built once from the plan, so placing a chunk looks up its positions instead of searching
  * every file of the game for it, which was quadratic in the size of the game.

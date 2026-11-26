@@ -1,7 +1,7 @@
 package dev.droidtop.hostbridge
 
 /**
- * Which bar lists a window, and where it can be moved (Droidtop/tracker#908, step D4; docs/SPEC.md 2b "The desktop on
+ * Which bar lists a window, and where it can be moved (mytop-project/tracker#908, step D4; docs/SPEC.md 2b "The desktop on
  * a second screen"). Pure, so the rules are tested on the JVM (WindowOutputsTest).
  *
  * [outputs] is the desktop's outputs by the compositor's name, the primary's first, as the session lists them

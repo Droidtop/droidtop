@@ -37,7 +37,7 @@ internal fun pageTabForSection(tab: String): PageTab = when (tab) {
 }
 
 /**
- * The PC game page's plugin rows (docs/plugin-api.md 3 C4, C18; Droidtop/tracker#316). Each node of a section's
+ * The PC game page's plugin rows (docs/plugin-api.md 3 C4, C18; mytop-project/tracker#316). Each node of a section's
  * view is a row of the page in droidtop's own style, under the tab the section names; each context action on this
  * game is a row under Extras. A fact takes no A; a call or job runs in place with its status in the value column
  * (a node that asks for confirmation takes a second A, like every destructive row); a node that opens a page, or
@@ -144,7 +144,7 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
 
 /**
  * The plugin page a row opened (a facet's `page` call, an action's reply), as a popup over the game page, which stays in
- * sight dimmed behind it and shows what the page changed once it closes (Droidtop/tracker#939: "A facet shouldn't take
+ * sight dimmed behind it and shows what the page changed once it closes (mytop-project/tracker#939: "A facet shouldn't take
  * over, it should give information to the main UI"). CatalogPopup paints its own panel, so the page behind does not
  * show through it (the reason a bare Dialog was replaced, rig, 0.2.0-dev.2070).
  */

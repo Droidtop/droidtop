@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drives the Desktop-mode fixture's plugin.py (docs/plugin-api.md 1.12, Droidtop/tracker#221) without a device.
+"""Drives the Desktop-mode fixture's plugin.py (docs/plugin-api.md 1.12, mytop-project/tracker#221) without a device.
 
     desktop_fixture_check.py [plugin dir, default ../src/test/fixtures/desktop]
 

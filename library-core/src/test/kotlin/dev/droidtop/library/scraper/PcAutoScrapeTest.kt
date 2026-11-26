@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** PC games' automatic details (Droidtop/tracker#568): on by default, at most every twelve hours, never when off. */
+/** PC games' automatic details (mytop-project/tracker#568): on by default, at most every twelve hours, never when off. */
 class PcAutoScrapeTest {
     private val now = 100L * 24 * 60 * 60 * 1000
 

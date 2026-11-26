@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * Haptics per key class (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"): which class a key is, the
+ * Haptics per key class (mytop-project/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"): which class a key is, the
  * "Vibration strength" setting and its migration from Hacker's Keyboard's "Vibrate on keypress", and the effect each
  * class gets at each strength. Hacker's "Vibrate duration" is kept: [VibrationStrength.CUSTOM] buzzes every key for it,
  * as Hacker's did. Pure, so it is tested on the JVM; [KeyHapticsPlayer] turns these into the platform's

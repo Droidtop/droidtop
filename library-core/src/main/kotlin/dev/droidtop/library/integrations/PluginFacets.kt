@@ -114,7 +114,7 @@ object PluginFacets {
         val held = target == SEARCH_FILTER
         val reading = Facets.read(data, subject, held)
         messages += reading.messages
-        // The subject droidtop asked about: a facet about another window or file is turned away (Droidtop/tracker#221).
+        // The subject droidtop asked about: a facet about another window or file is turned away (mytop-project/tracker#221).
         val guarded = FacetGuards.admit(reading.facets, target, guardsFor(record), messages, asked = subject)
         val admitted = if (held && context != null) SourceFilters.applied(guarded, SourceFilters.read(context, record.manifest.id)) else guarded
         // What it gave is remembered for "Where it appears", hidden ones too, so they can be shown again there.

@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * The library scrape as a job (docs/SPEC.md 12a "Jobs", 7h; Droidtop/tracker#174).
+ * The library scrape as a job (docs/SPEC.md 12a "Jobs", 7h; mytop-project/tracker#174).
  * The Games options menu, the per-system Settings row and the one-time offer
  * all start it through [start], so there is one place it runs, one entry in
  * "Downloads and installs" with Pause, Resume and Cancel, and one rate limit:
@@ -39,7 +39,7 @@ object LibraryScrapeJob {
     private const val ARG_FOLDER = "folder"
     private const val ARG_PC_ONLY = "pc_only"
     private const val ARG_PC_IDS = "pc_ids"
-    // The automatic pass (PcAutoScrape): it only fills gaps, never refreshes (Droidtop/tracker#318 §7.2).
+    // The automatic pass (PcAutoScrape): it only fills gaps, never refreshes (mytop-project/tracker#318 §7.2).
     private const val ARG_AUTO = "auto"
 
     /** The queue item that stands for every PC and engine game; its checkpoint is the last entry id finished. */
@@ -90,7 +90,7 @@ object LibraryScrapeJob {
         pcOnly: Boolean = false,
         // Only these PC and engine games (the list a person is looking at); implies [pcOnly].
         pcIds: List<String>? = null,
-        // The automatic pass, which only fills what is missing (Droidtop/tracker#318 §7.2).
+        // The automatic pass, which only fills what is missing (mytop-project/tracker#318 §7.2).
         auto: Boolean = false,
         onFinished: (String) -> Unit = {},
     ): String? {
@@ -102,7 +102,7 @@ object LibraryScrapeJob {
             if (auto) put(ARG_AUTO, "1")
         }
         // An automatic ask while a scrape already covers it joins that one: two passes over the same games at once
-        // asked each game twice and pulled the activity ring between their two numbers (Droidtop/tracker#834).
+        // asked each game twice and pulled the activity ring between their two numbers (mytop-project/tracker#834).
         if (auto) {
             PluginJobsCenter.entries().value
                 .firstOrNull { it.nativeKind == KIND && !it.done && PluginJobsCenter.argsOf(it.jobId)?.let { running -> covers(running, args) } == true }
@@ -254,7 +254,7 @@ object LibraryScrapeJob {
     /**
      * The one result text of a run. A system or the PC games that had nothing to do under the scrape
      * filter say so in one line naming them, instead of a sentence each: a run over eighteen systems
-     * with two to scrape was a wall of text a gamepad could not scroll (Droidtop/tracker#374).
+     * with two to scrape was a wall of text a gamepad could not scroll (mytop-project/tracker#374).
      */
     internal fun summarize(lines: List<String>, hasPc: Boolean): String {
         val said = lines.filter { it.isNotBlank() }

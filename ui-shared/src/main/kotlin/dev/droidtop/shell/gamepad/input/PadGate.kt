@@ -50,7 +50,7 @@ data class PadSyntheticKey(
  *   press, its repeats and its release are dropped. A keyboard's keys are
  *   never debounced: a doubled letter typed quickly (or typed by `adb shell
  *   input text`) is two presses of one key well inside the window, and the
- *   second was dropped ("Goodbye" arrived as "Godbye", Droidtop/tracker#569).
+ *   second was dropped ("Goodbye" arrived as "Godbye", mytop-project/tracker#569).
  * - **The stick and the hat are a D-pad.** Crossing [ENTER_THRESHOLD]
  *   presses the direction, falling back under [EXIT_THRESHOLD] releases it
  *   (a hysteresis band, so a stick resting near the edge cannot chatter);
@@ -61,14 +61,14 @@ data class PadSyntheticKey(
  *   The hat wins over the stick when both move. A device that also sends a
  *   real key for a direction is not translated for that direction again
  *   (per device AND per key: the Retroid Pocket 5 sends Down and Right as
- *   keys but Up and Left only on the hat, Droidtop/tracker#1/#43).
+ *   keys but Up and Left only on the hat, mytop-project/tracker#1/#43).
  * - **Analog triggers are buttons.** Some pads report L2/R2 only as an
  *   axis; past the same threshold they press `BUTTON_L2`/`BUTTON_R2`, unless
  *   the device sends the key itself.
  * - **Holding Select is R2, holding Start is L2.** The shell's fallback
  *   routes to the Quick Menu (R2, the global menu) and the focused thing's
  *   menu (L2, the local one) for a pad whose triggers send nothing at all
- *   (owner, 2026-10-23, Droidtop/tracker#621). The button is held back until
+ *   (owner, 2026-10-23, mytop-project/tracker#621). The button is held back until
  *   it is either released (a tap: one press of the button itself is
  *   delivered) or held for the long-press timeout (one trigger press is
  *   delivered, and the release is dropped). No screen ever sees half of a
@@ -148,7 +148,7 @@ class PadGateCore(
         rightTriggerValue: Float,
         now: Long,
     ) {
-        // The raw stick, for Settings > Controls' stick test (Droidtop/tracker#723); only read while that test shows.
+        // The raw stick, for Settings > Controls' stick test (mytop-project/tracker#723); only read while that test shows.
         lastStick.value = stickX to stickY
         update(vertical, deviceId, if (hatY != 0f) hatY else stickY, now, repeats = true)
         update(horizontal, deviceId, if (hatX != 0f) hatX else stickX, now, repeats = true)
@@ -172,7 +172,7 @@ class PadGateCore(
 
     private fun update(axis: Axis, deviceId: Int, value: Float, now: Long, repeats: Boolean) {
         // The stick's D-pad directions (the repeating axes) follow the dead zone in Settings > Controls
-        // (Droidtop/tracker#723); the hat sends whole steps, and the triggers keep the fixed band.
+        // (mytop-project/tracker#723); the hat sends whole steps, and the triggers keep the fixed band.
         val (enter, exit) = if (repeats) dev.droidtop.runtime.StickDeadZone.thresholds() else ENTER_THRESHOLD to EXIT_THRESHOLD
         val target = axisTargetKeyWithin(value, axis.key, axis.negativeKey, axis.positiveKey, enter, exit) { key ->
             key == 0 || pair(deviceId, key) in realKeys
@@ -310,7 +310,7 @@ fun axisTargetKeyWithin(
  * pad from: nothing tells the gate the stick went back to centre, because
  * the release went to that app. A made-up key is dropped, and everything
  * held let go, whenever the window is not [focused]
- * (Droidtop/tracker#265).
+ * (mytop-project/tracker#265).
  */
 class PadGate(
     private val deliver: (KeyEvent) -> Boolean,
@@ -414,7 +414,7 @@ class PadGate(
             (event.source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
 
     /**
-     * What Android does for a real key before it delivers it, done for the keys the gate delivers (Droidtop/tracker#820).
+     * What Android does for a real key before it delivers it, done for the keys the gate delivers (mytop-project/tracker#820).
      * A key from the input system takes the window out of touch mode (ViewRootImpl), which gives the focused view back
      * its focus. The D-pad keys the gate makes from the hat and stick never pass there. So after a touch (the
      * companion's screen is touch, and touch mode is device-wide before Android 14) the window stayed in touch mode, no
@@ -596,7 +596,7 @@ fun GatePadInThisDialog() {
 /**
  * Hides Android's system bars in the Compose `Dialog` window this is called
  * from, with the same sticky-immersive behavior the activity uses (`docs/
- * SPEC.md` 6e, Droidtop/tracker#169). A dialog is its own window: without
+ * SPEC.md` 6e, mytop-project/tracker#169). A dialog is its own window: without
  * this, the grey OS status bar (clock, icons) paints across the top of
  * every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
  * leaving the shell's own `StatusCluster` sitting under a second clock.
@@ -618,7 +618,7 @@ fun HideSystemBarsInThisDialog() {
 }
 
 /**
- * Whether the shell draws its selection (docs/SPEC.md 6e, Droidtop/tracker
+ * Whether the shell draws its selection (docs/SPEC.md 6e, mytop-project/tracker
  * #159). The selection is ONE thing whatever moves it -- a tap moves it as
  * much as the D-pad does -- but it is DRAWN only while a pad or keyboard is
  * driving: a person using a finger sees what they touch, and a ring left on

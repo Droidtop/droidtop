@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
  * How much room a game folder takes, measured on demand and kept by the
  * folder's stamp (its path and modification time): the one measurement the
  * game page's Size and the Storage page's PC rows read (docs/SPEC.md 7j
- * "Places", Droidtop/tracker#397 slice E). A folder whose time has not moved
+ * "Places", mytop-project/tracker#397 slice E). A folder whose time has not moved
  * is answered from memory with one `stat`; a folder it cannot read part of
  * is skipped there and its size is marked [Size.atLeast]. Measuring walks
  * the folder: off the main thread, and never while a list is drawn.

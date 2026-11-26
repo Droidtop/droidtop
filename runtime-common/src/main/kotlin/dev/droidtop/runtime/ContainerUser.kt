@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import java.io.File
 
 /**
- * The user a container's program or command runs as (Droidtop/tracker#715): `-u`/`--user`, the Engine API's `User`,
+ * The user a container's program or command runs as (mytop-project/tracker#715): `-u`/`--user`, the Engine API's `User`,
  * or the image's own `User`, read as Docker reads them (`name`, `uid`, `name:group`, `uid:gid`) against the image's
  * own /etc/passwd and /etc/group. [parse] and [resolve] are pure; [resolveIn] reads the two files from a tree.
  */

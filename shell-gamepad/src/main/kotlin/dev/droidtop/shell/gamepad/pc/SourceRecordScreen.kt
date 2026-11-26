@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A game's update, shown where the update row is (docs/SPEC.md 7g, "Facets in place"; owner, 2026-10-24,
- * Droidtop/tracker#639: "Clicking the update should present the facet containing the downloads", and "Facets go
+ * mytop-project/tracker#639: "Clicking the update should present the facet containing the downloads", and "Facets go
  * where they fit. No clunky redirects"). It is the linked source's record as a settings screen, so the Updates row
  * pushes it in place in every host that draws Updates (Gaming's places, Standard's settings, the screen host, the
  * companion), and nothing starts an activity or opens the game's page. The rows are the record page's own
@@ -83,7 +83,7 @@ object SourceRecordScreen {
         val versions = CatalogGroup(
             id = "update_record_versions",
             title = null,
-            // Which is which, in words: the version on offer leads, the one here is under it (Droidtop/tracker#639).
+            // Which is which, in words: the version on offer leads, the one here is under it (mytop-project/tracker#639).
             items = listOf(
                 ActionItem(
                     id = "update_record_available",
@@ -131,7 +131,7 @@ object SourceRecordScreen {
         // The record page's Downloads rows, less its System row: here the system is the choice above.
         val downloads = downloadRows(record, picked, dev.droidtop.library.DownloadPick.isSteamCopy(facet.entry)).filterNot { it.action == RecordAction.PickSystem }
         // A heading ("Extras", "Other builds") starts a group of its own, titled by it, rather than being a row
-        // (Droidtop/tracker#859).
+        // (mytop-project/tracker#859).
         val headed = downloads.withIndex().filter { it.value.heading }
         val firstHeading = headed.firstOrNull()?.index ?: downloads.size
         val sections = headed.mapIndexed { n, (at, heading) ->
@@ -187,7 +187,7 @@ object SourceRecordScreen {
                 confirmTitle = "Get the update? droidtop picks the build and the host, and it lands beside your other versions",
                 run = { ctx, onStatus -> getBest(library, facet.source, record, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
             )
-            // A build's hosts to choose from, Try in order first (Droidtop/tracker#859), as on the record page.
+            // A build's hosts to choose from, Try in order first (mytop-project/tracker#859), as on the record page.
             is RecordAction.Group -> NestedScreenItem(
                 id = id,
                 title = row.title,
@@ -242,7 +242,7 @@ object SourceRecordScreen {
                     dev.droidtop.library.Links.open(ctx, action.url)
                 },
             )
-            // Open thread (Droidtop/tracker#862): the source's page in droidtop's web view; what the person starts is placed.
+            // Open thread (mytop-project/tracker#862): the source's page in droidtop's web view; what the person starts is placed.
             RecordAction.OpenThread -> AsyncActionItem(
                 id = id,
                 title = row.title,

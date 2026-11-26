@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Words the shared components draw, English as the source language (docs/SPEC.md 7k, "Language is part of the
-  system"; Droidtop/tracker#177). Names start ui_shared_, since Android merges every module's strings into one set.
+  system"; mytop-project/tracker#177). Names start ui_shared_, since Android merges every module's strings into one set.
 -->
 <resources>
     <string name="ui_shared_details">Details</string>

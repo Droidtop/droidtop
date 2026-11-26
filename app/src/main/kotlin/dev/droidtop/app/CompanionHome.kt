@@ -69,7 +69,7 @@ import dev.droidtop.ui.shared.tabularFigures
 
 /**
  * The companion Home's sections and the pieces they share (docs/SPEC.md "The companion's tabs",
- * Droidtop/tracker#328): the second screen as the dashboard for whatever the main screen is doing. Every
+ * mytop-project/tracker#328): the second screen as the dashboard for whatever the main screen is doing. Every
  * section reads a store something else already keeps (the running launch, the focused game, the library feed,
  * the jobs center, the social hub, the system status) and runs no scan or query of its own; [CompanionSurface]
  * puts them in order on one scrolling page.
@@ -265,7 +265,7 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
             // Resume is a relaunch of the entry, the Quick Menu's own resume (the one launch path).
             CompanionPill("Resume", selected = true) { CompanionState.onLaunchEntry?.invoke(entry) }
             // Quit asks as the Game tab's does, by the one rule (GameControls.asks): the question is the Game tab's,
-            // so asking opens that tab on it (Droidtop/tracker#588: this pill used to quit at once, even in Kid).
+            // so asking opens that tab on it (mytop-project/tracker#588: this pill used to quit at once, even in Kid).
             val uiMode by UiModeRefresh.mode.collectAsState()
             val settings by CompanionPrefs.settings.collectAsState()
             val runner = runnerOf(entry)
@@ -286,7 +286,7 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
             }
             if (nav != null) CompanionPill("Controls") { nav.openTab(CompanionTab.SYSTEM) }
         }
-        // What Quit came to, under the button that was pressed (Droidtop/tracker#412).
+        // What Quit came to, under the button that was pressed (mytop-project/tracker#412).
         stopStatus?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) }
     }
 }
@@ -358,7 +358,7 @@ private fun FocusedGameCard(entry: LibraryEntry) {
         }
         // The existing update tracking (docs/SPEC.md 7g), never a second check.
         entry.availableUpdate?.let { latest ->
-            // Opens the one Updates list, as the companion's other update line does (Droidtop/tracker#792).
+            // Opens the one Updates list, as the companion's other update line does (mytop-project/tracker#792).
             Text(
                 stringResource(R.string.companion_home_update_available, latest),
                 style = MaterialTheme.typography.bodyMedium,
@@ -398,7 +398,7 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
     val context = LocalContext.current
     val jobs by PluginJobsCenter.entries().collectAsState()
     val active = remember(jobs) { jobs.filter { !it.done } }
-    // Everything the Updates page lists, not only games: the one count every entry to it reads (Droidtop/tracker#792).
+    // Everything the Updates page lists, not only games: the one count every entry to it reads (mytop-project/tracker#792).
     val updates by dev.droidtop.library.settings.UpdatesWaiting.count.collectAsState()
     LaunchedEffect(Unit) { dev.droidtop.library.settings.UpdatesWaiting.refresh?.invoke(context) }
     if (active.isEmpty() && updates == 0) return
@@ -410,7 +410,7 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             active.take(MAX_JOB_ROWS).forEach { job ->
                 // The bar says how far and the line the Downloads place's words ("About 4 min left"); a tap shows the
-                // figures, as focus does on the pad (Droidtop/tracker#643: never a live percent on a touch surface).
+                // figures, as focus does on the pad (mytop-project/tracker#643: never a live percent on a touch surface).
                 var figures by remember(job.jobId) { mutableStateOf(false) }
                 Column(modifier = Modifier.fillMaxWidth().clickable { figures = !figures }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -450,7 +450,7 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    // Opens the one Updates list, where each has its Update and there is Update all (Droidtop/tracker#792).
+                    // Opens the one Updates list, where each has its Update and there is Update all (mytop-project/tracker#792).
                     modifier = Modifier.clickable { openUpdates(context) },
                 )
             }
@@ -528,7 +528,7 @@ internal fun CompanionSystemSection(layout: CompanionHomeLayout) {
     }
 }
 
-/** The one Updates list, from a companion line that says something has an update (Droidtop/tracker#792). */
+/** The one Updates list, from a companion line that says something has an update (mytop-project/tracker#792). */
 private fun openUpdates(context: android.content.Context) {
     context.startActivity(
         PlaceLinks.intent(context, dev.droidtop.library.settings.Place.UPDATES).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),

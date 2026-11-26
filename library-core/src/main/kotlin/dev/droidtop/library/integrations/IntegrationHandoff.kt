@@ -2,7 +2,7 @@ package dev.droidtop.library.integrations
 
 /**
  * A JSON `acquire_content` integration's one row in the one search (docs/SPEC.md 13, "There is no Get games sheet";
- * coordinator decision 2026-10-16 under the owner's Get games direction, Droidtop/tracker#218): it cannot answer a
+ * coordinator decision 2026-10-16 under the owner's Get games direction, mytop-project/tracker#218): it cannot answer a
  * search (its template fires an `am start` and never hears back), so it hands the query to its app instead. Pure.
  */
 object IntegrationHandoff {

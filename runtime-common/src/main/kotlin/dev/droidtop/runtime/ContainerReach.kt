@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * What a container can reach of the device, in plain words (docs/SPEC.md 3d, "What it can reach";
- * Droidtop/tracker#787 slice 1): one line per kind of access, read from the same settings the container page's rows
+ * mytop-project/tracker#787 slice 1): one line per kind of access, read from the same settings the container page's rows
  * write, so the summary cannot say anything the rows do not. Pure.
  */
 object ContainerReach {

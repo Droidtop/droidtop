@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 /**
- * Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder", Droidtop/tracker#405): the
+ * Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder", mytop-project/tracker#405): the
  * game is taken out of the installer without running it, and Wine runs it only when that cannot be done, through
  * the one door "Install a Windows game" uses (`WindowsInstalls.install`). The installer is read where it is, never
  * copied, moved or changed. The new game goes in droidtop's own storage, in a folder named [FolderInstaller.title],

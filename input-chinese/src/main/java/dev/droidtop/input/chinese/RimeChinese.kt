@@ -7,7 +7,7 @@ import org.pocketworkstation.pckeyboard.InputEngine
 import org.pocketworkstation.pckeyboard.InputEngines
 
 /**
- * Chinese for droidtop's keyboard (Droidtop/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME"). :app calls
+ * Chinese for droidtop's keyboard (mytop-project/tracker#903 H8b; docs/SPEC.md 6a, "Chinese through RIME"). :app calls
  * [install] at start (Seams.kt), which registers RIME's engine for the input language "zh" (zh_CN, zh_TW and the
  * rest) with [InputEngines] and adds the "Chinese" row to the keyboard's settings. :input-keyboard knows nothing of
  * this module. MozcJapanese does the same for Japanese.

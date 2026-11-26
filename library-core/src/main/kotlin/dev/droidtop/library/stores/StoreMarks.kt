@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.launch
 
 /**
- * Each store's own mark (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when
+ * Each store's own mark (owner, 2026-10-14, mytop-project/tracker#503: "yep. we should always be able to show it even when
  * we can't bundle it, by caching it on login"). droidtop bundles no store's logo. Once a store is signed in, its mark
  * is read from the store's own site ([StoreLibrary.siteUrl]): the icon its home page declares, else its favicon. It
  * is kept as a small PNG in droidtop's files and drawn from there; the generic glyph is the fallback until then.

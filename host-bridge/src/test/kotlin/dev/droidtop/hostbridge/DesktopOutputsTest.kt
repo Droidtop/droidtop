@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The desktop session's extra outputs (Droidtop/tracker#908, step D2). */
+/** The desktop session's extra outputs (mytop-project/tracker#908, step D2). */
 class DesktopOutputsTest {
     private fun display(id: Int, width: Int = 1080, height: Int = 1920) = DisplayOutput(
         id = id.toString(),

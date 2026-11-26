@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Ubisoft Connect: the stored session, its renewal and the owned games (Droidtop/tracker#335). Answers written here in the shape Lutris's Ubisoft service reads. */
+/** Ubisoft Connect: the stored session, its renewal and the owned games (mytop-project/tracker#335). Answers written here in the shape Lutris's Ubisoft service reads. */
 class UbisoftTest {
     private val stored = """{"ticket":"T1","sessionId":"S1","userId":"U1","nameOnPlatform":"Mech","rememberMeTicket":"R1","other":1}"""
 

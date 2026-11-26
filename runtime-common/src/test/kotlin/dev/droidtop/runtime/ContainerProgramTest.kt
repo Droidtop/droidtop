@@ -10,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** docs/SPEC.md 3 "The image's own program" (Droidtop/tracker#555 D6b): running it, restarting it, its log. */
+/** docs/SPEC.md 3 "The image's own program" (mytop-project/tracker#555 D6b): running it, restarting it, its log. */
 class ContainerProgramTest {
     @get:Rule val tmp = TemporaryFolder()
 

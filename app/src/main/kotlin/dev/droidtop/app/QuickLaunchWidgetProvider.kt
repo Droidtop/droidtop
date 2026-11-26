@@ -9,7 +9,7 @@ import dev.droidtop.library.GameNaming
 import dev.droidtop.library.search.LibraryArtwork
 
 /**
- * The Quick launch widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): one game the person chose
+ * The Quick launch widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): one game the person chose
  * when placing it ([QuickLaunchConfigureActivity]), its art and title; a tap plays it through [GameLaunchActivity], as a
  * pinned game icon does. A game that has left the library says so, and a tap then opens the picker again.
  */

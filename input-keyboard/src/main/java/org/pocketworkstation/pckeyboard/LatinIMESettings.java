@@ -70,7 +70,7 @@ public class LatinIMESettings extends PreferenceActivity
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        // droidtop: pro mode is decided before the screen reads it (Droidtop/tracker#337).
+        // droidtop: pro mode is decided before the screen reads it (mytop-project/tracker#337).
         boolean pro = KeyboardProMode.isPro(getPreferenceManager().getSharedPreferences());
         addPreferencesFromResource(R.xml.prefs);
         mQuickFixes = (CheckBoxPreference) findPreference(QUICK_FIXES_KEY);
@@ -84,7 +84,7 @@ public class LatinIMESettings extends PreferenceActivity
         mKeyboardModePortraitPreference = (ListPreference) findPreference("pref_keyboard_mode_portrait");
         mKeyboardModeLandscapePreference = (ListPreference) findPreference("pref_keyboard_mode_landscape");
         
-        // droidtop: the keyboard's own dictionaries (Droidtop/tracker#339).
+        // droidtop: the keyboard's own dictionaries (mytop-project/tracker#339).
         Preference dictionaries = findPreference(DictionaryRow.KEY);
         if (dictionaries != null) {
             dictionaries.setOnPreferenceClickListener(p -> {
@@ -93,7 +93,7 @@ public class LatinIMESettings extends PreferenceActivity
             });
         }
 
-        // droidtop: the folders the emoji panel's GIFs and Stickers tabs read (Droidtop/tracker#903 H5).
+        // droidtop: the folders the emoji panel's GIFs and Stickers tabs read (mytop-project/tracker#903 H5).
         Preference gifFolders = findPreference(GifFoldersRow.KEY);
         if (gifFolders != null) {
             gifFolders.setOnPreferenceClickListener(p -> {
@@ -102,7 +102,7 @@ public class LatinIMESettings extends PreferenceActivity
             });
         }
 
-        // droidtop: offline voice typing's download (Droidtop/tracker#343).
+        // droidtop: offline voice typing's download (mytop-project/tracker#343).
         Preference offlineVoice = findPreference(OfflineVoiceRow.KEY);
         if (offlineVoice != null) {
             offlineVoice.setOnPreferenceClickListener(p -> {
@@ -112,11 +112,11 @@ public class LatinIMESettings extends PreferenceActivity
             OfflineVoice.refresh(this, () -> runOnUiThread(() -> offlineVoice.setSummary(OfflineVoiceRow.summary(this))));
         }
 
-        // droidtop: a language engine's own rows (Japanese's dictionary), after the languages (Droidtop/tracker#903 H7c).
+        // droidtop: a language engine's own rows (Japanese's dictionary), after the languages (mytop-project/tracker#903 H7c).
         Preference layoutGroup = findPreference(ENGINE_ROWS_GROUP);
         if (layoutGroup instanceof PreferenceGroup) EngineSettingsRows.addTo(this, (PreferenceGroup) layoutGroup);
 
-        // droidtop: the short screen hides what it leaves out, after every field above is held (Droidtop/tracker#337).
+        // droidtop: the short screen hides what it leaves out, after every field above is held (mytop-project/tracker#337).
         if (!pro) KeyboardProMode.applySimple(getPreferenceScreen());
         Preference reset = findPreference(KeyboardProMode.RESET_KEY);
         if (reset != null) {
@@ -233,7 +233,7 @@ public class LatinIMESettings extends PreferenceActivity
 
     public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         (new BackupManager(this)).dataChanged();
-        // droidtop: pro mode shows or hides options, so the screen is built again (Droidtop/tracker#337).
+        // droidtop: pro mode shows or hides options, so the screen is built again (mytop-project/tracker#337).
         if (KeyboardProMode.KEY.equals(key)) {
             recreate();
             return;

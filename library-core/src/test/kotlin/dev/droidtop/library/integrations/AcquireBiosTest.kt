@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Where a BIOS file from Game sources goes (Droidtop/tracker#558): the games folder's bios folder, by the database's name. */
+/** Where a BIOS file from Game sources goes (mytop-project/tracker#558): the games folder's bios folder, by the database's name. */
 class AcquireBiosTest {
     private val ps2 = listOf(
         BiosFileSpec("bios/ps2-0230a-20080220.bin", listOf("1AD977BB539FC9448A08AB276A836BBC")),

@@ -65,13 +65,13 @@ data class ShellWindow(
 
     /**
      * The least size of anything pressed in this window: a finger's ([minTouchTarget]) where touch comes first, else
-     * [Measure.padTarget]. The one place that choice is made (Droidtop/tracker#740): sizing a press target from
+     * [Measure.padTarget]. The one place that choice is made (mytop-project/tracker#740): sizing a press target from
      * [minTouchTarget] directly made the pad-driven Quick Menu as sparse as a phone's.
      */
     val pressTarget: Dp get() = if (touchFirst) minTouchTarget else Measure.padTarget
 
     /**
-     * Desktop's bar: the size follows the input mode (owner, 2026-11-05, Droidtop/tracker#690 and #913): a finger's
+     * Desktop's bar: the size follows the input mode (owner, 2026-11-05, mytop-project/tracker#690 and #913): a finger's
      * ([minTouchTarget]) after a touch, the pad's denser [Measure.padTarget] while the pad drives ([PadModality]).
      * Sized by [pressTarget] alone, a console with its pad got the pad's size even under a finger, 65 px on the
      * Retroid Pocket 5, about 29dp of its own (release 2967); sized as a finger's always, the pad lost the dense bar.
@@ -80,7 +80,7 @@ data class ShellWindow(
 
     /**
      * The title-bar buttons and resize band droidtop puts on the Linux desktop's windows (docs/SPEC.md 2b "Window
-     * controls", Droidtop/tracker#910): a finger's size ([minTouchTarget]) always, as only a finger or a mouse presses
+     * controls", mytop-project/tracker#910): a finger's size ([minTouchTarget]) always, as only a finger or a mouse presses
      * them, never the pad (whose route to a window is its bar menu). The buttons are drawn at the title bar's height
      * and pressed over this.
      */
@@ -88,7 +88,7 @@ data class ShellWindow(
 
     /**
      * A pane of a larger window ([pane]): the Quick Menu's catalog tabs. Its rows and section labels are compact
-     * (DroidDeck's compact settings rows, Droidtop/tracker#363): a one-line row is [pressTarget] tall and no taller, and
+     * (DroidDeck's compact settings rows, mytop-project/tracker#363): a one-line row is [pressTarget] tall and no taller, and
      * a section label sits closer above its rows on a hairline.
      */
     val inPane: Boolean get() = paneTouchFirst != null
@@ -134,10 +134,10 @@ data class ShellWindow(
     val touchFirst: Boolean get() = paneTouchFirst ?: (portrait || (minOf(widthDp, heightDp) < 600 && !padPresent))
 
     /**
-     * This window seen by a pane [widthDp] wide inside it (the Quick Menu's catalog tabs, Droidtop/tracker#649): its
+     * This window seen by a pane [widthDp] wide inside it (the Quick Menu's catalog tabs, mytop-project/tracker#649): its
      * gutters and layout follow the pane, its input does not. A plain copy at the pane's width was taller than wide, so
      * it read as a phone held upright: touch-first, finger-sized rows with the pad attached, about 200px each on the
-     * add-on (Droidtop/tracker#740).
+     * add-on (mytop-project/tracker#740).
      */
     fun pane(widthDp: Int): ShellWindow = copy(widthDp = widthDp, paneTouchFirst = touchFirst)
 
@@ -288,7 +288,7 @@ fun esDeHelpRowOwner(
     claim: HelpRowClaim,
     // Whether the pad is what the person is using now (PadModality). "Show button hints" off hides the
     // bar only then: the bar is also the touch route to what the pad buttons do, and for some of it
-    // (the Start menu) the only one, so a person touching always has it (Droidtop/tracker#839).
+    // (the Start menu) the only one, so a person touching always has it (mytop-project/tracker#839).
     padDriving: Boolean = true,
 ): HelpRowOwner {
     val shown = showHints || !padDriving
@@ -365,7 +365,7 @@ fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, xdpi: Float): Flo
 }
 
 /**
- * The density a window [widthPx] by [heightPx] lays out at with the Interface size [factor] (Droidtop/tracker#656):
+ * The density a window [widthPx] by [heightPx] lays out at with the Interface size [factor] (mytop-project/tracker#656):
  * [canvasDensity] from the display's own [systemDensity], then times [factor], so 125 percent draws everything a
  * quarter bigger and 75 percent a quarter smaller, layout and text together, whatever density the window's
  * configuration already carries. Pure.
@@ -420,7 +420,7 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
     val heightPx = configuration.screenHeightDp * configDensity
     // The canvas is bounded by the display's own density, not the configuration's, which droidtop's activities have
     // already moved to the canvas: with the Interface size factor on top, bounding by the moved density would apply
-    // the factor twice. The factor is the setting for the screen this window is on (Droidtop/tracker#656).
+    // the factor twice. The factor is the setting for the screen this window is on (mytop-project/tracker#656).
     val displayId = LocalView.current.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
     val sizeTick by dev.droidtop.runtime.InterfaceSize.changed.collectAsState()
     val (systemDensity, factor) = remember(configuration, displayId, sizeTick) {

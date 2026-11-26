@@ -1,4 +1,4 @@
-// The enhancement provider host (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): the one app that holds
+// The enhancement provider host (docs/SPEC.md "Enhancement providers", mytop-project/tracker#852): the one app that holds
 // elevated access (su through the root manager, Shizuku, wireless debugging) so droidtop's own code holds none. It is
 // a TEMPLATE: built here unsigned and carried in droidtop's assets, then signed on the device with a key droidtop made
 // in Android's Keystore and installed by droidtop (ProviderHostSetup). Nothing signed leaves CI, and nothing leaves the

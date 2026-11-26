@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
-/** "Tint themes to my colours" in the theme's own views (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#844). */
+/** "Tint themes to my colours" in the theme's own views (docs/SPEC.md 7k, "Colours outside Gaming"; mytop-project/tracker#844). */
 class ThemeTintTest {
     private val amber = 0xE0A030FFL
     private val white = 0xFFFFFFFFL

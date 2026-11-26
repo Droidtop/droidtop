@@ -45,7 +45,7 @@ internal val LocalRunningGameHost = staticCompositionLocalOf<RunningGameHost?> {
 private val LocalInRunningGameSheet = staticCompositionLocalOf { false }
 
 /**
- * L2 on the game that is running (Droidtop/tracker#740; the owner, 2026-10-30: "r2 is the global menu. L2 is
+ * L2 on the game that is running (mytop-project/tracker#740; the owner, 2026-10-30: "r2 is the global menu. L2 is
  * everything we can do contextually for this app/game/etc"): [RunningGameSheet] first, its Game options row opening
  * [content], the game's own menu. Any other game, or no host, is [content] at once. The game menus wrap themselves
  * in this, so every L2 and long press on the running game in Gaming opens the same sheet the overlay does.
@@ -79,12 +79,12 @@ internal fun GameOptionsOfRunningGame(content: @Composable () -> Unit) {
 /**
  * The running game's sheet, one [ActionSheet] wherever it is drawn: L2 on the running game in Gaming, and HOME + L2
  * over it (docs/SPEC.md "In-game overlays: HOME chords"). It is what the Quick Menu's Game section held, which R2 no
- * longer has (Droidtop/tracker#740), with the overlay's own rows:
+ * longer has (mytop-project/tracker#740), with the overlay's own rows:
  *
  * - Resume ([onResume]), and Pause the game for a console game (RetroArch's PAUSE_TOGGLE, sent only on this press);
  * - Emulator, the game's own choice ([GameEmulatorChoice], the companion's model too);
  * - Report a problem, Mouse mode and Controls for a game in droidtop's own screen;
- * - Screenshot, which closes the sheet first so the picture is of the game (Droidtop/tracker#626);
+ * - Screenshot, which closes the sheet first so the picture is of the game (mytop-project/tracker#626);
  * - Guides; the console's own search where the host has one; Game options, the game's own menu ([onGameOptions]);
  * - Quit, Restart and Kill, which ask in the one [ConfirmDialog] when [GameControls.asks] says so, say their outcome on
  *   the row, and close the sheet once the game really ended; Restart starts it again only then.
@@ -199,7 +199,7 @@ internal fun RunningGameSheet(
         controls?.let { line ->
             add(ActionRow("Controls", line) { controls = ownScreen?.nextControls() ?: line })
         }
-        // One press during play (Droidtop/tracker#626): the sheet closes first so the shot is of the game, on the
+        // One press during play (mytop-project/tracker#626): the sheet closes first so the shot is of the game, on the
         // screen the game runs on; a flash says where it went.
         if (GameRow.SCREENSHOT in shown) {
             add(

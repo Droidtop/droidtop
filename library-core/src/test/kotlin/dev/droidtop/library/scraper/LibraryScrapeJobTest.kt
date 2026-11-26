@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The library scrape job's checkpoint and resume rules (Droidtop/tracker#174):
+ * The library scrape job's checkpoint and resume rules (mytop-project/tracker#174):
  * the checkpoint is the position in the scrape queue, a paused or restarted
  * run carries on from it, and nothing before it is asked again.
  */

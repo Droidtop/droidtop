@@ -137,7 +137,7 @@ object GameEngineDetector {
 
     private fun isGodot(facts: FolderListing): Boolean {
         // A `.pck` counts only when it is Godot's pack: its first bytes are `GDPC`, as Enginehost checks
-        // (GodotPack.kt), so a stray file with that extension is not a Godot game (Droidtop/tracker#873).
+        // (GodotPack.kt), so a stray file with that extension is not a Godot game (mytop-project/tracker#873).
         val packs = facts.entryNames().asSequence()
             .filter { it.substringAfterLast('.', "").lowercase() == "pck" && facts.isFile(it) }
             .take(GODOT_MAX_TRAILER_READS)
@@ -1356,7 +1356,7 @@ class EngineGameProvider(
     // [GameEngineDetector.engineOwnsInstall]) would silently delete every
     // store-side fact about the game.
     // Null while the stores have not answered yet (just after start): a store game's folder then keeps the store
-    // facts its own record last had ([storeInstallFor], Droidtop/tracker#891), not the folder's name.
+    // facts its own record last had ([storeInstallFor], mytop-project/tracker#891), not the folder's name.
     private val storeInstalls: () -> List<StoreInstall>? = { emptyList() },
     // Where this provider's game records are written and read from
     // (docs/SPEC.md 7g, step 2) -- [NoOpGameRecordStore] by default so

@@ -4,7 +4,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * What the one candidate bar ([CandidateView]) shows, for any engine (Droidtop/tracker#903 H6; docs/SPEC.md 6a, "The
+ * What the one candidate bar ([CandidateView]) shows, for any engine (mytop-project/tracker#903 H6; docs/SPEC.md 6a, "The
  * candidate bar"): the candidates with their annotations, whether the row can open into a full grid and whether it is
  * open, the grid's pages, and the pad's selection. Pure, so paging, expanding and selection are tested on the JVM; the
  * view draws it and turns touches and pad moves into its calls.

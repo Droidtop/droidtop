@@ -34,7 +34,7 @@ private val Context.gameNativeStore by preferencesDataStore(name = "PluviaPrefer
 private val Context.winlatorStore by preferencesDataStore(name = "WinlatorPreferences", corruptionHandler = corruptionReset())
 
 /**
- * One DataStore preferences file, read from memory (Droidtop/tracker#765). Once [open], a collector keeps the file's
+ * One DataStore preferences file, read from memory (mytop-project/tracker#765). Once [open], a collector keeps the file's
  * latest values in [snapshot], so a read is a map lookup, never a blocking read of the file; only a read that comes
  * before the first load waits for it, once. [WindowsBackbone] opens and loads both files off the main thread when the
  * runtime starts, so the reads from the Winlator view and launch code find them in memory.

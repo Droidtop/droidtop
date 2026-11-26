@@ -21,7 +21,7 @@ import kotlin.math.abs
 
 /**
  * A second-screen page that scrolls from a vertical drag starting ANYWHERE on it (docs/SPEC.md "The
- * companion's tabs", Droidtop/tracker#328): [verticalScroll] plus [dragAnywhereScroll]. Every scrolling page
+ * companion's tabs", mytop-project/tracker#328): [verticalScroll] plus [dragAnywhereScroll]. Every scrolling page
  * of the companion uses this, never a bare `verticalScroll`.
  */
 fun Modifier.secondScreenScroll(state: ScrollState): Modifier = composed {

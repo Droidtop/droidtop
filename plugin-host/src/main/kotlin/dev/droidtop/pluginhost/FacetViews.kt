@@ -57,7 +57,7 @@ object FacetViews {
         val id = facet.id
         return when (val b = facet.body) {
             is FacetBody.Info -> ViewNode.Info(id, b.label, b.sub, b.value)
-            // A status keeps its state for the host's glyph (Droidtop/tracker#644), and its words for the value column.
+            // A status keeps its state for the host's glyph (mytop-project/tracker#644), and its words for the value column.
             is FacetBody.Status -> ViewNode.Info(id, b.label, b.value, stateWords(b.state), state = b.state)
             is FacetBody.Badge -> ViewNode.Info(id, b.text, null, null)
             is FacetBody.Progress -> ViewNode.Progress(id, b.label, b.sub, b.value)

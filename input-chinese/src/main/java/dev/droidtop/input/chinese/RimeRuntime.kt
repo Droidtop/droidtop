@@ -14,7 +14,7 @@ import org.pocketworkstation.pckeyboard.InputEngines
 import org.pocketworkstation.pckeyboard.KeyboardThreads
 
 /**
- * librime in this process (Droidtop/tracker#903 H8b): its data, its library and the one lock around its calls. librime
+ * librime in this process (mytop-project/tracker#903 H8b): its data, its library and the one lock around its calls. librime
  * is a process singleton (one service, one deployer), so this is one too, which every [RimeEngine] shares.
  *
  * [start] runs once Chinese is first used (the engine's factory, or a field starting), never at app start. On the

@@ -13,7 +13,7 @@ plugins {
     alias(libs.plugins.androidx.baselineprofile) apply false
 }
 
-// The classes Compose may treat as stable (compose-stability.conf, Droidtop/tracker#941), for every module that uses
+// The classes Compose may treat as stable (compose-stability.conf, mytop-project/tracker#941), for every module that uses
 // Compose.
 subprojects {
     val module = this
@@ -34,7 +34,7 @@ subprojects {
     }
 }
 
-// Compose compiler reports, with -PcomposeReports (Droidtop/tracker#941): for each module that uses Compose, which
+// Compose compiler reports, with -PcomposeReports (mytop-project/tracker#941): for each module that uses Compose, which
 // composables can skip when their inputs are unchanged and which classes Compose counts as unstable, the reason a
 // screen redraws whole when one value changes. Written to <module>/build/compose-reports and compose-metrics;
 // scripts/compose-stability.py totals them, and Android checks prints the totals on every run.
@@ -55,7 +55,7 @@ if (providers.gradleProperty("composeReports").isPresent) {
     }
 }
 
-// One Compose for every module (Droidtop/tracker#566): a module compiled against an older Compose than the app ships
+// One Compose for every module (mytop-project/tracker#566): a module compiled against an older Compose than the app ships
 // links to methods the shipped library no longer has, and the release build dies with NoSuchMethodError (the plugin
 // page's FlowRow, compiled against foundation 1.7 while shell-default's material3 brought 1.9). Each module writes the
 // Compose ui, foundation, runtime and animation versions of its own classpath (the app its release runtime, every
@@ -106,7 +106,7 @@ tasks.register("checkComposeVersions") {
                 if (ships != null && ships != version) problems += "${module.path} compiles against $artifact:$version, the app ships $ships"
             }
         }
-        if (problems.isNotEmpty()) throw GradleException("Compose versions differ (Droidtop/tracker#566):\n" + problems.joinToString("\n"))
+        if (problems.isNotEmpty()) throw GradleException("Compose versions differ (mytop-project/tracker#566):\n" + problems.joinToString("\n"))
         logger.lifecycle("Compose: one version per artifact across every module (${shipped.size} artifacts)")
     }
 }

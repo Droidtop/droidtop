@@ -27,14 +27,14 @@ import kotlinx.coroutines.isActive
  * A rescan can be stopped: [cancel] ends the one in flight, and the row
  * calls it when it is selected again while the rescan runs, so a walk over
  * a slow card is never something a person has to sit out
- * (Droidtop/tracker#275).
+ * (mytop-project/tracker#275).
  *
- * "Rescan PC game folders" ([runPcFolders], Droidtop/tracker#397 slice E) is
+ * "Rescan PC game folders" ([runPcFolders], mytop-project/tracker#397 slice E) is
  * the same action over the PC walks only (PC and engine games, never the ROM
  * walk): Game sources > Folders and PC Games' list options offer it. One
  * rescan runs at a time, whichever it is, and either row cancels it.
  *
- * A rescan is a job (Droidtop/tracker#595): with [asJob] set (library-core's `LibraryRescanJob`, at start) every
+ * A rescan is a job (mytop-project/tracker#595): with [asJob] set (library-core's `LibraryRescanJob`, at start) every
  * [run] and [runPcFolders] starts or joins the one rescan job in the jobs center, so its progress shows under
  * Downloads and on the Home strip and stays when the menu that started it closes; the row still hears its status
  * while it is open. The job's runner walks through [walk], the handlers themselves.

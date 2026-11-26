@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A provider and a caller plugin end to end through the broker (docs/plugin-api.md 2.4 and 2.6, Droidtop/tracker#129):
+ * A provider and a caller plugin end to end through the broker (docs/plugin-api.md 2.4 and 2.6, mytop-project/tracker#129):
  * the caller gets the provider's answer, PROVIDER_UNAVAILABLE while the provider is off or gone, and the answer again
  * when it is back. The rig half of #129 runs the same steps with real plugins.
  */

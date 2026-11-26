@@ -24,7 +24,7 @@ class PcPrimaryActionLabelTest {
 
     @Test
     fun aRunnersInstallNeverReadsAsTheGamesOwnInstall() {
-        // The game's own Install is the installer row's (Droidtop/tracker#657); no runner step may share its words.
+        // The game's own Install is the installer row's (mytop-project/tracker#657); no runner step may share its words.
         for (action in RunnerAction.entries) assertFalse(action.name, primaryActionLabel(option(action)) == "Install")
     }
 

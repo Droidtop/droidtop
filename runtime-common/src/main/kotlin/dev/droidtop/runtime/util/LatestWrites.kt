@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
  * track asks for a write at every step, and Android's setting (a volume, a brightness, a helper's command) need only
  * end at where the finger stopped. Each write has a key (the control's id); a write waiting under a key is replaced by
  * a newer one, and different keys all run, in the order they first asked. The companion's one write path for live
- * controls (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 S2a: "Slider writes go through a background
+ * controls (docs/SPEC.md "The companion's tabs", mytop-project/tracker#786 S2a: "Slider writes go through a background
  * write queue"). A write that throws is dropped; the next one still runs.
  */
 class LatestWrites(private val scope: CoroutineScope) {

@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * Presses keys as a hardware keyboard would (Droidtop/tracker#772): the one place a chord is spelled out, where
+ * Presses keys as a hardware keyboard would (mytop-project/tracker#772): the one place a chord is spelled out, where
  * macros, the slab and the second-screen keyboard each built the same press and release sequence. [send] takes an
  * Android keycode and whether it goes down.
  */

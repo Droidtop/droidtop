@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The keyboard's own strip for a phone typing into this device (docs/SPEC.md, "Type from another device", "On the
- * keyboard", Droidtop/tracker#903): shown only while a phone is paired, a password field's text never kept, "Not
+ * keyboard", mytop-project/tracker#903): shown only while a phone is paired, a password field's text never kept, "Not
  * received" in place until the next thing lands, and the router telling it of each delivery.
  */
 class RemoteStripTest {

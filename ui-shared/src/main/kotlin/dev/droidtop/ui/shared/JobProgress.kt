@@ -44,14 +44,14 @@ import dev.droidtop.library.settings.JobLook
 data class JobProgressColors(val track: Color, val fill: Color, val done: Color, val failed: Color)
 
 /**
- * The one job progress bar, every surface (docs/SPEC.md "Motion and visual status", Droidtop/tracker#643; owner,
+ * The one job progress bar, every surface (docs/SPEC.md "Motion and visual status", mytop-project/tracker#643; owner,
  * 2026-10-24: "The current 'flickery numbers for download progress', for instance, is bad"). The fill glides to each
  * new [fraction] ([Motion.progress]) instead of jumping; [look] says how it moves: queued pulses dim, checking runs a
  * shimmer along the track, paused stands dimmed, done fills, failed turns the track to the danger colour and shakes
  * once. Every moving value is read while drawing, so a list of jobs is drawn again, never laid out again, as they
  * move; with motion off ([Motion.enabled]) it is the same bar standing still.
  *
- * [parts] from 2 to [JobLook.MAX_PARTS] draws the segmented form (Droidtop/tracker#738): a release in parts or several
+ * [parts] from 2 to [JobLook.MAX_PARTS] draws the segmented form (mytop-project/tracker#738): a release in parts or several
  * files, one segment each, filled part by part. A screen reader hears the state's words ([JobLook.words]) and, while
  * it moves, the percent.
  */
@@ -69,7 +69,7 @@ fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modif
     val segments = parts.takeIf { it in 2..JobLook.MAX_PARTS } ?: 1
     val said = JobLook.words(look) + if (look == JobLook.ACTIVE || look == JobLook.LEVEL) ", ${(target * 100).toInt()} percent" else ""
     // One band brush per colour, spanning whatever it fills and moved with translate: a gradient built with new start
-    // and end every frame was a new native shader each frame for as long as a job checks (Droidtop/tracker#917).
+    // and end every frame was a new native shader each frame for as long as a job checks (mytop-project/tracker#917).
     val bandBrush = remember(colors.fill) { Brush.horizontalGradient(listOf(Color.Transparent, colors.fill, Color.Transparent)) }
     Canvas(
         modifier
@@ -145,7 +145,7 @@ fun JobMark(look: JobLook, colors: JobProgressColors, modifier: Modifier = Modif
 
 /**
  * The ring form of [JobProgress], for a place too small for a bar: an entry that stands for many jobs (Downloads and
- * Updates in the left menu, Droidtop/tracker#643: "a filling ring while active, a dot when something needs the
+ * Updates in the left menu, mytop-project/tracker#643: "a filling ring while active, a dot when something needs the
  * person"). The arc glides to [fraction] as the bar's fill does; with no fraction ([JobLook.CHECKING]) a short arc
  * turns, standing still with motion off.
  */

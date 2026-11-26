@@ -20,7 +20,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * GOG's download path off the network (Droidtop/tracker#732): a Gen 2 depot manifest read into files and their chunks,
+ * GOG's download path off the network (mytop-project/tracker#732): a Gen 2 depot manifest read into files and their chunks,
  * the chunk plan and its CDN paths, chunks unpacked into their place in a file and checked by MD5, and a resume that
  * keeps a file only when its MD5 is the manifest's. The manifest is written here in GOG's Gen 2 shape, not taken from a
  * store.

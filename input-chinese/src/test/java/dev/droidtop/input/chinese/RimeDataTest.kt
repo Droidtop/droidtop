@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#903 H8b: the data's download, checks, unpacking and placing, against a fake server. */
+/** mytop-project/tracker#903 H8b: the data's download, checks, unpacking and placing, against a fake server. */
 class RimeDataTest {
     private val dir: File = Files.createTempDirectory("rime-data").toFile()
 
@@ -84,7 +84,7 @@ class RimeDataTest {
         val server = Server(body = good)
         val heard = ArrayList<Int>()
         assertNull(RimeData.ensure(dir, pin(), manifest, server) { heard += it })
-        assertEquals("https://github.com/Droidtop/droidtop/releases/download/rime-engine-test/rime-data-luna.tar.gz", server.url)
+        assertEquals("https://github.com/mytop-project/droidtop/releases/download/rime-engine-test/rime-data-luna.tar.gz", server.url)
         assertTrue(RimeData.present(dir, pin()))
         assertTrue(RimeData.verify(dir, manifest))
         assertTrue(File(dir, "shared/build/luna_pinyin.table.bin").readBytes().contentEquals(table))

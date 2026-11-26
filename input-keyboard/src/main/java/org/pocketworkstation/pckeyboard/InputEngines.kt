@@ -7,7 +7,7 @@ import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The engines other than Hacker's Latin one, by language (Droidtop/tracker#903 H6; docs/SPEC.md 6a, "The engine
+ * The engines other than Hacker's Latin one, by language (mytop-project/tracker#903 H6; docs/SPEC.md 6a, "The engine
  * seam"). A conversion engine (Mozc for Japanese, librime for Chinese, libhangul for Korean, H7 to H9) registers a
  * [Factory] here; the input method asks [forLanguage] each time its language is set up, and uses [LatinEngine] when no
  * factory answers. The keyboard module names no engine: :app registers them at start (#903 H7c: Mozc for Japanese,
@@ -54,7 +54,7 @@ object InputEngines {
     const val KEY_PREFIX = "pref_engine_"
 
     /**
-     * Where an engine keeps what it learns (Droidtop/tracker#903 H7a): context.noBackupFilesDir/engine-<id>, so it is
+     * Where an engine keeps what it learns (mytop-project/tracker#903 H7a): context.noBackupFilesDir/engine-<id>, so it is
      * neither backed up nor in the user's files. Resolving it touches the disk, so [directory] refuses the main thread.
      */
     class Profile(private val context: Context, val id: String) {

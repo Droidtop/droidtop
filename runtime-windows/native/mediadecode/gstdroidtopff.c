@@ -1,6 +1,6 @@
 /*
  * droidtopffdemux: Wine's GStreamer hands a game's media container to droidtop's sandboxed decode server and gets raw
- * video and audio back (Droidtop/tracker#601, the enginehost-ffmpeg handoff; design on #601).
+ * video and audio back (mytop-project/tracker#601, the enginehost-ffmpeg handoff; design on #601).
  *
  * winegstreamer builds decodebin pipelines, and the base image has no decoders for the formats games ship (WMV/WMA,
  * AV1, H.264, Opus: #897). This element claims the container caps at a rank above every demuxer, streams nothing of
@@ -307,7 +307,7 @@ static void droidtop_ff_class_init(DroidtopFfClass *klass) {
     gst_element_class_add_static_pad_template(element_class, &video_template);
     gst_element_class_add_static_pad_template(element_class, &audio_template);
     gst_element_class_set_static_metadata(element_class, "droidtop media handoff", "Codec/Demuxer",
-        "Decodes a container in droidtop's sandboxed decode server (Droidtop/tracker#601)", "droidtop");
+        "Decodes a container in droidtop's sandboxed decode server (mytop-project/tracker#601)", "droidtop");
     element_class->change_state = change_state;
 }
 
@@ -318,4 +318,4 @@ static gboolean plugin_init(GstPlugin *plugin) {
 
 GST_PLUGIN_DEFINE(GST_VERSION_MAJOR, GST_VERSION_MINOR, droidtopff,
     "droidtop's media handoff to its sandboxed decode server", plugin_init, "1.0", "GPL", "droidtop",
-    "https://github.com/Droidtop/droidtop")
+    "https://github.com/mytop-project/droidtop")

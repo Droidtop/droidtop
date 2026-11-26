@@ -11,7 +11,7 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * Copying saves from one copy of a game to another (docs/SPEC.md 7o, "Saves between copies", Droidtop/tracker#745):
+ * Copying saves from one copy of a game to another (docs/SPEC.md 7o, "Saves between copies", mytop-project/tracker#745):
  * Bare Witness's own folder and its Steam copy. The owner, 2026-10-29: "We should be able to link the copies, transfer
  * saves, and etc".
  *

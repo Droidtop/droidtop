@@ -37,7 +37,7 @@ data class UserOriginKey(
     /**
      * The SHA-256 (lowercase hex of the SPKI) of every key this origin's key replaced through [UserOriginKeys.replace],
      * the person's confirmed rotation: a plugin approved under one of them that is now signed by this key is an update
-     * of the same publisher, not a new trust decision ([UserOriginKeys.succeeds], Droidtop/tracker#270).
+     * of the same publisher, not a new trust decision ([UserOriginKeys.succeeds], mytop-project/tracker#270).
      */
     val previous: List<String> = emptyList(),
 )
@@ -232,7 +232,7 @@ object UserOriginKeys {
         val stored = load(file)
         val existing = stored[id] ?: return AddKeyOutcome.Refused("no trusted key for origin \"$id\" to replace")
         if (fingerprint(key) == fingerprint(existing.keyBase64)) return AddKeyOutcome.AlreadyTrustedSameKey
-        // The replaced key is remembered as this one's predecessor: plugins approved under it carry over (Droidtop/tracker#270).
+        // The replaced key is remembered as this one's predecessor: plugins approved under it carry over (mytop-project/tracker#270).
         val replaced = listOfNotNull(keySha256(existing.keyBase64)) + existing.previous
         val entry = UserOriginKey(
             origin = id,
@@ -248,7 +248,7 @@ object UserOriginKeys {
     }
 
     /**
-     * Follows a source's superseded marker (Droidtop/tracker#887): [origin]'s trusted key becomes [keyBase64], and the
+     * Follows a source's superseded marker (mytop-project/tracker#887): [origin]'s trusted key becomes [keyBase64], and the
      * key it replaces joins [UserOriginKey.previous], the record "Trust new key" writes, so plugins approved under the
      * old key keep their approval and an update signed by the new one is the same publisher. The caller checked the
      * marker came from the source this trust came from ([KeySupersession.follows]). Null when the origin is not
@@ -265,7 +265,7 @@ object UserOriginKeys {
     /**
      * Whether content approved under [approvedKeySha256] stays valid although its origin's key has moved on: the key is
      * one the origin's key replaced ([UserOriginKey.previous]). The owner: "Whatever K signed stays installed and
-     * running" (Droidtop/tracker#887); revocation is the only way it stops, checked by the caller. Pure.
+     * running" (mytop-project/tracker#887); revocation is the only way it stops, checked by the caller. Pure.
      */
     fun predecessorInForce(entry: UserOriginKey?, approvedKeySha256: String): Boolean =
         entry != null && approvedKeySha256.lowercase() in entry.previous

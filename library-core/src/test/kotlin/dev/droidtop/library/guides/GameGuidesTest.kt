@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The guides a game's folder carries, and the place kept in them (Droidtop/tracker#817). */
+/** The guides a game's folder carries, and the place kept in them (mytop-project/tracker#817). */
 class GameGuidesTest {
     @Test
     fun `a folder's walkthrough, guide and readme are found, the walkthrough first, and nothing else`() {

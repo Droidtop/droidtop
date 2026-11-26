@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `social.changed` (docs/plugin-api.md 3 C19, Droidtop/tracker#327): only a social provider whose point is on may say so. */
+/** `social.changed` (docs/plugin-api.md 3 C19, mytop-project/tracker#327): only a social provider whose point is on may say so. */
 class SocialHostApiTest {
     private fun request(args: JSONObject = JSONObject()) =
         obj("api" to "social", "version" to 1, "op" to "changed", "args" to args).toString()

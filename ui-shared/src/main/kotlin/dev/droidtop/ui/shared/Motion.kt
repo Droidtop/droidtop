@@ -39,7 +39,7 @@ import kotlin.math.roundToInt
  * Android's scale current for every host in the process, and Gaming's
  * MotionSync adds its own switch. It lives in `:ui-shared` so every surface
  * that shows a job, the companion and Standard's settings among them, moves
- * by the same roles (Droidtop/tracker#643).
+ * by the same roles (mytop-project/tracker#643).
  */
 object Motion {
     /** A focus colour or fill change: instant, so the eye gets the answer first. */
@@ -94,7 +94,7 @@ object Motion {
     const val RiseDp = 8f
 
     /**
-     * A job's bar (JobProgress, Droidtop/tracker#643): the fill glides to each new value over [ProgressMs], longer than
+     * A job's bar (JobProgress, mytop-project/tracker#643): the fill glides to each new value over [ProgressMs], longer than
      * the gap between two reports (a quarter second at most, ProgressThrottle) so it never stops between them; a
      * checking shimmer crosses the track every [ShimmerMs]; a finished job's check draws in over [DoneMs]; a failed one
      * shakes once over [ShakeMs]. A queued job pulses on [AmbientPulseMs].

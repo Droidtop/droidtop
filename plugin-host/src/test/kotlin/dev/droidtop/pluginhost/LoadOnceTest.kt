@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A plugin is loaded once per process, not once per call (Droidtop/tracker#884: one search ran
+ * A plugin is loaded once per process, not once per call (mytop-project/tracker#884: one search ran
  * NativePluginRunner.load once per source at the same time, on every call, on BlueStacks). Counts the loads.
  */
 class LoadOnceTest {

@@ -26,7 +26,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Humble Bundle as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335): the DRM-free games of the
+ * Humble Bundle as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335): the DRM-free games of the
  * account's orders, installed the way itch.io's are ([SingleFileInstall]: one file, unpacked or kept). Signed in on
  * Humble's own page; its session cookie is all droidtop keeps. Steam keys in the orders are not rows: they are
  * Steam's once redeemed. Download links are signed and short-lived, so the kept library holds them without their

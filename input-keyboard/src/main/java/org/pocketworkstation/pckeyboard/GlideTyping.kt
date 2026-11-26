@@ -9,12 +9,12 @@ import android.os.Looper
 import android.os.SystemClock
 
 /**
- * Glide typing on the keyboard (Droidtop/tracker#341): one finger drawn across the letter keys types a word. The view
+ * Glide typing on the keyboard (mytop-project/tracker#341): one finger drawn across the letter keys types a word. The view
  * hands it each single-finger touch ([down], [move], [up]) in keyboard coordinates; a touch that starts on a letter
  * and travels [GLIDE_START_KEYS] key widths becomes a glide, after which the view stops the ordinary key press and
  * draws the [trail]. On release the guesser's words go to [onWords], best first.
  *
- * The guesser is a [GestureEngine] (Droidtop/tracker#903 H6, the gesture seam): droidtop's [GlideClassifier] unless a
+ * The guesser is a [GestureEngine] (mytop-project/tracker#903 H6, the gesture seam): droidtop's [GlideClassifier] unless a
  * gesture library is set ([GestureEngines]). It is made for each keyboard's letter keys and the language's glide words
  * ([KeyboardDictionaries.glideWords]) on a background thread, and is handed each stroke whole, with its timing, at
  * release. Until it is ready, or with no words for the language,

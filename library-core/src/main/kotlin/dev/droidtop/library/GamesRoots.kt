@@ -76,7 +76,7 @@ object GamesRoots {
 
     /**
      * When the ROM walk last finished [root], as [markPcScanned] is for the PC walk: a folder that holds only ROMs
-     * read "not scanned yet" beside its games (Droidtop/tracker#846). Off the main thread.
+     * read "not scanned yet" beside its games (mytop-project/tracker#846). Off the main thread.
      */
     fun markRomScanned(context: Context, root: String, now: Long = System.currentTimeMillis()) {
         context.getSharedPreferences(ROM_SCANS_PREFS, Context.MODE_PRIVATE).edit().putLong(root, now).apply()

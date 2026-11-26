@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 /**
  * Where native Linux games run, and the FEX that runs their x86 programs on an arm64 device (docs/SPEC.md 3c,
- * Droidtop/tracker#962).
+ * mytop-project/tracker#962).
  *
  * Desktop mode's primary container is Alpine (musl), and FEX needs a glibc host, so a Linux game runs in a sibling
  * container made from [IMAGE]. That is either the one shared "Linux games" container or, when the game's settings
@@ -38,13 +38,13 @@ object LinuxGames {
     private const val ROOTFS_FOLDER = "Ubuntu_24_04"
 
     /**
-     * droidtop's FEX build (github.com/Droidtop/FEX, release [FEX_BUILD]): FEX 2611.1 with guest files on noexec mounts
+     * droidtop's FEX build (github.com/mytop-project/FEX, release [FEX_BUILD]): FEX 2611.1 with guest files on noexec mounts
      * mapped without host PROT_EXEC. Android mounts shared storage and SD cards noexec, and FEX's own packages refused
      * every x86 program kept there ("MapFile: Some elf mapping failed, 1", console, 2026-11-23). One tarball of the
      * installed tree per Arm level, the levels FEX's own Ubuntu packages ship.
      */
     const val FEX_BUILD = "droidtop-2611.1-1"
-    private const val FEX_RELEASE = "https://github.com/Droidtop/FEX/releases/download/$FEX_BUILD"
+    private const val FEX_RELEASE = "https://github.com/mytop-project/FEX/releases/download/$FEX_BUILD"
 
     /** SHA-256 of each level's tarball, from the release's own `.sha256` files. */
     private val FEX_SHA256 = mapOf(

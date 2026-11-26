@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The Android half of [ContainerLauncher] for one desktop session
- * (docs/SPEC.md 2a, Droidtop/tracker#353): keeps one desktop entry per
+ * (docs/SPEC.md 2a, mytop-project/tracker#353): keeps one desktop entry per
  * library game in step with the library's own published list, and turns
  * the launch helper's requests into [DesktopLaunchRequests].
  *
@@ -76,13 +76,13 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         helper.parentFile?.mkdirs()
         val script = ContainerLauncher.helperScript()
         if (!helper.isFile || helper.readText() != script) helper.writeText(script)
-        // Open on Android (Droidtop/tracker#388): its helper, its hidden entry and the lowest-precedence mimeapps.list.
+        // Open on Android (mytop-project/tracker#388): its helper, its hidden entry and the lowest-precedence mimeapps.list.
         writeIfChanged(ContainerLauncher.hostViewHelper(filesDir), ContainerLauncher.viewHelperScript())
         writeIfChanged(File(applicationsDir, ContainerLauncher.VIEW_ENTRY), ContainerLauncher.viewEntry())
         writeIfChanged(File(applicationsDir, "mimeapps.list"), ContainerLauncher.mimeApps())
-        // Other containers' apps exported into the desktop (Droidtop/tracker#555 D5): their entries, stale ones gone.
+        // Other containers' apps exported into the desktop (mytop-project/tracker#555 D5): their entries, stale ones gone.
         ContainerExports.writeEntries(filesDir, ContainerExports.read(filesDir))
-        // Other containers' exported commands and the enter helper they run through (Droidtop/tracker#555 D5, D7).
+        // Other containers' exported commands and the enter helper they run through (mytop-project/tracker#555 D5, D7).
         ContainerEnter.writeWrappers(filesDir, ContainerEnter.read(filesDir))
         // Requests from a session that has ended are not this session's to answer.
         // An enter request is a folder of FIFOs and small files; it is emptied first (one level, no walk), then removed.
@@ -154,7 +154,7 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         // Started by the showing Desktop shell from its activity, on the main thread, as Start starts an Android app
         // (which the 2026-11-04 rig run saw come to the front). Started from here, a file watcher's thread with the
         // application's context, the link reached Chrome's dispatcher but Chrome never came to the front
-        // (Droidtop/tracker#388). With no Desktop shell showing, from here as before.
+        // (mytop-project/tracker#388). With no Desktop shell showing, from here as before.
         if (DesktopLaunchRequests.offerView(chooser)) {
             Log.i(TAG, "Open on Android: handed to the Desktop shell (${intent.data?.scheme})")
             return

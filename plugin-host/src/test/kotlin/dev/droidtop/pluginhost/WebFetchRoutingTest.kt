@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#600: a host that has shown a browser check is read by droidtop's web view, never its HTTP client. */
+/** mytop-project/tracker#600: a host that has shown a browser check is read by droidtop's web view, never its HTTP client. */
 class WebFetchRoutingTest {
     private val record = TestPlugins.record(
         TestPlugins.manifest(id = "acme.checked") {

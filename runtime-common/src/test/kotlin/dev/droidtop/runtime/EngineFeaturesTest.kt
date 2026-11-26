@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/SPEC.md 3, "Kernel features, detected at runtime" (Droidtop/tracker#555 D10). */
+/** docs/SPEC.md 3, "Kernel features, detected at runtime" (mytop-project/tracker#555 D10). */
 class EngineFeaturesTest {
     private val filesystems = "nodev\tsysfs\nnodev\ttmpfs\n\text4\nnodev\toverlay\nnodev\tcgroup2\n"
 

@@ -11,7 +11,7 @@ import kotlinx.serialization.json.jsonObject
 /**
  * What a store left in a game folder it installed, read by the PC folder
  * scan and written on the folder game's row (docs/SPEC.md 7g, "Store
- * markers", Droidtop/tracker#397 slice E): the store's id, the store's own
+ * markers", mytop-project/tracker#397 slice E): the store's id, the store's own
  * id for the game, the build the files are, and the DLC installed beside it.
  *
  * A game a store installed outside droidtop (a GOG offline installer, Heroic,

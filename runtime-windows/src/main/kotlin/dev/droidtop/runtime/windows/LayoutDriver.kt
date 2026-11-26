@@ -14,7 +14,7 @@ import dev.droidtop.mapping.MappingEngine
 import dev.droidtop.mapping.PadInputs
 
 /**
- * The Wine sink of the controls engine (Droidtop/tracker#618 C1/C3; docs/SPEC.md 5b "Controller layouts"): while [on],
+ * The Wine sink of the controls engine (mytop-project/tracker#618 C1/C3; docs/SPEC.md 5b "Controller layouts"): while [on],
  * the pad is played through [layout] as a keyboard and mouse. Pad buttons and sticks go to a [MappingEngine]; its keys
  * reach the X server as key presses ([WineKeyNames]), its mouse buttons, wheel and pointer moves go through the game's
  * one [pointer], as mouse mode's and the companion trackpad's do. A pad button the layout leaves unbound is not taken,

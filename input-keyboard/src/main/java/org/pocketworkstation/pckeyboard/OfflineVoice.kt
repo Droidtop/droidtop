@@ -13,7 +13,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 
 /**
- * Offline voice typing's engine and model, downloaded on request (Droidtop/tracker#343; owner: "offline voice is a
+ * Offline voice typing's engine and model, downloaded on request (mytop-project/tracker#343; owner: "offline voice is a
  * download on request thing"). Nothing of it is in the APK: Settings > Voice input > Offline voice typing fetches the
  * sherpa-onnx engine (this device's two native libraries out of the release's AAR) and one English streaming model,
  * each checked against the SHA-256 pinned here, into the keyboard's own no-backup storage. Each download is hashed

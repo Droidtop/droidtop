@@ -10,7 +10,7 @@ import dev.droidtop.library.settings.words
 import dev.droidtop.shell.gamepad.R
 
 /**
- * What a screen reader says for a themed list's entry under the cursor (Droidtop/tracker#728): its name, whether it is
+ * What a screen reader says for a themed list's entry under the cursor (mytop-project/tracker#728): its name, whether it is
  * a favourite, the system it comes from in a collection, and where it is in the list, as one sentence. The ES-DE
  * views drew every entry as pictures and text with no meaning attached, so TalkBack, which SPEC 7k says works through
  * Gaming's menus, had nothing to read on the main game lists. Empty for an empty list. Pure.

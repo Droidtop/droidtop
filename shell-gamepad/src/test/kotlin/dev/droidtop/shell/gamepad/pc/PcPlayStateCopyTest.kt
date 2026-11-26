@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * Which copy a card's button acts on (docs/SPEC.md 7i, "Which copy",
- * Droidtop/tracker#397 slice H): an installed copy first, the chosen one when
+ * mytop-project/tracker#397 slice H): an installed copy first, the chosen one when
  * it is installed; the chosen copy when nothing is installed; the stores'
  * order otherwise. A choice whose copy left the card is dropped.
  */

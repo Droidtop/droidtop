@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The mapping engine's rules (Droidtop/tracker#618 C3), each on [LAYOUT]. */
+/** The mapping engine's rules (mytop-project/tracker#618 C3), each on [LAYOUT]. */
 class MappingEngineTest {
     private fun engine() = MappingEngine(ControllerLayout.parse(LAYOUT))
 
@@ -71,7 +71,7 @@ class MappingEngineTest {
 
     @Test
     fun `one held button can shift several sources at once`() {
-        // The desktop's chords (Droidtop/tracker#383): L2 puts both the face buttons and the D-pad on chord groups.
+        // The desktop's chords (mytop-project/tracker#383): L2 puts both the face buttons and the D-pad on chord groups.
         val layout = ControllerLayout.parse(
             """
             "controller_mappings" {

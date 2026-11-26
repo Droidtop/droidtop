@@ -149,7 +149,7 @@ object PluginConsent {
     /**
      * [PluginManifest.unsupportedDeclarations] as the approval screen says them: a plain title, the plugin's own label
      * or reason when it gave one, and the declared id only in the detail. The rig read "permission gpu.render" there
-     * (Droidtop/tracker#516).
+     * (mytop-project/tracker#516).
      */
     internal fun unsupportedLines(manifest: PluginManifest): List<ConsentLine> {
         val v2 = manifest.v2

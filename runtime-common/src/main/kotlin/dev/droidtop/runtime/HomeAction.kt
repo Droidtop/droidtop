@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * What a home-screen gesture or a home icon's swipe does in Standard (docs/SPEC.md, Launcher mode "Gestures" and
- * "Icon swipes"; Droidtop/tracker#564): one of Standard's own actions, by its `GestureAction` name, or starting an
+ * "Icon swipes"; mytop-project/tracker#564): one of Standard's own actions, by its `GestureAction` name, or starting an
  * app. One type and one stored form for both, so a gesture slot, an icon's swipe and an imported Nova or Apex action
  * all mean the same thing. Pure.
  */

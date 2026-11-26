@@ -83,7 +83,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * One companion tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): Home, Game (while a game runs),
+ * One companion tab (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): Home, Game (while a game runs),
  * System, Apps, Performance, Input, Social, Plugins, or one plugin's panel. [id] is what the Companion group of
  * the catalog stores ([CompanionPrefs]); [panel] is the name [ControlAccess] decides on.
  */
@@ -97,7 +97,7 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val GAME = of(ControlPanel.GAME, "Game", QuickGlyph.GAMEPAD)
 
         /**
-         * The two management tabs (Droidtop/tracker#786 S3, plan 4.2): each a list of its pages, and any page can be a
+         * The two management tabs (mytop-project/tracker#786 S3, plan 4.2): each a list of its pages, and any page can be a
          * tab of its own ([CompanionPrefs.pageId]). System, Network and Apps, tabs until S3, are Device's pages.
          */
         val DEVICE = of(ControlPanel.DEVICE, "Device", QuickGlyph.SETTINGS)
@@ -123,14 +123,14 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         /** Android's own pages, folded under one row until each has its own page (plan 4.1 rule 1). */
         val ANDROID_PAGES = CompanionTab(CompanionPrefs.DEVICE_ANDROID, "Android's pages", QuickGlyph.ANDROID)
         val COMPANION_SETTINGS = CompanionTab(CompanionPrefs.DROIDTOP_COMPANION, "Companion", QuickGlyph.SECOND_SCREEN)
-        /** droidtop > Downloads (Droidtop/tracker#786 S6): Downloads and Updates, the place every mode has. */
+        /** droidtop > Downloads (mytop-project/tracker#786 S6): Downloads and Updates, the place every mode has. */
         val DOWNLOADS = CompanionTab(CompanionPrefs.DROIDTOP_DOWNLOADS, "Downloads", QuickGlyph.DOWNLOAD)
         val PERFORMANCE = of(ControlPanel.PERFORMANCE, "Performance", QuickGlyph.GAUGE)
         val INPUT = of(ControlPanel.INPUT, "Input", QuickGlyph.KEYBOARD)
         val SOCIAL = of(ControlPanel.SOCIAL, "Social", QuickGlyph.PEOPLE)
         val PLUGINS = of(ControlPanel.PLUGINS, "Plugins", QuickGlyph.GENERIC)
 
-        /** Every network in context, with Manage (Droidtop/tracker#583); a page of Device since S3. */
+        /** Every network in context, with Manage (mytop-project/tracker#583); a page of Device since S3. */
         val NETWORK = CompanionTab(CompanionPrefs.DEVICE_NETWORK, "Network", QuickGlyph.NETWORK)
 
         /** The tabs a person can choose, in the order More lists them. Game is not one: it comes while a game runs. */
@@ -184,7 +184,7 @@ internal fun runningTabs(gameRunning: Boolean, wantsInput: Boolean): List<Compan
  *   ([plugins]) can itself be a chosen tab.
  * - When the tabs and More need more than [extent] (in [labelSizes]' unit, More's own size [moreSize]), chosen
  *   tabs move into More from the right end, first in its list, and come back when there is room. Home and Device
- *   never move ([ControlAccess.NEVER_IN_MORE], Droidtop/tracker#786). An [extent] of
+ *   never move ([ControlAccess.NEVER_IN_MORE], mytop-project/tracker#786). An [extent] of
  *   zero or less means not measured yet: nothing moves.
  */
 internal fun slots(
@@ -315,7 +315,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         }
     }
     // Picture-in-picture video moves here while this companion is started, and back to the main screen when it
-    // stops (PipMover; only with the helper app and the setting on, Droidtop/tracker#430).
+    // stops (PipMover; only with the helper app and the setting on, mytop-project/tracker#430).
     DisposableEffect(lifecycle, view) {
         val scope = kotlinx.coroutines.MainScope()
         var job: kotlinx.coroutines.Job? = null
@@ -357,7 +357,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     }
     // A field on the other screen wants keys: the slab docks under whatever tab is showing while the request stands
     // (CompanionDockedSlab), part of this layout, and the selected tab is never touched, so Hide, Back and a field
-    // losing focus all leave the person where they were (Droidtop/tracker#369). Changing tab keeps the keyboard.
+    // losing focus all leave the person where they were (mytop-project/tracker#369). Changing tab keeps the keyboard.
     val requested by KeyboardTargets.companion.collectAsState()
 
     // Screens plugged in or out: the companion goes back to the screen chosen for the new set by itself (the
@@ -427,7 +427,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             // A tap on Device or droidtop shows its list again.
             openPages = openPages - id
         }
-        // A page that is not a tab of its own opens on its parent's tab (Droidtop/tracker#786 S3): "All controls" on Home
+        // A page that is not a tab of its own opens on its parent's tab (mytop-project/tracker#786 S3): "All controls" on Home
         // opens Device > System wherever System is.
         fun showTab(tab: CompanionTab) {
             val parent = CompanionPrefs.parentOf(tab.id)?.let(CompanionPrefs::id)
@@ -467,10 +467,10 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         }
 
         // The keyboard for a field on the other screen is part of this layout, under the tab the person is on (owner,
-        // 2026-10-16: "by default, it's PART of the companion"); the tab itself stays (Droidtop/tracker#369).
+        // 2026-10-16: "by default, it's PART of the companion"); the tab itself stays (mytop-project/tracker#369).
         val shown = selected
         val colors = MaterialTheme.colorScheme
-        // The shell's tab strip: the selected tab on the accent plate (Droidtop/tracker#786 S2a, the console capture).
+        // The shell's tab strip: the selected tab on the accent plate (mytop-project/tracker#786 S2a, the console capture).
         val railColors = RailColors(
             selected = colors.primary,
             ink = colors.onPrimary,
@@ -492,9 +492,9 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
 
         val content: @Composable ColumnScope.() -> Unit = {
             // The keyboard for a field on the other screen can be hidden from here while it is docked. Keys is the Input
-            // tab, on the bar or under More like any tab; there is no floating Keys button (Droidtop/tracker#786 S2a).
+            // tab, on the bar or under More like any tab; there is no floating Keys button (mytop-project/tracker#786 S2a).
             // Where Android's bar is hidden, droidtop's own clock, network and battery end the row
-            // (Droidtop/tracker#524); a tap opens System, which has the controls behind them.
+            // (mytop-project/tracker#524); a tap opens System, which has the controls behind them.
             if (immersive || requested != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
@@ -504,7 +504,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                     if (requested != null) {
                         CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
                     }
-                    // What is happening now (Droidtop/tracker#786 S5, #742): the shell's one activity spot, here too; a tap
+                    // What is happening now (mytop-project/tracker#786 S5, #742): the shell's one activity spot, here too; a tap
                     // opens droidtop > Downloads, where the jobs are. Nothing is drawn while nothing runs.
                     if (bar.all.any { it.id == CompanionTab.DROIDTOP.id || it.id == CompanionTab.DOWNLOADS.id }) {
                         dev.droidtop.shell.gamepad.ActivitySpot(onOpen = { showTab(CompanionTab.DOWNLOADS) })
@@ -679,7 +679,7 @@ private fun CompanionMoreList(
 }
 
 /**
- * Device's or droidtop's tab (Droidtop/tracker#786 S3, plan 4.1 rule 7): the tab is level 0, its list of [pages]; a page
+ * Device's or droidtop's tab (mytop-project/tracker#786 S3, plan 4.1 rule 7): the tab is level 0, its list of [pages]; a page
  * is level 1, opened in place with a Back row above it. [open] is the page shown, null for the list.
  */
 @Composable
@@ -725,7 +725,7 @@ private fun CompanionPage(id: String) {
             dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
         }
         // The same Downloads and Updates screen the places open (SPEC 7j), so its jobs' Pause, Cancel and Retry and
-        // Updates' Check now are the ones every surface has; a row's outcome stays by its id (Droidtop/tracker#554).
+        // Updates' Check now are the ones every surface has; a row's outcome stays by its id (mytop-project/tracker#554).
         CompanionTab.DOWNLOADS.id -> CompanionCatalogPage { _ ->
             dev.droidtop.app.settings.AppSettingsCatalogs.ensureRegistered()
             dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.library.settings.Place.ID_DOWNLOADS, null)
@@ -746,7 +746,7 @@ private fun CompanionCatalogPage(build: (android.content.Context) -> dev.droidto
 }
 
 /**
- * "Android's pages" (Droidtop/tracker#786 S3, plan 4.1 rules 1 and 2): Android's own Settings pages droidtop has no page
+ * "Android's pages" (mytop-project/tracker#786 S3, plan 4.1 rules 1 and 2): Android's own Settings pages droidtop has no page
  * for yet, folded under one row of Device, each labelled as the exit it is ("Android's Display") and saying where it
  * opens. NFC and Printing are left out where the device lacks them, since a resolving page does not prove the
  * hardware. Each later slice moves its area onto a page of droidtop's and its link leaves this list.
@@ -823,7 +823,7 @@ private fun CompanionTasksTab() {
     ) {
         CompanionPill("Open an app") { picking = true }
         CompanionTasks()
-        // The Linux desktop's windows, while a desktop session runs (Droidtop/tracker#425).
+        // The Linux desktop's windows, while a desktop session runs (mytop-project/tracker#425).
         CompanionDesktopWindows()
     }
 }
@@ -889,7 +889,7 @@ internal fun CompanionPanels(panels: List<@Composable () -> Unit>) {
 /**
  * Whether the companion hides Android's system bars and draws droidtop's own status readout instead: in Gaming and
  * Desktop, the modes whose main screen is immersive too (MainActivity.applySystemBars); Standard keeps Android's bars,
- * as its launcher does (Droidtop/tracker#524). Pure.
+ * as its launcher does (mytop-project/tracker#524). Pure.
  */
 internal fun companionImmersive(mode: SecondaryDisplayContent.Mode): Boolean = mode != SecondaryDisplayContent.Mode.STANDARD
 
@@ -920,5 +920,5 @@ private fun CompanionSystemBars(immersive: Boolean) {
     }
 }
 
-/** Home draws the jobs running now (Downloads and updates), so while one runs and Home shows the companion stays on (Droidtop/tracker#526). Pure. */
+/** Home draws the jobs running now (Downloads and updates), so while one runs and Home shows the companion stays on (mytop-project/tracker#526). Pure. */
 internal fun jobShownOnHome(shownTab: String, jobRunning: Boolean): Boolean = jobRunning && shownTab == CompanionTab.HOME.id

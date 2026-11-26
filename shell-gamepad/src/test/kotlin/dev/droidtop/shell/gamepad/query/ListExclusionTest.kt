@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * The one rule for which games a list shows (docs/SPEC.md 7j, "Hidden is one
- * rule", extended by Droidtop/tracker#397 slice B), row by row of its precedence.
+ * rule", extended by mytop-project/tracker#397 slice B), row by row of its precedence.
  */
 class ListExclusionTest {
 

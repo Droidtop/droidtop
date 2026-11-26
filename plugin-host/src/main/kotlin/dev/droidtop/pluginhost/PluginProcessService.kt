@@ -112,7 +112,7 @@ abstract class PluginProcessService : Service() {
     }
 
     /**
-     * True in a process of another app that droidtop drives (the enhancement provider host, Droidtop/tracker#852):
+     * True in a process of another app that droidtop drives (the enhancement provider host, mytop-project/tracker#852):
      * droidtop's user id is not this app's, and its processes cannot be named from here.
      */
     protected open val driverIsRemote: Boolean get() = false
@@ -139,7 +139,7 @@ abstract class PluginProcessService : Service() {
 
     /**
      * [requireApp] for a one-way call, which has no caller pid (Binder.getCallingPid is 0 on a oneway transaction, so
-     * every touch and key was refused, Droidtop/tracker#511): the call must come from droidtop's UID and carry the
+     * every touch and key was refused, mytop-project/tracker#511): the call must come from droidtop's UID and carry the
      * secret only droidtop could have asked for ([IPluginRuntime.inputToken], itself checked by pid).
      */
     private fun requireAppToken(token: Long) {
@@ -540,7 +540,7 @@ interface HostedScreen {
 internal open class BrokerPluginContext(private val broker: IPluginHostBroker, private val folder: String = "") : PluginContext {
     init {
         // Native code in the plugin (a Go or C engine) finds the plugin's config and cache folders where it looks for its
-        // own (XDG; Go's os.UserConfigDir and os.UserCacheDir), and its home in the plugin's folder (Droidtop/tracker#741).
+        // own (XDG; Go's os.UserConfigDir and os.UserCacheDir), and its home in the plugin's folder (mytop-project/tracker#741).
         if (folder.isNotEmpty()) {
             runCatching {
                 android.system.Os.setenv("XDG_CONFIG_HOME", configDir(), true)

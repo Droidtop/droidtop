@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Credentials stay on the site they were made for, as the earlier downloader kept them (Droidtop/tracker#417). */
+/** Credentials stay on the site they were made for, as the earlier downloader kept them (mytop-project/tracker#417). */
 class RedirectGuardTest {
     private class Net(vararg routes: Pair<String, RedirectGuard.Answer>) {
         private val routes = routes.toMap()

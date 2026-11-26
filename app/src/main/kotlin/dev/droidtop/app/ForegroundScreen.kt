@@ -8,7 +8,7 @@ import java.lang.ref.WeakReference
 
 /**
  * droidtop's screen in front, for the hidden web views to run behind ([dev.droidtop.pluginhost.HiddenWebViews],
- * Droidtop/tracker#783). Not the surfaces droidtop parks on the other screen (the companion, a cover) and not a game,
+ * mytop-project/tracker#783). Not the surfaces droidtop parks on the other screen (the companion, a cover) and not a game,
  * which a page behind it would slow.
  */
 internal object ForegroundScreen {

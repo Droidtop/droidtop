@@ -8,7 +8,7 @@ import java.io.File
 import timber.log.Timber
 
 /**
- * The vtest server of a Venus session (docs/SPEC.md 10b, "A real GPU on x86_64: Venus"; Droidtop/tracker#608).
+ * The vtest server of a Venus session (docs/SPEC.md 10b, "A real GPU on x86_64: Venus"; mytop-project/tracker#608).
  *
  * The guest's Venus driver (`libvulkan_virtio.so` in the x86_64 graphics archive) serialises its Vulkan calls onto
  * [socket]; this process, `libvirgl_vtest.so` in the APK (virglrenderer 1.3.0 with Termux's Android patches, built by

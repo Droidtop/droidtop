@@ -194,7 +194,7 @@ object ContainerLayout {
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
-        // A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910), never the primary's.
+        // A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", mytop-project/tracker#910), never the primary's.
         x11Display?.let { putAll(SiblingX11.environment(it)) }
         // sway's IPC socket ([findSwayIpcSocket]), so `swaymsg` works from any program droidtop starts, as from
         // the ones sway starts itself (console 2026-10-29: "Unable to retrieve socket path" in Foot). It is in the
@@ -208,8 +208,8 @@ object ContainerLayout {
         // With audio sharing off, or no bridge running, nothing listens
         // there either -- to a program that is the same as no PulseAudio.
         if (audioShared) put("PULSE_SERVER", "$SOCKET_DIR/$AUDIO_SOCKET")
-        // GTK apps dark or light as droidtop is (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694), unless the
-        // container keeps its image's own look (3d "Scale and theme", Droidtop/tracker#787).
+        // GTK apps dark or light as droidtop is (docs/SPEC.md 2b "Desktop appearance", mytop-project/tracker#694), unless the
+        // container keeps its image's own look (3d "Scale and theme", mytop-project/tracker#787).
         if (look.followTheme) putAll(DesktopAppearance.environment(DesktopAppearance.dark))
         putAll(scaleEnvironment(look.scale))
     }
@@ -412,7 +412,7 @@ object ContainerLayout {
         volumes.map { it.root.absolutePath to "$SHARED_STORAGE_DIR/${it.name}" }
 
     /**
-     * The binds a container gets without "All internal storage" (docs/SPEC.md 5a, 4; Droidtop/tracker#584): each of
+     * The binds a container gets without "All internal storage" (docs/SPEC.md 5a, 4; mytop-project/tracker#584): each of
      * [folders] (the person's games folders) that lies on one of [volumes], at the same guest path
      * [sharedStorageBinds] would give it, so paths read the same whichever way it is bound. A folder that is itself
      * wide ([WideAccess.classify] against the volumes and droidtop's [privateDir]) is left out: that is what the

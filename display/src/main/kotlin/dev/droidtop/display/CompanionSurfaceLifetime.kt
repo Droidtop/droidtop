@@ -12,7 +12,7 @@ import dev.droidtop.runtime.DualScreenOrchestration
 
 /**
  * A companion surface never stands in for the main UI (docs/SPEC.md 4c, "Second display: the Main
- * screen choice moves the shell both ways", Droidtop/tracker#182).
+ * screen choice moves the shell both ways", mytop-project/tracker#182).
  *
  * The shell's orchestration only runs while a shell instance exists, so it cannot be the one thing that
  * keeps the companion activity and the idle cover off a lone screen: when the add-on display goes away,

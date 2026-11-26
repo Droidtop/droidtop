@@ -15,7 +15,7 @@ data class SettingsSearchResult(
     /**
      * How the root reaches [target]: each row that opened a screen, with that screen, from the root's own row down to
      * [target]; empty for a row of the root itself. A category screen picks its column entry from the first step
-     * (a plugin's page found by search opened under Modes, the category on show, Droidtop/tracker#954 item 15).
+     * (a plugin's page found by search opened under Modes, the category on show, mytop-project/tracker#954 item 15).
      */
     val trail: List<Pair<String, CatalogScreen>> = emptyList(),
 )
@@ -30,7 +30,7 @@ data class SettingsSearchResult(
  * [CatalogScreen.groups] is skipped for the cheap rows, because some of
  * them cost library-sized work -- Console systems walks and game-counts
  * every folder, which held the first search on "Indexing settings..."
- * for 10-40 s on a real device (Droidtop/tracker#136)) and then filtered
+ * for 10-40 s on a real device (mytop-project/tracker#136)) and then filtered
  * per keystroke with a plain substring match
  * ([search], pure and in-memory) -- never rebuilt while someone types,
  * satisfying "no file/database work ... in list rendering".
@@ -59,7 +59,7 @@ object SettingsSearchIndex {
         // A screen's rows, then each of its pages' rows in the order the rows name them. The pages a screen opens are
         // read side by side: one after another, the index took the sum of every page's time (12.9 s on BlueStacks,
         // 7.3 s of it Game sources and 3.0 s Containers), where side by side it takes about the slowest one's
-        // (Droidtop/tracker#954 item 14). The order of the results, and so which of two paths to one row wins, is
+        // (mytop-project/tracker#954 item 14). The order of the results, and so which of two paths to one row wins, is
         // the same as before.
         suspend fun indexScreen(screen: CatalogScreen, depth: Int, trail: List<Pair<String, CatalogScreen>>): List<SettingsSearchResult> {
             // Which screen holds the index up: any one that takes a quarter second is named in the log with its time.
@@ -108,7 +108,7 @@ object SettingsSearchIndex {
 
     /**
      * Pure, in-memory: safe to call on every keystroke. Ranked as Android Settings ranks
-     * (Droidtop/tracker#505): a title that starts with the text, then a title with a word that does,
+     * (mytop-project/tracker#505): a title that starts with the text, then a title with a word that does,
      * then the text inside a title, then the screen's own name, and last a row whose description has
      * the text as a whole word (a description is prose, so "them" inside "...share them with..." is a
      * weak hit, and a part of a longer word is no hit). Rows of one rank keep the tree's order.

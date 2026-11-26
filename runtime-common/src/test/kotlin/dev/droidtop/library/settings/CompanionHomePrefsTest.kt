@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion Home's section choices (docs/SPEC.md "The companion's tabs", Droidtop/tracker#328). */
+/** The companion Home's section choices (docs/SPEC.md "The companion's tabs", mytop-project/tracker#328). */
 class CompanionHomePrefsTest {
     @Test
     fun `by default every section shows and only Notifications starts folded`() {

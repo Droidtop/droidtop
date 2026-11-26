@@ -9,7 +9,7 @@ import dev.droidtop.pluginhost.PluginStore
 import org.json.JSONObject
 
 /**
- * The bulk refresh of a source's index (owner, 2026-11-12, Droidtop/tracker#937: "bulk refresh on by default"): a
+ * The bulk refresh of a source's index (owner, 2026-11-12, mytop-project/tracker#937: "bulk refresh on by default"): a
  * source that publishes its whole list (`"bulkIndex": true` on its `library.sources` entry) is asked for it page by
  * page with `library.sources index {limit, cursor}` → `{results, next}` (docs/plugin-api.md 1.6), and each page is
  * added to its index ([SourceIndex]). It runs as an automatic download job: the download policy (Wi-Fi, while

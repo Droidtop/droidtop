@@ -31,7 +31,7 @@ import java.util.concurrent.Executors
 
 /**
  * droidtop's accessibility service for typing into other apps (docs/SPEC.md 4c, "Typing on the add-on display",
- * Droidtop/tracker#314). The user turns it on in Android's accessibility settings (Displays, "Keyboard through
+ * mytop-project/tracker#314). The user turns it on in Android's accessibility settings (Displays, "Keyboard through
  * accessibility"). It listens only for a view gaining focus or being tapped and for a window changing
  * (res/xml/typing_accessibility_service.xml), keeps only the one focused text field of another app, and reads that
  * field's text only to make the edit asked for. All of the work is [AccessibilityTyping].
@@ -42,7 +42,7 @@ class TypingAccessibilityService : AccessibilityService() {
 
     /**
      * Android's accessibility button (the service asks for it: flagRequestAccessibilityButton): the touch route to
-     * droidtop's menus over any app, the pad's being the HOME chords (Droidtop/tracker#839; the owner: "We should
+     * droidtop's menus over any app, the pad's being the HOME chords (mytop-project/tracker#839; the owner: "We should
      * probably add an accessibility button that lets the user pick what menu to open"). A tap opens the picker.
      */
     private val menuButton = object : android.accessibilityservice.AccessibilityButtonController.AccessibilityButtonCallback() {
@@ -71,8 +71,8 @@ class TypingAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * The key filter's users: the HOME chords (Droidtop/tracker#740) first, then the keys Android keeps, for a Desktop
-     * session in front (Droidtop/tracker#697), then the taskbar's Meta and Mode.
+     * The key filter's users: the HOME chords (mytop-project/tracker#740) first, then the keys Android keeps, for a Desktop
+     * session in front (mytop-project/tracker#697), then the taskbar's Meta and Mode.
      */
     override fun onKeyEvent(event: KeyEvent): Boolean =
         HomeOverlayKeys.onKey(this, event) || dev.droidtop.runtime.keyboard.DesktopSystemKeys.offer(event) ||
@@ -321,7 +321,7 @@ internal object AccessibilityTyping {
             select(node, before.min, before.max)
             val context = service ?: return
             // Marked sensitive: what is typed is not a copy, so the keyboard's clipboard history never keeps it
-            // (Droidtop/tracker#903 H12d) and Android 13's clipboard preview does not show it.
+            // (mytop-project/tracker#903 H12d) and Android 13's clipboard preview does not show it.
             if (!ClipboardHistoryStore.putOnClipboard(context, edit.text, typed = true)) return
             if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return
         } else {

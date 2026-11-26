@@ -167,7 +167,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         boolean swipeUp();
 
         /**
-         * droidtop patch (Droidtop/tracker#340): a touch that began on the space key became a cursor drag. Called
+         * droidtop patch (mytop-project/tracker#340): a touch that began on the space key became a cursor drag. Called
          * once when it does (steps 0, the space key is then not typed) and again for each run of steps; positive
          * steps move the cursor right, negative left.
          */
@@ -196,11 +196,11 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     private int mShadowColor;
     private float mShadowRadius;
     private Drawable mKeyBackground;
-    /** droidtop patch (Droidtop/tracker#903 H2): the colours keys are drawn as plates in, or null for the theme's drawing. */
+    /** droidtop patch (mytop-project/tracker#903 H2): the colours keys are drawn as plates in, or null for the theme's drawing. */
     private KeyboardColors mPlates;
     private final Paint mPlatePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final android.graphics.RectF mPlateRect = new android.graphics.RectF();
-    // droidtop patch (Droidtop/tracker#903 H12a): the pressed key's scale and tint, eased (KeyPressMotion, KeyMotion).
+    // droidtop patch (mytop-project/tracker#903 H12a): the pressed key's scale and tint, eased (KeyPressMotion, KeyMotion).
     private final KeyPressMotion mPressMotion = new KeyPressMotion();
     // The pressed tint of the key being drawn, 0 to 1, for drawPlate.
     private float mDrawTint;
@@ -312,7 +312,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
     private final UIHandler mHandler = new UIHandler();
 
-    // droidtop patch (Droidtop/tracker#903 H12a): the key preview and the long-press popup grow out of their key and
+    // droidtop patch (mytop-project/tracker#903 H12a): the key preview and the long-press popup grow out of their key and
     // shrink back into it (PopupMotion); a popup shrinking away is "leaving" and no longer counts as shown.
     private static final float POPUP_LEAVE_SCALE = 0.7f;
     private boolean mPreviewLeaving;
@@ -473,7 +473,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             mQueue.remove(tracker);
         }
 
-        /** droidtop: forgets every pointer without releasing it (a glide took the touch, Droidtop/tracker#341). */
+        /** droidtop: forgets every pointer without releasing it (a glide took the touch, mytop-project/tracker#341). */
         public void clear() {
             mQueue.clear();
         }
@@ -716,7 +716,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             tracker.setKeyboard(mKeys, mKeyHysteresisDistance);
         }
         mLabelScale = LatinIME.sKeyboardSettings.labelScalePref;
-        // droidtop patch (Droidtop/tracker#903 H2): HKR's modern plates, or the theme's drawing (KeyPlates.colorsFor).
+        // droidtop patch (mytop-project/tracker#903 H2): HKR's modern plates, or the theme's drawing (KeyPlates.colorsFor).
         mPlates = KeyPlates.colorsFor(getContext());
         if (mPlates != null) setBackgroundColor(mPlates.getGround());
         //if (keyboard.mLayoutRows >= 4) mLabelScale *= 5.0f / keyboard.mLayoutRows;
@@ -725,7 +725,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         mKeyboardChanged = true;
         invalidateAllKeys();
         computeProximityThreshold(keyboard);
-        // droidtop: glide typing works out its paths for this keyboard's letter keys (Droidtop/tracker#341).
+        // droidtop: glide typing works out its paths for this keyboard's letter keys (mytop-project/tracker#341).
         if (mGlide != null) mGlide.prepare(keyboard);
         mMiniKeyboardCacheMain.clear();
         mMiniKeyboardCacheShift.clear();
@@ -921,9 +921,9 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             onBufferDraw(canvas);
         }
         if (mBuffer != null) canvas.drawBitmap(mBuffer, 0, 0, null);
-        // droidtop: a glide's trail over the keys (Droidtop/tracker#341).
+        // droidtop: a glide's trail over the keys (mytop-project/tracker#341).
         if (mGlide != null) mGlide.drawTrail(canvas, getPaddingLeft(), getPaddingTop(), mGlideTrailPaint);
-        // droidtop: the pad's focus ring (Droidtop/tracker#338), over the keys, only while a pad drives.
+        // droidtop: the pad's focus ring (mytop-project/tracker#338), over the keys, only while a pad drives.
         if (mPadFocus != null) {
             Key k = mPadFocus;
             float inset = mPadRingPaint.getStrokeWidth() / 2f;
@@ -934,11 +934,11 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         }
     }
 
-    // droidtop: the key the pad's focus ring is on, or null (Droidtop/tracker#338, PadKeys).
+    // droidtop: the key the pad's focus ring is on, or null (mytop-project/tracker#338, PadKeys).
     private Key mPadFocus;
     private final Paint mPadRingPaint = padRingPaint(getResources().getDisplayMetrics().density);
 
-    // droidtop: glide typing (Droidtop/tracker#341). Null while it is off; the IME sets it.
+    // droidtop: glide typing (mytop-project/tracker#341). Null while it is off; the IME sets it.
     private GlideTyping mGlide;
     private final Paint mGlideTrailPaint = GlideTyping.trailPaint(getContext(), 6 * getResources().getDisplayMetrics().density);
 
@@ -1045,7 +1045,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     }
 
     /**
-     * droidtop patch (Droidtop/tracker#903 H2): one key as a flat rounded plate, in the canvas already moved to the
+     * droidtop patch (mytop-project/tracker#903 H2): one key as a flat rounded plate, in the canvas already moved to the
      * key's corner. The colour is {@link KeyPlates#plateColor}: function keys a shade apart, a latched modifier lit, a
      * pressed key in the focused shade.
      */
@@ -1159,7 +1159,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             mLabelTextSize = mKeyTextSize * 3 / 4;
         }
 
-        // droidtop patch (Droidtop/tracker#903 H12a): one clock and one duration scale for the whole frame.
+        // droidtop patch (mytop-project/tracker#903 H12a): one clock and one duration scale for the whole frame.
         final long now = android.view.animation.AnimationUtils.currentAnimationTimeMillis();
         final float motion = KeyboardMotion.getScale();
 
@@ -1834,7 +1834,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
     @Override
     public boolean onTouchEvent(MotionEvent me) {
-        // droidtop: a finger on the keys ends the pad's ring (Droidtop/tracker#338).
+        // droidtop: a finger on the keys ends the pad's ring (mytop-project/tracker#338).
         if (mPadFocus != null && me.getActionMasked() == MotionEvent.ACTION_DOWN) setPadFocus(null);
         return onTouchEvent(me, false);
     }
@@ -1852,7 +1852,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             return true;
         }
 
-        // droidtop: glide typing sees a single finger first, before the swipe gestures (Droidtop/tracker#341).
+        // droidtop: glide typing sees a single finger first, before the swipe gestures (mytop-project/tracker#341).
         if (offerToGlide(me, action)) return true;
 
         // Track the last few movements to look for spurious swipes.

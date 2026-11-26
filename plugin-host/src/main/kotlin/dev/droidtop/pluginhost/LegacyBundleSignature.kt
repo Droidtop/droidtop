@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 /**
  * THE LEGACY PATH, BOUNDED (docs/SPEC.md 12a "Migration from raw keys",
- * Droidtop/tracker#550). Before the certificate format, a bundle carried
+ * mytop-project/tracker#550). Before the certificate format, a bundle carried
  * `manifest.sig` (base64 DER ECDSA P-256 over manifest.json) and, when
  * certified, `origin.cert` (a JSON certificate from droidtop's P-256 plugin
  * master or an added catalog's organisation master). This object verifies

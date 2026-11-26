@@ -142,7 +142,7 @@ internal object LaunchWatchPolicy {
      * Whether [trouble] from [packageName] means the person left before a game started, not that anything failed:
      * Enginehost's launch screen asks first (the no-sandbox warning, a configuration question) and reports its own
      * failures on screens of its own, so an Enginehost launch that hands straight back to droidtop with none of them
-     * open was cancelled there (Droidtop/tracker#289: Cancel on the warning raised "Enginehost closed straight after
+     * open was cancelled there (mytop-project/tracker#289: Cancel on the warning raised "Enginehost closed straight after
      * it started" and left a Playing session). No alert, and the session ends: no game ever ran.
      */
     /**
@@ -218,7 +218,7 @@ internal object LaunchWatchPolicy {
     /**
      * The plain sentence for [trouble], naming the app and what to do. [opensFile] is a launch that hands the app a game
      * file (an emulator's); an app opened by itself (an installed app, from the library or Desktop's search) has no game
-     * file to check (Droidtop/tracker#750, console 0.2.0-dev.2554: Settings was told to check "its game file").
+     * file to check (mytop-project/tracker#750, console 0.2.0-dev.2554: Settings was told to check "its game file").
      */
     fun message(appName: String, trouble: LaunchTrouble, opensFile: Boolean = true): String = when (trouble) {
         LaunchTrouble.EXITED_AT_ONCE ->
@@ -270,7 +270,7 @@ object LaunchWatchdog {
      * almost nothing since it started is reported ([LaunchTrouble.STALLED]); a plain app, an engine or a launcher is
      * not read that way. [advice] is what the provider that built the launch knows that would explain trouble with it,
      * added to any alert that launch gets; its one user is a launch handed a content link because its emulator has no
-     * All files access (Droidtop/tracker#270): the alert says so and names the emulator setup row that gives it.
+     * All files access (mytop-project/tracker#270): the alert says so and names the emulator setup row that gives it.
      * Taken by the next [start] for that package, and dropped by a start for any other.
      */
     fun expectNext(packageName: String, advice: String? = null) {
@@ -305,8 +305,8 @@ object LaunchWatchdog {
             val started = System.currentTimeMillis()
             var settled = false
             // An emulator launch's processor time is read (LaunchWatchPolicy.STALL_CHECK_MS): a missing or broken
-            // core leaves RetroArch black and idle and it reports nothing (Droidtop/tracker#271), and NetherSX2 sits
-            // black and idle on a game it cannot boot (Droidtop/tracker#270). A reading that does not come back (the
+            // core leaves RetroArch black and idle and it reports nothing (mytop-project/tracker#271), and NetherSX2 sits
+            // black and idle on a game it cannot boot (mytop-project/tracker#270). A reading that does not come back (the
             // helper not ready) is tried again a check later.
             var stallChecked = !checkStall
             var nextStallCheckMs = LaunchWatchPolicy.STALL_CHECK_MS

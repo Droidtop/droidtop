@@ -105,7 +105,7 @@ object ComponentSourcesCatalog {
                     )
                 },
             )
-            // What is on the device (Droidtop/tracker#233): each build's size, and Remove for one nothing uses.
+            // What is on the device (mytop-project/tracker#233): each build's size, and Remove for one nothing uses.
             val onDevice = installed.map { c ->
                 // A build added by link or file says where from (its WineBuilds id is the store key without the kind).
                 val size = dev.droidtop.library.format.ValueFormat.size(c.bytes) +

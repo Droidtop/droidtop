@@ -34,7 +34,7 @@ fun SoundSync() {
 }
 
 /**
- * The shell's interface-sound roles (docs/SPEC.md "Interface sounds", Droidtop/tracker#363 slice 10,
+ * The shell's interface-sound roles (docs/SPEC.md "Interface sounds", mytop-project/tracker#363 slice 10,
  * #211): Steam's cue vocabulary (a move, a press that went nowhere, a tab, a side menu opening and
  * closing, a modal showing and hiding, a toggle, a slider step, a page entered and left, a toast,
  * confirm, back, launch), restated as droidtop's own roles. Nothing of Valve's is used: each role
@@ -78,7 +78,7 @@ sealed interface UiSoundSource {
 }
 
 /**
- * The theme overrides the bundled set, role by role (Droidtop/tracker#211): [themeSounds] are the
+ * The theme overrides the bundled set, role by role (mytop-project/tracker#211): [themeSounds] are the
  * navigation sounds the active theme has bound, [packFiles] the bundled set's file stems. Pure.
  */
 fun uiSoundSource(sound: UiSound, themeSounds: Set<String>, packFiles: Set<String>): UiSoundSource = when {

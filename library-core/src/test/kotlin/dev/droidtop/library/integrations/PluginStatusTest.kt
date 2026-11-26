@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A plugin's status glyph from its state (Droidtop/tracker#644: quiet when good, attention over work under way). */
+/** A plugin's status glyph from its state (mytop-project/tracker#644: quiet when good, attention over work under way). */
 class PluginStatusTest {
     @Test
     fun `a plugin that runs well has no glyph, and work under way turns a ring`() {

@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * The redistributable installers a game ships, where the stores and engines put them (docs/SPEC.md 9, "Redistributable
- * installers"; Droidtop/tracker#916), as Steam and Heroic find them before a game's first start:
+ * installers"; mytop-project/tracker#916), as Steam and Heroic find them before a game's first start:
  * - Steam's `installscript.vdf`: its "Run Process" entries' `process N` paths (`%INSTALLDIR%` is the game's folder);
  * - Unreal's `Engine/Extras/Redist/<language>/`;
  * - Steam's `_CommonRedist/<product>/<version>/`;

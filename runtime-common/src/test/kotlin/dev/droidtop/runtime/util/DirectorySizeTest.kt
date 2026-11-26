@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** The one size-of-a-folder helper (Droidtop/tracker#766). */
+/** The one size-of-a-folder helper (mytop-project/tracker#766). */
 class DirectorySizeTest {
     @get:Rule
     val temp = TemporaryFolder()

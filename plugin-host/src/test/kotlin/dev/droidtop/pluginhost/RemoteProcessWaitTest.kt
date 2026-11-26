@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Droidtop/tracker#412: a Shizuku remote process says "still running" with an IllegalArgumentException. */
+/** mytop-project/tracker#412: a Shizuku remote process says "still running" with an IllegalArgumentException. */
 class RemoteProcessWaitTest {
     /** A process that exits with [code] after [pollsBeforeExit] polls, saying "still running" the way [running] does. */
     private class FakeProcess(private val code: Int, private val pollsBeforeExit: Int, private val running: () -> RuntimeException) : Process() {

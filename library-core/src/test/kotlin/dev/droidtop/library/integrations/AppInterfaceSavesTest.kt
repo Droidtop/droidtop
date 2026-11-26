@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/plugin-api.md 3 A7a (Droidtop/tracker#547): the engine games droidtop offers an app, and finding one by its folder. */
+/** docs/plugin-api.md 3 A7a (mytop-project/tracker#547): the engine games droidtop offers an app, and finding one by its folder. */
 class AppInterfaceSavesTest {
     private fun entry(id: String, title: String, kind: LibraryEntryKind = LibraryEntryKind.RENPY, missing: Boolean = false) =
         LibraryEntry(id = id, title = title, kind = kind, missing = missing)

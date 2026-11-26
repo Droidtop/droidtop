@@ -49,7 +49,7 @@ class StoreWebPages(
 
 /**
  * A store's own pages in droidtop's web view, signed in as the account this device holds (docs/SPEC.md 7g, "A store's
- * own pages", Droidtop/tracker#407): browse, claim a free game, buy one. The view is the one droidtop shows every
+ * own pages", mytop-project/tracker#407): browse, claim a free game, buy one. The view is the one droidtop shows every
  * signed-in web page in ([WebSessionActivity], shared with a plugin's session), in its browse mode: it reads no page
  * content, so payment details stay between the person and the store.
  *

@@ -13,7 +13,7 @@ import java.util.stream.Collectors
 /**
  * A game's saves, carried from one prefix to another when the person moves the game (docs/SPEC.md 5a "Per-game
  * prefixes", piece 2: "Copy this game's saves to the new prefix: the save locations (`drive_c/users/ * /Documents`,
- * `AppData`, `Saved Games`) are copied, never overwriting a name that is already there"; Droidtop/tracker#584).
+ * `AppData`, `Saved Games`) are copied, never overwriting a name that is already there"; mytop-project/tracker#584).
  *
  * Links are never followed or copied: a prefix's user folders can be links to the device's storage, and a copy that
  * followed one would copy that storage. Registry values are not carried. Disk work: never on the main thread.

@@ -9,7 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Copying a container, the one way (Droidtop/tracker#757): its page's Make a copy. The backend copies its tree and
+ * Copying a container, the one way (mytop-project/tracker#757): its page's Make a copy. The backend copies its tree and
  * settings ([ContainerRuntime.clone]); droidtop's own settings for its program come with it. What it exported into the
  * desktop, start-up, pods and networks do not: the copy is a new container, and putting it in the desktop's menus or
  * starting it with the desktop is the person's choice for it.
@@ -23,7 +23,7 @@ internal object ContainerClone {
                 ?.copyTo(ContainerProgram.overridesFile(files, copy.id))
         }
         ContainerPrograms.recordCreated(context.applicationContext, copy.id)
-        // The list measures the copy, and the original again (Droidtop/tracker#911).
+        // The list measures the copy, and the original again (mytop-project/tracker#911).
         ContainerSizes.forget(info.container.id)
         return copy
     }

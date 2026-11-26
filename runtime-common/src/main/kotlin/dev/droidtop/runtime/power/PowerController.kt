@@ -9,7 +9,7 @@ import android.os.PowerManager
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
- * The person's power settings (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 3b): Auto power (off until
+ * The person's power settings (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 3b): Auto power (off until
  * chosen, owner Q3), each game's pick, and their own heat limit. Disk: IO only.
  */
 object PowerPrefs {

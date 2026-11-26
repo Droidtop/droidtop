@@ -44,7 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 
 /**
- * The Linux desktop's second output on the Android display it was made for (Droidtop/tracker#908, step D3): a surface
+ * The Linux desktop's second output on the Android display it was made for (mytop-project/tracker#908, step D3): a surface
  * showing that output, which takes touch and a mouse for it, and a bar of its own. The host (`:app`'s
  * DesktopSecondScreenActivity) gives it the session's bridge and the output's name, and sizes the output from
  * [onSurfaceSize] the way the primary's is sized (`DesktopSessionService.extendTo` with the surface's pixels and
@@ -146,7 +146,7 @@ private fun SecondOutputSurface(
     }
     val sizeTo by rememberUpdatedState(onSurfaceSize)
     var liveHolder by remember(hostBridge) { mutableStateOf<SurfaceHolder?>(null) }
-    // The refresh rate of the display the surface is on, which paces its capture (Droidtop/tracker#950).
+    // The refresh rate of the display the surface is on, which paces its capture (mytop-project/tracker#950).
     var liveRefreshRate by remember(hostBridge) { mutableStateOf(0f) }
     var surfaceSize by remember(hostBridge) { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var presentFailed by remember { mutableStateOf(false) }
@@ -204,7 +204,7 @@ private fun SecondOutputSurface(
                 }
             },
         )
-        // The title-bar buttons and resize band of the windows on this output (Droidtop/tracker#910).
+        // The title-bar buttons and resize band of the windows on this output (mytop-project/tracker#910).
         WindowControlsOverlay(windows, router, outputName, primary = false)
         if (presentFailed) {
             Text(

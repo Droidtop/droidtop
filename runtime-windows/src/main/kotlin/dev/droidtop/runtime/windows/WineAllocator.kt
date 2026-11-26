@@ -9,7 +9,7 @@ import timber.log.Timber
 
 /**
  * A game's choice of the memory allocator its Wine processes use (docs/SPEC.md 9, "The allocator a game's Wine
- * uses"; Droidtop/tracker#894). Android's own (Scudo) unless the game opts into mimalloc.
+ * uses"; mytop-project/tracker#894). Android's own (Scudo) unless the game opts into mimalloc.
  *
  * Why: Scudo gives each small size class a fixed 256 MB region in every process. On the x86_64 Lavapipe path,
  * LLVM compiling DXVK's pipelines inside the game's Wine process fills the 32 KB and 64 KB classes, and Scudo then

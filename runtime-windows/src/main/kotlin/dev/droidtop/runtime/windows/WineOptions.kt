@@ -110,7 +110,7 @@ object WineOptions {
     private const val LSFG_KEY = "lsfg"
     private const val LSFG_OFF = "off"
 
-    /** A game's memory allocator (WineAllocator, Droidtop/tracker#894): Android's unless the game chose mimalloc. */
+    /** A game's memory allocator (WineAllocator, mytop-project/tracker#894): Android's unless the game chose mimalloc. */
     const val ALLOCATOR = "wine_allocator"
     private const val ALLOCATOR_ANDROID = "android"
 
@@ -125,7 +125,7 @@ object WineOptions {
     private const val STEAMWORKS_APPID_KEY = "steamworks_appid"
 
     /**
-     * The game's persistent "owned" flag for the Steamworks shim (Droidtop/tracker#718, [SteamworksOwnership]): set once,
+     * The game's persistent "owned" flag for the Steamworks shim (mytop-project/tracker#718, [SteamworksOwnership]): set once,
      * when the person ticks "Yes, I own this game" or the first time droidtop's Steam lists the app on the signed-in
      * account, and never cleared by droidtop (a sync, a network failure, a cache clear or "Use the shared settings again"
      * leave it: it is one of [OWN_KEYS]). Its value is the app ID it was set for, kept for the record. A flagged game
@@ -142,10 +142,10 @@ object WineOptions {
     private const val CACHE_OFF = "off"
     private const val CACHE_CLEAR = "clear"
 
-    /** The "Prepare for first launch" row (docs/SPEC.md 9; Droidtop/tracker#866): a game's, when its folder is known. */
+    /** The "Prepare for first launch" row (docs/SPEC.md 9; mytop-project/tracker#866): a game's, when its folder is known. */
     const val PREPARE = "wine_prepare_first_launch"
 
-    /** The two wide grants (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584), off until turned on. */
+    /** The two wide grants (docs/SPEC.md 5a, "What a game can reach", 4; mytop-project/tracker#584), off until turned on. */
     const val GRANT_DEVICE_SYSTEM = "wine_grant_device_system"
     const val GRANT_ALL_STORAGE = "wine_grant_all_storage"
     private const val GRANT_DENY = "deny"
@@ -161,7 +161,7 @@ object WineOptions {
      */
     private val gameRoots = java.util.concurrent.ConcurrentHashMap<String, String>()
 
-    /** The "Prefix" row (docs/SPEC.md 5a "Per-game prefixes", piece 1; Droidtop/tracker#584): which managed prefix a game runs in. */
+    /** The "Prefix" row (docs/SPEC.md 5a "Per-game prefixes", piece 1; mytop-project/tracker#584): which managed prefix a game runs in. */
     const val PREFIX = "wine_prefix"
     private const val PREFIX_NEW = "droidtop:new-prefix"
 
@@ -605,7 +605,7 @@ object WineOptions {
         return SteamworksShim.resolve(own[STEAMWORKS_KEY], own[STEAMWORKS_APPID_KEY]?.toIntOrNull(), detected)
     }
 
-    /** Whether [entryId] carries the Steamworks owned flag (Droidtop/tracker#718). Disk work. */
+    /** Whether [entryId] carries the Steamworks owned flag (mytop-project/tracker#718). Disk work. */
     fun steamworksOwned(context: Context, entryId: String?): Boolean =
         entryId != null && WineGameOptionsPrefs.get(context, entryId)[STEAMWORKS_OWNED_KEY] != null
 
@@ -618,7 +618,7 @@ object WineOptions {
     /**
      * The Steamworks rows of [entryId] (docs/SPEC.md 5b, "Steamworks in the prefix"): the switch, the Steam app it starts
      * as, and, while the shim is on for an app the signed-in Steam account doesn't list, a warning on the switch and the
-     * "Yes, I own this game" row (5b, "DRM: platform enablement"; Droidtop/tracker#718). Disk and database work.
+     * "Yes, I own this game" row (5b, "DRM: platform enablement"; mytop-project/tracker#718). Disk and database work.
      */
     private suspend fun steamworksRows(context: Context, entryId: String, gameRoot: File?): List<WineOptionRow> {
         val own = WineGameOptionsPrefs.get(context, entryId)
@@ -742,14 +742,14 @@ object WineOptions {
         return listOf(WineStorageGrants.DEVICE_SYSTEM, WineStorageGrants.ALL_STORAGE).filter { own[it] == "1" }.associateWith { "1" }
     }
 
-    /** The game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8), when it has chosen any. */
+    /** The game's own touchscreen gestures over the prefix's (mytop-project/tracker#618 C8), when it has chosen any. */
     private fun gestureOverrides(context: Context, entryId: String?): Map<String, String> {
         val own = entryId?.let { WineGameOptionsPrefs.get(context, it)[GESTURES_KEY] } ?: return emptyMap()
         return mapOf(GESTURE_OVERRIDE to own)
     }
 
     /**
-     * [entryId]'s touchscreen gestures (Droidtop/tracker#618 C8): its own when it chose any, else its prefix's, else
+     * [entryId]'s touchscreen gestures (mytop-project/tracker#618 C8): its own when it chose any, else its prefix's, else
      * the defaults. Disk work.
      */
     fun gestures(context: Context, entryId: String): dev.droidtop.runtime.windows.data.TouchGestureConfig {

@@ -52,7 +52,7 @@ object RootfsDelete {
     /**
      * Why [canonical] must not be deleted given [procMounts] (the text of /proc/mounts), or null when nothing is
      * mounted at it or under it. A mount point that only shares a prefix with it (`<rootfs>-old`) does not count.
-     * Pure, so the rule that keeps `rm -rf` out of a live bind is tested on its own (Droidtop/tracker#731).
+     * Pure, so the rule that keeps `rm -rf` out of a live bind is tested on its own (mytop-project/tracker#731).
      */
     internal fun mountedUnder(canonical: String, procMounts: String): String? {
         val mounted = procMounts.lineSequence()

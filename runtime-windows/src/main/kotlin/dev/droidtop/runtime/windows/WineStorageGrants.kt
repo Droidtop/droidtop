@@ -8,7 +8,7 @@ import dev.droidtop.runtime.WideAccess
 import java.io.File
 
 /**
- * The two wide grants of a Windows game (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584), off
+ * The two wide grants of a Windows game (docs/SPEC.md 5a, "What a game can reach", 4; mytop-project/tracker#584), off
  * for every game and prefix until the person turns one on (owner, 2026-10-17: "Let's gate the root and internal
  * storage maps behind a permission toggle. That way users can enable it if something fucky depends on it, but it's
  * not normally there"):

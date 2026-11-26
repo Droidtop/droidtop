@@ -50,7 +50,7 @@ sealed interface ScanStep {
         val complete: Boolean = false,
         /**
          * Ids this walk no longer lists on purpose though their files are still there (a file that gave way to its
-         * game folder's main program, Droidtop/tracker#931): dropped from the part, never kept as missing.
+         * game folder's main program, mytop-project/tracker#931): dropped from the part, never kept as missing.
          */
         val gone: List<String> = emptyList(),
     ) : ScanStep

@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost.debrid
 import java.net.URLDecoder
 import java.security.MessageDigest
 
-/** The info hash of a magnet or a `.torrent`, for asking a debrid service about it (Droidtop/tracker#638). Pure. */
+/** The info hash of a magnet or a `.torrent`, for asking a debrid service about it (mytop-project/tracker#638). Pure. */
 object TorrentRefs {
     private val HEX = Regex("^[0-9a-fA-F]{40}$")
     private val BASE32 = Regex("^[A-Za-z2-7]{32}$")

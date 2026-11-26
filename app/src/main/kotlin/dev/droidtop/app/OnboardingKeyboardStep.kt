@@ -160,7 +160,7 @@ internal fun KeyboardStep(
             enabled -> StepNote("Hacker's Keyboard is on, not in use yet.")
             else -> StepNote("Opens Android's keyboard settings.")
         }
-        // The layout, asked once the keyboard is on (Droidtop/tracker#903, the owner: "the default layout is derived from
+        // The layout, asked once the keyboard is on (mytop-project/tracker#903, the owner: "the default layout is derived from
         // screen size and dpi, and first setup asks the person"). Automatic is that default; the others are the
         // keyboard's own presets (KeyboardProMode.Preset), changeable later in its settings.
         if (enabled) KeyboardLayoutChoice()

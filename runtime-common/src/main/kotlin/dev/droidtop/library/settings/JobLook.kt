@@ -1,7 +1,7 @@
 package dev.droidtop.library.settings
 
 /**
- * How a job's progress looks, by where it stands (docs/SPEC.md "Motion and visual status", Droidtop/tracker#643; owner,
+ * How a job's progress looks, by where it stands (docs/SPEC.md "Motion and visual status", mytop-project/tracker#643; owner,
  * 2026-10-24: "how we do notifications and stuff is very text based. Can we move to more animations and intuitive
  * design?"): every surface that shows a job draws the same states the same way, so its state is seen, not read.
  */
@@ -25,8 +25,8 @@ enum class JobLook {
     FAILED,
 
     /**
-     * Not a job: a quantity drawn as a meter (show, then say, Droidtop/tracker#738), such as a disk's used share on
-     * the Storage page (Droidtop/tracker#363). The fill stands at the value with no motion or mark, and is said as
+     * Not a job: a quantity drawn as a meter (show, then say, mytop-project/tracker#738), such as a disk's used share on
+     * the Storage page (mytop-project/tracker#363). The fill stands at the value with no motion or mark, and is said as
      * its percent.
      */
     LEVEL,
@@ -45,7 +45,7 @@ enum class JobLook {
 
         /**
          * What [look] is in words, for a screen reader and beside the drawing (show, then say: owner, 2026-10-29,
-         * Droidtop/tracker#738); the bar or the mark is never the only way the state is told.
+         * mytop-project/tracker#738); the bar or the mark is never the only way the state is told.
          */
         fun words(look: JobLook): String = when (look) {
             QUEUED -> "Waiting"
@@ -60,7 +60,7 @@ enum class JobLook {
 }
 
 /**
- * What a job is doing, as the icon its status starts with (owner, 2026-11-05, Droidtop/tracker#886: "We can use icons
+ * What a job is doing, as the icon its status starts with (owner, 2026-11-05, mytop-project/tracker#886: "We can use icons
  * to represent downloads vs uploads"): ↓ a download, ↑ an upload or a sync's push, and one each for an install, an
  * update and a check. [words] is the icon's description for a screen reader and a hint; the icon replaces the word on
  * screen, never adds a sentence.

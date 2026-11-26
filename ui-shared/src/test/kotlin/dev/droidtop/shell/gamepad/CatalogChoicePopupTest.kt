@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The Text size sample's scale against the size in force (Droidtop/tracker#673). */
+/** The Text size sample's scale against the size in force (mytop-project/tracker#673). */
 class CatalogChoicePopupTest {
     @Test fun `the sample is drawn relative to the size in force`() {
         assertEquals(1.5f, sampleRatio(1.5f, 1.0f), 0.001f)

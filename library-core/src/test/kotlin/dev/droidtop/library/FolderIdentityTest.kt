@@ -10,7 +10,7 @@ import java.io.File
 
 /**
  * A folder game keeps its identity across a version bump (docs/SPEC.md 7g,
- * Droidtop/tracker#397 slice E): `MyGame-v0.5` replaced by `MyGame-v0.6` in
+ * mytop-project/tracker#397 slice E): `MyGame-v0.5` replaced by `MyGame-v0.6` in
  * the same folder is the same game, so its id, and with it every fact the
  * library keys by it, carries over. Two version folders side by side stay two.
  */

@@ -1,18 +1,18 @@
 package dev.droidtop.shell.gamepad.input
 
 /**
- * The hint bar's fit rule (docs/SPEC.md 7j, "The hint bar fits"; Droidtop/tracker#485 F2a, final design
+ * The hint bar's fit rule (docs/SPEC.md 7j, "The hint bar fits"; mytop-project/tracker#485 F2a, final design
  * C.1 item 8). The bar names every button that acts; when they do not fit on one line at the current text
  * size, it gives up room in a fixed order rather than cutting a label or scrolling a hint out of sight:
  *
  * 1. Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2);
  * 2. L1/R1 drop (the strip they step shows its own shoulder glyphs);
  * 3. Select becomes its glyph alone. It never drops: on several screens its pill is the only touch route to what it
- *    opens (List options, Filter, Copy all), and a touch never assumes a pad (Droidtop/tracker#839).
+ *    opens (List options, Filter, Copy all), and a touch never assumes a pad (mytop-project/tracker#839).
  *
  * A, B and Select never drop. Start and R2 always sit first, on the left. What still does not fit after the last
  * step wraps onto a second line, in a sheet's bar and a full-width bar alike: a scrolled bar cut "A Open" mid-word
- * at Largest text in portrait, with nothing saying there was more (Droidtop/tracker#770). Pure, so the order is a
+ * at Largest text in portrait, with nothing saying there was more (mytop-project/tracker#770). Pure, so the order is a
  * JVM test.
  */
 object HintFit {

@@ -15,7 +15,7 @@ import org.pocketworkstation.pckeyboard.remote.RemoteInputRouter
 import org.pocketworkstation.pckeyboard.remote.RemoteTarget
 
 /**
- * Typing from another device (docs/SPEC.md, "Type from another device", Droidtop/tracker#645): the token and code
+ * Typing from another device (docs/SPEC.md, "Type from another device", mytop-project/tracker#645): the token and code
  * checks, the code the console confirms, the one paired device, the reset on a refusal, the prompt timeout, the idle
  * limit, and what the session does with a delivery. Which field a delivery lands in is the router's, tested with it in
  * `:input-keyboard` (RemoteInputRouterTest). Fakes for the clock, the listener and the fields; one test uses a real socket.

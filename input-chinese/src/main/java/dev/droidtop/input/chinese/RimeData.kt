@@ -13,7 +13,7 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * RIME's data on the device (Droidtop/tracker#903 H8b), in the engine's profile directory (noBackupFilesDir/engine-rime):
+ * RIME's data on the device (mytop-project/tracker#903 H8b), in the engine's profile directory (noBackupFilesDir/engine-rime):
  * `shared/` is librime's shared_data_dir, the compiled luna_pinyin schemas and OpenCC's data, and `user/` its
  * user_data_dir, where it keeps what it learns. The first time Chinese is used `shared/` is downloaded from the
  * release the pin names ([RimePin.dataUrl]), never at app start and never in the APK, as Mozc's dictionary is

@@ -12,7 +12,7 @@ import java.io.File
 import java.nio.file.Files
 
 /**
- * Syncable data, droidtop's side (docs/plugin-api.md F8 protocol 2, Droidtop/tracker#794): a published copy is made
+ * Syncable data, droidtop's side (docs/plugin-api.md F8 protocol 2, mytop-project/tracker#794): a published copy is made
  * current whole, a sync's merged copy replaces it whole, and nothing that fails changes anything.
  */
 class PluginContextsTest {

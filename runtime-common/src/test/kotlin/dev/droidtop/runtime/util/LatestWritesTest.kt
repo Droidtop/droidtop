@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion's write queue for live controls (Droidtop/tracker#786 S2a). */
+/** The companion's write queue for live controls (mytop-project/tracker#786 S2a). */
 class LatestWritesTest {
     private val worker = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private fun queue() = LatestWrites(CoroutineScope(SupervisorJob() + worker))

@@ -59,7 +59,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The running game's guides on the companion, beside the game (docs/SPEC.md 7i "Guides", Droidtop/tracker#817): the
+ * The running game's guides on the companion, beside the game (docs/SPEC.md 7i "Guides", mytop-project/tracker#817): the
  * same list and the same kept place as the game menu's Guides ([GuideContent], [GuidePlaces]), drawn for touch. A finger
  * scrolls and turns pages while the pad stays on the game (the companion never takes the pad: [CompanionActivity]).
  * The notes are shown here and written in the game menu, where the shell's text entry is. A web search opens the

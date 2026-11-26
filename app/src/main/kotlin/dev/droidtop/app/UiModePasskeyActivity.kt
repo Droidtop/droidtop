@@ -49,7 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Leaving Kid or Kiosk when a passkey is set (docs/SPEC.md "UI modes and ControlAccess", Droidtop/tracker#414): a
+ * Leaving Kid or Kiosk when a passkey is set (docs/SPEC.md "UI modes and ControlAccess", mytop-project/tracker#414): a
  * keypad over whatever was on screen, worked by touch or by pad. The D-pad moves between keys, A presses one and B
  * cancels; a wrong passkey says so and clears, the right one leaves and closes. The check is
  * [UiModePasskey.matches]; nothing here stores or compares digits itself.

@@ -1,7 +1,7 @@
 name: Commit hygiene
 
-# The rule lives once, in Droidtop/droidtop-platforms, and is pinned by commit
-# (Droidtop/tracker#199).
+# The rule lives once, in mytop-project/droidtop-platforms, and is pinned by commit
+# (mytop-project/tracker#199).
 on:
   push:
   pull_request:
@@ -15,7 +15,7 @@ jobs:
 
   # droidtop's own: the commit convention its changelog is made from (docs/SPEC.md 10b, "Every build carries its
   # changelog"; changelog.d/README.md). Every commit carries a well-formed Changelog trailer, the line a person reads
-  # in What's new, or "Changelog: none" (the owner, 2026-11-19: clean user-facing lines, Droidtop/tracker#954 item 9).
+  # in What's new, or "Changelog: none" (the owner, 2026-11-19: clean user-facing lines, mytop-project/tracker#954 item 9).
   # The generator's own cases run first.
   changelog-convention:
     runs-on: ubuntu-latest

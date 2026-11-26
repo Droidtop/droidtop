@@ -289,7 +289,7 @@ class RunnerAvailabilityTest {
 
     @Test
     fun `Get support names the version it installs`() {
-        // Droidtop/tracker#837: "The "get support" button should list a version".
+        // mytop-project/tracker#837: "The "get support" button should list a version".
         assertEquals("Ren'Py 8.3", engineSupportName("Ren'Py", "Ren'Py 8.3", "8.3.7", "8.1.3"))
         assertEquals("Ren'Py 8.3", engineSupportName("Ren'Py", "Ren'Py", "8.3.7", "8.1.3"))
         assertEquals("Ren'Py 8.1", engineSupportName("Ren'Py", null, null, "8.1.3"))

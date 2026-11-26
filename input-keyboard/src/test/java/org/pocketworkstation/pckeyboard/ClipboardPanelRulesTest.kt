@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The clipboard panel's rules (docs/SPEC.md 6a, "Clipboard history", Droidtop/tracker#903 H12d): one intake rule for
+ * The clipboard panel's rules (docs/SPEC.md 6a, "Clipboard history", mytop-project/tracker#903 H12d): one intake rule for
  * every source, "Keep clips for" with pins, search, ages, the panel's order and sections, and the upgrade. The paired
  * device's cases were PairedClipsTest ("Type from another device", "On the keyboard").
  */

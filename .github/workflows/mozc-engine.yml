@@ -1,7 +1,7 @@
 name: Mozc engine
 
 # Builds Google's open-source Japanese conversion engine, Mozc (BSD-3), for the
-# keyboard's Japanese input (Droidtop/tracker#903 H7; docs/SPEC.md 6a, "The
+# keyboard's Japanese input (mytop-project/tracker#903 H7; docs/SPEC.md 6a, "The
 # engine seam, the candidate bar and the gesture seam"), and publishes it as a
 # prerelease of this repository, the lsfg-vk-layer.yml precedent:
 #

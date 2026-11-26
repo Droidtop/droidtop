@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which pointer call a surface's absolute motion takes (Droidtop/tracker#908, step D3). */
+/** Which pointer call a surface's absolute motion takes (mytop-project/tracker#908, step D3). */
 class PointerTargetTest {
     @Test
     fun `the one-screen desktop keeps the unnamed call`() {

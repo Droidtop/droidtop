@@ -3,7 +3,7 @@ package dev.droidtop.app.update
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The self-update's download is droidtop's own job (Droidtop/tracker#226): its file is the one [UpdateFiles] sweeps. */
+/** The self-update's download is droidtop's own job (mytop-project/tracker#226): its file is the one [UpdateFiles] sweeps. */
 class UpdateDownloadTest {
     @Test
     fun `the downloaded file is named for the sweeper to find`() {

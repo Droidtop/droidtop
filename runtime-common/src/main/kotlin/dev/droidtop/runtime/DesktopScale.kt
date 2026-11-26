@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import kotlin.math.roundToInt
 
 /**
- * How large the Linux desktop draws (Droidtop/tracker#386, docs/SPEC.md 4
+ * How large the Linux desktop draws (mytop-project/tracker#386, docs/SPEC.md 4
  * "Desktop scale"): the compositor output's scale, logical pixel to
  * physical pixels. The output keeps the screen's full pixel size, so
  * nothing is lost to it; only text and controls grow.
@@ -43,7 +43,7 @@ object DesktopScale {
     }
 
     /**
-     * The SharedPreferences key of the render resolution (Droidtop/tracker#426): what fraction of the
+     * The SharedPreferences key of the render resolution (mytop-project/tracker#426): what fraction of the
      * screen's pixels the desktop's output has. [FULL_RESOLUTION], the default, is the screen's own size.
      */
     const val RESOLUTION_KEY = "pref_desktop_render_resolution"

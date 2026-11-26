@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A container's scale and theme (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5). */
+/** A container's scale and theme (docs/SPEC.md 3d "Scale and theme", mytop-project/tracker#787 slice 5). */
 class ContainerLookTest {
     @Test
     fun `it reads back as written, and anything else is the default`() {

@@ -5,7 +5,7 @@ import java.io.File
 
 /**
  * A plugin's database: droidtop's own SQLite (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's",
- * Droidtop/tracker#741), the same in every tier and on every Android. A Kotlin plugin gets one from
+ * mytop-project/tracker#741), the same in every tier and on every Android. A Kotlin plugin gets one from
  * [PluginContext.database]; a Flutter plugin's `sqflite` is answered over it ([SqfliteCalls]).
  *
  * Values are SQLite's own: `Long`, `Double`, `String`, `ByteArray` and null. Arguments may also be any other number,

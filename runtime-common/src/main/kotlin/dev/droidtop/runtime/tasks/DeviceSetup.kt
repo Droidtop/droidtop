@@ -25,9 +25,9 @@ enum class SetupState {
 
 /**
  * One change to Android's settings that droidtop can make itself through the one privileged shell (docs/SPEC.md
- * "Device setup", Droidtop/tracker#816, owner 2026-10-30: "the things droidtop can do for setup, when shizuku is
+ * "Device setup", mytop-project/tracker#816, owner 2026-10-30: "the things droidtop can do for setup, when shizuku is
  * running, or through wireless debugging's autosetup"). Every item is asked first, in plain words ([ask]), and can be
- * undone from the same row ([undoAsk]) when droidtop made it. The words are string resources (Droidtop/tracker#177),
+ * undone from the same row ([undoAsk]) when droidtop made it. The words are string resources (mytop-project/tracker#177),
  * read with `words()` or `getString`. [state], [apply] and [undo] run shell commands: IO only.
  */
 class DeviceSetupItem(
@@ -35,7 +35,7 @@ class DeviceSetupItem(
     /** The row's title, at most 40 characters. */
     @StringRes val title: Int,
     /**
-     * The confirm card's question before [apply]: what changes and for whom, in one job (Droidtop/tracker#153). The undo
+     * The confirm card's question before [apply]: what changes and for whom, in one job (mytop-project/tracker#153). The undo
      * is the row's own state, so the question does not repeat it.
      */
     @StringRes val ask: Int,
@@ -67,7 +67,7 @@ object DeviceSetup {
     /** Whether [shell] can run a command now. */
     fun canRun(shell: PrivilegedShell): Boolean = runCatching { shell.capabilities().shellCommand }.getOrDefault(false)
 
-    // ---- Android's child-process limit (Droidtop/tracker#816) ----
+    // ---- Android's child-process limit (mytop-project/tracker#816) ----
 
     val childProcesses = DeviceSetupItem(
         id = "child_processes",
@@ -128,7 +128,7 @@ object DeviceSetup {
         undo = { context, shell -> turnOffButtonPresses(context, shell) },
     )
 
-    // ---- Auto power (Droidtop/tracker#841, owner Q3: off until chosen, offered in onboarding, recommended on) ----
+    // ---- Auto power (mytop-project/tracker#841, owner Q3: off until chosen, offered in onboarding, recommended on) ----
 
     val autoPower = DeviceSetupItem(
         id = "auto_power",

@@ -5,7 +5,7 @@ import androidx.compose.ui.res.stringResource
 
 /**
  * The one-time question after the library's first walk: "Fetch box art and
- * details for your games?" (docs/SPEC.md 7h, Droidtop/tracker#174). Raised by
+ * details for your games?" (docs/SPEC.md 7h, mytop-project/tracker#174). Raised by
  * [dev.droidtop.library.scraper.ScrapeOffer.pending]; either answer is stored
  * and ends the question for good, B declines. Same panel and pad handling as
  * every other modal of the shell (docs/SPEC.md 6e).

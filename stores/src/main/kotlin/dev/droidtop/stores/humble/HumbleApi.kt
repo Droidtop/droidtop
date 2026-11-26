@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Humble Bundle's library API as its own site reads it (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335): the account's
+ * Humble Bundle's library API as its own site reads it (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335): the account's
  * orders (`/api/v1/user/order`), then those orders in batches (`/api/v1/orders?gamekeys=...`), each with the DRM-free
  * products it holds and their downloads. Signed in by the site's own session cookie (`_simpleauth_sess`), which the
  * person's sign-in on Humble's page leaves; nothing else is sent.

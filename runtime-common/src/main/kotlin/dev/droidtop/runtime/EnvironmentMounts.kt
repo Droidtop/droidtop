@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import java.io.File
 
 /**
- * Which home a container's programs see at `/root` (docs/SPEC.md 3d "Home and folders", Droidtop/tracker#555 D3).
+ * Which home a container's programs see at `/root` (docs/SPEC.md 3d "Home and folders", mytop-project/tracker#555 D3).
  * Distrobox's model: by default a container shares the person's home; `--home` gives it one of its own.
  */
 sealed interface HomeChoice {
@@ -26,7 +26,7 @@ data class EnvironmentMounts(
     val home: HomeChoice = HomeChoice.Private,
     val folders: List<ExtraMount> = emptyList(),
     /**
-     * "All internal storage" (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584): every mounted
+     * "All internal storage" (docs/SPEC.md 5a, "What a game can reach", 4; mytop-project/tracker#584): every mounted
      * volume bound whole. Off unless the person allowed it, for new and existing containers alike (owner,
      * 2026-10-22: "Nope, turn it off. If it breaks, we fix it then."); without it only the shared folders are bound.
      */

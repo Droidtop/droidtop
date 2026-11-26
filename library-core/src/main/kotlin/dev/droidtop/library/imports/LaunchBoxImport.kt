@@ -1,7 +1,7 @@
 package dev.droidtop.library.imports
 
 /**
- * LaunchBox's per-platform files (`Data/Platforms/<platform>.xml`), read for an import (Droidtop/tracker#724): each
+ * LaunchBox's per-platform files (`Data/Platforms/<platform>.xml`), read for an import (mytop-project/tracker#724): each
  * game's file, whether it is a favourite, its play time and when it was last played. Only read, never written. A
  * small extractor of the `<Game>` blocks rather than an XML library, so it runs the same in a JVM test. Pure.
  */

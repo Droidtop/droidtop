@@ -68,7 +68,7 @@ internal fun ManualMatchPicker(
     var status by remember(entry) { mutableStateOf<String?>(null) }
     var focusIndex by remember(entry) { mutableIntStateOf(0) }
     var applying by remember(entry) { mutableStateOf(false) }
-    // What is searched for (Droidtop/tracker#861): the folder's name as droidtop reads it, until the person changes it.
+    // What is searched for (mytop-project/tracker#861): the folder's name as droidtop reads it, until the person changes it.
     val suggestion = remember(entry) { PcScraper.suggestedSearch(entry) }
     var query by remember(entry) { mutableStateOf(suggestion) }
     var editingQuery by remember(entry) { mutableStateOf(false) }
@@ -162,8 +162,8 @@ internal fun ManualMatchPicker(
                 color = MenuTokens.OnSurface,
                 fontWeight = FontWeight.SemiBold,
             )
-            // The search first (Droidtop/tracker#861): A types other words, with the touch keyboard or the pad's.
-            // Typed in the row itself, the picker still open (no editor, no panel: Droidtop/tracker#954 item 12).
+            // The search first (mytop-project/tracker#861): A types other words, with the touch keyboard or the pad's.
+            // Typed in the row itself, the picker still open (no editor, no panel: mytop-project/tracker#954 item 12).
             if (editingQuery) {
                 dev.droidtop.shell.gamepad.InPlaceTextField(
                     initial = query,

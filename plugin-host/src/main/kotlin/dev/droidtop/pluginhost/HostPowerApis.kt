@@ -6,7 +6,7 @@ import org.json.JSONObject
 data class PowerState(val level: Int?, val charging: Boolean, val saver: Boolean)
 
 /**
- * D7 (docs/plugin-api.md 3, `power.state`, Droidtop/tracker#553): the battery level, whether it charges and whether
+ * D7 (docs/plugin-api.md 3, `power.state`, mytop-project/tracker#553): the battery level, whether it charges and whether
  * Battery Saver is on, so a plugin defers heavy work (a sync engine waits for the charger) without reading `/sys`
  * itself. Under `power.state` (normal).
  */

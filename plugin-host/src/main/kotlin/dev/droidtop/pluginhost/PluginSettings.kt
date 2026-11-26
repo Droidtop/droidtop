@@ -6,7 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * A plugin's declared settings, droidtop's side (Droidtop/tracker#880, docs/plugin-api.md 1.10): the values the person
+ * A plugin's declared settings, droidtop's side (mytop-project/tracker#880, docs/plugin-api.md 1.10): the values the person
  * set, the text the plugin pushed while it ran, and which settings changed since the plugin last heard. Kept in
  * `plugins/settings/<id>.json`, outside the plugin's own folder. Drawing the page reads only this and the manifest,
  * never the plugin.

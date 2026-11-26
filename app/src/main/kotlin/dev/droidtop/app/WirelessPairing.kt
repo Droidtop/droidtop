@@ -15,7 +15,7 @@ import android.provider.Settings
 import dev.droidtop.pluginhost.ElevatedAccessHost
 
 /**
- * Pairing droidtop with Android's wireless debugging (docs/SPEC.md "Wireless debugging", Droidtop/tracker#816). The
+ * Pairing droidtop with Android's wireless debugging (docs/SPEC.md "Wireless debugging", mytop-project/tracker#816). The
  * pairing code shows in Settings and disappears when Settings goes to the background, so the person types it into
  * droidtop's notification instead, which they can answer from the notification shade while Settings stays in front;
  * Shizuku does the same. [start] opens Developer options at Wireless debugging and posts that notification;
@@ -32,7 +32,7 @@ object WirelessPairing {
         if (!canNotify(context)) return "Allow droidtop's notifications first: the code is typed into one"
         notify(context, "Pair with wireless debugging", "In Wireless debugging, tap Pair device with pairing code, then reply here with the six digits", withReply = true)
         if (!openDeveloperOptions(context)) return "Turn on Developer options first: Settings > About > tap Build number seven times"
-        // Over Settings, a guide the pad can reach takes the code too (Droidtop/tracker#363).
+        // Over Settings, a guide the pad can reach takes the code too (mytop-project/tracker#363).
         return if (PairingGuide.show(context)) "Type the code into droidtop's guide over Settings, or reply to its notification"
         else "Reply to droidtop's notification with the code"
     }

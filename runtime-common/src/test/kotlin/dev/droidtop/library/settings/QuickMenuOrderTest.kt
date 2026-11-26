@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The Quick Menu's section order, the person's to set (Droidtop/tracker#610). */
+/** The Quick Menu's section order, the person's to set (mytop-project/tracker#610). */
 class QuickMenuOrderTest {
     private val default = QuickMenuOrder.DEFAULT.map { it.first }
 

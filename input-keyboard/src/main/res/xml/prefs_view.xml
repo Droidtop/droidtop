@@ -60,7 +60,7 @@
             android:persistent="true"
             android:title="@string/title_top_row_scale" />
         
-        <!-- droidtop: each theme with a preview of its keys (ThemePreference, Droidtop/tracker#903 H12b). -->
+        <!-- droidtop: each theme with a preview of its keys (ThemePreference, mytop-project/tracker#903 H12b). -->
         <org.pocketworkstation.pckeyboard.ThemePreference
             android:defaultValue="8"
             android:key="pref_keyboard_layout"

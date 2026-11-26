@@ -7,7 +7,7 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 
 /**
- * "Prepare for first launch" as a job (docs/SPEC.md 9; Droidtop/tracker#866): one entry in "Downloads and installs"
+ * "Prepare for first launch" as a job (docs/SPEC.md 9; mytop-project/tracker#866): one entry in "Downloads and installs"
  * with progress and Cancel, started only from the game's own row ([WineOptions.PREPARE]), never by itself.
  *
  * The owner's rule (relayed 2026-11-04): opt-in, "never automatic on battery". A run started without [ARG_ON_BATTERY]

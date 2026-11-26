@@ -1,10 +1,10 @@
-// Japanese typing through Google's Mozc (Droidtop/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam").
+// Japanese typing through Google's Mozc (mytop-project/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam").
 //
 // An engine behind :input-keyboard's InputEngine seam, kept out of that module: :input-keyboard does not depend on
 // this one, :app registers MozcJapanese at start (Seams.kt), and so the keyboard, and the standalone Hacker Keyboard
 // Reborn built from it, carry no engine. This module depends on :input-keyboard only for the seam.
 //
-// - libmozc.so (both ABIs) is Mozc 3.35.6354 built by Droidtop/tracker#903 H7b and released on this repository as
+// - libmozc.so (both ABIs) is Mozc 3.35.6354 built by mytop-project/tracker#903 H7b and released on this repository as
 //   the prerelease mozc-engine-3.35.6354. build-scripts/fetch-mozc-engine.sh puts it in mozc/jniLibs (git-ignored)
 //   against mozc-engine.pin, as fetch-lsfg-layer.sh does for the lsfg layer; the android-setup action runs it
 //   before Gradle. It is packaged unstripped and AGP strips it with the NDK (:app:strip*DebugSymbols).

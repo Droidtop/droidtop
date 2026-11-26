@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
  * pane can show the service's key page, it opens on that pane ([KeyWebPane]), which reads the key off the page when
  * the person confirms. Otherwise, and from the pane's "Other ways", it is the service's Settings page
  * ([ScraperKeyScreen]), drawn by the same [CatalogNavigator] as every other page, with the shell's hint row: the
- * page Settings > Accounts and sources opens in place (Droidtop/tracker#869).
+ * page Settings > Accounts and sources opens in place (mytop-project/tracker#869).
  */
 class ScraperKeySetupActivity : AppCompatActivity() {
     private val panelFocus = mutableStateOf(false)

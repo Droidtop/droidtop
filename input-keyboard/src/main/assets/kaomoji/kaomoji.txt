@@ -1,4 +1,4 @@
-# Kaomoji for Hacker Keyboard Reborn's emoji panel (Droidtop/tracker#903 H4): [Group] lines, then one kaomoji per line.
+# Kaomoji for Hacker Keyboard Reborn's emoji panel (mytop-project/tracker#903 H4): [Group] lines, then one kaomoji per line.
 # Source and changes: SOURCE.txt beside this file.
 
 [Joy]

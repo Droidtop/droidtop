@@ -16,7 +16,7 @@ import java.nio.ByteBuffer
  * (module-aaudio-sink.c state_func_io, SUSPENDED: AAudioStream_close) and
  * reopens it on resume (state_func_main, SINK_MESSAGE_OPEN_STREAM), which
  * is how the Desktop session gives up its output while another app is in
- * front (docs/SPEC.md "Launch audio hand-off", Droidtop/tracker#160).
+ * front (docs/SPEC.md "Launch audio hand-off", mytop-project/tracker#160).
  *
  * Not pactl itself: the packaged pactl sits in the extracted modules
  * asset under the app's data directory, which Android does not let an app

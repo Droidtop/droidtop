@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.READ_USER_DICTIONARY" />
     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
-    <!-- droidtop: offline voice typing downloads its engine and model, and listens (Droidtop/tracker#343). -->
+    <!-- droidtop: offline voice typing downloads its engine and model, and listens (mytop-project/tracker#343). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -102,7 +102,7 @@
             </intent-filter>
         </activity>
         <!-- droidtop: serves the one GIF or sticker being inserted, copied into the keyboard's cache, to the app it
-             goes into, read-only and only with the grant the insert gives (Droidtop/tracker#903 H5; docs/SPEC.md 6a). -->
+             goes into, read-only and only with the grant the insert gives (mytop-project/tracker#903 H5; docs/SPEC.md 6a). -->
         <provider
                 android:name="org.pocketworkstation.pckeyboard.HkrMediaProvider"
                 android:authorities="${applicationId}.hkr.media"

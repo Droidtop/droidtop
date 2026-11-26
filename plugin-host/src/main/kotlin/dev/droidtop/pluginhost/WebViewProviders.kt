@@ -157,14 +157,14 @@ object WebViewProviders {
         val host = NetScope.hostOf(url)
         val finish = when {
             host == null -> false
-            // A link onto a file host droidtop serves closes there, before anything was taken (Droidtop/tracker#650).
+            // A link onto a file host droidtop serves closes there, before anything was taken (mytop-project/tracker#650).
             request.mode == WebSessionRequest.Mode.OPEN && NetScope.isHttps(url) && dev.droidtop.pluginhost.hosts.HostLinks.served(url) -> {
                 asked.handoff = url
                 Log.i(TAG, "$host: handed to droidtop's host resolvers")
                 true
             }
             // A browser check passes on the site's own page with a pass cookie for it, and, where the plugin signs in
-            // there, once it is signed in (Droidtop/tracker#600).
+            // there, once it is signed in (mytop-project/tracker#600).
             request.mode == WebSessionRequest.Mode.CHECK &&
                 (request.domains.isEmpty() || WebSessions.covers(host, request.domains)) &&
                 SiteCheck.pagePassed(title, hostCookies) -> signedIn != false

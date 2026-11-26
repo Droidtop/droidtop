@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A credential's setup page (docs/SPEC.md 7h, "Supplying your own keys") as a Settings page of droidtop's: the same
- * frame, rows, hints and focus as every other page, wherever it is drawn (Droidtop/tracker#869). The owner, of the
+ * frame, rows, hints and focus as every other page, wherever it is drawn (mytop-project/tracker#869). The owner, of the
  * page it replaces: "a massive breach of UI rules" (its own pills and a bare Paste link, a numbered how-to and a QR
  * code, three unlabelled status lines and a bare text box).
  *
@@ -129,7 +129,7 @@ object ScraperKeyScreen {
     }
 
     /**
-     * Real-Debrid's device sign-in (Droidtop/tracker#638): a short code to enter at real-debrid.com/device on any
+     * Real-Debrid's device sign-in (mytop-project/tracker#638): a short code to enter at real-debrid.com/device on any
      * device, shown in the row while it waits. Approval stores the sign-in, whose token droidtop refreshes itself;
      * leaving the page stops the wait.
      */

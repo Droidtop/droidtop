@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The pad's focus ring over the input method's keys (Droidtop/tracker#338): every key reachable, rows wrap, edges stop. */
+/** The pad's focus ring over the input method's keys (mytop-project/tracker#338): every key reachable, rows wrap, edges stop. */
 class KeyFocusTest {
     // Three rows: four keys of 25 across, three of 33 (offset), one wide space bar.
     private val keys = listOf(

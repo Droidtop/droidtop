@@ -13,7 +13,7 @@ import kotlin.concurrent.thread
 /**
  * A loopback HTTP/1.1 server for the tests in this module. An Android module's unit tests compile against
  * android.jar, which does not show the JDK's com.sun.net.httpserver, so the tests cannot use HttpServer (HttpTest
- * did, and did not compile in CI, Droidtop/tracker#730); java.net.ServerSocket is in android.jar. One request per
+ * did, and did not compile in CI, mytop-project/tracker#730); java.net.ServerSocket is in android.jar. One request per
  * connection, answered by the handler registered for its path.
  */
 internal class TestServer {

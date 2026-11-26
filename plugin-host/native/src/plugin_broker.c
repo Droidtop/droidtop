@@ -11,7 +11,7 @@
  * logged under droidtop.sandbox with the plugin's id, so an open the rules
  * missed is named on the rig.
  *
- * The broker is the sandbox library's (vendor/sandbox, Droidtop/tracker#470).
+ * The broker is the sandbox library's (vendor/sandbox, mytop-project/tracker#470).
  */
 #include <jni.h>
 #include <errno.h>
@@ -125,7 +125,7 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
     if (!policy) return -ENOMEM;
     /*
      * A contained process is an Android isolated process: SELinux refuses it any folder descriptor its app sends it
-     * (file_receive), so its handler holds such a folder by its path (fibrewall 8be4adc, Droidtop/tracker#741). With
+     * (file_receive), so its handler holds such a folder by its path (fibrewall 8be4adc, mytop-project/tracker#741). With
      * this the broker does not send folders' descriptors at all, so no denial is logged for each one.
      */
     if (folders_by_path) sbx_policy_set_folders_by_path(policy, 1);
@@ -181,7 +181,7 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
         sbx_policy_add_system_socket(policy, "/dev/socket/fwmarkd", SBX_NET_CONNECT | SBX_NET_LISTEN);
         /*
          * The process is locked down with SBX_LOCK_NET_FILTER (plugin_filter.c), so every destination is decided by rules.
-         * Built to the recommendation, owner to confirm (Droidtop/tracker#850, 2026-11-05): the rules grant what the
+         * Built to the recommendation, owner to confirm (mytop-project/tracker#850, 2026-11-05): the rules grant what the
          * grants did, any destination out, any peer in and any name, so no plugin loses access; what the filter adds is
          * that nothing goes around the broker (a send that names an address, a connect from the handler's own code,
          * DNS other than the broker's) and that every call is decided and logged. Narrowing a plugin to its own

@@ -147,7 +147,7 @@ public class WinHandler {
      * falls back to app.gamenative's directory, not ours: every slot then stays unmapped and each rumble poller
      * spins a core. Setting it before the load is the one way that works for both halves of the APK: the arm64
      * library is GameNative's prebuilt, which has no other entry for the path, and the x86_64 one is built from
-     * the same source (Droidtop/tracker#249: a separate attachSharedMemory call existed only in the x86_64 build,
+     * the same source (mytop-project/tracker#249: a separate attachSharedMemory call existed only in the x86_64 build,
      * so on the arm64 console every Windows launch failed with UnsatisfiedLinkError).
      */
     private static synchronized void loadEvshim(Context context) {

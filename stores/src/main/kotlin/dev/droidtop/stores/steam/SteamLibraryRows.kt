@@ -55,7 +55,7 @@ internal object SteamLibraryRows {
     data class DlcCount(val counted: Int, val free: Int, val otherBase: Int, val family: Int)
 
     /**
-     * The DLC the profile counts, 782 on the console (Droidtop/tracker#377): a
+     * The DLC the profile counts, 782 on the console (mytop-project/tracker#377): a
      * DLC an own live licence grants and bills as a purchase ([SteamOwnership.paid]),
      * whose base game is one of [ownGames]. Everything else is counted into
      * the left-out figures so the sync line shows each exclusion.

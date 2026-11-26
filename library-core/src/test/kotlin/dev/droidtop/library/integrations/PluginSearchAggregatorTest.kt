@@ -160,7 +160,7 @@ class PluginSearchAggregatorTest {
         assertEquals("The site did not answer", plain.failure)
         assertTrue(plain.technical!!.contains("Detail: socket closed after 3 s"))
         assertEquals(null, plain.access)
-        // droidtop's own refusal wrapped in the source's FAILED (Droidtop/tracker#881): the check, with Open the site.
+        // droidtop's own refusal wrapped in the source's FAILED (mytop-project/tracker#881): the check, with Open the site.
         val wrapped = PluginSearchAggregator.failureOutcome(
             source,
             SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.FAILED, dev.droidtop.pluginhost.SiteChecks.refusal("f95zone.to"), null),

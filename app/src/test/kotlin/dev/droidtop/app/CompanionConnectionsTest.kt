@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion's Network tab (CompanionNetwork.kt, Droidtop/tracker#583; the network half of slice C19). */
+/** The companion's Network tab (CompanionNetwork.kt, mytop-project/tracker#583; the network half of slice C19). */
 class CompanionConnectionsTest {
     @Test fun `Wi-Fi bands from the frequency`() {
         assertEquals("2.4 GHz", band(2437))

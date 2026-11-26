@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which prefix a game starts in, and the folder scanner's forgetting (Droidtop/tracker#731). */
+/** Which prefix a game starts in, and the folder scanner's forgetting (mytop-project/tracker#731). */
 class PcPrefixIdsTest {
     @Test
     fun `a store game's own prefix is the id gamenative gave it`() {

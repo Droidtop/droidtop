@@ -69,7 +69,7 @@ private val Context.pluginJobsStore by preferencesDataStore(
  *
  * Kept across restarts ([encodeEntries]): an unfinished resumable job comes back paused (a reattaching kind runs
  * again), and the newest [FINISHED_KEPT] finished jobs come back with their results and reports, so what a job did
- * stays readable after its toast (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577) until the person
+ * stays readable after its toast (docs/SPEC.md "Jobs and their results", mytop-project/tracker#577) until the person
  * clears it ([clear], [clearFinished]).
  */
 object PluginJobsCenter {
@@ -120,7 +120,7 @@ object PluginJobsCenter {
         val retryable: Boolean = false,
         /**
          * The words of a failed job's other way through ([offerInstead]): "Open thread" on a source's download that got no
-         * file (Droidtop/tracker#862). Null when it has none. Not kept over a restart, as its handler is not.
+         * file (mytop-project/tracker#862). Null when it has none. Not kept over a restart, as its handler is not.
          */
         val instead: String? = null,
         /** Why a running job is not moving right now; null while it moves ([JobWait]). */
@@ -214,7 +214,7 @@ object PluginJobsCenter {
     /**
      * Attaches a registry nothing attached yet (a job started in a process the init provider did not run in). The three
      * job starts called [attach] whenever they had a context, which restored the saved jobs a second time and put back
-     * every job cleared since start (rig, AVD dev.3370, the stack of "attach asked again"; Droidtop/tracker#790).
+     * every job cleared since start (rig, AVD dev.3370, the stack of "attach asked again"; mytop-project/tracker#790).
      */
     private fun ensureAttached(context: Context?) {
         if (context != null && !attached.get()) attach(context)
@@ -225,7 +225,7 @@ object PluginJobsCenter {
 
     /**
      * Waits until the saved jobs are back in the live list ([attach]), so a caller that looks for a row an earlier run
-     * of droidtop left finds it (a background service's earlier failed rows, Droidtop/tracker#790).
+     * of droidtop left finds it (a background service's earlier failed rows, mytop-project/tracker#790).
      */
     suspend fun awaitRestored() = restoredOnce.await()
 
@@ -234,7 +234,7 @@ object PluginJobsCenter {
         // Once per process. A second attach read the saved list back again and put every job cleared since the first
         // back on it: on the rig the log said "restored 74 saved jobs", then a background service's clearing took 25
         // rows off, then "restored 73 saved jobs" again ten seconds later and the 25 were back (AVD dev.3369,
-        // Droidtop/tracker#790).
+        // mytop-project/tracker#790).
         if (!attached.compareAndSet(false, true)) {
             android.util.Log.w("droidtop.jobs", "attach asked again; the saved jobs are restored once per process", Throwable("second attach"))
             return
@@ -245,10 +245,10 @@ object PluginJobsCenter {
             val prefs = app.pluginJobsStore.data.first()
             val saved = decodeEntries(prefs[persistedKey].orEmpty())
             // A finished job already in history was archived just before droidtop stopped, while the live list's write
-            // was still waiting: it stays in history only, never in both (Droidtop/tracker#940).
+            // was still waiting: it stays in history only, never in both (mytop-project/tracker#940).
             val archived = runCatching { JobHistory.has(app, saved.filter { it.done }.map { it.jobId }) }.getOrDefault(emptySet())
             restore(saved.filter { it.jobId !in archived })
-            // How many came back, so a row that returns after it was cleared can be traced (Droidtop/tracker#790).
+            // How many came back, so a row that returns after it was cleared can be traced (mytop-project/tracker#790).
             android.util.Log.i("droidtop.jobs", "restored ${saved.size - archived.size} saved jobs (${archived.size} already in history); the list holds ${state.value.size}")
             restoredOnce.complete(Unit)
             runCatching { onRestored() }
@@ -268,7 +268,7 @@ object PluginJobsCenter {
      * Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. A job that
      * cannot be paused comes back ended ([stoppedByRestart]): paused, it had no Resume, and whoever asked for its kind
      * again joined it and waited for ever. That was the update check after a self-update, so Check now did nothing
-     * (Droidtop/tracker#837, console dev.2758: "PAUSED (1): Check for updates").
+     * (mytop-project/tracker#837, console dev.2758: "PAUSED (1): Check for updates").
      */
     internal fun restore(restored: List<Entry>) {
         val now = System.currentTimeMillis()
@@ -314,7 +314,7 @@ object PluginJobsCenter {
             val list = state.value
             val snapshot = encodeEntries(list)
             context.pluginJobsStore.edit { it[persistedKey] = snapshot }
-            // Each change of how many jobs are saved, once (Droidtop/tracker#790: cleared rows came back after a restart).
+            // Each change of how many jobs are saved, once (mytop-project/tracker#790: cleared rows came back after a restart).
             if (list.size != lastSavedCount) {
                 lastSavedCount = list.size
                 android.util.Log.i("droidtop.jobs", "saved ${list.size} jobs")
@@ -447,7 +447,7 @@ object PluginJobsCenter {
 
     /**
      * Runs a plugin's job as one step of a job droidtop already shows (a download whose source is asked first,
-     * Droidtop/tracker#354: "the actual task sits on the other side of" the download queue): it has no row of its own,
+     * mytop-project/tracker#354: "the actual task sits on the other side of" the download queue): it has no row of its own,
      * its progress goes to [onProgress] for the outer job to say, and it ends with that job. A cancelled caller (the
      * outer job cancelled or paused) asks the plugin to stop. Returns the plugin's result.
      */
@@ -584,7 +584,7 @@ object PluginJobsCenter {
     }
 
     /**
-     * When each running native job last reported (Droidtop/tracker#842): a run that says nothing for [stallMs] has stopped
+     * When each running native job last reported (mytop-project/tracker#842): a run that says nothing for [stallMs] has stopped
      * making progress (a step waiting on something that will not come back), and is ended with a plain reason and Retry
      * instead of staying "current" for hours.
      */
@@ -616,7 +616,7 @@ object PluginJobsCenter {
     }
 
     /**
-     * Writes the jobs list now, not within [PERSIST_INTERVAL_MS] (Droidtop/tracker#842): before droidtop installs its own
+     * Writes the jobs list now, not within [PERSIST_INTERVAL_MS] (mytop-project/tracker#842): before droidtop installs its own
      * update, so the restart finds every running job with its last checkpoint and runs it again from there.
      */
     suspend fun flushNow() {
@@ -666,7 +666,7 @@ object PluginJobsCenter {
                             }
                         }
                     }
-                    // A run that reports nothing for [stallMs] is stopped (Droidtop/tracker#842), so nothing stays
+                    // A run that reports nothing for [stallMs] is stopped (mytop-project/tracker#842), so nothing stays
                     // "current" with no work behind it.
                     var stalled = false
                     val watch = launch {
@@ -737,7 +737,7 @@ object PluginJobsCenter {
         }
         // The job's handle is in its context, so a download it runs reports its bytes to its row like any job's
         // (DownloadJobs.TransferNumbers reads JobHandle.current()); without it a plugin's download had no numbers
-        // (Droidtop/tracker#877).
+        // (mytop-project/tracker#877).
         brokeredJobs[jobId] = brokeredScope.launch(JobHandle(jobId)) {
             val reply = try {
                 block(jobId)
@@ -854,7 +854,7 @@ object PluginJobsCenter {
 
     /**
      * Keeps the newest [FINISHED_KEPT] finished jobs in the live list. The rest move to [JobHistory], one row each, instead
-     * of being forgotten (Droidtop/tracker#940).
+     * of being forgotten (mytop-project/tracker#940).
      */
     private fun prune() {
         var dropped: List<Entry> = emptyList()
@@ -903,7 +903,7 @@ object PluginJobsCenter {
     fun wasCleared(jobId: String): Boolean = jobId in clearedIds
 
     /**
-     * A plugin job's last line (Droidtop/tracker#790): "Done", or its failure as one plain sentence ([JobFailureLine]) with
+     * A plugin job's last line (mytop-project/tracker#790): "Done", or its failure as one plain sentence ([JobFailureLine]) with
      * a runtime's own words kept as the report's Details, never as the line.
      */
     private fun ended(entry: Entry, result: PluginResult): Entry {
@@ -921,7 +921,7 @@ object PluginJobsCenter {
 
     /**
      * Offers Retry on [jobId], a finished plugin job: [again] starts its work afresh (a plugin service is started again,
-     * Droidtop/tracker#790), and the row gives way to the new run. Nothing when the job is gone or still running.
+     * mytop-project/tracker#790), and the row gives way to the new run. Nothing when the job is gone or still running.
      */
     fun offerRetry(jobId: String, again: () -> Unit) {
         val entry = find(jobId) ?: return
@@ -936,7 +936,7 @@ object PluginJobsCenter {
     private val insteadHandlers = ConcurrentHashMap<String, Instead>()
 
     /**
-     * Offers [instead] on [jobId], beside Retry and Clear: another way to get what the job did not (Droidtop/tracker#862,
+     * Offers [instead] on [jobId], beside Retry and Clear: another way to get what the job did not (mytop-project/tracker#862,
      * the owner: "If it can't find it, it should still let the user load the thread manually to override it"). It stays
      * offered as long as the row is, and goes with Clear.
      */

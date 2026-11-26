@@ -29,7 +29,7 @@ object ComputerLibrary {
 
     /**
      * A title as every device keys a game without a store id: `title2:` and its Lutris slug ([TitleKeys.slug];
-     * Droidtop/tracker#870, owner 2026-11-05: "letters and digits only, but with space-to-hyphen conversion. Lutris's
+     * mytop-project/tracker#870, owner 2026-11-05: "letters and digits only, but with space-to-hyphen conversion. Lutris's
      * standard"). "Being a DIK" is `title2:being-a-dik`.
      */
     fun titleKey(title: String): String = TITLE2 + dev.droidtop.library.TitleKeys.slug(title)
@@ -66,7 +66,7 @@ object ComputerLibrary {
 
     /**
      * The person's own organization of a game that travels with it, by the
-     * agent's field names (docs/SPEC.md 7o, "Library"; Droidtop/tracker#469
+     * agent's field names (docs/SPEC.md 7o, "Library"; mytop-project/tracker#469
      * part 1). Newest change wins per field on every device. Per-device
      * choices (emulator, launch screen, "broken", media paths) stay here.
      */
@@ -292,7 +292,7 @@ object ComputerLibrary {
     data class PlayElsewhere(val device: String, val seconds: Long, val lastPlayedMs: Long)
 
     /**
-     * The game [key]'s play time on the person's other devices (Droidtop/tracker#469: play time over every device), from
+     * The game [key]'s play time on the person's other devices (mytop-project/tracker#469: play time over every device), from
      * the agent core's library ([me] is this device's id). Reads a file: never on the main thread.
      */
     fun playElsewhere(context: Context, key: String, me: String?): List<PlayElsewhere> {

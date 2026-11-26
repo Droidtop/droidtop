@@ -3,7 +3,7 @@ package dev.droidtop.input.chinese
 import java.security.MessageDigest
 
 /**
- * rime-data-luna.files.sha256 (Droidtop/tracker#903 H8b): every file the data's archive unpacks to and its SHA-256, in
+ * rime-data-luna.files.sha256 (mytop-project/tracker#903 H8b): every file the data's archive unpacks to and its SHA-256, in
  * sha256sum's format ("<hash>  shared/build/luna_pinyin.table.bin"), as rime-engine.yml publishes it beside the archive.
  * The module carries a copy (input-chinese/rime-data-luna.files.sha256, handed over as BuildConfig.RIME_DATA_FILES),
  * and the pin names that copy's own SHA-256, so neither can change without the other. Pure.

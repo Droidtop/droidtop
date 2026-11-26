@@ -58,7 +58,7 @@ target_compile_definitions(droidtop_sqlite PUBLIC
 target_compile_options(droidtop_sqlite PRIVATE -fvisibility=hidden)
 set_property(TARGET droidtop_sqlite PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-# The sandbox library droidtop shares with Enginehost (bi0shacker001/sandbox, Droidtop/tracker#470), pinned as a
+# The sandbox library droidtop shares with Enginehost (bi0shacker001/sandbox, mytop-project/tracker#470), pinned as a
 # submodule; only its static library is built here.
 set(SBX_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/sandbox ${CMAKE_CURRENT_BINARY_DIR}/sandbox)

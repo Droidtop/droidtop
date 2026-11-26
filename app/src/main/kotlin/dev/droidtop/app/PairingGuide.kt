@@ -26,7 +26,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * The floating pairing guide (DroidDeck's Settings guide, Droidtop/tracker#363; the pairing is #816's). Wireless
+ * The floating pairing guide (DroidDeck's Settings guide, mytop-project/tracker#363; the pairing is #816's). Wireless
  * debugging's code shows in Settings and goes when Settings leaves the screen, so the code is typed somewhere that
  * floats over it. The notification's reply ([WirelessPairing]) does that on a phone, but a pad cannot reach the
  * notification shade. This small window over Settings can: it says the steps, and while the person moves through

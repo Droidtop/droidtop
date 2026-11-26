@@ -23,7 +23,7 @@ fun hasGamePage(entry: LibraryEntry): Boolean = entry.isPcOrEngineGame || entry.
 
 /**
  * A game's page outside the Gaming shell, the one Gaming opens (docs/SPEC.md 7j "Places in every mode",
- * Droidtop/tracker#349): a PC or engine game's page and menu ([PcGameStandalone]), or a console game's
+ * mytop-project/tracker#349): a PC or engine game's page and menu ([PcGameStandalone]), or a console game's
  * detail, the same screen Gaming's Info opens, in a window of its own. Standard's Games grid and Desktop's
  * Start menu host it, so a console game can be scraped, edited, have its media viewed or be put in a
  * collection from every mode, not only played. [onClose] runs when the page closes, or when the library

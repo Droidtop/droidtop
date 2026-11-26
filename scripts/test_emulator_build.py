@@ -1,4 +1,4 @@
-"""Which android-build run the emulator tests take: the same commit's, never another's (Droidtop/tracker#735).
+"""Which android-build run the emulator tests take: the same commit's, never another's (mytop-project/tracker#735).
 
 Run: python3 -m unittest discover -s scripts -p 'test_emulator_build.py'
 """

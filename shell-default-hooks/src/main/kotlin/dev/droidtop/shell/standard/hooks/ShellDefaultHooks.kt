@@ -47,7 +47,7 @@ import dev.droidtop.ui.shared.MenuViews
 import com.android.launcher3.R as LauncherR
 
 /**
- * Installs droidtop's implementations of the Murine launcher's hooks (app.murinelauncher.hooks, Droidtop/tracker#921
+ * Installs droidtop's implementations of the Murine launcher's hooks (app.murinelauncher.hooks, mytop-project/tracker#921
  * item 2). Called once from DroidtopApplication.onCreate before LauncherApplication's own start, so the launcher's start
  * (its light or dark, ThemeOverride) already reads droidtop's. It only sets references, so it is safe in every process.
  */
@@ -95,7 +95,7 @@ object ShellDefaultHooks {
         override fun performGlobalAction(action: Int) = AccessibilityHost.performGlobalAction(action)
 
         /**
-         * droidtop's one accessibility service (Droidtop/tracker#740), turned on the one way: elevated access when
+         * droidtop's one accessibility service (mytop-project/tracker#740), turned on the one way: elevated access when
          * droidtop has it, else Android's accessibility page. Turning it on may wait on the privileged service, so it
          * runs off the main thread.
          */
@@ -108,10 +108,10 @@ object ShellDefaultHooks {
 
     /**
      * droidtop's menus: the launcher's small menus are the one anchored menu, in the colours outside Gaming
-     * (MenuViews, docs/SPEC.md 7k, Droidtop/tracker#827). The home screen's long-press menu gets the library's games
+     * (MenuViews, docs/SPEC.md 7k, mytop-project/tracker#827). The home screen's long-press menu gets the library's games
      * grid, the Quick Menu (the sheet Gaming's R2 opens), the companion while the device has no second screen to hold
      * it (docs/SPEC.md "The companion's tabs", One screen), then plugins' entries (docs/plugin-api.md 1.9); an app's
-     * long-press menu gets "Plugin actions" (Droidtop/tracker#67). Plugins' entries are answered from memory
+     * long-press menu gets "Plugin actions" (mytop-project/tracker#67). Plugins' entries are answered from memory
      * (PluginShellHooks) and kept here by id until the next menu asks, since the menu runs one by its id.
      */
     private object DroidtopMenus : MenuHooks {
@@ -154,8 +154,8 @@ object ShellDefaultHooks {
 
     /**
      * droidtop's work around the Standard home: as it shows, its own icon asked for at the end of setup is placed
-     * (HomeRolePrefs), its in-place hint shows until done (HomeHints, Droidtop/tracker#829) and the pad's hint row is
-     * laid out (StandardPadHints, Droidtop/tracker#699); keys and touches tell that row which input is in use; a long
+     * (HomeRolePrefs), its in-place hint shows until done (HomeHints, mytop-project/tracker#829) and the pad's hint row is
+     * laid out (StandardPadHints, mytop-project/tracker#699); keys and touches tell that row which input is in use; a long
      * Back opens the mode menu (BackButtonMenu).
      */
     private object DroidtopHome : HomeHooks {
@@ -180,8 +180,8 @@ object ShellDefaultHooks {
      * screen; it was only that action once, and the rig found no way back to Modes after turning Gaming off,
      * dq-coordinator-23 F5), the places a person can reach in this UI mode (Standard has no left menu, docs/SPEC.md
      * 7j "Places in every mode"; none in Kiosk and Kid), and Desktop's and Gaming's settings. The launcher's Home
-     * screen row opens Global settings, where "droidtop is your home screen" is (Droidtop/tracker#571 row 11); its
-     * import row opens the Nova and Apex import (Droidtop/tracker#564); droidtop has the taskbar (StandardTaskbar).
+     * screen row opens Global settings, where "droidtop is your home screen" is (mytop-project/tracker#571 row 11); its
+     * import row opens the Nova and Apex import (mytop-project/tracker#564); droidtop has the taskbar (StandardTaskbar).
      */
     private object DroidtopSettings : SettingsHooks {
         private const val PLACE = "place:"
@@ -236,7 +236,7 @@ object ShellDefaultHooks {
     }
 
     /**
-     * droidtop's one Appearance setting (AppearancePrefs, Settings > Appearance; docs/SPEC.md 7k, Droidtop/tracker#560)
+     * droidtop's one Appearance setting (AppearancePrefs, Settings > Appearance; docs/SPEC.md 7k, mytop-project/tracker#560)
      * is the launcher's light or dark, so the home screen never disagrees with droidtop's other screens.
      */
     private object DroidtopTheme : ThemeHooks {

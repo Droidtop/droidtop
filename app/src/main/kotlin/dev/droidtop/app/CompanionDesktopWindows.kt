@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The Linux desktop's own windows on the companion's Apps tab while a desktop session runs (docs/SPEC.md "The
- * companion's tabs", Apps; Droidtop/tracker#425): each window with Raise or Restore, Minimize and Close, the same
+ * companion's tabs", Apps; mytop-project/tracker#425): each window with Raise or Restore, Minimize and Close, the same
  * actions as Desktop's taskbar ([dev.droidtop.hostbridge.DesktopWindows], the bridge's close request), so the two
  * never disagree. Nothing is drawn without a session.
  */

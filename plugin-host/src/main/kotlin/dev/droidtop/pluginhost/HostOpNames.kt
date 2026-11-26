@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 /**
- * Host op names (docs/plugin-api.md 3 "Naming", Droidtop/tracker#459; owner, 2026-10-10: "make API call names simple
+ * Host op names (docs/plugin-api.md 3 "Naming", mytop-project/tracker#459; owner, 2026-10-10: "make API call names simple
  * and descriptive ... the name should match it"). A call is `<area>.<verb>` or `<area>.<verb>_<object>`; a read-only
  * call starts with a read verb ([READ_VERBS]). The names droidtop served before contract 2.1 are deprecated aliases
  * for one release ([DEPRECATED]): a plugin calling one is answered as if it had used the new name. [check] is the

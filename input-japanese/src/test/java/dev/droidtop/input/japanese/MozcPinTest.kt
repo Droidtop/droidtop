@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Droidtop/tracker#903 H7c: the pin the build and the dictionary download share. */
+/** mytop-project/tracker#903 H7c: the pin the build and the dictionary download share. */
 class MozcPinTest {
     private val good = """
         # a comment
@@ -24,7 +24,7 @@ class MozcPinTest {
         assertEquals("a3b81db2ddbd5cccf8d14b182f9bc0940471b2d9e6a8c78abd94236bd5b5d620", pin.dataGzSha256)
         assertEquals(19_001_738L, pin.dataSize)
         assertEquals("7a47a2b3958baeb0796345aec2c3f380b1d783d6fa399c8a0c358a197bee6046", pin.dataSha256)
-        assertEquals("https://github.com/Droidtop/droidtop/releases/download/mozc-engine-3.35.6354/mozc.data.gz", pin.dataUrl)
+        assertEquals("https://github.com/mytop-project/droidtop/releases/download/mozc-engine-3.35.6354/mozc.data.gz", pin.dataUrl)
     }
 
     @Test fun `the module's own pin parses and names the dictionary H7b released`() {

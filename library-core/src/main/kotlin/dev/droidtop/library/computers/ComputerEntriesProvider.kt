@@ -75,7 +75,7 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
     /**
      * Nothing here runs it: it is on the computer (docs/SPEC.md 7o, "Starting
      * a game on a computer"). Opening a computer's game streams it from that
-     * computer ([ComputerLaunch.stream], Droidtop/tracker#860): its agent starts
+     * computer ([ComputerLaunch.stream], mytop-project/tracker#860): its agent starts
      * the game, Steam's or the program hosting it's (Pythia), and droidtop's stream
      * screen (windowcast's library) opens at its window. An application opens the
      * same stream screen on its computer, at a window named like it (7a).
@@ -99,7 +99,7 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
             computer != null && entry.kind == LibraryEntryKind.REMOTE_STREAM ->
                 ComputerLaunch.openWindowcast(context, computer, null, entry.title, "${entry.title} is installed on $name; its window is shown if it is open there.", entry.id)
             computer == null || entry.kind != LibraryEntryKind.COMPUTER_GAME -> "${entry.title} is installed on $name, not on this device"
-            // Opening a computer's game streams it from there (Droidtop/tracker#860): Steam's too, through windowcast.
+            // Opening a computer's game streams it from there (mytop-project/tracker#860): Steam's too, through windowcast.
             else -> ComputerLaunch.stream(context, computer, key, entry.title, entry.id)
         }
     }

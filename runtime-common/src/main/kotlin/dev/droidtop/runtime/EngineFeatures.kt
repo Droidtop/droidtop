@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * The kernel features droidtop's container engine uses when a device has them (docs/SPEC.md 3, "Kernel features,
- * detected at runtime"; Droidtop/tracker#555 D10). Detected on each device, never assumed at build time: the RP5 has
+ * detected at runtime"; mytop-project/tracker#555 D10). Detected on each device, never assumed at build time: the RP5 has
  * none of them, a rooted phone may have all.
  */
 @Serializable

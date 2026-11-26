@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * "Switch keyboard" (docs/SPEC.md 6a, Droidtop/tracker#717): one code that moves to the next keyboard enabled on the
+ * "Switch keyboard" (docs/SPEC.md 6a, mytop-project/tracker#717): one code that moves to the next keyboard enabled on the
  * device, so someone typing a second language in another keyboard does not go through Settings. A long press on the
  * space bar sends it, the place other keyboards keep it; a layout may also carry it as a key of its own. It addresses
  * the keyboard, not the text, so it never reaches a container (HackersKeyCodes drops it).

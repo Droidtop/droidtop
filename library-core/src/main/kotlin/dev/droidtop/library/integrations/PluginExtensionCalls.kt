@@ -179,7 +179,7 @@ object PluginContextActions {
     }
 
     /**
-     * The actions plugins offer on one game or app, as a page (Droidtop/tracker#67): what Standard's long-press app menu
+     * The actions plugins offer on one game or app, as a page (mytop-project/tracker#67): what Standard's long-press app menu
      * and Desktop's Start menu open from their "Plugin actions" row, in [mode] at [place]. Which actions apply is read
      * from manifests and `enabled` asked when the page opens, off the main thread; each action is a row that runs it and
      * says what came of it, and a reply's view opens through [onReplyScreen].
@@ -303,7 +303,7 @@ object PluginMetadataSources {
         /**
          * Every candidate each source offers for [facts], for the person to pick from ("Choose match"). A candidate with
          * no name, or only its id for one ("Thread 214581"), is named by the source's `fetch` (docs/plugin-api.md 1.11,
-         * Droidtop/tracker#784), at most [MAX_NAMED] per source; one still unnamed stays untitled, and the picker says so.
+         * mytop-project/tracker#784), at most [MAX_NAMED] per source; one still unnamed stays untitled, and the picker says so.
          */
         suspend fun candidates(
             facts: JSONObject,
@@ -480,7 +480,7 @@ object PluginTiles {
  * (docs/SPEC.md 7g, "Getting an update").
  */
 class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources {
-    /** Where a failed job's Open thread runs: it outlives the jobs page that was pressed (Droidtop/tracker#862). */
+    /** Where a failed job's Open thread runs: it outlives the jobs page that was pressed (mytop-project/tracker#862). */
     private val threadScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
 
     private val app = context.applicationContext
@@ -543,7 +543,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         return (0 until minOf(rows.length(), MAX_CANDIDATES)).mapNotNull { rows.optJSONObject(it)?.let(::found) }
     }
 
-    // The last page each source gave for a record (Droidtop/tracker#599): shown at once, and its links are the ones
+    // The last page each source gave for a record (mytop-project/tracker#599): shown at once, and its links are the ones
     // the person picks from.
     private val records = RecordCache(java.io.File(app.filesDir, "source-records"))
 
@@ -640,7 +640,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
         onStatus("Opening the link from $label")
-        // The link the record gave, opened out of sight first (Droidtop/tracker#783): a host droidtop serves takes it with
+        // The link the record gave, opened out of sight first (mytop-project/tracker#783): a host droidtop serves takes it with
         // no page shown, and a page the person must act on opens for them (#599). A link the page says has expired is asked
         // of the source again, from its thread, once. A link that no longer works starts nothing, so the record's own page
         // opens next for the person to pick again.
@@ -657,7 +657,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             Log.w(TAG, "update $source/$externalId: the web view started no download from ${dev.droidtop.pluginhost.NetScope.hostOf(url)}")
             return dev.droidtop.library.DownloadPick.NOTHING_STARTED
         }
-        // Where it lands is worked out once the page started something (Droidtop/tracker#859): a page opened only to read
+        // Where it lands is worked out once the page started something (mytop-project/tracker#859): a page opened only to read
         // (View thread on a game that is up to date) never fails for a folder it was never going to make.
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         val descriptors = UpdateLinks.descriptorsFor(captured)
@@ -672,7 +672,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     }
 
     /**
-     * The address [source]'s record [externalId] gives now for the mirror whose address was [expired] (Droidtop/tracker#783):
+     * The address [source]'s record [externalId] gives now for the mirror whose address was [expired] (mytop-project/tracker#783):
      * the mirror is found in droidtop's saved copy of the record by that address, and the same mirror in the record asked
      * again ([RecordMirrors.sameIn]). Null when the record cannot be asked or no longer lists it.
      */
@@ -732,10 +732,10 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
         val title = "Download $name"
-        // A job that failed has nothing to place: its row offers Open thread, the person's way past it (Droidtop/tracker#862).
+        // A job that failed has nothing to place: its row offers Open thread, the person's way past it (mytop-project/tracker#862).
         val offer: (String) -> Unit = { jobId -> offerThread(jobId, source, externalId, label, version, gameName, newest) }
         val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus, onFailed = offer)
-        // A job that failed or named no file started nothing: the pick tries the next mirror (Droidtop/tracker#862).
+        // A job that failed or named no file started nothing: the pick tries the next mirror (mytop-project/tracker#862).
         if (!result.ok) {
             Log.w(TAG, "update $source/$externalId: the source's download job for $link failed: ${result.error}")
             return dev.droidtop.library.DownloadPick.broughtNothing("${record.manifest.label}: ${result.error ?: "the download did not start"}")
@@ -750,7 +750,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     }
 
     /**
-     * Open thread on [jobId], a source's download job that got no file (Droidtop/tracker#862; the owner: "If it can't
+     * Open thread on [jobId], a source's download job that got no file (mytop-project/tracker#862; the owner: "If it can't
      * find it, it should still let the user load the thread manually to override it"): the record's page opens in
      * droidtop's web view with the source's session ([openThread]), and whatever the person starts there is placed as
      * this game's update. Nothing when droidtop holds no page for the record.
@@ -782,7 +782,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     /**
      * The record's own page ([source]'s thread for [externalId]) in droidtop's web view with the source's session; what
      * the person starts there is placed as the update of the game whose newest version is [newest], as a picked link's
-     * download is ([openDownload]). Droidtop/tracker#862: the person's override when droidtop cannot get a file itself.
+     * download is ([openDownload]). mytop-project/tracker#862: the person's override when droidtop cannot get a file itself.
      */
     override suspend fun openThread(
         source: String,
@@ -860,7 +860,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
          * A record's page, asked for by the person (the record page, a Download's current link): long enough for a site's
          * browser check to pass by itself in droidtop's hidden view ([dev.droidtop.pluginhost.WebFetch.SETTLE_MS]) after
          * the plugin has loaded, which [QUICK_BUDGET_MS] was not: on the console the check had about 13 s
-         * (Droidtop/tracker#783). The page says "Asking <source>..." meanwhile.
+         * (mytop-project/tracker#783). The page says "Asking <source>..." meanwhile.
          */
         const val RECORD_BUDGET_MS = 45_000L
 
@@ -881,11 +881,11 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                 if (row.isNull(name)) null else row.optString(name).trim().takeIf { it.isNotEmpty() }?.take(max)
             val id = text("id") ?: askedId
             if (id != askedId) return null
-            // Each mirror once, whatever systems it covers (Droidtop/tracker#838), as for a contract 3 record.
+            // Each mirror once, whatever systems it covers (mytop-project/tracker#838), as for a contract 3 record.
             val downloads = row.optJSONArray("downloads")?.let { array ->
                 (0 until minOf(array.length(), MAX_DOWNLOADS)).mapNotNull { i ->
                     val d = array.optJSONObject(i) ?: return@mapNotNull null
-                    // A download is the address droidtop opens itself (Droidtop/tracker#599), the source's token, or both.
+                    // A download is the address droidtop opens itself (mytop-project/tracker#599), the source's token, or both.
                     val url = d.optString("url").trim().takeIf { it.startsWith("https://") && it.length <= MAX_LINK }
                     val link = d.optString("link").takeIf { it.isNotBlank() && it.length <= MAX_LINK }
                     if (url == null && link == null) return@mapNotNull null

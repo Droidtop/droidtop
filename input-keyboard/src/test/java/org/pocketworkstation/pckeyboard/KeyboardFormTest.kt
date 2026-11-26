@@ -7,7 +7,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** One-handed and split as pure geometry (Droidtop/tracker#342). */
+/** One-handed and split as pure geometry (mytop-project/tracker#342). */
 class KeyboardFormTest {
     // Four keys of 250 in a row of 1000, the last two a space bar straddling nothing: x 0, 250, 500, 750.
     private fun row() = Triple(intArrayOf(0, 250, 500, 750), intArrayOf(250, 250, 250, 250), intArrayOf(0, 0, 0, 0))
@@ -71,7 +71,7 @@ class KeyboardFormTest {
         assertEquals(listOf("split", "left", "right", "full"), seen)
     }
 
-    // Droidtop/tracker#903 H1: one shape per orientation, split by default in landscape on a handheld.
+    // mytop-project/tracker#903 H1: one shape per orientation, split by default in landscape on a handheld.
 
     @Test fun landscapeOnAHandheldIsSplitUntilSomethingIsChosen() {
         assertSame(KeyboardForm.SPLIT, KeyboardForm.choose(null, null, landscape = true, handheld = true))
@@ -109,7 +109,7 @@ class KeyboardFormTest {
         assertNull(KeyboardForm.carriedToLandscape("nonsense", landscapeSet = false))
     }
 
-    // Droidtop/tracker#903 H12c: the thumb split and the floating height.
+    // mytop-project/tracker#903 H12c: the thumb split and the floating height.
 
     @Test fun aWideScreenGetsAThumbSplitWithTheHalvesAtTheEdges() {
         // A 10 inch wide tablet, 2560 px at 256 dpi: halves of 3 inches, a 40% gap.

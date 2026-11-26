@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The content picker's pure rules (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313). */
+/** The content picker's pure rules (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313). */
 class StoreContentTest {
     private fun branch(id: String, locked: Boolean = false, unlocked: Boolean = false, selected: Boolean = false) =
         StoreBranch(id, id, locked, unlocked, build = null, updatedMs = null, selected = selected)

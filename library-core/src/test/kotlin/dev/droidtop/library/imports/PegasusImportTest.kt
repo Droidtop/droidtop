@@ -3,7 +3,7 @@ package dev.droidtop.library.imports
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Reading Pegasus's collections and favourites for an import (Droidtop/tracker#724). */
+/** Reading Pegasus's collections and favourites for an import (mytop-project/tracker#724). */
 class PegasusImportTest {
     @Test
     fun `collections gather their own files and their games' files`() {

@@ -73,7 +73,7 @@ suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under:
 /**
  * How far to scroll so an item laid out at [itemStart], [itemSize] long, is in the room from [roomStart] to
  * [roomEnd], by as little as it takes; null when it already is. Positive scrolls forward. An item longer than the
- * room shows its start, so moving inside it never scrolls (Droidtop/tracker#616: Home's first row, taller than the
+ * room shows its start, so moving inside it never scrolls (mytop-project/tracker#616: Home's first row, taller than the
  * screen, scrolled down to its end and back up to its start on every left or right). Pure, for the tests.
  */
 fun inViewDelta(itemStart: Int, itemSize: Int, roomStart: Int, roomEnd: Int): Float? {
@@ -160,7 +160,7 @@ suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = false) {
 
 /**
  * Keeps the hero card of a row whose cursor card widens (Home's first shelf, docs/SPEC.md 7i "Home art") in view the
- * way Steam's home row does (owner, 2026-11-15, Droidtop/tracker#632: "steam scrolling for that doesn't actually move
+ * way Steam's home row does (owner, 2026-11-15, mytop-project/tracker#632: "steam scrolling for that doesn't actually move
  * the items much. When you snap off a card, it shrinks, and when you snap onto a card, it grows. Part of the movement
  * velocity is provided by the resize"). The row is not centred: it scrolls only when the grown card would leave the
  * visible span, and then just far enough, worked out from the widths the cards end at ([cardPx] for every card,

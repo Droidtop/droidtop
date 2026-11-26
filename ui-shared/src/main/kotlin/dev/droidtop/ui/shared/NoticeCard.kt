@@ -50,7 +50,7 @@ import dev.droidtop.library.settings.NoticePress
 import dev.droidtop.library.settings.NoticeTone
 
 /**
- * The one notice card (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485):
+ * The one notice card (docs/SPEC.md 7k, "Notices"; mytop-project/tracker#485):
  * a plate in the tone's colour with a [EDGE] bar of its ink on the leading
  * edge, the tone's glyph, the title (and "from <plugin>" for a plugin's
  * notice), the body, and either the action as a chip or a chevron when there
@@ -79,7 +79,7 @@ fun NoticeCard(
     val on = palette.on(tone)
     val shape = RoundedCornerShape(if (placement == NoticePlacement.Page) PAGE_CORNER else ROW_CORNER)
     val density = LocalDensity.current
-    // Motion's switch: Android's Remove animations makes it a snap (Droidtop/tracker#643). Compose scales the tween itself.
+    // Motion's switch: Android's Remove animations makes it a snap (mytop-project/tracker#643). Compose scales the tween itself.
     val appear = remember { Animatable(if (Motion.enabled) 0f else 1f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, Motion.tw(FADE_MS)) }
     val press = notice.aPress()

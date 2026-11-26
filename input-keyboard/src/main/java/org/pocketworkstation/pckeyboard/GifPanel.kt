@@ -1,6 +1,6 @@
 /*
  * The emoji panel's GIFs and Stickers tabs and their search (docs/SPEC.md 6a, "GIFs and stickers",
- * Droidtop/tracker#903 H5). The grid of first-frame thumbnails, recently used first, follows CleverKeys' GifGridManager
+ * mytop-project/tracker#903 H5). The grid of first-frame thumbnails, recently used first, follows CleverKeys' GifGridManager
  * (https://github.com/tribixbite/CleverKeys at c8cbb74b, GPL-3.0, Copyright (C) tribixbite and contributors), drawn
  * with the panel's own plain views instead of a RecyclerView and an image loader.
  */

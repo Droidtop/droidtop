@@ -59,13 +59,13 @@ object PluginBundleInstaller {
         /**
          * Whether a key is the person's confirmed successor of another for an origin ([UserOriginKeys.succeeds]):
          * (origin, approved key SHA-256, verified key SHA-256). An approved plugin signed by its old key's successor
-         * carries over like a same-key update (Droidtop/tracker#270). Never by default.
+         * carries over like a same-key update (mytop-project/tracker#270). Never by default.
          */
         succeeds: (String, String, String) -> Boolean = { _, _, _ -> false },
     ): PluginInstallResult {
         // Entries are streamed to a staging folder on disk and hashed as they go: a bundle carrying both ABIs of an
         // engine is tens of MiB, and several installs run at once (Update all), so none of it is held in the heap
-        // (Droidtop/tracker#545). Only the small trust files are read into memory, each under its cap.
+        // (mytop-project/tracker#545). Only the small trust files are read into memory, each under its cap.
         val staging = File(pluginsRoot.absoluteFile.parentFile ?: pluginsRoot, ".plugin-install-" + System.nanoTime()).also { it.mkdirs() }
         try {
             return installStaged(bundleFile, pluginsRoot, staging, userKeys, hostPermissions, succeeds)
@@ -90,7 +90,7 @@ object PluginBundleInstaller {
         try {
             var count = 0
             val buffer = ByteArray(64 * 1024)
-            // BundleTar (vendor/lib-net, :trust) refuses a path that could leave the plugin's own directory, a link or
+            // BundleTar (vendor/mytop-net, :trust) refuses a path that could leave the plugin's own directory, a link or
             // special file, a path that appears twice, an entry over the per-file cap and an xz stream that asks for too much
             // memory, before an entry reaches this code.
             BundleTar.read(bundleFile, BundleTar.Limits(maxEntryBytes = MAX_ENTRY_BYTES, pathChars = BundleTar.PERMISSIVE_PATH_CHARS)) { entry ->
@@ -267,7 +267,7 @@ object PluginBundleInstaller {
             },
         )
         writeRecord(pluginsRoot, record)
-        // Other bytes than the installed ones: any process still running the old code lets go of it (Droidtop/tracker#539).
+        // Other bytes than the installed ones: any process still running the old code lets go of it (mytop-project/tracker#539).
         // After the switch, so a load in between cannot pick the old version up again.
         if (existingState != null && existingState.archiveDigest != digest) {
             runCatching { PluginProcesses.retire(manifest.id) }
@@ -296,7 +296,7 @@ object PluginBundleInstaller {
      */
     /**
      * Whether an installed plugin whose signature no longer verifies under its origin's current key stays valid because
-     * it was approved under a key that key superseded (Droidtop/tracker#887): the key is in the origin's
+     * it was approved under a key that key superseded (mytop-project/tracker#887): the key is in the origin's
      * [UserOriginKey.previous] and its sunset has not passed on this device's clock, and neither it nor any certificate
      * of the plugin's chain is revoked. Its bytes on disk are still the ones verified at install: the manifest's digest
      * and every payload file are checked against the record as before, so nothing changed since.

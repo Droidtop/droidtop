@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard;
 import java.util.List;
 
 /**
- * Hacker's Latin path as LatinIME had it before the engine seam (Droidtop/tracker#903 H6), copied here word for word so
+ * Hacker's Latin path as LatinIME had it before the engine seam (mytop-project/tracker#903 H6), copied here word for word so
  * LatinEngineTest runs it beside {@link LatinEngine}: only LatinIME's fields became parameters and mSuggest the
  * {@link LatinEngine.Lexicon} it now is. Each method names the LatinIME method it was.
  */

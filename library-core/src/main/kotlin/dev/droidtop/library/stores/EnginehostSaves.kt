@@ -6,7 +6,7 @@ import java.io.File
 
 /**
  * Cloud saves for a store game that Enginehost runs (docs/SPEC.md 7g, "Stores", "A game Enginehost runs";
- * Droidtop/tracker#580). droidtop owns the save folder: each such game gets a folder of its own in shared storage,
+ * mytop-project/tracker#580). droidtop owns the save folder: each such game gets a folder of its own in shared storage,
  * shaped like a Wine prefix ([prefixFor]: `drive_c/users/<user>/...`), so a store's sync writes into it exactly as it
  * writes into a real prefix and needs no second mapping. The launch hands Enginehost [saveRoot] as the inline
  * `saveRoot` key: the folder in it that directly holds the game's save files, as the store's cloud names it
@@ -107,7 +107,7 @@ object EnginehostSaves {
      * synced folder is known yet, that folder is kept and the next launch brings its saves in.
      *
      * [adoptOther] says the report came from Enginehost itself (its app interface plugin's broker call,
-     * `saves.changed`), not from a broadcast any app can send (Droidtop/tracker#550 build review): only then is a folder
+     * `saves.changed`), not from a broadcast any app can send (mytop-project/tracker#550 build review): only then is a folder
      * other than the one droidtop passed copied from, so a forged report cannot put a folder's files into a synced
      * game's saves. A report that names the passed folder only asks for its upload, which is harmless from anyone.
      */
@@ -153,7 +153,7 @@ object EnginehostSaves {
     /**
      * A report naming [reported] after droidtop passed [passed]: the passed folder is an upload from anyone; any other
      * folder may be copied from only when the report is Enginehost's own ([fromEnginehost], its broker call), never a
-     * broadcast's (Droidtop/tracker#550). Pure but for the paths it builds.
+     * broadcast's (mytop-project/tracker#550). Pure but for the paths it builds.
      */
     internal fun reportTrust(passed: String?, reported: String?, fromEnginehost: Boolean): ReportTrust = when {
         sameFolder(passed, reported) -> ReportTrust.UPLOAD_PASSED

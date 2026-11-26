@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The engine's dictionary format (Droidtop/tracker#339). [GOLDEN] is the fixture's dictionary as the native reader
+ * The engine's dictionary format (mytop-project/tracker#339). [GOLDEN] is the fixture's dictionary as the native reader
  * (src/main/cpp/dictionary.cpp, built on a host) read it back: every word valid, completions ranked by frequency,
  * "Robin" and "robin" apart, and the bigrams after "the", "hello" and "it" found. The writer must produce exactly it.
  */

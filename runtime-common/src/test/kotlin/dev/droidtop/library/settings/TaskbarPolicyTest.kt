@@ -63,7 +63,7 @@ class TaskbarPolicyTest {
         assertFalse(TaskbarPolicy.folds(gameHere = false, appInFront = false, defaultDisplay = false))
     }
 
-    // Droidtop/tracker#702: with Android's task list read exactly, the open list is the running apps.
+    // mytop-project/tracker#702: with Android's task list read exactly, the open list is the running apps.
     @Test
     fun `the task list keeps the bar's order, adds the other running apps and drops what stopped`() {
         assertEquals(

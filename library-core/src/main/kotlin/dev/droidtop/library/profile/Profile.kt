@@ -24,7 +24,7 @@ data class ProfileCandidate(val key: String, val name: String, val from: String)
 data class Profile(val name: String?, val picture: File?)
 
 /**
- * droidtop's own profile (Droidtop/tracker#586; owner, 2026-10-28: "a, but autofill from all the profiles we have and
+ * droidtop's own profile (mytop-project/tracker#586; owner, 2026-10-28: "a, but autofill from all the profiles we have and
  * let users pick/override"): a name and a picture, set in the Quick Menu's Profile section. The name is filled in from
  * every account droidtop knows ([candidates]: a social provider's own name, Steam's among them, and a store's account
  * name where the store keeps one), the first by default; the person picks another or types their own. No account gives

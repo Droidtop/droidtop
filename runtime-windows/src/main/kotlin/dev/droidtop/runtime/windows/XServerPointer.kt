@@ -5,7 +5,7 @@ import com.winlator.xserver.XServer
 import dev.droidtop.library.OwnGameScreens
 
 /**
- * The game's pointer for droidtop's Windows screen ([OwnGameScreens.Pointer], Droidtop/tracker#565): the calls the
+ * The game's pointer for droidtop's Windows screen ([OwnGameScreens.Pointer], mytop-project/tracker#565): the calls the
  * screen's touch trackpad already makes on [xServer] (`injectPointerMoveDelta`, `injectPointerButtonPress` and
  * `Release`, the wheel as scroll-button presses), so controller mouse mode and the companion's trackpad share one
  * pointer path. Main thread.

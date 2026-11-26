@@ -61,7 +61,7 @@ private fun screenBounds(coords: LayoutCoordinates, view: View): AnchorRect {
 
 /**
  * The anchored menu of the one component set (docs/DESIGN-LANGUAGE.md, "Overlays and depth": "beside the item, up to
- * 8 rows, L2"; Droidtop/tracker#827): an item's own menu, opened beside the item rather than in the middle of the
+ * 8 rows, L2"; mytop-project/tracker#827): an item's own menu, opened beside the item rather than in the middle of the
  * screen. It is the [ActionSheet]'s body, the same rows and pad handling ([ActionSheetBody]): Up and Down move, A
  * chooses, B goes to [onBack], Select or L2 closes ([onDismiss]).
  *

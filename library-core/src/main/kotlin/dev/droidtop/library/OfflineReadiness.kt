@@ -2,7 +2,7 @@ package dev.droidtop.library
 
 /**
  * Whether a game can be played with no network, from what the library entry already knows (docs/SPEC.md 7i, "The game
- * page", Droidtop/tracker#422): a person going travelling checks it before they lose the connection. Pure and read from
+ * page", mytop-project/tracker#422): a person going travelling checks it before they lose the connection. Pure and read from
  * the entry alone, so it costs no disk or network work wherever it is shown.
  */
 object OfflineReadiness {

@@ -9,7 +9,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * The one way droidtop replaces a file whole (Droidtop/tracker#766): a reader sees the old file or the new one, never
+ * The one way droidtop replaces a file whole (mytop-project/tracker#766): a reader sees the old file or the new one, never
  * half of either, and a power cut after the call returns leaves the new one. The bytes go to a temp file of a name of
  * its own in the same folder, are synced to disk, and the temp file is moved over [target] in one step; a filesystem
  * that cannot move atomically gets a plain replacing move. On any failure the temp file is deleted, [target] is left as

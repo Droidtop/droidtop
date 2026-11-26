@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** How a launch hands the game file over (Droidtop/tracker#270): the template choice and the provider's answer. */
+/** How a launch hands the game file over (mytop-project/tracker#270): the template choice and the provider's answer. */
 class LaunchFileAccessTest {
     private fun player(path: String?) = Player.AmStart(
         id = "p",

@@ -10,7 +10,7 @@ import dev.droidtop.runtime.systemstatus.RestrictedSettings
 
 /**
  * droidtop's accessibility service for typing into other apps (docs/SPEC.md 4c, "Typing on the add-on display",
- * Droidtop/tracker#314): the route that works whichever keyboard is selected and with no elevated access. The
+ * mytop-project/tracker#314): the route that works whichever keyboard is selected and with no elevated access. The
  * service itself lives in `:app`; this is its state and its settings step, shared with the settings catalog and
  * the shells, which cannot see `:app`.
  */
@@ -37,7 +37,7 @@ object AccessibilityKeyboard {
     /**
      * Whether Android actually runs the service: bound, or among the services Android reports enabled. A switch the
      * person turned on that Android then refused (Android 13's restricted settings for an app installed from a file:
-     * the console showed it "enabled" while ACCESS_RESTRICTED_SETTINGS was deny, Droidtop/tracker#740) is not.
+     * the console showed it "enabled" while ACCESS_RESTRICTED_SETTINGS was deny, mytop-project/tracker#740) is not.
      */
     fun isActive(context: Context): Boolean {
         if (connected) return true
@@ -50,7 +50,7 @@ object AccessibilityKeyboard {
 
     /**
      * Whether the HOME button combos work over other apps (docs/SPEC.md "In-game overlays: HOME chords",
-     * Droidtop/tracker#740), and the line that says so in plain words: on, off, or blocked by Android's restricted
+     * mytop-project/tracker#740), and the line that says so in plain words: on, off, or blocked by Android's restricted
      * settings. They need this service running: Android delivers a game's button presses to no other app, so only the
      * service's key filter sees HOME held with R2, L2 or Start. Reads system state: off the main thread.
      */
@@ -65,7 +65,7 @@ object AccessibilityKeyboard {
     }
 
     /**
-     * Whether Super, Alt+Tab and the other keys Android keeps reach the desktop (Droidtop/tracker#697,
+     * Whether Super, Alt+Tab and the other keys Android keeps reach the desktop (mytop-project/tracker#697,
      * [DesktopSystemKeys]), and the line that says so in plain words. They need this service on, as the HOME combos
      * do. Reads system state: off the main thread.
      */
@@ -78,7 +78,7 @@ object AccessibilityKeyboard {
     }
 
     /**
-     * Turns the service on for the person who pressed to (Droidtop/tracker#740). With the privileged shell (Shizuku,
+     * Turns the service on for the person who pressed to (mytop-project/tracker#740). With the privileged shell (Shizuku,
      * Sui or wireless debugging; docs/SPEC.md "Device setup") droidtop allows its restricted settings and adds itself
      * to Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant,
      * stays). Without it, App info opens when Android's restricted settings block the service, else Android's
@@ -91,7 +91,7 @@ object AccessibilityKeyboard {
         // The device-setup item's own way, so what it changed is kept and Device setup can undo it.
         if (dev.droidtop.runtime.tasks.DeviceSetup.turnOnButtonPresses(context, dev.droidtop.runtime.tasks.TaskManager.shell)) return "On"
         if (RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false)) {
-            // Some Androids have no "Allow restricted settings" item at all (the Retroid Pocket 5, Droidtop/tracker#740),
+            // Some Androids have no "Allow restricted settings" item at all (the Retroid Pocket 5, mytop-project/tracker#740),
             // so the way that always works is said too, and copied, ready to paste on the computer.
             copyCommand(context)
             RestrictedSettings.openAppInfo(context)

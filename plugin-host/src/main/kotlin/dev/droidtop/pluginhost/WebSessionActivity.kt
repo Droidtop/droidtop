@@ -39,7 +39,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *   sites are handed back to be sealed in the plugin's vault. Back with nothing done is "not signed in".
  * - **Open** (a plugin): a protected link opened with the stored session; the download the page starts is captured
  *   (its address, the cookies it needs, the user agent and the page it came from) and the view closes. Asked for
- *   several ([WebSessionRequest.maxDownloads], Droidtop/tracker#419), it stays open, says how many it has and closes at
+ *   several ([WebSessionRequest.maxDownloads], mytop-project/tracker#419), it stays open, says how many it has and closes at
  *   the most asked for or on Done.
  * - **Browse** (a store): the store's pages, to look around, claim and buy. Only https pages load. The view reads
  *   nothing of a page: there is no script bridge and no script is run in it, so what a person types into a store's
@@ -68,7 +68,7 @@ class WebSessionActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         // droidtop's colours for a screen it draws with plain views (docs/SPEC.md 7k "Light and dark",
-        // Droidtop/tracker#559): the role tokens in use, and the system's light or dark widgets to match them.
+        // mytop-project/tracker#559): the role tokens in use, and the system's light or dark widgets to match them.
         val tokens = dev.droidtop.library.theme.RoleTokens.current(this)
         setTheme(if (tokens.light) android.R.style.Theme_Material_Light_NoActionBar else android.R.style.Theme_Material_NoActionBar)
         super.onCreate(savedInstanceState)
@@ -119,7 +119,7 @@ class WebSessionActivity : Activity() {
                 setOnClickListener { finishWith(completed = true, download = null) }
             })
         }
-        // The site's own sign-in page as a full page (Droidtop/tracker#600): F95zone's in-page log-in overlay failed in
+        // The site's own sign-in page as a full page (mytop-project/tracker#600): F95zone's in-page log-in overlay failed in
         // this view with "Oops! We ran into some problems", and a signed-out page has no download links.
         val signIn = asked.signInUrl?.takeIf { asked.mode != WebSessionRequest.Mode.SIGN_IN && NetScope.isHttps(it) }
         if (signIn != null) {
@@ -154,9 +154,9 @@ class WebSessionActivity : Activity() {
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             // The web view's own user agent, never one kept from before: a browser check compares it with the engine
             // that runs the check, and a kept one from an older WebView made Cloudflare ask again and again
-            // (Droidtop/tracker#600). What the view ends with is kept, and droidtop's requests send that one.
+            // (mytop-project/tracker#600). What the view ends with is kept, and droidtop's requests send that one.
             cookies.setAcceptThirdPartyCookies(this, true)
-            // What the page reports, in droidtop's log (Droidtop/tracker#600: a site's own error, such as a failed
+            // What the page reports, in droidtop's log (mytop-project/tracker#600: a site's own error, such as a failed
             // sign-in request, was otherwise invisible on a device).
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(message: ConsoleMessage): Boolean {
@@ -170,7 +170,7 @@ class WebSessionActivity : Activity() {
                     // pages, where people pay, load only over https.
                     val scheme = request.url.scheme?.lowercase()
                     // A page that leads to a file host droidtop has an API for (a masked link the person just unmasked,
-                    // Droidtop/tracker#650) closes there: the host's resolvers serve the link, through the person's
+                    // mytop-project/tracker#650) closes there: the host's resolvers serve the link, through the person's
                     // account or a debrid one, where its own page would build the file where no download can reach it.
                     val target = request.url.toString()
                     if (asked.mode == WebSessionRequest.Mode.OPEN && request.isForMainFrame && scheme == "https" &&
@@ -198,13 +198,13 @@ class WebSessionActivity : Activity() {
 
                 override fun onPageFinished(view: WebView, url: String?) {
                     location?.text = url?.let { NetScope.hostOf(it) }.orEmpty()
-                    // The same probe as the hidden views', so the two can be compared in a device's log (Droidtop/tracker#783).
+                    // The same probe as the hidden views', so the two can be compared in a device's log (mytop-project/tracker#783).
                     url?.let { NetScope.hostOf(it) }?.let {
                         WebViewProbe.report("visible ${asked.mode.name.lowercase()}", it, view, startedAt, if (SiteCheck.isCheckTitle(view.title)) "check page" else "page")
                     }
                     if (url != null && browse) asked.onPage?.invoke(url)
                     // A browser check is passed once the view shows the site's own page with a pass cookie for it, and the
-                    // view closes by itself (Droidtop/tracker#600). Not on a timer or the first page: a challenge's own
+                    // view closes by itself (mytop-project/tracker#600). Not on a timer or the first page: a challenge's own
                     // page has a check's title, and a clearance cookie alone (`__cf_bm` is set on the challenge) is not a pass.
                     // A clearance still good from before passes at once.
                     val host = url?.let { NetScope.hostOf(it) }

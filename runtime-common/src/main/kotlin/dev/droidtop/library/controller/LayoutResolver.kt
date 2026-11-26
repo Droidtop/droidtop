@@ -25,7 +25,7 @@ data class PadFacts(
  * 1. the console's own layout switch, for the pad built into a known
  *    console whose toggle reads a value the table lists: it alone decides,
  *    every time it changes, and no capture overrides it (owner,
- *    2026-11-06, Droidtop/tracker#935: a stored capture kept confirm on
+ *    2026-11-06, mytop-project/tracker#935: a stored capture kept confirm on
  *    the bottom button in Retro mode, "the opposite of what I'd ever want");
  * 2. a capture the person made for this pad that is still current, for a
  *    pad droidtop cannot read (a toggle it cannot read or does not list, an

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A source result's own facets and its box art (docs/plugin-api.md 1.8, "featured"; Droidtop/tracker#612). */
+/** A source result's own facets and its box art (docs/plugin-api.md 1.8, "featured"; mytop-project/tracker#612). */
 class SourceResultFacetsTest {
     private fun reply(facets: String) = JSONObject("""{"results": [{"id": "1", "title": "Eternum", "facets": $facets}]}""")
 

@@ -60,7 +60,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * Plugins on the companion (docs/SPEC.md "The companion's tabs", docs/plugin-api.md 3 C15, Droidtop/tracker#414 slice
+ * Plugins on the companion (docs/SPEC.md "The companion's tabs", docs/plugin-api.md 3 C15, mytop-project/tracker#414 slice
  * C9). A plugin's companion panel is its `ui.panel` (the Quick Menu's panel, [PluginPanels]) drawn for touch with
  * `context.surface` `<mode>.companion`: on the Plugins tab, which lists every panel with its abilities on one line, or
  * as a tab of its own when the person put it on the bar. A panel that declares the `game` ability also gives rows for
@@ -117,7 +117,7 @@ private fun rememberRunningTarget(): ContextTarget? {
 
 /**
  * The Plugins tab ([only] null): every installed plugin by name, with its icon and status glyph, the same list as the
- * Quick Menu's (Droidtop/tracker#644); a tap opens its panel, Back returns. With [only] ("plugin:<id>"), that one panel
+ * Quick Menu's (mytop-project/tracker#644); a tap opens its panel, Back returns. With [only] ("plugin:<id>"), that one panel
  * is the whole tab.
  */
 @Composable
@@ -168,7 +168,7 @@ internal fun CompanionPluginsTab(only: String?) {
                             modifier = Modifier.padding(end = 12.dp).size(32.dp),
                         )
                     }
-                    // The plugin's name, as on the shell's list (Droidtop/tracker#515): no line of droidtop's internals under it.
+                    // The plugin's name, as on the shell's list (mytop-project/tracker#515): no line of droidtop's internals under it.
                     Text(item.panel.label, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
                     item.status.mark?.let { mark ->
                         if (mark != dev.droidtop.library.settings.StatusMark.WORKING) {

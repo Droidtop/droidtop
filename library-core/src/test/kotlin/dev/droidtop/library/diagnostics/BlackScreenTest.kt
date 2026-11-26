@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#601: a black screen with a pointer is noticed after a while; a picture or a fade never is. */
+/** mytop-project/tracker#601: a black screen with a pointer is noticed after a while; a picture or a fade never is. */
 class BlackScreenTest {
     private val black = 0xFF000000.toInt()
     private val white = 0xFFFFFFFF.toInt()
@@ -61,7 +61,7 @@ class BlackScreenTest {
 
     @Test
     fun `a copy that reads all zero is not a picture, and a pointer on black is`() {
-        // Droidtop/tracker#896: BlueStacks' PixelCopy gave 48x27 pixels of RGB 0, alpha 255, over a drawn menu.
+        // mytop-project/tracker#896: BlueStacks' PixelCopy gave 48x27 pixels of RGB 0, alpha 255, over a drawn menu.
         assertFalse(FrameDarkness.hasPicture(IntArray(48 * 27) { 0xFF000000.toInt() }))
         assertTrue(FrameDarkness.hasPicture(IntArray(48 * 27) { if (it == 600) 0xFFFFFFFF.toInt() else 0xFF000000.toInt() }))
         assertTrue(FrameDarkness.hasPicture(IntArray(4) { 0xFF0A0A0A.toInt() }))

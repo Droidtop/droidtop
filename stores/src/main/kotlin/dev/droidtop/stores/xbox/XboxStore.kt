@@ -25,7 +25,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Xbox (the Microsoft Store's PC games) as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), after
+ * Xbox (the Microsoft Store's PC games) as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after
  * Playnite's XboxLibrary (MIT, JosefNemec/PlayniteExtensions, `Services/XboxAccountClient.cs`): the person signs in to
  * their Microsoft account on its own page (its public desktop client id, the code returned on
  * `oauth20_desktop.srf`), the Microsoft token becomes an Xbox Live user token and then an XSTS token, and TitleHub's

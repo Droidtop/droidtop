@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Droidtop/tracker#903 H8b: the tar reader the data is unpacked with. */
+/** mytop-project/tracker#903 H8b: the tar reader the data is unpacked with. */
 class RimeTarTest {
     private fun read(bytes: ByteArray): Map<String, ByteArray> {
         val out = LinkedHashMap<String, ByteArray>()

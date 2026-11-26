@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The one store retry around a chunk or file fetch (Droidtop/tracker#766). */
+/** The one store retry around a chunk or file fetch (mytop-project/tracker#766). */
 class ChunkRetryTest {
     @Test
     fun `the pause doubles from a second and none comes before the first try`() {

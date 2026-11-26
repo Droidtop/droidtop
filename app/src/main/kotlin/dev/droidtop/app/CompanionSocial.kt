@@ -68,10 +68,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The companion's Social tab (docs/SPEC.md "Social" and "The companion's tabs", Droidtop/tracker#327): the
+ * The companion's Social tab (docs/SPEC.md "Social" and "The companion's tabs", mytop-project/tracker#327): the
  * same merged friends and conversations as the Social place, by touch. A conversation has a draft field and
  * droidtop's own keyboard drawn inside the companion window, typing into the field directly: no IME and no
- * window focus, so it works on the add-on display where Android's keyboard does not (Droidtop/tracker#314)
+ * window focus, so it works on the add-on display where Android's keyboard does not (mytop-project/tracker#314)
  * and never takes the pad from the shell (SPEC 4c, "a Presentation takes no focus").
  */
 @Composable

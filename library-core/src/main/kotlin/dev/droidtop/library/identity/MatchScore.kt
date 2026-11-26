@@ -3,7 +3,7 @@ package dev.droidtop.library.identity
 import dev.droidtop.library.scraper.PcMatching
 
 /**
- * How sure a name match is (Droidtop/tracker#318 §3.2): each candidate a source returns gets a score from 0 to 100
+ * How sure a name match is (mytop-project/tracker#318 §3.2): each candidate a source returns gets a score from 0 to 100
  * against the local title, and the scores together give a tier that says whether droidtop takes the match itself or
  * asks the person. Only name matches are scored here; a hash, a store id or an alias is certain before any name is
  * compared, and the caller says so with [Tier.A] or [Tier.A_ALIAS]. Pure, so the calibration set runs offline.

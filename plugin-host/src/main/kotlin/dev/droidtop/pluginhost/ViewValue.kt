@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * A view's typed value (docs/plugin-api.md 1.6 "Typed values", Droidtop/tracker#521 item 7): an `info` or `row`
+ * A view's typed value (docs/plugin-api.md 1.6 "Typed values", mytop-project/tracker#521 item 7): an `info` or `row`
  * `value` may be an object instead of a string, and droidtop writes it in its own words, so every plugin's sizes,
  * durations and switches read the same as droidtop's ([ValueFormat]). A plain string is shown as given, as before.
  *

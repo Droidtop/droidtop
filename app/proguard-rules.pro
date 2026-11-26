@@ -1,4 +1,4 @@
-# R8 keep rules for the release build (docs/SPEC.md 10b, Droidtop/tracker#283).
+# R8 keep rules for the release build (docs/SPEC.md 10b, mytop-project/tracker#283).
 #
 # Posture: R8 shrinks and does not obfuscate or optimise. proguard-android.txt
 # (the base file in build.gradle.kts) carries -dontoptimize; -dontobfuscate is
@@ -55,7 +55,7 @@
 # it, not only the parts its own code happens to call. Shrinking it removed
 # kotlin.collections.MapsKt from build 1535, and a CI-signed status tile plugin
 # was disabled at once with "Failed resolution of:
-# Lkotlin/collections/MapsKt;" (BlueStacks, Droidtop/tracker#378).
+# Lkotlin/collections/MapsKt;" (BlueStacks, mytop-project/tracker#378).
 -keep class kotlin.** { *; }
 
 # Custom widget plugins. Launcher3's CustomWidgetManager reads their class
@@ -95,7 +95,7 @@
 -keep class in.dragonbra.javasteam.** { *; }
 -keep class * extends in.dragonbra.javasteam.steam.handlers.steamunifiedmessages.UnifiedService { *; }
 # Bouncy Castle for JavaSteam (stores): its provider registers every algorithm by class name and creates them by
-# reflection, so R8 must keep the provider and the algorithm classes it names (Droidtop/tracker#313: Steam downloads
+# reflection, so R8 must keep the provider and the algorithm classes it names (mytop-project/tracker#313: Steam downloads
 # died with BouncyCastleProvider missing). Its LDAP store is never used.
 -keep class org.bouncycastle.jce.provider.** { *; }
 -keep class org.bouncycastle.jcajce.provider.** { *; }

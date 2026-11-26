@@ -163,7 +163,7 @@ object RootProcess {
 
     /**
      * Starts [args] as root and hands back the process itself, for a caller that streams its input or output (a
-     * container's backup through tar, Droidtop/tracker#758) rather than collecting it; null with no helper that can
+     * container's backup through tar, mytop-project/tracker#758) rather than collecting it; null with no helper that can
      * start a process. The caller reads, writes and waits; it must not leave the process running.
      */
     suspend fun spawn(vararg args: String): Process? =
@@ -181,7 +181,7 @@ object RootProcess {
      * inferring it from a failed command. Waits up to [HELPER_WAIT_MS] for
      * the helper's binder, which arrives a moment after the process starts.
      * [waitMs] 0 asks once, for a reader that only lists (settings search): with no helper at all the wait was 3 s
-     * of every index (BlueStacks dev.3376, Droidtop/tracker#954 item 14).
+     * of every index (BlueStacks dev.3376, mytop-project/tracker#954 item 14).
      */
     suspend fun access(waitMs: Long = HELPER_WAIT_MS): RootAccess = withContext(Dispatchers.IO) {
         var result = run(TaskManager.shell, listOf("id", "-u"), null)

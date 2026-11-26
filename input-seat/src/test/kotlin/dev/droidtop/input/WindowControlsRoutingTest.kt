@@ -14,7 +14,7 @@ import org.junit.Test
 
 /**
  * A press on a title-bar button or in a window's resize band is droidtop's, and nothing of it is a click in the
- * compositor (Droidtop/tracker#910); every other press is left exactly as it was.
+ * compositor (mytop-project/tracker#910); every other press is left exactly as it was.
  */
 class WindowControlsRoutingTest {
     private val bridge = FakeHostBridge()

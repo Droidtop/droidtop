@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** lib-kdeconnect's replies as droidtop reads them (docs/SPEC.md "KDE Connect"); the shapes are kdeconnect-service's. */
+/** mytop-kdeconnect's replies as droidtop reads them (docs/SPEC.md "KDE Connect"); the shapes are kdeconnect-service's. */
 class KdeConnectTest {
     @Test
     fun devices() {
@@ -100,7 +100,7 @@ class KdeConnectTest {
             KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"notification","key":"k","app":"Messages","title":"Ana","text":"hi","dismissable":true,"silent":false}}""")),
         )
         assertEquals(KdcEvent.NotificationGone("a", "k"), KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"notification_gone","key":"k"}}""")))
-        // lib-kdeconnect's PluginEvent::NotificationDismissed, serialised snake_case.
+        // mytop-kdeconnect's PluginEvent::NotificationDismissed, serialised snake_case.
         assertEquals(
             KdcEvent.NotificationDismissed("a", "0|org.app|7|null|10123"),
             KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"notification_dismissed","key":"0|org.app|7|null|10123"}}""")),

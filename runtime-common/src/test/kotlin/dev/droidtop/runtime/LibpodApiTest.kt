@@ -12,7 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/SPEC.md 3d, "The libpod API" (Droidtop/tracker#555 D15): the routes podman.sock answers and their shapes. */
+/** docs/SPEC.md 3d, "The libpod API" (mytop-project/tracker#555 D15): the routes podman.sock answers and their shapes. */
 class LibpodApiTest {
     private val digest = "sha256:" + "ab".repeat(32)
     private val config = ImageRunConfig(env = listOf("PATH=/usr/bin"), entrypoint = listOf("/entry.sh"), cmd = listOf("nginx", "-g", "daemon off;"))

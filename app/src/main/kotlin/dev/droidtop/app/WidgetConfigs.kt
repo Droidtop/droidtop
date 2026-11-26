@@ -3,7 +3,7 @@ package dev.droidtop.app
 import android.content.Context
 
 /**
- * What each placed droidtop widget was set up to show, by its appWidgetId (Droidtop/tracker#563): the game a Quick
+ * What each placed droidtop widget was set up to show, by its appWidgetId (mytop-project/tracker#563): the game a Quick
  * launch widget plays, a Shelf widget's content and layout, and a Plugin widget's source. Kept in droidtop's own preferences, written by the widget's configure activity and
  * forgotten when the launcher removes the widget. Read off the main thread, in the widget's render.
  */

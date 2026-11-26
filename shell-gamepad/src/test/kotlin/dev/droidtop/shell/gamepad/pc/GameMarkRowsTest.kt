@@ -5,7 +5,7 @@ import dev.droidtop.library.settings.PlayStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The game page's own-marks rows (Droidtop/tracker#722). */
+/** The game page's own-marks rows (mytop-project/tracker#722). */
 class GameMarkRowsTest {
     @Test
     fun `A adds a star and turns the status`() {

@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * The role tokens for UI droidtop does not draw itself (docs/SPEC.md 7k, "Light and dark"; Droidtop/tracker#559): a
+ * The role tokens for UI droidtop does not draw itself (docs/SPEC.md 7k, "Light and dark"; mytop-project/tracker#559): a
  * plugin's own pages through `ui.get_theme` (docs/plugin-api.md), and droidtop's own screens built from plain Android
  * views (the web sign-in screen). One set, read from the palette in use and never restated: the Gaming theme's while
  * the Gaming shell holds one ([provider]), the colours outside Gaming otherwise ([OutsideGamingColors]).

@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#337: a short screen with pro mode off, nothing removed, a reset that keeps the person's own content. */
+/** mytop-project/tracker#337: a short screen with pro mode off, nothing removed, a reset that keeps the person's own content. */
 class KeyboardProModeTest {
 
     @Test

@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The meta state every keyboard sink derives from droidtop's hardware-style key stream (Droidtop/tracker#314, #772). */
+/** The meta state every keyboard sink derives from droidtop's hardware-style key stream (mytop-project/tracker#314, #772). */
 class MetaTrackerTest {
     @Test
     fun `modifiers set and clear their own bit and other keys leave the state alone`() {

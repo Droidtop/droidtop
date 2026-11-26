@@ -41,7 +41,7 @@ import kotlinx.coroutines.withContext
 /**
  * One fact a game's page gets from outside the library: its achievements, how long it takes, how an emulator
  * runs it (docs/SPEC.md 7h, "Game info"). Every game's page draws it as one of its rows (`PageFact`, the page's
- * frame, Droidtop/tracker#845); the saves and the achievements sign-in are rows of its Options.
+ * frame, mytop-project/tracker#845); the saves and the achievements sign-in are rows of its Options.
  */
 internal data class GameInfoRow(
     val title: String,
@@ -163,7 +163,7 @@ internal class SaveCopying(
 }
 
 /**
- * "Saves between copies" (docs/SPEC.md 7o, Droidtop/tracker#745): copy another copy's saves to this one, asked first
+ * "Saves between copies" (docs/SPEC.md 7o, mytop-project/tracker#745): copy another copy's saves to this one, asked first
  * with what is replaced, this copy's saves backed up; and put a backup back. The other copy's saves are only read.
  */
 private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, volumes: Map<String, String>): List<CatalogGroup> {
@@ -272,7 +272,7 @@ internal fun savesScreen(
 private fun offline(message: String) = message.startsWith("No connection")
 
 internal suspend fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
-    // A console game: RetroAchievements. A store's game: the store's own (Steam, GOG, Epic: Droidtop/tracker#230), in the same row.
+    // A console game: RetroAchievements. A store's game: the store's own (Steam, GOG, Epic: mytop-project/tracker#230), in the same row.
     val retro = achievementRowsFor(RetroAchievements.lookup(context, entry), entry.id)
     if (retro.isNotEmpty()) return retro
     val key = entry.pcInfo?.storeId
@@ -281,13 +281,13 @@ internal suspend fun achievementRows(context: Context, entry: LibraryEntry): Lis
         val rows = storeAchievementRowsFor(store.label, key.substringAfter(':'), store.achievements(context, key.substringAfter(':')))
         if (rows.isNotEmpty()) return rows
     }
-    // Neither: a plugin that provides achievements (docs/plugin-api.md 3 A8, Droidtop/tracker#143), in the same row.
+    // Neither: a plugin that provides achievements (docs/plugin-api.md 3 A8, mytop-project/tracker#143), in the same row.
     val (label, list) = dev.droidtop.library.integrations.PluginAchievements.read(context, entry) ?: return emptyList()
     return storeAchievementRowsFor(label, entry.id.hashCode().toUInt().toString(), Result.success(list))
 }
 
 /**
- * The Achievements row of a store's game (Droidtop/tracker#230): earned of all, opening the same page of rows
+ * The Achievements row of a store's game (mytop-project/tracker#230): earned of all, opening the same page of rows
  * RetroAchievements' row opens. None when the store reports none, nobody is signed in, or the device is offline; a
  * game with no achievements has no row. Pure, for the tests.
  */
@@ -360,7 +360,7 @@ internal fun rarityLine(percent: Float?): String? {
 /** The rows for what RetroAchievements said about a game ([entryId] answers a proposal). Pure, for the tests. */
 internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<GameInfoRow> =
     when (result) {
-        // A title match is asked, never shown by itself (Droidtop/tracker#318 decision 7a): wrong achievements and wrong
+        // A title match is asked, never shown by itself (mytop-project/tracker#318 decision 7a): wrong achievements and wrong
         // progress are worse than none.
         is RaResult.Proposed -> listOf(
             GameInfoRow(
@@ -371,7 +371,7 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
             ),
         )
         RaResult.Unsupported -> emptyList()
-        // A console RetroAchievements covers, and no key yet: the feature says it is there (Droidtop/tracker#143).
+        // A console RetroAchievements covers, and no key yet: the feature says it is there (mytop-project/tracker#143).
         RaResult.NotSignedIn -> listOf(
             GameInfoRow(
                 "Achievements",
@@ -445,7 +445,7 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
     return when (val result = HowLongToBeat.lookup(context, title)) {
         HltbResult.Off, HltbResult.NotFound -> emptyList()
         // The person reads one plain line; the site's own answer ("api/search/site/init answered HTTP 200 but gave no
-        // token") is in the log, where HowLongToBeat writes it (Droidtop/tracker#678, rig 2936).
+        // token") is in the log, where HowLongToBeat writes it (mytop-project/tracker#678, rig 2936).
         is HltbResult.Failed -> if (offline(result.message)) emptyList() else listOf(GameInfoRow("How long to beat", "Not loaded", HLTB_FAILED_LINE))
         is HltbResult.Found -> {
             val summary = HowLongToBeat.summary(result.game)

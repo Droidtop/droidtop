@@ -125,7 +125,7 @@ class PluginGrants(private val dir: File) {
      * now, so a refused network or folder is gone at once (docs/plugin-api.md 5.3).
      */
     fun set(pluginId: String, permission: String, state: GrantState) {
-        // A choice made on the Permissions page replaces a Not now from earlier in this run (Droidtop/tracker#518).
+        // A choice made on the Permissions page replaces a Not now from earlier in this run (mytop-project/tracker#518).
         PluginRefusals.forgetNotNow(pluginId, permission)
         val changedHole = synchronized(LOCK) {
             val snap = readLocked(pluginId)
@@ -230,7 +230,7 @@ class PluginGrants(private val dir: File) {
         for (export in old.manifest.v2.exports) states[EXPORT_PREFIX + export.grantKey] = exportState(snap, export.grantKey)
         // Explicit entries the user set win over what was just derived.
         states.putAll(snap.states.filterKeys { it in states })
-        // Category and call overrides (Droidtop/tracker#263) are the user's own and outlive an update.
+        // Category and call overrides (mytop-project/tracker#263) are the user's own and outlive an update.
         states.putAll(snap.states.filterKeys { it.startsWith(PluginPermissionPolicy.CATEGORY_PREFIX) || it.startsWith(PluginPermissionPolicy.CALL_PREFIX) })
         // So are "Where it appears" (docs/plugin-api.md 1.9, and its facet targets, 1.10) and each service's or schedule's own switch.
         states.putAll(snap.states.filterKeys { it.startsWith(PluginModes.KEY_PREFIX) || it.startsWith(BackgroundProtocol.ENTRY_PREFIX) ||
@@ -292,7 +292,7 @@ class PluginGrants(private val dir: File) {
          * A ticked item is granted. An unticked dangerous or critical permission the plugin declares as
          * required still waits for the first-use sheet (it cannot work without it, and the list says
          * so); every other unticked item, an optional permission included, is denied, so the tick box
-         * really declines it (Droidtop/tracker#512).
+         * really declines it (mytop-project/tracker#512).
          */
         private fun answerFor(item: String, tier: PermissionTier, ticked: Set<String>, required: Boolean = false): GrantState = when {
             item in ticked -> GrantState.GRANTED
@@ -322,7 +322,7 @@ class PluginGrants(private val dir: File) {
          * person had answered keeps that answer (allowed ticked, blocked unticked), and only what was never answered
          * starts as [defaultTicked]. A plugin sent back to waiting by an update signed with another key, or approved
          * again after it was denied, is not reset to the defaults that block every high-risk point
-         * (Droidtop/tracker#270); the person still sees every tick before approving.
+         * (mytop-project/tracker#270); the person still sees every tick before approving.
          */
         fun approvalTicked(record: PluginRecord, snapshot: Snapshot): Set<String> {
             val defaults = defaultTicked(record)
@@ -389,7 +389,7 @@ class PluginGrants(private val dir: File) {
         /**
          * Asks the person on the first-use sheet whether [record] may provide [point], a point it declares that is set to
          * Ask first or not answered yet, and keeps the answer: Allow turns it on, Never blocks it, Not now leaves it to be
-         * asked again (Droidtop/tracker#270). True when it is allowed afterwards. Blocks until answered: off the main
+         * asked again (mytop-project/tracker#270). True when it is allowed afterwards. Blocks until answered: off the main
          * thread, and only for something the person just did.
          */
         fun askPoint(context: Context, record: PluginRecord, point: String): Boolean {

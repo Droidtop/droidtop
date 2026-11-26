@@ -6,7 +6,7 @@ import java.time.ZoneId
 import org.json.JSONObject
 
 /**
- * A plugin's everyday calls, counted per day (docs/plugin-api.md 4.6, Droidtop/tracker#61): the calls the activity
+ * A plugin's everyday calls, counted per day (docs/plugin-api.md 4.6, mytop-project/tracker#61): the calls the activity
  * ring does not list one by one (normal-tier permissions, and ops that need none), as a count per day and per
  * permission, or per `api op` when there is none. Kept [DAYS] days beside the ring, in `<id>.counts.json`.
  *
@@ -43,7 +43,7 @@ class PluginCallCounts(private val dir: File) {
     /**
      * The newest day (`YYYY-MM-DD`) on which [pluginId] made a call counted under [key], or null when none in the last
      * [DAYS] days: an everyday permission's "last used" on the Permissions page, which the activity ring never lists
-     * (Droidtop/tracker#60).
+     * (mytop-project/tracker#60).
      */
     fun lastDay(pluginId: String, key: String, nowMs: Long = System.currentTimeMillis()): String? =
         days(pluginId, nowMs).firstOrNull { (_, counts) -> counts.any { it.first == key } }?.first

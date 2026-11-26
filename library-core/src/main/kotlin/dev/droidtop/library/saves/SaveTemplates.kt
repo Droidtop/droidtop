@@ -10,7 +10,7 @@ import java.nio.file.Files
  * token and the path below it with forward slashes, compared without case.
  *
  * This is the same walk the core makes (docs/SPEC.md 7o "Saves"): no link is followed, depth is bounded, and a name
- * that could leave its root is refused. The agent-core move (Droidtop/tracker#546, slice 1) will give the one
+ * that could leave its root is refused. The agent-core move (mytop-project/tracker#546, slice 1) will give the one
  * implementation to both sides; until then this reads, and never writes, so the two cannot disagree about a file.
  *
  * Every function here does file work: never on the main thread.

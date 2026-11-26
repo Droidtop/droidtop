@@ -37,13 +37,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * System > Sound's own rows (docs/SPEC.md "The companion's tabs", Sound and connections; Droidtop/tracker#414 slice
+ * System > Sound's own rows (docs/SPEC.md "The companion's tabs", Sound and connections; mytop-project/tracker#414 slice
  * C19): a slider for each stream, every one through [VolumeControl], the one volume write path where Kid's cap holds.
  */
 @Composable
 internal fun CompanionStreamVolumes() {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Outputs are the catalog's Audio output row under these, the same panel (Droidtop/tracker#786 S8).
+        // Outputs are the catalog's Audio output row under these, the same panel (mytop-project/tracker#786 S8).
         VolumeControl.Stream.entries.forEach { stream -> StreamSlider(stream) }
     }
 }
@@ -70,7 +70,7 @@ private fun StreamSlider(stream: VolumeControl.Stream) {
 /**
  * System > Connections (slice C19): the Bluetooth devices paired with the device, asking for Bluetooth access when the
  * card is first opened (owner question 1's default), and the way to the Network tab, where each network is shown in
- * detail (Droidtop/tracker#583). Read off the main thread when the card opens.
+ * detail (mytop-project/tracker#583). Read off the main thread when the card opens.
  */
 @Composable
 internal fun CompanionConnections() {
@@ -97,7 +97,7 @@ internal fun CompanionConnections() {
                 }
             }
             list.isEmpty() -> CompanionNote("None paired")
-            // Connected ones first, each saying so (Droidtop/tracker#786 S9); Android lets no app connect one.
+            // Connected ones first, each saying so (mytop-project/tracker#786 S9); Android lets no app connect one.
             else -> pairedInOrder(list).forEach { device ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(device.name, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, modifier = Modifier.weight(1f))
@@ -112,7 +112,7 @@ internal fun CompanionConnections() {
 }
 
 /**
- * Device > Controllers' pads (Droidtop/tracker#786 S9): each connected controller with its battery, through the one
+ * Device > Controllers' pads (mytop-project/tracker#786 S9): each connected controller with its battery, through the one
  * reader ([Controllers], `ConnectedPads`), read off the main thread when the page opens.
  */
 @Composable

@@ -7,7 +7,7 @@ import dev.droidtop.library.StoreMarker
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The `storeIds` fact a metadata plugin's `match` gets (docs/plugin-api.md 3 A3, Droidtop/tracker#568). */
+/** The `storeIds` fact a metadata plugin's `match` gets (docs/plugin-api.md 3 A3, mytop-project/tracker#568). */
 class PluginFactsStoreIdsTest {
     private fun entry(pc: PcInfo) = LibraryEntry(id = pc.storeId ?: "folder:CUSTOM_GAME_1", title = "Game", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = pc)
 

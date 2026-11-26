@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Recently added means added since a source's first sync or scan (docs/SPEC.md 7g, Droidtop/tracker#397 slice B). */
+/** Recently added means added since a source's first sync or scan (docs/SPEC.md 7g, mytop-project/tracker#397 slice B). */
 class SyncBaselineTest {
 
     private val steam = PcSource.Store("steam").id

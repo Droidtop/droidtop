@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.windows.redist
 
 /**
- * The redistributables droidtop recognises (docs/SPEC.md 9, "Redistributable installers"; Droidtop/tracker#916), each
+ * The redistributables droidtop recognises (docs/SPEC.md 9, "Redistributable installers"; mytop-project/tracker#916), each
  * matched by the installer's version info AND its signer, never by its file name.
  *
  * [Row.provided]: droidtop already provides that runtime (Wine Mono covers .NET Framework and XNA, #895; Wine's own

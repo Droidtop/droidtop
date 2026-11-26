@@ -40,7 +40,7 @@ object ControllerLayoutTiles {
                 run = { ControllerLayouts.requestCapture() },
             ),
             // The tile showed no state (console, build 1386). On = droidtop trades the A and B (and X and Y) key codes
-            // right now, whatever decided it; a switch, not the word (show, then say: Droidtop/tracker#738).
+            // right now, whatever decided it; a switch, not the word (show, then say: mytop-project/tracker#738).
             ActionItem(
                 id = ID_SWAP,
                 title = words(R.string.gamepad_swap_a_and_b),

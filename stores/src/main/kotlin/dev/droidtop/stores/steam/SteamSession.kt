@@ -64,7 +64,7 @@ import timber.log.Timber
  * its job, which is what keeps the process alive while it downloads.
  *
  * Achievements are read, never written (`SteamAchievements`, owner
- * 2026-10-23: "read-only and for display", Droidtop/tracker#230): droidtop
+ * 2026-10-23: "read-only and for display", mytop-project/tracker#230): droidtop
  * shows them on a game's page and sets no stat. Collections are read when the
  * library syncs (`SteamCollections`). Not carried from GameNative's service:
  * unlocking achievements, family sharing, game invites and the continuous

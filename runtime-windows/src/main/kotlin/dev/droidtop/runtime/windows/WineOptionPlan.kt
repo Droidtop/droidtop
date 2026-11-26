@@ -93,7 +93,7 @@ object WineOptionPlan {
         !isArm64ec(wine) && (wineMajor(wine)?.let { it >= 10 } ?: true)
 
     /**
-     * Why a catalog Wine build [wine] is not offered on this CPU, or null when it is (Droidtop/tracker#233: shown as
+     * Why a catalog Wine build [wine] is not offered on this CPU, or null when it is (mytop-project/tracker#233: shown as
      * "Not on this device" with this reason, never just hidden). Pure.
      */
     fun notHereReason(x86Host: Boolean, wine: String): String? = when {

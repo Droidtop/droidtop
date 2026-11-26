@@ -36,7 +36,7 @@ import kotlin.math.hypot
  * - tap, then put a finger straight back down, is a drag with the left
  *   button held, released when that finger lifts
  *
- * Each of these is a setting ([TrackpadConfig], the companion's Trackpad settings, Droidtop/tracker#414 slice C12),
+ * Each of these is a setting ([TrackpadConfig], the companion's Trackpad settings, mytop-project/tracker#414 slice C12),
  * on by default as libinput ships them. Two more are libinput's and off by default, as there: drag lock (a
  * tap-and-drag's button stays down when the finger lifts, until the next tap) and momentum after a two-finger scroll
  * (a kinetic coast, the macOS behaviour). Deliberately NOT included: software button areas along the bottom edge (a
@@ -123,7 +123,7 @@ data class TrackpadConfig(
     /** A three-finger tap is the middle button. */
     val threeFingerMiddleClick: Boolean = true,
     /**
-     * Three fingers swiped sideways at least [swipeMinMm], mostly sideways, switch workspaces (Droidtop/tracker#426):
+     * Three fingers swiped sideways at least [swipeMinMm], mostly sideways, switch workspaces (mytop-project/tracker#426):
      * the desktop's own gesture on a laptop trackpad. Not a libinput constant.
      */
     val threeFingerSwipe: Boolean = true,

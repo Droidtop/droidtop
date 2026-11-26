@@ -4,7 +4,7 @@ import android.content.Context
 import dev.droidtop.library.settings.CatalogPrefs
 
 /**
- * The stick's dead zone as the shell's D-pad reads it (Settings > Controls, Droidtop/tracker#723): how far the stick
+ * The stick's dead zone as the shell's D-pad reads it (Settings > Controls, mytop-project/tracker#723): how far the stick
  * must lean before it moves the cursor, so a drifting stick stops walking the menus on its own. A percentage of full
  * travel; the stick releases its direction under it and presses one past it plus a margin. The default, 30, is the
  * shell's long-standing 0.3 / 0.5 band. Process-wide, read by the pad's front ([dev.droidtop.shell.gamepad.input.PadGateCore]).

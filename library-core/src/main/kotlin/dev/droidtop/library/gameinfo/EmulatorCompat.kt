@@ -87,7 +87,7 @@ object EmulatorCompat {
     private fun get(address: String, maxBytes: Long): String {
         val answer = Http.request(
             address,
-            headers = mapOf("User-Agent" to "droidtop (Android game launcher; https://github.com/Droidtop/droidtop)"),
+            headers = mapOf("User-Agent" to "droidtop (Android game launcher; https://github.com/mytop-project/droidtop)"),
             timeouts = Http.Timeouts(connectMs = TIMEOUT_MS, readMs = TIMEOUT_MS),
             maxBytes = maxBytes,
         )

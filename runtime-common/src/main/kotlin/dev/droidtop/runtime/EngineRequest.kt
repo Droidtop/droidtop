@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * One request to droidtop's container engine, whichever front asked (docs/SPEC.md 3d "The docker command" and "The
- * podman command", Droidtop/tracker#555 D11): each command front ([EngineCli.DOCKER], [EngineCli.PODMAN], and later the
+ * podman command", mytop-project/tracker#555 D11): each command front ([EngineCli.DOCKER], [EngineCli.PODMAN], and later the
  * API daemons) reads its own tool's syntax into these, and droidtop answers them one way. A closed set: nothing the
  * container wrote reaches Android as a command, a path or an argv.
  */
@@ -19,7 +19,7 @@ sealed interface EngineRequest {
 
     /**
      * `logs`: the last [tail] lines of a container's program log; with [follow] (`-f`), then what it writes next, until
-     * its program ends (Droidtop/tracker#715). [sinceMs] and [untilMs] bound the lines by when they were written
+     * its program ends (mytop-project/tracker#715). [sinceMs] and [untilMs] bound the lines by when they were written
      * ([LogTimes]); null is no bound.
      */
     data class Logs(

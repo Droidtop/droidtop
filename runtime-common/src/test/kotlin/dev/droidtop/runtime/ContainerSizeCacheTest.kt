@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** When a container's size in the Containers list still holds (docs/SPEC.md 3d; Droidtop/tracker#911). */
+/** When a container's size in the Containers list still holds (docs/SPEC.md 3d; mytop-project/tracker#911). */
 class ContainerSizeCacheTest {
     private val stopped = Stamp(running = false, digest = "sha256:aa")
     private val running = Stamp(running = true, digest = "sha256:aa")

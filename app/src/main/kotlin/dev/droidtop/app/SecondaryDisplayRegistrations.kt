@@ -43,7 +43,7 @@ object SecondaryDisplayRegistrations {
     /**
      * Standard is the always-on default (docs/SPEC.md 2c): it is never gated behind a ModePiece the way
      * Gaming/Desktop's second screens are. It draws the same companion tabs as the other modes
-     * (Droidtop/tracker#347); its own launcher-style surface used to stand in for them, without Social,
+     * (mytop-project/tracker#347); its own launcher-style surface used to stand in for them, without Social,
      * Tasks, Performance, System or Keys, and its quick-launch row is now Home's Recent apps section.
      * No shell publishes a focused game in Standard, so Home's Now shows only a running game.
      */
@@ -69,7 +69,7 @@ object SecondaryDisplayRegistrations {
         // where the mode's role says so (Desktop by default), and Tasks, Performance and System are
         // beside them (docs/SPEC.md "The companion's tabs").
         // The companion beside Gaming or Desktop wears the theme the shell beside it does (its colours and typefaces),
-        // as CompanionActivity does; Standard's keeps the colours outside Gaming (Droidtop/tracker#524).
+        // as CompanionActivity does; Standard's keeps the colours outside Gaming (mytop-project/tracker#524).
         dev.droidtop.app.ui.DroidtopTheme(gamingThemed = mode != SecondaryDisplayContent.Mode.STANDARD) {
             CompanionTabs(mode) { CompanionSurfaceHost(settledFocusedEntry()) }
         }

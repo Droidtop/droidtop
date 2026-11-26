@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * droidtop's own card art order (owner, 2026-10-23, Droidtop/tracker#632): box art first, a screenshot only when
+ * droidtop's own card art order (owner, 2026-10-23, mytop-project/tracker#632): box art first, a screenshot only when
  * nothing else exists.
  */
 class EsDeArtworkOrderTest {

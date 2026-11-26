@@ -67,7 +67,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /*
- * Home's top band and strip (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a, final design B.2). The band
+ * Home's top band and strip (docs/SPEC.md 7i, "Home"; mytop-project/tracker#485 F7a, final design B.2). The band
  * is touch only (in the accessibility tree, never a stop of the pad): Downloads while a job runs, Search, the
  * bell, Friends, then the status facts on a plate. The strip is What's new, Friends and Downloads, stepped
  * with L1/R1; its pills are not a stop, the cards are.
@@ -115,7 +115,7 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
         bios = withContext(Dispatchers.IO) { runCatching { biosAttention(context, systemsWithGames) }.getOrDefault(emptyList()) }
     }
     // Installed plugins with a newer release in a catalog as last fetched (the Updates page's own count): read once off
-    // the main thread. It was passed as 0, so the card never showed (Droidtop/tracker#570).
+    // the main thread. It was passed as 0, so the card never showed (mytop-project/tracker#570).
     var pluginUpdates by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         pluginUpdates = withContext(Dispatchers.IO) {
@@ -178,7 +178,7 @@ private fun biosAttention(context: Context, systems: Map<String, String>): List<
 
 /**
  * The top band (Home only): a scrim from the ground at 60 percent to clear, then, right to left, only what carries
- * state (the owner, 2026-10-29, Droidtop/tracker#742: "2 is my choice. Have a contextual spot that shows an icon for
+ * state (the owner, 2026-10-29, mytop-project/tracker#742: "2 is my choice. Have a contextual spot that shows an icon for
  * whatever's currently happening"): the status pill on a solid plate, with the activity spot ([ActivitySpot]) on it, a
  * divider, Friends while a service reports the person's presence (the avatar in a ring), and the bell while something
  * is unread, with the count. Search is not here: Y is Search everywhere, and the icon said nothing. 48dp targets with
@@ -202,7 +202,7 @@ internal fun HomeTopBand(
             .focusProperties { canFocus = false }
             .background(Brush.verticalGradient(0f to MenuTokens.Ground.copy(alpha = 0.6f), 1f to Color.Transparent)),
     ) {
-        // The person (Droidtop/tracker#586): their picture or initial and their name, from Quick Menu > Profile; a tap
+        // The person (mytop-project/tracker#586): their picture or initial and their name, from Quick Menu > Profile; a tap
         // opens the Quick Menu. Nothing while droidtop knows neither.
         val context = androidx.compose.ui.platform.LocalContext.current
         LaunchedEffect(Unit) {
@@ -239,7 +239,7 @@ internal fun HomeTopBand(
         }
         Row(
             // The same inset from the top edge as the status pill floating over every other page, so the pill keeps
-            // its rounded top in portrait (Droidtop/tracker#675).
+            // its rounded top in portrait (mytop-project/tracker#675).
             modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = window.edgePadding, vertical = STATUS_INSET),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.Xs),

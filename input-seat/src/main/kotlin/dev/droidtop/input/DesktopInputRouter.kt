@@ -44,7 +44,7 @@ class DesktopInputRouter {
     var transform: PointerTransform? = null
 
     /**
-     * Where absolute pointer motion from this router's surface goes (Droidtop/tracker#908, step D3): the unnamed call
+     * Where absolute pointer motion from this router's surface goes (mytop-project/tracker#908, step D3): the unnamed call
      * while the desktop has one output, the surface's own output once there are more ([PointerTarget.choose]). Set
      * by the surface's host whenever the session's outputs change. Buttons, scrolling and relative motion go through
      * the one pointer whatever this is, so they need no output.
@@ -53,7 +53,7 @@ class DesktopInputRouter {
 
     /**
      * The title-bar buttons and resize bands drawn over this surface (docs/SPEC.md 2b "Window controls",
-     * Droidtop/tracker#910), in this view's pixels; [WindowControls.NONE] under labwc, with no session, or before sway's
+     * mytop-project/tracker#910), in this view's pixels; [WindowControls.NONE] under labwc, with no session, or before sway's
      * tree is read. A finger or a mouse's primary button pressed on one of them is droidtop's ([onWindowButton], or
      * sway's own resize from the band), and nothing of that press reaches the compositor as a click. Every other press
      * goes exactly as it did before. Main thread.
@@ -84,7 +84,7 @@ class DesktopInputRouter {
     var gamepadPointerEnabled: Boolean = true
 
     /**
-     * The pad's chord layout (docs/SPEC.md 6b "Pad chords", Droidtop/tracker#383), Steam's controller layout format
+     * The pad's chord layout (docs/SPEC.md 6b "Pad chords", mytop-project/tracker#383), Steam's controller layout format
      * played by the one mapping engine: by default, held, L2 puts the face buttons and the D-pad on key chords (copy,
      * paste, cut, undo, the arrow keys). A pad button the layout leaves unbound is not taken, so D-pad and A keep
      * driving droidtop's own focus, and nothing changes while no layout is set. The host parses it off the main thread.
@@ -101,7 +101,7 @@ class DesktopInputRouter {
     /** The pad buttons the chord engine took the press of, so it also gets their release. */
     private val chordHeld = mutableSetOf<dev.droidtop.mapping.MappingEngine.Physical>()
 
-    /** Touch on the surface: tap, drag, long press and two-finger tap and scroll (docs/SPEC.md 6b, Droidtop/tracker#684). */
+    /** Touch on the surface: tap, drag, long press and two-finger tap and scroll (docs/SPEC.md 6b, mytop-project/tracker#684). */
     private val touch = DirectTouchGestures(
         object : DirectTouchGestures.Output {
             override fun moveTo(x: Float, y: Float) {
@@ -152,7 +152,7 @@ class DesktopInputRouter {
     fun attachTo(view: View) {
         view.isFocusable = true
         view.isFocusableInTouchMode = true
-        // Android's own touch thresholds for this screen (Droidtop/tracker#684).
+        // Android's own touch thresholds for this screen (mytop-project/tracker#684).
         val config = android.view.ViewConfiguration.get(view.context)
         touch.slopPx = config.scaledTouchSlop.toFloat()
         touch.longPressMs = android.view.ViewConfiguration.getLongPressTimeout().toLong()
@@ -168,7 +168,7 @@ class DesktopInputRouter {
         view.setOnFocusChangeListener { _, focused -> if (!focused) releaseHeldInput() }
         // Back from a sheet (the Start menu, the windows list), the keys are the desktop's again: Android hands the focus
         // back to whatever last had it, and a bar button holding it took the pad's A as a click, so the Start menu came
-        // back and the next typing went to its search (Droidtop/tracker#350, rig 2638).
+        // back and the next typing went to its search (mytop-project/tracker#350, rig 2638).
         view.viewTreeObserver.addOnWindowFocusChangeListener { focused ->
             if (!focused) releaseHeldInput() else if (!view.isFocused) view.requestFocus()
         }
@@ -208,7 +208,7 @@ class DesktopInputRouter {
         return when {
             // A finger first, whatever else the device says it is: the emulator's touchscreen reports itself as a
             // touchscreen and a stylus (source 0x5002), and the stylus branch below took two fingers as one pointer,
-            // so a two-finger tap or scroll only moved the cursor (Droidtop/tracker#684, rig 2638).
+            // so a two-finger tap or scroll only moved the cursor (mytop-project/tracker#684, rig 2638).
             isFingerTouch(event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN), event.getToolType(0)) -> onTouch(event)
             event.isFromSource(InputDevice.SOURCE_MOUSE_RELATIVE) -> onRelativePointer(event)
             event.isFromSource(InputDevice.SOURCE_MOUSE) ||
@@ -615,7 +615,7 @@ class DesktopInputRouter {
      * on-screen keyboard, droidtop's own keyboards (they build KeyEvents with the virtual device), anything
      * without a real input device. Those keys were picked against Android's US virtual key map, so they go
      * through the container's US text keyboard; a physical keyboard's keys go through the layout keyboard
-     * (docs/SPEC.md 6b "Keyboard layout", Droidtop/tracker#387).
+     * (docs/SPEC.md 6b "Keyboard layout", mytop-project/tracker#387).
      */
     private fun isTyped(event: KeyEvent): Boolean {
         if (event.flags and KeyEvent.FLAG_SOFT_KEYBOARD != 0) return true
@@ -628,7 +628,7 @@ class DesktopInputRouter {
      * A modifier can arrive with no press for the compositor to latch: Android carries it in the meta state of the key
      * itself, which is all an IME-synthesized keystroke has (and `adb shell input keycombination` sends), and a hardware
      * keyboard whose modifier press predates this surface's focus never delivered one either. Shift was handled so
-     * first ('!' reached the container as '1', capitals as lowercase, Droidtop/tracker#147); Ctrl, Alt and Meta went
+     * first ('!' reached the container as '1', capitals as lowercase, mytop-project/tracker#147); Ctrl, Alt and Meta went
      * unpressed, so Ctrl+minus reached foot as a bare minus (rig 2026-10-16). Now, for every modifier the meta state
      * says is part of the keystroke and the container does not already see held, one is pressed around the key. The
      * container sees it because host-bridge follows every modifier key with the keyboard's modifier state

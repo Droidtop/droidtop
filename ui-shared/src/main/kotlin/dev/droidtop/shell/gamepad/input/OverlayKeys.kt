@@ -4,7 +4,7 @@ import androidx.compose.runtime.compositionLocalOf
 
 /**
  * Who a key belongs to while overlays open and close (docs/SPEC.md 6e,
- * "The overlay stack owns the keys", Droidtop/tracker#359).
+ * "The overlay stack owns the keys", mytop-project/tracker#359).
  *
  * Every modal surface is a Compose `Dialog`, a window of its own, and
  * Android moves window focus to it a frame or more after the press that

@@ -132,7 +132,7 @@ class RomDatabaseMigrationTest {
             assertEquals("$column must stay a nullable column", 0, notNullByColumn[column])
         }
 
-        // v12 (Droidtop/tracker#318): the row's game has a uid, its path the uid's first locator on this device, and
+        // v12 (mytop-project/tracker#318): the row's game has a uid, its path the uid's first locator on this device, and
         // the identity tables are otherwise empty: nothing about the row is claimed, nothing is re-keyed.
         val uid = runBlocking { room.identityDao().uidAt(dev.droidtop.library.identity.GameIdentities.THIS_DEVICE, GAME_ID) }
         assertTrue("the migrated row's path must locate a uid", uid != null && uid.matches(Regex("[0-9a-f]{32}")))
@@ -141,7 +141,7 @@ class RomDatabaseMigrationTest {
         val games = room.openHelper.readableDatabase.query("SELECT COUNT(*) FROM games WHERE uid = ?", arrayOf<Any>(uid!!)).use { it.moveToFirst(); it.getInt(0) }
         assertEquals(1, games)
 
-        // v13 (Droidtop/tracker#318 §5): the review queue exists and starts empty; the next pass fills it.
+        // v13 (mytop-project/tracker#318 §5): the review queue exists and starts empty; the next pass fills it.
         assertEquals(null, runBlocking { room.romDao().matchQueueRow(GAME_ID) })
         assertEquals(emptyList<Any>(), runBlocking { room.romDao().matchQueueRows(dev.droidtop.library.identity.MatchQueue.QUEUED) })
         assertEquals(null, runBlocking { room.romDao().matchAlias("anything") })

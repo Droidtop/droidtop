@@ -70,10 +70,10 @@ object PluginPermissions {
             android = AndroidNeed("android.permission.INTERNET"),
             caution = "A plugin with this connects by itself, also to other apps on this device, so only allow it for a plugin from a source you trust",
         ),
-        // D21 (Droidtop/tracker#556, #553): the computers and handhelds the person paired, and what the same plugin
+        // D21 (mytop-project/tracker#556, #553): the computers and handhelds the person paired, and what the same plugin
         // announced on each; never an address, a key or another plugin's value.
         PluginPermission("devices.paired", PermissionTier.DANGEROUS, "See and reach the devices you paired with droidtop"),
-        // D22 (Droidtop/tracker#645): a VPN plugin's devices, which droidtop announces itself to (KDE Connect).
+        // D22 (mytop-project/tracker#645): a VPN plugin's devices, which droidtop announces itself to (KDE Connect).
         PluginPermission("peers.addresses", PermissionTier.DANGEROUS, "Tell droidtop where your other devices can be reached"),
         PluginPermission("storage.volumes", PermissionTier.NORMAL, "See your storage devices and free space"),
         PluginPermission("files.picker", PermissionTier.NORMAL, "Ask you to choose files or folders"),
@@ -111,13 +111,13 @@ object PluginPermissions {
         PluginPermission("apps.bind", PermissionTier.DANGEROUS, "Stay connected to other apps"),
         PluginPermission("vault.own", PermissionTier.NORMAL, "Keep its own saved passwords"),
         PluginPermission("context.sync", PermissionTier.DANGEROUS, "Keep its data in step with apps on your paired computers"),
-        // docs/plugin-api.md 3 H3 (Droidtop/tracker#793): its declared data kinds, which move only when the person asks.
+        // docs/plugin-api.md 3 H3 (mytop-project/tracker#793): its declared data kinds, which move only when the person asks.
         PluginPermission("data.kinds", PermissionTier.NORMAL, "Hand its data to plugins that can take it, when you ask"),
         PluginPermission("auth.oauth", PermissionTier.NORMAL, "Ask you to sign in to a service"),
         PluginPermission("web.session", PermissionTier.DANGEROUS, "Use your sign-in on its sites"),
         PluginPermission("github.api", PermissionTier.NORMAL, "Use your GitHub account for GitHub requests"),
         PluginPermission("github.token.read", PermissionTier.DANGEROUS, "See your GitHub sign-in"),
-        // docs/plugin-api.md 3 G8 (Droidtop/tracker#379): through droidtop's own Steam session, never its secrets.
+        // docs/plugin-api.md 3 G8 (mytop-project/tracker#379): through droidtop's own Steam session, never its secrets.
         PluginPermission("steam.account", PermissionTier.DANGEROUS, "Use your Steam account: claim free games, redeem keys and show games as played"),
         PluginPermission("diagnostics.read", PermissionTier.DANGEROUS, "Read droidtop's logs", officialOnly = true),
         PluginPermission("telemetry.send", PermissionTier.DANGEROUS, "Send usage data"),

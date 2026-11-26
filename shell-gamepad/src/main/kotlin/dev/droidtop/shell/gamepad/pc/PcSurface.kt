@@ -49,7 +49,7 @@ internal fun LibraryEntry.engineGroup(): String? =
  * Whether this copy is on the device: a store row says so; a folder the
  * walk still finds is installed by definition, and one it no longer finds
  * ([LibraryEntry.missing]) is not, whatever its store row says (a store's
- * game whose files went showed MISSING in Not played yet, Droidtop/tracker#756).
+ * game whose files went showed MISSING in Not played yet, mytop-project/tracker#756).
  * The Installed shelf and the Installed view read this one answer (docs/SPEC.md 7i).
  */
 internal val LibraryEntry.isInstalled: Boolean

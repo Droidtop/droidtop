@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * "Get apps" (docs/SPEC.md 10b "Installing apps", Droidtop/tracker#261): every app catalog plugin
+ * "Get apps" (docs/SPEC.md 10b "Installing apps", mytop-project/tracker#261): every app catalog plugin
  * ([AppCatalogs]) drawn by droidtop, the sibling of Get games. Per catalog: a search, its sources (repositories or
  * tracked pages: each with its address, key fingerprint, apps, last refresh, on/off, Refresh and Remove), the known
  * sources it lists to add with a press, and Add by address or QR code. An app's page shows its summary and

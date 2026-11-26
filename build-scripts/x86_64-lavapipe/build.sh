@@ -20,14 +20,14 @@
 # GPL-3.0). usr/share/doc/x86_64-lavapipe/PACKAGES in the archive names every
 # package and version it was made from.
 #
-# OpenGL (Droidtop/tracker#309): WineD3D's default renderer is OpenGL, and the
+# OpenGL (mytop-project/tracker#309): WineD3D's default renderer is OpenGL, and the
 # x86_64 guest had none. Termux's own mesa package is a DRI GLX behind glvnd,
 # which needs a GLX extension the app's X server does not have, so the libGL here
 # is Mesa's xlib target (client-side GLX, XPutImage presentation, llvmpipe),
 # built from Termux's recipe and patches by mesa-gl/ (MESA_GL_DEB is that
 # package); its dependencies join the same closure.
 #
-# Venus (Droidtop/tracker#608): Mesa's virtio Vulkan ICD, which forwards Vulkan to
+# Venus (mytop-project/tracker#608): Mesa's virtio Vulkan ICD, which forwards Vulkan to
 # the app's vtest server and so to the device's own GPU, built from Termux's
 # recipe by build-scripts/x86_64-venus/mesa-venus (MESA_VENUS_DEB is that
 # package). It goes beside lavapipe under the same loader, so one archive holds

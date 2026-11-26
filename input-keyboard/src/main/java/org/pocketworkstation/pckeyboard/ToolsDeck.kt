@@ -18,7 +18,7 @@ import org.pocketworkstation.pckeyboard.remote.RemoteStrip
 import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
- * The keyboard with its editing helpers (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): a strip of tool
+ * The keyboard with its editing helpers (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340): a strip of tool
  * buttons above the key grid, and panels (clipboard history, [ClipboardPanel]; macros) that take the grid's place
  * while open. The one wrapper both surfaces use: droidtop's input method wraps its input view in it ([wrap], from
  * `KeyboardSwitcher`), and [KeyboardPanel] (the companion, the overlays, droidtop's own fields) wraps its grid. What a
@@ -39,7 +39,7 @@ class ToolsDeck private constructor(
     /** Whether the strip of tools shows ("Tool strip"); off, the deck is only here for a mode's controls. */
     val stripShown: Boolean,
 ) : LinearLayout(context) {
-    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
+    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, mytop-project/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
     private val stack = FrameLayout(context)
     private var overlay: View? = null
@@ -49,13 +49,13 @@ class ToolsDeck private constructor(
     private val notice = TextView(context)
     private val inlineRow = LinearLayout(context)
 
-    // A phone typing into this device through "Type from another device" (Droidtop/tracker#903), above the strip.
+    // A phone typing into this device through "Type from another device" (mytop-project/tracker#903), above the strip.
     private val remoteRow = LinearLayout(context)
     private val remoteLine = TextView(context)
     private val remoteNotice = TextView(context)
     private val remoteListener: (RemoteStrip) -> Unit = { state -> post { showRemote(state) } }
 
-    // Emoji for the word just typed (Droidtop/tracker#903 H4), above the strip; hidden while there are none.
+    // Emoji for the word just typed (mytop-project/tracker#903 H4), above the strip; hidden while there are none.
     private val emojiRow = LinearLayout(context)
     private val emojiScroll = HorizontalScrollView(context)
     private var emojiWord = ""
@@ -64,7 +64,7 @@ class ToolsDeck private constructor(
     // Autofill chips are surfaces of another process; on Android 11 and later they are clipped to this host.
     private val inlineHost: ViewGroup = if (Build.VERSION.SDK_INT >= 30) InlineClipView(context) else FrameLayout(context)
 
-    // The input method's mode (Droidtop/tracker#903 H12c): one-handed puts its controls beside the keys. Embedded
+    // The input method's mode (mytop-project/tracker#903 H12c): one-handed puts its controls beside the keys. Embedded
     // keyboards have no modes (KeyboardModes.current answers Normal there).
     private val inputMethod = KeyboardAppearance.drawnByInputMethod(context)
     private val mode = KeyboardModes.current(context)
@@ -142,7 +142,7 @@ class ToolsDeck private constructor(
     val panelOpen: Boolean get() = overlay != null
 
     /**
-     * What a pad steps through above the keys (PadKeys, Droidtop/tracker#903 H12c): the open panel's buttons while one
+     * What a pad steps through above the keys (PadKeys, mytop-project/tracker#903 H12c): the open panel's buttons while one
      * is open, else the strip's tools then the mode's controls. A tool is pressed as a tap presses it.
      */
     fun padTargets(): List<View> {
@@ -155,7 +155,7 @@ class ToolsDeck private constructor(
     /** Whether the clipboard panel is the one open. */
     val clipboardOpen: Boolean get() = overlay is ClipboardPanel
 
-    /** X on a pad over an open panel (Droidtop/tracker#903 H12d): the clip under the ring opens its menu. */
+    /** X on a pad over an open panel (mytop-project/tracker#903 H12d): the clip under the ring opens its menu. */
     fun padMenu(target: View?): Boolean = (overlay as? ClipboardPanel)?.padMenu(target) ?: false
 
     /** B on a pad over an open panel: a menu or question inside it closes first; false when the panel itself should. */
@@ -180,7 +180,7 @@ class ToolsDeck private constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        // Switch keyboard first, where other keyboards keep their globe key (Droidtop/tracker#717): the space bar's
+        // Switch keyboard first, where other keyboards keep their globe key (mytop-project/tracker#717): the space bar's
         // long press does the same, but nothing on screen said so (rig 2936). Only the input method has one to switch.
         switchKeyboard?.let { switch -> row.addView(tool(context.getString(R.string.tool_switch_keyboard)) { switch.run() }) }
         if (ToolsPrefs.clipboardHistory(context)) row.addView(tool(context.getString(R.string.tool_clipboard)) { toggle("clipboard") { clipboardPanel() } })
@@ -208,7 +208,7 @@ class ToolsDeck private constructor(
         fun label() = context.getString(R.string.tool_layout, ToolsPrefs.form(context).id)
         button = tool(label()) {
             val form = KeyboardForm.next(ToolsPrefs.form(context))
-            // The current orientation's shape: landscape and portrait keep their own (Droidtop/tracker#903 H1).
+            // The current orientation's shape: landscape and portrait keep their own (mytop-project/tracker#903 H1).
             ToolsPrefs.setForm(context, form)
             button.text = label()
             (keyboard.layoutParams as? FrameLayout.LayoutParams)?.let { it.gravity = formGravity() }
@@ -219,7 +219,7 @@ class ToolsDeck private constructor(
         return button
     }
 
-    /** "Mode: Normal" and the like: opens the chooser of modes (Droidtop/tracker#903 H12c). */
+    /** "Mode: Normal" and the like: opens the chooser of modes (mytop-project/tracker#903 H12c). */
     private fun modesButton(): Button =
         tool(context.getString(R.string.tool_mode, context.getString(modeName(mode)))) { toggle("modes") { modesPanel() } }
 
@@ -276,7 +276,7 @@ class ToolsDeck private constructor(
         panel.isClickable = true
         stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         // It slides up into place over the keys, which fade and are then hidden, keeping their size
-        // (Droidtop/tracker#903 H12a; PanelMotion, under the keyboard's reduce-motion rule).
+        // (mytop-project/tracker#903 H12a; PanelMotion, under the keyboard's reduce-motion rule).
         PanelMotion.enter(panel, dp(PANEL_SLIDE_DP).toFloat())
         PanelMotion.hide(keyboard, INVISIBLE)
     }
@@ -307,7 +307,7 @@ class ToolsDeck private constructor(
     fun clearInlineSuggestions() = showInlineSuggestions(emptyList())
 
     /**
-     * Offers emoji for [word], the word just before the cursor (Droidtop/tracker#903 H4): up to three, in the tone last
+     * Offers emoji for [word], the word just before the cursor (mytop-project/tracker#903 H4): up to three, in the tone last
      * picked; a tap replaces the word with the emoji. An empty word, a [sensitive] field (passwords and fields asking
      * for no learning, IncognitoRules), the emoji panel switched off or no match hides the row. Called by the input
      * method as the text before the cursor changes.
@@ -387,7 +387,7 @@ class ToolsDeck private constructor(
     )
 
     /**
-     * The GIFs and Stickers tabs (Droidtop/tracker#903 H5): only in the input method, with an editor that takes text,
+     * The GIFs and Stickers tabs (mytop-project/tracker#903 H5): only in the input method, with an editor that takes text,
      * and never in a password or no-learning field (IncognitoRules.sensitiveField).
      */
     private fun gifTabs(): GifTabs? {
@@ -547,7 +547,7 @@ class ToolsDeck private constructor(
     }
 
     /**
-     * The clipboard history (Droidtop/tracker#903 H12d, [ClipboardPanel]): a tap pastes and closes the panel; into a
+     * The clipboard history (mytop-project/tracker#903 H12d, [ClipboardPanel]): a tap pastes and closes the panel; into a
      * container the clip goes onto the clipboard and the panel stays, saying to paste there.
      */
     private fun clipboardPanel(): View = ClipboardPanel(
@@ -629,7 +629,7 @@ class ToolsDeck private constructor(
             media: MediaTarget? = null,
         ): View {
             val strip = ToolsPrefs.strip(context)
-            // One-handed keeps its controls beside the keys with the strip off (Droidtop/tracker#903 H12c).
+            // One-handed keeps its controls beside the keys with the strip off (mytop-project/tracker#903 H12c).
             val mode = KeyboardModes.current(context)
             val controls = mode == KeyboardModes.Mode.LEFT || mode == KeyboardModes.Mode.RIGHT
             if (!strip && !controls) return keyboard

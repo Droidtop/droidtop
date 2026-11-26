@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * The themes the keyboard's theme setting offers, in order (Droidtop/tracker#903 H12b; docs/SPEC.md 6a, "Themes,
+ * The themes the keyboard's theme setting offers, in order (mytop-project/tracker#903 H12b; docs/SPEC.md 6a, "Themes,
  * light and dark"): HKR's modern ones first, then every classic Hacker's Keyboard theme, as before. The owner's rule
  * for HKR: "Hacker's Keyboard is our foundation. If we can rebuild it while keeping ALL of hacker's functionality...",
  * so no classic theme goes. Ids are the stored values and are never renumbered (strings.xml).

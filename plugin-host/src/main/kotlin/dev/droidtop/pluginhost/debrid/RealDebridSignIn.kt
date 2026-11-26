@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 /**
  * Real-Debrid's device sign-in for open-source apps (api.real-debrid.com, "Workflow for opensource apps";
- * Droidtop/tracker#638): droidtop asks for a short code under Real-Debrid's open-source client id, the person enters
+ * mytop-project/tracker#638): droidtop asks for a short code under Real-Debrid's open-source client id, the person enters
  * it at real-debrid.com/device, and the approval hands this device its own client id and secret, which turn the code
  * into a token and later refresh it. Nothing of droidtop's own is a secret here. Blocking network calls.
  */

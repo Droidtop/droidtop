@@ -30,7 +30,7 @@ internal class ChangelogBuild(
 )
 
 /**
- * What changed, shown after an update (docs/SPEC.md 7b, "Update onboarding", Droidtop/tracker#727). The changelog is
+ * What changed, shown after an update (docs/SPEC.md 7b, "Update onboarding", mytop-project/tracker#727). The changelog is
  * the build's own `changelog.json`, bundled by CI (docs/SPEC.md 10b, "Every build carries its changelog"): every
  * build's entry, newest first, the same text as its release notes. So a person who skipped builds sees every one
  * since the version they had, without the network.
@@ -115,7 +115,7 @@ object WhatsNew {
 
     /**
      * Whether What's new may open over [screen] now: not while it is going away, and over the shell only once the screen
-     * placement said the shell stays where it is ([settled], Droidtop/tracker#824). Before that, the placement could still
+     * placement said the shell stays where it is ([settled], mytop-project/tracker#824). Before that, the placement could still
      * start the shell again on another screen, over What's new: on the console it did, 0.4 s after What's new opened, and
      * the person never saw it. Standard and droidtop's other screens are never moved. Pure.
      */
@@ -162,7 +162,7 @@ object WhatsNew {
 
     /** The steps droidtop registers, at its start (DroidtopApplication), before onboarding or What's new reads them. */
     fun registerSteps() {
-        // The first step (Droidtop/tracker#740): HOME + R2, L2 or Start over any game needs the accessibility service,
+        // The first step (mytop-project/tracker#740): HOME + R2, L2 or Start over any game needs the accessibility service,
         // which Android leaves off. App-wide, right after What's new, with the button that turns it on.
         FeatureSteps.register(
             FeatureStep(
@@ -180,7 +180,7 @@ object WhatsNew {
                 applies = { context -> !dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(context).first },
             ),
         )
-        // Android's child-process limit (Droidtop/tracker#816): the device-setup item, asked once after the update when
+        // Android's child-process limit (mytop-project/tracker#816): the device-setup item, asked once after the update when
         // droidtop can lift it. The card is the question; Settings > Accounts and sources > Device setup undoes it.
         FeatureSteps.register(
             FeatureStep(

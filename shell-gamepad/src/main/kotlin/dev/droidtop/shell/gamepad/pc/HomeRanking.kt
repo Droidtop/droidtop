@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PlayStart
 
-/** Home's row of the games this person plays at this time of day (Droidtop/tracker#611, owner's "a", 2026-10-28). */
+/** Home's row of the games this person plays at this time of day (mytop-project/tracker#611, owner's "a", 2026-10-28). */
 internal const val SHELF_USUAL_NOW = "usual-now"
 
 /** How many hours either side of now a start still counts as "at this time of day". */
@@ -33,7 +33,7 @@ internal fun usualNowShelf(starts: List<PlayStart>, all: List<LibraryEntry>, now
 }
 
 /**
- * Home's rows in the order this person uses them (Droidtop/tracker#611): the rows they pinned first, in their order
+ * Home's rows in the order this person uses them (mytop-project/tracker#611): the rows they pinned first, in their order
  * ([rules]), then Usual now when there is one (it is about this hour), then the rows that started the most games
  * ([use], starts from each row id), rows used alike keeping the order they came in, so a new person sees today's
  * order. Rows they hid are left out. Pure.

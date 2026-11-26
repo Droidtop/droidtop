@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** The requirement model's rules (docs/SPEC.md "Permissions", §7 and §8; Droidtop/tracker#830 R1). */
+/** The requirement model's rules (docs/SPEC.md "Permissions", §7 and §8; mytop-project/tracker#830 R1). */
 class RequirementsTest {
     private fun state(id: String, met: Boolean) = RequirementState(AndroidAccess.all.first { it.id == id }, met)
 

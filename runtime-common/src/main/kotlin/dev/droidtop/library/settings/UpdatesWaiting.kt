@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * How many updates are waiting, everything the Updates page lists (droidtop, plugins, apps, games), as one number every
- * entry to the page reads (docs/SPEC.md 10b "The Updates page", Droidtop/tracker#792): the left menu's badge on
+ * entry to the page reads (docs/SPEC.md 10b "The Updates page", mytop-project/tracker#792): the left menu's badge on
  * Updates, the Quick Menu's "Updates · N available" row, the companion's Home. The page publishes it each time it lists
  * its rows; [refresh] (installed by `:app`, where the page is) lists them again in the background, for an entry opened
  * before the page was.

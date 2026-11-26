@@ -27,7 +27,7 @@ data class AppTarget(val packageName: String, val service: String) {
 }
 
 /**
- * Whether droidtop trusts an app interface plugin's app (docs/plugin-api.md 1.3, Droidtop/tracker#547). The owner:
+ * Whether droidtop trusts an app interface plugin's app (docs/plugin-api.md 1.3, mytop-project/tracker#547). The owner:
  * "Applications interface plugins don't get a special signing certificate. They use the android signature. This also
  * means using root to bypass the signature check will STILL trip our trust store". So the decision rests on droidtop's
  * own verification of every APK of the app ([ApkCheck], made with apksig by [AppInterfaces]), checked against what
@@ -53,8 +53,8 @@ object AppInterfaceTrust {
     /**
      * The official app certificates, by package: the SHA-256 of each one's signing certificate (lowercase hex). An app
      * signed by one of these is Official. Enginehost's is its release certificate (the v2 signer of enginehost-latest.apk,
-     * Droidtop/tracker#547). droidtop Browser's is the APK leaf derived from the droidtop root for subject
-     * "apk:Droidtop/droidtop-browser" (`plugin-key-provision apk`, deterministic, so it never changes; Droidtop/tracker#605).
+     * mytop-project/tracker#547). droidtop Browser's is the APK leaf derived from the droidtop root for subject
+     * "apk:mytop-project/droidtop-browser" (`plugin-key-provision apk`, deterministic, so it never changes; mytop-project/tracker#605).
      */
     val OFFICIAL: Map<String, Set<String>> = mapOf(
         "dev.enginehost" to setOf("56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"),
@@ -63,7 +63,7 @@ object AppInterfaceTrust {
 
     /**
      * The certificates that make [packageName] Official: its pinned ones, and for the enhancement provider host
-     * ([ProviderHost.PACKAGE], Droidtop/tracker#852) [hostCert], the certificate of the key droidtop made on this device
+     * ([ProviderHost.PACKAGE], mytop-project/tracker#852) [hostCert], the certificate of the key droidtop made on this device
      * and signed the host with. No other package is ever Official by that key, and the host by no other key.
      */
     fun officialCerts(packageName: String, hostCert: String?): Set<String> = when (packageName) {
@@ -140,7 +140,7 @@ object AppInterfaceTrust {
     const val MIN_APP_CONTRACT = 2
 
     /**
-     * What to tell the person when an app carries a plugin this droidtop cannot speak (Droidtop/tracker#854), or null
+     * What to tell the person when an app carries a plugin this droidtop cannot speak (mytop-project/tracker#854), or null
      * when it can: Enginehost was missing from Plugins altogether. [manifestBytes] is its `droidtop-plugin.json` as
      * read, [manifest] what droidtop made of it (null when it could not read it: a kind or shape it does not know).
      * The contract is read from the bytes themselves, so a plugin made for a newer droidtop says so and is not told to

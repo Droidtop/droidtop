@@ -7,7 +7,7 @@ import org.json.JSONObject
 data class GogChangelog(val latest: String, val pageUrl: String?)
 
 /**
- * "What's new" for a GOG game (docs/SPEC.md 7i, Droidtop/tracker#229): the changelog GOG keeps for the product, from
+ * "What's new" for a GOG game (docs/SPEC.md 7i, mytop-project/tracker#229): the changelog GOG keeps for the product, from
  * its public products API (`api.gog.com/products/<id>?expand=changelog`, no key, no account; only the product id is
  * sent). GOG writes it as HTML, newest first, one heading or bold line per version; droidtop shows the newest entry
  * as plain text. Read-only and asked for, like ProtonDB and Steam's news.

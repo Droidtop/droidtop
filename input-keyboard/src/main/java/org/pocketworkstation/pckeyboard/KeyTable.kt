@@ -4,7 +4,7 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 
 /**
- * The one table from characters and key names to Android keys (Droidtop/tracker#772): the slab, macros and the
+ * The one table from characters and key names to Android keys (mytop-project/tracker#772): the slab, macros and the
  * bridge from Hacker's Keyboard all read it, where each used to carry its own copy.
  *
  * Key codes, not a layout. The far side owns the layout (a container's compositor runs a us/pc105 keymap, see

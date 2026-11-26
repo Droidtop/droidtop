@@ -5,7 +5,7 @@ import dev.droidtop.pluginhost.GrantState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Another app asking droidtop to start a game (Droidtop/tracker#124): the plugin API's three states, asked on first use. */
+/** Another app asking droidtop to start a game (mytop-project/tracker#124): the plugin API's three states, asked on first use. */
 class ExternalGameLaunchTest {
 
     @Test

@@ -19,7 +19,7 @@ class BrowserInstallTest {
                 abis.forEach { abi ->
                     put(
                         JSONObject().put("name", "droidtop-browser-$abi.apk").put("size", 134_000_000L)
-                            .put("browser_download_url", "https://github.com/Droidtop/droidtop-browser/releases/download/v160.0.1-dt.5/droidtop-browser-$abi.apk"),
+                            .put("browser_download_url", "https://github.com/mytop-project/droidtop-browser/releases/download/v160.0.1-dt.5/droidtop-browser-$abi.apk"),
                     )
                 }
             },

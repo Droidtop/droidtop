@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * Which kept images go when the image cache is over its limit (docs/SPEC.md 3, "Storage is checked before it is
- * spent"; Droidtop/tracker#911): the pure half of [OciImageStore.evictToFit], so the choice is tested without a
+ * spent"; mytop-project/tracker#911): the pure half of [OciImageStore.evictToFit], so the choice is tested without a
  * store on disk.
  *
  * Images are given least recently used first, as the store keeps them. Each is taken in turn until what stays on

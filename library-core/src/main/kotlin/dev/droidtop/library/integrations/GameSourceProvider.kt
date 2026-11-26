@@ -68,19 +68,19 @@ interface GameSourceProvider {
 
     /**
      * What the source features now, newest or most popular first, for Get new games' page (docs/plugin-api.md 1.8
-     * "featured", Droidtop/tracker#612): the same results [search] gives, scoped to [platform] when given. A source
+     * "featured", mytop-project/tracker#612): the same results [search] gives, scoped to [platform] when given. A source
      * with no such list has nothing, which is not a failure.
      */
     suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> = Result.success(emptyList())
 
     /**
      * What this source's own index ([SourceIndex]) has for [query], with no call to the source and no network
-     * (Droidtop/tracker#937): what typing shows. A source with no index has nothing.
+     * (mytop-project/tracker#937): what typing shows. A source with no index has nothing.
      */
     suspend fun indexed(context: Context, query: String, platform: String?, limit: Int): List<AcquireContentResult> = emptyList()
 
     /**
-     * Gets the source ready to answer, before it is asked (Droidtop/tracker#848): a plugin source is started in its
+     * Gets the source ready to answer, before it is asked (mytop-project/tracker#848): a plugin source is started in its
      * process, held by [SourceWarmth], so a cold start is not spent out of [search]'s own budget. Null when it is
      * ready, else why not. A source that needs nothing started has nothing to do.
      */
@@ -98,7 +98,7 @@ interface GameSourceProvider {
 
     /**
      * Fetches [result] from its row into [destination] (docs/plugin-api.md "Fetchers answer in the one search",
-     * Droidtop/tracker#218): the same `acquire` job the detail page starts, with the values the result gave. The
+     * mytop-project/tracker#218): the same `acquire` job the detail page starts, with the values the result gave. The
      * outcome's message is the sentence to show. Only called when [canGet].
      */
     suspend fun get(
@@ -153,7 +153,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map(::resultOf))
     }
 
-    /** What the source answered, added to its own index, unless it opted out (Droidtop/tracker#937). */
+    /** What the source answered, added to its own index, unless it opted out (mytop-project/tracker#937). */
     private fun remember(context: Context, data: org.json.JSONObject) {
         if (SourceIndex.allowed(source.record)) runCatching { SourceIndex.record(context, id, data) }
     }
@@ -165,7 +165,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
     }
 
     /**
-     * `featured {platform, limit, context}` (docs/plugin-api.md 1.8, Droidtop/tracker#612): optional, so a source that
+     * `featured {platform, limit, context}` (docs/plugin-api.md 1.8, mytop-project/tracker#612): optional, so a source that
      * answers UNSUPPORTED features nothing. Any other failure is the
      * source's to show, as a search's is. The same budget as a search.
      */
@@ -236,9 +236,9 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
             extraWhenFailed = {
                 listOf(AcquireContentSources.pluginPageRow("source_detail_page_${source.record.manifest.id}", "Open $label's page", source.record.manifest.id))
             },
-            // A reply of the item's bundles is its item page, drawn as droidtop draws a record (Droidtop/tracker#737).
+            // A reply of the item's bundles is its item page, drawn as droidtop draws a record (mytop-project/tracker#737).
             itemPage = { ctx, data, messages -> SourceItemPage.read(ctx, source.record, result.id, ref, context, data, messages) },
-            // The record page asks the source and downloads from it: offline it says so first (Droidtop/tracker#594).
+            // The record page asks the source and downloads from it: offline it says so first (mytop-project/tracker#594).
             needsNetwork = true,
         )
     }

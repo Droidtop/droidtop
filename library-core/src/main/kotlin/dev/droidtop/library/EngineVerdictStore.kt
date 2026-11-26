@@ -10,7 +10,7 @@ import java.io.File
  * writes the same answers (docs/SPEC.md 7g). Until 2026-10-02 only the PC
  * walk kept verdicts, and only for rule 6; the engine walk, which is the
  * slow one on a card, kept nothing, so a rescan of unchanged folders asked
- * the card every engine question again (Droidtop/tracker#275).
+ * the card every engine question again (mytop-project/tracker#275).
  *
  * Callers [forRules] and [save] on a background thread: both touch the
  * file.

@@ -83,7 +83,7 @@ object ControllerLayouts {
 
     /**
      * The active pad has no L2 and R2 at all, as a key or as an axis: a held Select is its R2 and a held Start its L2
-     * (PadGate's holds), and the hints say so (Droidtop/tracker#621 M9). False with no pad, where nothing is held.
+     * (PadGate's holds), and the hints say so (mytop-project/tracker#621 M9). False with no pad, where nothing is held.
      */
     val triggerless: Boolean get() = triggerlessState
 
@@ -101,7 +101,7 @@ object ControllerLayouts {
     private var console: ConsoleDef? = null
     private var captures: Map<String, PadCapture> = emptyMap()
 
-    /** The button labels chosen per pad in Settings > Controls (Droidtop/tracker#723), by descriptor. */
+    /** The button labels chosen per pad in Settings > Controls (mytop-project/tracker#723), by descriptor. */
     private var glyphOverrides: Map<String, dev.droidtop.library.controller.GlyphFamily> = emptyMap()
     private var glyphListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var snapshot: Map<String, String> = emptyMap()
@@ -119,7 +119,7 @@ object ControllerLayouts {
 
     /**
      * Whether a controller or a hardware keyboard is attached right now, kept live from the device list: plugging
-     * one in or out changes it (owner, 2026-10-23, Droidtop/tracker#612: with none, droidtop raises the on-screen
+     * one in or out changes it (owner, 2026-10-23, mytop-project/tracker#612: with none, droidtop raises the on-screen
      * keyboard when it puts the cursor in a field, as any touch app does). Read after [listen].
      */
     val padOrKeyboard: StateFlow<Boolean> = padOrKeyboardState
@@ -445,7 +445,7 @@ object ControllerLayouts {
             capture = pad?.let { captures[it.descriptor] },
             signature = signature,
         )
-        // The person's own choice of labels for this pad, glyphs only (Droidtop/tracker#723).
+        // The person's own choice of labels for this pad, glyphs only (mytop-project/tracker#723).
         val resolved = dev.droidtop.library.controller.GlyphOverrides.apply(
             LayoutResolver.resolve(facts),
             pad?.let { glyphOverrides[it.descriptor] },

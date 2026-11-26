@@ -15,7 +15,7 @@ interface HostBridgeInput {
 
     /**
      * The pointer at ([x], [y]) of a [extentWidth] x [extentHeight] surface showing the compositor output named
-     * [outputName], wherever that output sits in the layout (Droidtop/tracker#908, steps D1b and D3). False, and
+     * [outputName], wherever that output sits in the layout (mytop-project/tracker#908, steps D1b and D3). False, and
      * nothing sent, when there is no output of that name.
      */
     fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean

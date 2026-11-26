@@ -1,7 +1,7 @@
 package dev.droidtop.net
 
 /**
- * What a download is for (docs/SPEC.md 12a, "One download engine", Droidtop/tracker#577). The owner: "it would behoove
+ * What a download is for (docs/SPEC.md 12a, "One download engine", mytop-project/tracker#577). The owner: "it would behoove
  * us to have categories and stuff, so things are segmented", and "The scrapes get a threadset, game downloads get a
  * threadset (though one game at a time), etc. Downloads are treated as separate sets of resources." Each category is
  * a pool of its own: how many of its downloads run at once is its own, and a full pool queues only its own downloads.

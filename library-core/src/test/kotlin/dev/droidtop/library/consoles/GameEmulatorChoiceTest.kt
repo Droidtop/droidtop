@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The per-game emulator choice as one control model: the Quick Menu cycles it with A, the companion's Game tab and
- * the metadata editor lay the same options out (Droidtop/tracker#414, #248). Stand-in players; only the model is
+ * the metadata editor lay the same options out (mytop-project/tracker#414, #248). Stand-in players; only the model is
  * tested.
  */
 class GameEmulatorChoiceTest {

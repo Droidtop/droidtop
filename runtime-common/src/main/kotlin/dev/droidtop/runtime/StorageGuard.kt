@@ -5,7 +5,7 @@ import android.os.StatFs
 
 /**
  * Whether the app's own storage is too full for droidtop to start (docs/SPEC.md 10c, "Storage full";
- * Droidtop/tracker#849). With about 12 MB free on /data, opening droidtop raised "Input dispatching timed out
+ * mytop-project/tracker#849). With about 12 MB free on /data, opening droidtop raised "Input dispatching timed out
  * (Application does not have a focused window)" and never drew a window. A start that has too little room shows one
  * plain screen that says so instead, before anything reads or writes a file.
  *

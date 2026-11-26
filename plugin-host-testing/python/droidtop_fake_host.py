@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A python plugin's host without a device (docs/plugin-api.md 3 I2, Droidtop/tracker#71).
+"""A python plugin's host without a device (docs/plugin-api.md 3 I2, mytop-project/tracker#71).
 
 Loads a plugin's plugin.py the way droidtop's bootstrap does (the modules droidtop and droidtop.host are in
 sys.modules first), answers droidtop.host.call from memory with grants the case sets, and runs the conformance

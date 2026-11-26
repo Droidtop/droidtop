@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Which android-build run the Emulator tests workflow tests (Droidtop/tracker#735).
+"""Which android-build run the Emulator tests workflow tests (mytop-project/tracker#735).
 
 A push tests the android-build of the SAME commit: it waits for that run, and starts one when there is none (ci/ branches
 are not built on push). A nightly or a by-hand run on main tests main's latest successful build. A given run id is

@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** When a place that shows updates checks again (Droidtop/tracker#792). */
+/** When a place that shows updates checks again (mytop-project/tracker#792). */
 class UpdateChecksStaleTest {
     @Test
     fun `a check more than 15 minutes old is checked again`() {

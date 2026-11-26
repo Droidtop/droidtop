@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
 /**
- * Reads a SharedPreferences file's `<map>` XML, as Nova and Apex put it in their backups (Droidtop/tracker#564),
+ * Reads a SharedPreferences file's `<map>` XML, as Nova and Apex put it in their backups (mytop-project/tracker#564),
  * without installing it as a preferences file. A small strict reader of that one format (`string`, `int`, `long`,
  * `float`, `boolean`, `set` of strings, `null`) rather than an XML library, so no entity or DTD is ever expanded and it
  * reads the same on the JVM and on Android. Anything it does not know is skipped. Pure.

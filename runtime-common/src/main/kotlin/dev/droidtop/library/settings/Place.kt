@@ -4,13 +4,13 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * The places things live (docs/SPEC.md 7j "Places", Droidtop/tracker#258, #346): Stores, Social,
+ * The places things live (docs/SPEC.md 7j "Places", mytop-project/tracker#258, #346): Stores, Social,
  * Downloads and Updates, and Plugins. Each is a registered settings catalog screen ([screenId],
  * registered by `:app`), and this is the one list of them for every mode: Gaming's left menu lists them
  * as sections, Standard's settings root and droidtop's icon shortcuts link to them, Desktop's Start menu
  * lists them. Kiosk and Kid hide them in every mode ([visible]), because they are the device's management
  * as much as Settings is. Updates is a place of its own (its links and notifications open it) but not
- * [listed]: it is a page of Downloads and Updates (owner, 2026-10-24, Droidtop/tracker#639: "Updates should
+ * [listed]: it is a page of Downloads and Updates (owner, 2026-10-24, mytop-project/tracker#639: "Updates should
  * be in the Downloads and Updates menu").
  */
 private const val STORES_SCREEN = "stores"
@@ -20,16 +20,16 @@ private const val UPDATES_SCREEN = "updates"
 private const val PLUGINS_SCREEN = "plugins"
 
 /**
- * [icon] is the place's glyph wherever it is a row that opens it (Standard's settings root, Droidtop/tracker#705: every
+ * [icon] is the place's glyph wherever it is a row that opens it (Standard's settings root, mytop-project/tracker#705: every
  * place there used to share Android's one settings cog).
  */
 enum class Place(val screenId: String, val title: String, val icon: CatalogIcon, val listed: Boolean = true) {
-    // "Game sources" (Droidtop/tracker#397 slice E): stores, game folders and imports, one place.
+    // "Game sources" (mytop-project/tracker#397 slice E): stores, game folders and imports, one place.
     STORES(STORES_SCREEN, "Game sources", CatalogIcon.LIBRARY),
     SOCIAL(SOCIAL_SCREEN, "Social", CatalogIcon.SOCIAL),
     DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates", CatalogIcon.DOWNLOADS),
     // A page of Downloads and Updates, reached by its "Updates · N available" row there, never a row of its own (the owner,
-    // 2026-10-30, Droidtop/tracker#792: "An updates link should be in the Downloads and Updates tab. Not there directly,
+    // 2026-10-30, mytop-project/tracker#792: "An updates link should be in the Downloads and Updates tab. Not there directly,
     // but a shortcut").
     UPDATES(UPDATES_SCREEN, "Updates", CatalogIcon.SYSTEM_UPDATES, listed = false),
     PLUGINS(PLUGINS_SCREEN, "Plugins", CatalogIcon.INTEGRATIONS),

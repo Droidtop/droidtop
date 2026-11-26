@@ -179,7 +179,7 @@ object PcLibrary {
             )
         }.let { games ->
             // The games on the stores' wishlists that the person does not have, held as WISHLIST
-            // (Droidtop/tracker#134): from each store's own copy, no network.
+            // (mytop-project/tracker#134): from each store's own copy, no network.
             val owned = games.filter { it.holding != dev.droidtop.library.stores.StoreHolding.WISHLIST }
             val ownedRows = owned.map {
                 StoreGame(
@@ -403,7 +403,7 @@ object PcLibrary {
 
     /**
      * [folders] without [path] and every folder under it; a folder that only shares its name's start (`<path>-2`) is
-     * kept. Pure (Droidtop/tracker#731).
+     * kept. Pure (mytop-project/tracker#731).
      */
     internal fun foldersKept(folders: Set<String>, path: String): Set<String> =
         folders.filterNot { it == path || it.startsWith("$path/") }.toSet()
@@ -465,7 +465,7 @@ object PcLibrary {
     /**
      * [knownInstalls], or null until the stores have answered once since start: "no store installs" and "not known
      * yet" are different answers, and engine detection keeps a store game's own facts in the second
-     * (Droidtop/tracker#891).
+     * (mytop-project/tracker#891).
      */
     fun knownInstallsOrNull(): List<StoreInstall>? = if (storesAnswered) knownInstalls() else null
 
@@ -583,7 +583,7 @@ object PcLibrary {
      * and each walked folder gets its own `droidtop.ScanLog` line with
      * what it cost ([PcFolderScan.Work]), as the ROM and engine walks
      * already do: the five-minute rescan of 79 games on a card
-     * (Droidtop/tracker#275) could not be explained from one line for the
+     * (mytop-project/tracker#275) could not be explained from one line for the
      * whole root.
      */
     private suspend fun scanGameFolders(

@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The one-time "Fetch box art and details for your games?" question after the
- * library's first walk (docs/SPEC.md 7h; Droidtop/tracker#174). Nobody opens
+ * library's first walk (docs/SPEC.md 7h; mytop-project/tracker#174). Nobody opens
  * a scrape menu to find out games can have art, so the first finished walk
  * asks once. The answer is stored the moment it is given and the question is
  * never raised again: [Answer.ASK] is the only state that ever asks.
@@ -52,7 +52,7 @@ object ScrapeOffer {
 
     /** How a scrape is started; a test swaps it. */
     // Automatic (the person's "Fetch automatically"): it fills gaps, joins a scrape already running, and does not ask
-    // again about games whose last answer stands (Droidtop/tracker#834).
+    // again about games whose last answer stands (mytop-project/tracker#834).
     internal var starter: (Context) -> Unit = { LibraryScrapeJob.start(it, "Scrape all systems", auto = true) }
 
     fun current(context: Context): Answer {
@@ -77,7 +77,7 @@ object ScrapeOffer {
                 pendingState.value = true
             }
             // A walk that found the same number of games as the one that last started a scrape changed nothing to
-            // fetch for (Droidtop/tracker#834: the index ran every minute or two and each run started the pass again).
+            // fetch for (mytop-project/tracker#834: the index ran every minute or two and each run started the pass again).
             Action.START -> if (sameAsLastStart(context, gameCount)) Unit else starter(context)
             Action.NOTHING -> Unit
         }

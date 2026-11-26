@@ -72,7 +72,7 @@ def check(message, require=False):
 
     With [require], a message with no Changelog trailer fails too: What's new listed developers' subjects ("Downloads:
     starting a job attaches the jobs registry only if nothing has yet") where a commit had none, and the owner wants
-    clean lines a person reads (2026-11-19, Droidtop/tracker#954 item 9). Commit hygiene requires it of every new
+    clean lines a person reads (2026-11-19, mytop-project/tracker#954 item 9). Commit hygiene requires it of every new
     commit; the generator still reads older commits' subjects.
     """
     if require and not any(key == "Changelog" for key, _ in trailers(message)):

@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.settings.Locked
 
 /**
- * A control droidtop may not change yet, kept in place (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 S2a,
+ * A control droidtop may not change yet, kept in place (docs/SPEC.md "The companion's tabs", mytop-project/tracker#786 S2a,
  * rule 3): its name, its state in the read-only look (muted, with a meter when [fraction] is given, never a live
  * track), and "Not allowed yet" where a control would be. A tap opens the one sheet in place under it
  * ([CompanionLockedSheet]). TalkBack hears one node: the name, the state, and that it is read-only.

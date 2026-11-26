@@ -70,9 +70,9 @@ fun LauncherSearchScreen(
     onDismiss: () -> Unit,
     // The settings of this surface, searched with the rest (null: this surface has none to search).
     settingsRoot: dev.droidtop.library.settings.CatalogScreen? = null,
-    // A web search for the text, as one row of the list (Standard's search bar, Droidtop/tracker#564); null: none.
+    // A web search for the text, as one row of the list (Standard's search bar, mytop-project/tracker#564); null: none.
     webSearch: ((String) -> Unit)? = null,
-    // The providers the person left on (Settings > Search bar, Droidtop/tracker#704).
+    // The providers the person left on (Settings > Search bar, mytop-project/tracker#704).
     calculator: Boolean = true,
     androidPages: Boolean = true,
 ) {
@@ -91,7 +91,7 @@ fun LauncherSearchScreen(
             value = LocalSimilarityRecommendations({ playable })
                 .recommend(context, RecommendationScope.Overall, 5)
         }
-        // Android's own Settings pages by title (Droidtop/tracker#704): which resolve on this device, read once off the
+        // Android's own Settings pages by title (mytop-project/tracker#704): which resolve on this device, read once off the
         // main thread; typing only filters them in memory.
         val androidPageLinks by produceState(emptyList<dev.droidtop.runtime.systemstatus.SystemControls.SettingsLink>(), androidPages) {
             value = if (!androidPages) emptyList() else withContext(Dispatchers.IO) {
@@ -141,7 +141,7 @@ fun LauncherSearchScreen(
                         onDismiss()
                     }
                 }
-                // A sum answers first (Droidtop/tracker#704): its title starts with the text, so it ranks with the best
+                // A sum answers first (mytop-project/tracker#704): its title starts with the text, so it ranks with the best
                 // matches, and CALC sorts ahead of them; picking it copies the answer.
                 val sum = dev.droidtop.library.integrations.SearchCalculator.answer(text)?.takeIf { calculator }?.let { value ->
                     LocalSearchRow("calc", SearchRowKind.CALC, "${text.trim()} = $value", CALC_DETAIL) {

@@ -98,11 +98,11 @@ internal suspend fun getDownload(
     pageFallback: Boolean = true,
 ): String {
     val externalId = record.externalId
-    // TorBox's hosts known before any page opens, so a mirror it serves goes to it (Droidtop/tracker#638).
+    // TorBox's hosts known before any page opens, so a mirror it serves goes to it (mytop-project/tracker#638).
     primeDebrid()
     // The game's own page on the source's site, opened in droidtop's web view when droidtop's own requests are turned
     // away: the web view passes the site's browser check itself (it is the browser), and the person picks the mirror
-    // there, as on the site; droidtop takes the download the page starts (Droidtop/tracker#600, #599). Cloudflare
+    // there, as on the site; droidtop takes the download the page starts (mytop-project/tracker#600, #599). Cloudflare
     // refused droidtop's HTTP client on F95zone even with the web view's fresh clearance and user agent (console,
     // dev.2324), so a mirror with no address is never fetched through it while the site is checking.
     val sitePage = record.url?.takeIf { it.startsWith("https://") }
@@ -122,7 +122,7 @@ internal suspend fun getDownload(
     if (picked.url == null && sitePage != null && library.sourceNeedsCheck(source.key)) {
         return if (pageFallback) pickOnSitePage() else DownloadPick.NOTHING_STARTED
     }
-    // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
+    // A site that checks the browser first: its check, then the rest (mytop-project/tracker#600).
     var checked = false
     if (library.sourceNeedsCheck(source.key)) {
         say("${source.label} checks the browser first")
@@ -130,7 +130,7 @@ internal suspend fun getDownload(
         checked = true
     }
     // A link the source gave is opened in droidtop's web view, where the person starts the download and droidtop takes it
-    // over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked again first: the token of a
+    // over (mytop-project/tracker#599). A mirror with no link is looked up in the record asked again first: the token of a
     // saved record goes stale when the source's page changes. Only a mirror that still has no link goes to the source's
     // job, with the fresh token.
     var use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, record.downloads) ?: picked
@@ -151,7 +151,7 @@ internal suspend fun getDownload(
         return if (pageFallback) pickOnSitePage() else DownloadPick.NOTHING_STARTED
     }
     // A mirror picked by hand that the source could not get ("no PIXELDRAIN link now"): the thread opens for the person
-    // to start it there, and what they start is placed (Droidtop/tracker#862). Tried in turn, the next mirror goes first.
+    // to start it there, and what they start is placed (mytop-project/tracker#862). Tried in turn, the next mirror goes first.
     if (url == null && sitePage != null && pageFallback && DownloadPick.startedNothing(outcome)) {
         say(outcome.removePrefix(DownloadPick.broughtNothing("")))
         return pickOnSitePage()
@@ -165,7 +165,7 @@ internal suspend fun getDownload(
 }
 
 /**
- * droidtop's own pick (Droidtop/tracker#838; the owner: "Downloads still don't auto-pick links"): the mirrors
+ * droidtop's own pick (mytop-project/tracker#838; the owner: "Downloads still don't auto-pick links"): the mirrors
  * [DownloadPick] orders for [newest] (its build, the system droidtop runs it with, the person's host order, a link droidtop
  * serves without a page first) are tried in turn. A mirror that starts nothing gives way to the next, said on the
  * status line; anything else (a download that started, a check not passed, a sign-in declined) is the answer. Only
@@ -192,7 +192,7 @@ internal suspend fun getBest(
     return tryInTurn(library, source, record, candidates, gameName, newest, say)
 }
 
-/** One build's row ([RecordAction.Group], Droidtop/tracker#838): its mirrors tried in turn, in [hostOrder]. */
+/** One build's row ([RecordAction.Group], mytop-project/tracker#838): its mirrors tried in turn, in [hostOrder]. */
 internal suspend fun getGroup(
     library: Library,
     source: UpdateSources.Source,
@@ -211,7 +211,7 @@ internal suspend fun getGroup(
 /**
  * Whether droidtop serves [d] without its page: its address is on a served host, or it names a host a connected debrid
  * account serves. A masked forum link names its host ("GOFILE") before it is opened, so the name decides then
- * (Droidtop/tracker#638: with TorBox signed in, the pick never put TorBox's hosts first).
+ * (mytop-project/tracker#638: with TorBox signed in, the pick never put TorBox's hosts first).
  */
 private fun servedHere(d: UpdateSources.Download): Boolean =
     (d.url ?: d.parts.firstOrNull()?.url)?.let { dev.droidtop.pluginhost.hosts.HostLinks.served(it) } == true ||
@@ -238,7 +238,7 @@ private suspend fun tryInTurn(
     for ((index, candidate) in candidates.withIndex()) {
         say(if (index == 0) "Trying ${candidate.host}" else "${candidates[index - 1].host} started nothing. Trying ${candidate.host}")
         val outcome = getDownload(library, source, record, candidate, gameName, newest, say, pageFallback = false)
-        // A mirror the source could not get (its job failed: "no PIXELDRAIN link now") gives way too (Droidtop/tracker#862).
+        // A mirror the source could not get (its job failed: "no PIXELDRAIN link now") gives way too (mytop-project/tracker#862).
         if (!DownloadPick.startedNothing(outcome)) return outcome
     }
     val page = record.url?.takeIf { it.startsWith("https://") } ?: return "No mirror started a download (${candidates.size} tried)"
@@ -305,7 +305,7 @@ internal fun SourceRecordPage(
     startTab: RecordTab = RecordTab.OVERVIEW,
     installedVersion: String? = null,
 ) {
-    // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
+    // droidtop's saved copy first, so the page shows at once, then the source's answer (mytop-project/tracker#599).
     // Asked again after a sign-in, which gives the source's download links.
     var asked by remember(source.key, externalId) { mutableIntStateOf(0) }
     val answer by produceState<UpdateSources.RecordAnswer?>(null, source.key, externalId, asked) {
@@ -318,15 +318,15 @@ internal fun SourceRecordPage(
     var tab by remember(source.key, externalId) { mutableStateOf(startTab) }
     var focusIndex by remember(source.key, externalId, tab) { mutableIntStateOf(0) }
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
-    // A build's host list, open over the page (Droidtop/tracker#859): Try in order first, focused, then each host.
+    // A build's host list, open over the page (mytop-project/tracker#859): Try in order first, focused, then each host.
     var hostsOf by remember(source.key, externalId, tab) { mutableStateOf<RecordAction.Group?>(null) }
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val record = answer?.record
-    // The system last picked on this source's pages is picked again (Droidtop/tracker#617).
+    // The system last picked on this source's pages is picked again (mytop-project/tracker#617).
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE) }
     var picked by remember(source.key, externalId) { mutableStateOf(prefs.getString(SYSTEM_KEY_PREFIX + source.key, null)) }
-    // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
+    // With no page to show, the one thing to do is Change link: the page never relinks by itself (mytop-project/tracker#619).
     val rows = remember(record, tab, picked, answer, signedOut, needsCheck) {
         val check = listOfNotNull(checkRow(source.label).takeIf { needsCheck })
         record?.let { r ->
@@ -356,7 +356,7 @@ internal fun SourceRecordPage(
         when (val action = row.action) {
             null -> Unit
             is RecordAction.Open -> onOpen(action.url)
-            // Open thread (Droidtop/tracker#862): the source's page with its session; what the person starts is placed.
+            // Open thread (mytop-project/tracker#862): the source's page with its session; what the person starts is placed.
             RecordAction.OpenThread -> {
                 val current = record ?: return
                 onClose()
@@ -398,7 +398,7 @@ internal fun SourceRecordPage(
                 val order = HostOrder.get(context)
                 scope.launch { say(getBest(library, source, current, gameName, newest, order, say)) }
             }
-            // A build's hosts to choose from, Try in order first (Droidtop/tracker#859); a second A takes it.
+            // A build's hosts to choose from, Try in order first (mytop-project/tracker#859); a second A takes it.
             is RecordAction.Group -> {
                 armed = null
                 hostsOf = action
@@ -484,7 +484,7 @@ internal fun SourceRecordPage(
                 true
             },
         ) {
-            // The game it is about, by its cover, beside the page's title and which version is which (Droidtop/tracker#591).
+            // The game it is about, by its cover, beside the page's title and which version is which (mytop-project/tracker#591).
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Md), verticalAlignment = Alignment.CenterVertically) {
                 newest.artworkUri?.let { art ->
                     AsyncImage(
@@ -501,10 +501,10 @@ internal fun SourceRecordPage(
                         color = MenuTokens.OnSurface,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    // Which version is which, in words: the one on offer stands out, the one here is secondary (Droidtop/tracker#639).
+                    // Which version is which, in words: the one on offer stands out, the one here is secondary (mytop-project/tracker#639).
                     record?.version?.takeIf { it.isNotBlank() }?.let { available ->
                         Text(
-                            // In the installed version's form, so the two compare at a glance (Droidtop/tracker#859).
+                            // In the installed version's form, so the two compare at a glance (mytop-project/tracker#859).
                             GameUpdates.availableLabel(GameUpdates.sameForm(available, installedVersion)),
                             style = MaterialTheme.typography.titleMedium,
                             color = MenuTokens.OnSurface,
@@ -521,7 +521,7 @@ internal fun SourceRecordPage(
             // The tabs as the shell's tab pills between the shoulder glyphs, the PC game page's strip: L1/R1 step them
             // and a tap picks one. They were words in brackets on one line, which touch could not reach.
             // The shoulders sit outside the pills, which scroll when the panel is narrow, so R1 is never cut off
-            // (Droidtop/tracker#859), as on the game page's strip.
+            // (mytop-project/tracker#859), as on the game page's strip.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
                 Row(
@@ -600,7 +600,7 @@ private val RECORD_HINTS = listOf(
 )
 
 /**
- * A build's hosts (Droidtop/tracker#859): Try in order first, with focus when the list opens, so A twice is the old
+ * A build's hosts (mytop-project/tracker#859): Try in order first, with focus when the list opens, so A twice is the old
  * pick-for-me; then each host with its link's label, picked to download from that host alone.
  */
 @Composable

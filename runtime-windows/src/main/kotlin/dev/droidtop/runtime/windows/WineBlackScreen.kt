@@ -20,7 +20,7 @@ import dev.droidtop.library.diagnostics.FrameDarkness
 
 /**
  * Notices a Wine game showing nothing but a black screen and offers Report a problem (docs/SPEC.md 7e2, "A black
- * screen is noticed"; Droidtop/tracker#601: Clover Days stayed black with its audio playing and nothing said why).
+ * screen is noticed"; mytop-project/tracker#601: Clover Days stayed black with its audio playing and nothing said why).
  *
  * Every [BlackScreenWatch.SAMPLE_MS] it copies a small frame of what [surface] shows ([PixelCopy], so the GL and the
  * Vulkan renderer alike) on its own thread, and once the game's window is up and every frame has been flat dark for
@@ -107,7 +107,7 @@ internal class WineBlackScreen(
         val message = TextView(activity).apply {
             text = "The game is showing a black screen.\nIt may still be loading. Report a problem saves what droidtop " +
                 "knows about this run and lets you share it."
-            // droidtop's own notice over the game, so it follows Light or dark (Droidtop/tracker#561).
+            // droidtop's own notice over the game, so it follows Light or dark (mytop-project/tracker#561).
             setTextColor(chrome()?.color("onSurface") ?: Color.WHITE)
         }
         val reportButton = Button(activity).apply {
@@ -165,7 +165,7 @@ internal class WineBlackScreen(
     /**
      * The pad while the notice is up: Left and Right move between its two buttons, A or Enter presses one, B keeps
      * waiting. Back closes the notice and goes on to do what it does on the game screen, open the running game's sheet,
-     * as the hint row says (Droidtop/tracker#896: it was eaten here). Every other key is the notice's while it is up;
+     * as the hint row says (mytop-project/tracker#896: it was eaten here). Every other key is the notice's while it is up;
      * false when it is not.
      */
     fun onKey(event: KeyEvent): Boolean {

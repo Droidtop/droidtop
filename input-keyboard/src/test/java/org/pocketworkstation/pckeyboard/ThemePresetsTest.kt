@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The theme list (Droidtop/tracker#903 H12b): modern themes first, then every classic Hacker's Keyboard theme. */
+/** The theme list (mytop-project/tracker#903 H12b): modern themes first, then every classic Hacker's Keyboard theme. */
 class ThemePresetsTest {
     private val modern = KeyboardAppearance.FOLLOW
 

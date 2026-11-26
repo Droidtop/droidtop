@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Real notifications, built the way a messaging app builds them, read into the conversation model
- * (docs/SPEC.md "Social: messages from your apps", Droidtop/tracker#329), and a provider holding the result.
+ * (docs/SPEC.md "Social: messages from your apps", mytop-project/tracker#329), and a provider holding the result.
  */
 @RunWith(RobolectricTestRunner::class)
 // A library module has no targetSdk of its own for Robolectric to pick its android-all jar from; pin one.

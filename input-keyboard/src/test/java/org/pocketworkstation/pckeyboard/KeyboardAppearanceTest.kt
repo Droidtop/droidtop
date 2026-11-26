@@ -8,7 +8,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Droidtop/tracker#562: "Follow light or dark" draws Material light or dark; a theme the person chose stays. */
+/** mytop-project/tracker#562: "Follow light or dark" draws Material light or dark; a theme the person chose stays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class KeyboardAppearanceTest {

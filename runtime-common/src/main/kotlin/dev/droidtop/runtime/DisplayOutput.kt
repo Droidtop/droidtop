@@ -89,7 +89,7 @@ object DisplayModes {
 /**
  * Which of droidtop's two screens an output is: Android's default display, or any other. Whether a panel is built in
  * or an external monitor is a different question, answered from Android's display type and FLAG_PRESENTATION
- * ([ScreenClass], Droidtop/tracker#765), not by this.
+ * ([ScreenClass], mytop-project/tracker#765), not by this.
  */
 enum class DisplayOutputKind { PRIMARY_SCREEN, SECOND_SCREEN }
 

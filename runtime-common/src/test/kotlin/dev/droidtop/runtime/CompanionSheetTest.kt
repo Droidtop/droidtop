@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The one-screen companion sheet (CompanionSheet.kt, Droidtop/tracker#414 slice C13). */
+/** The one-screen companion sheet (CompanionSheet.kt, mytop-project/tracker#414 slice C13). */
 class CompanionSheetTest {
     @Test fun `the sheet is offered only with no second screen for the companion`() {
         assertTrue(CompanionSheet.offered(1))

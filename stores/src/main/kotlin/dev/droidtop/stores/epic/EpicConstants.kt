@@ -97,7 +97,7 @@ object EpicConstants {
     const val EPIC_LAUNCHER_API_URL = "https://launcher-public-service-prod06.ol.epicgames.com"
 
     /**
-     * The client version droidtop's Epic API calls name (Droidtop/tracker#732): the version GameNative's Legendary-style
+     * The client version droidtop's Epic API calls name (mytop-project/tracker#732): the version GameNative's Legendary-style
      * client has always sent, kept as it is because it identifies the protocol those calls follow, not droidtop's own
      * release, and Epic's services have accepted it since the store code moved in. droidtop's release number would say
      * nothing to Epic and change with every build.

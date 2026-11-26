@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which files in the downloads folder the self-update deletes (Droidtop/tracker#445). */
+/** Which files in the downloads folder the self-update deletes (mytop-project/tracker#445). */
 class UpdateFilesTest {
     private val folder = listOf(
         "droidtop-1734.apk", "droidtop-1735.apk", "droidtop-1736.apk.part", "droidtop-1736.apk.part.meta",

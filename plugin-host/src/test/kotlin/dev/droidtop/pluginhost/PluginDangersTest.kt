@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The red dialogs before a plugin runs without droidtop's protection (Droidtop/tracker#481): each is a danger notice
+ * The red dialogs before a plugin runs without droidtop's protection (mytop-project/tracker#481): each is a danger notice
  * that recommends Cancel, still lets the person go on, and names no tier (docs/plugin-api.md 4, "Users must not have
  * to know").
  */

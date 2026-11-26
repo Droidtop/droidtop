@@ -6,7 +6,7 @@ import android.os.Process
 import app.murinelauncher.settings.hiddenapps.HiddenAppsRepository
 
 /**
- * Hide an installed app from droidtop, or show it again (Droidtop/tracker#499). The one rule is the
+ * Hide an installed app from droidtop, or show it again (mytop-project/tracker#499). The one rule is the
  * launcher's own hidden list ([HiddenAppsRepository], keyed by launcher activity), the list
  * [NativeAppProvider] reads on every scan and Standard's app drawer honours, so an app hidden here
  * is hidden everywhere and the Apps Filter's Hidden view brings it back. Reads the package manager

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Host op names (docs/plugin-api.md 3 "Naming", Droidtop/tracker#459): every op follows the rule, and every old name still answers. */
+/** Host op names (docs/plugin-api.md 3 "Naming", mytop-project/tracker#459): every op follows the rule, and every old name still answers. */
 class HostOpNamesTest {
     @Test
     fun `every host op droidtop serves follows the naming rule`() {

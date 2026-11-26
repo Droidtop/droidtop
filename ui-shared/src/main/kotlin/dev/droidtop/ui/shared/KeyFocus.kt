@@ -14,7 +14,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 
 /**
- * Keeps a panel that reads the pad with `onPreviewKeyEvent` reachable (Droidtop/tracker#747). Key events go only to
+ * Keeps a panel that reads the pad with `onPreviewKeyEvent` reachable (mytop-project/tracker#747). Key events go only to
  * the focused element and its ancestors, so a panel whose one focusable child is a text field went deaf the moment the
  * field gave its focus up: Back hiding the on-screen keyboard clears the field's focus, and after that D-pad Up and A
  * did nothing on the console while a tap still worked. With this the panel is a focus target of its own, under its

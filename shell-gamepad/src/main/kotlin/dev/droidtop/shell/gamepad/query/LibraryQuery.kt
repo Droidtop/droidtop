@@ -38,7 +38,7 @@ enum class LibrarySortKey(val label: String, val naturalOrder: String, val flipp
     ADDED("Recently added", "Newest first", "Oldest first"),
     YEAR("Release year", "Oldest first", "Newest first"),
     RATING("Rating", "Highest first", "Lowest first"),
-    /** The person's own stars (Droidtop/tracker#722), apart from the scraped Rating. */
+    /** The person's own stars (mytop-project/tracker#722), apart from the scraped Rating. */
     MY_RATING("My rating", "Most stars first", "Fewest stars first"),
     SIZE("Size", "Largest first", "Smallest first"),
     ;
@@ -83,7 +83,7 @@ enum class LibraryFacet(val key: String, val label: String) {
     // A console gamelist's own facts (the ES-DE completed flag, and what a
     // Switch game's update and DLC files add up to, docs/SPEC.md 7m).
     COMPLETED("completed", "Completed"),
-    /** The person's own status for the game (Droidtop/tracker#722): Playing, Completed, Backlog or Dropped. */
+    /** The person's own status for the game (mytop-project/tracker#722): Playing, Completed, Backlog or Dropped. */
     MY_STATUS("my_status", "My status"),
     SWITCH_CONTENT("switch", "Switch content"),
 
@@ -241,7 +241,7 @@ data class LibraryQueryContext(
     val collectionsOf: (LibraryEntry) -> Set<String> = { emptySet() },
     /** A collection's name by id, for the Collection facet's values. */
     val collectionName: (String) -> String? = { null },
-    /** The person's own rating and status for a game (Droidtop/tracker#722), from memory ([dev.droidtop.library.settings.GameMarks.cached]). */
+    /** The person's own rating and status for a game (mytop-project/tracker#722), from memory ([dev.droidtop.library.settings.GameMarks.cached]). */
     val markOf: (LibraryEntry) -> dev.droidtop.library.settings.GameMark = { dev.droidtop.library.settings.GameMarks.cached(it.id) },
 )
 
@@ -428,7 +428,7 @@ enum class Exclusion { HIDDEN, SHARED, FREE, WISHLIST }
 
 /**
  * THE rule for which games a list shows (docs/SPEC.md 7j, "Hidden is one
- * rule", extended by Droidtop/tracker#397): every list, count, shelf and the
+ * rule", extended by mytop-project/tracker#397): every list, count, shelf and the
  * launcher's search reads it. Highest first:
  * 1. Hidden is out unless [includeHidden] or the Hidden facet is selected in [query].
  * 2. With the Ownership facet selected, the list shows exactly those holdings
@@ -457,7 +457,7 @@ fun listExclusion(
         null, StoreHolding.OWNED, StoreHolding.NOT_OWNED -> null
         StoreHolding.FAMILY -> if (options.showShared) null else Exclusion.SHARED
         StoreHolding.FREE -> if (options.showFree || entry.freeInLibrary()) null else Exclusion.FREE
-        // Not owned: only the Wishlist shelf and the Ownership facet show it (Droidtop/tracker#134).
+        // Not owned: only the Wishlist shelf and the Ownership facet show it (mytop-project/tracker#134).
         StoreHolding.WISHLIST -> Exclusion.WISHLIST
     }
 }
@@ -532,7 +532,7 @@ fun matchesSearchText(entry: LibraryEntry, text: String): Boolean {
 }
 
 /**
- * The name [entry] sorts by, as ES-DE sorts (Droidtop/tracker#766): inside a custom collection its
+ * The name [entry] sorts by, as ES-DE sorts (mytop-project/tracker#766): inside a custom collection its
  * `collectionsortname`, then its `sortname`, then its title; elsewhere its `sortname`, then its title. The metadata
  * editor's "Sort name" and "Custom collections sort name" set them.
  */
@@ -700,7 +700,7 @@ object LibraryViewPrefs {
 
     /**
      * What older builds stored, brought to today's shape once and never looked at again
-     * (Droidtop/tracker#763): every saved view and every left-showing query whose Store facet still names stores
+     * (mytop-project/tracker#763): every saved view and every left-showing query whose Store facet still names stores
      * ([migrateLegacyStore]), and the PC library's "Updates" view given once ([withUpdatesView]). The first read
      * of any view setting runs it; [MIGRATED_KEY] records that it ran, so later reads are plain reads.
      */
@@ -902,7 +902,7 @@ object LibraryViewPrefs {
 
     /**
      * Whether a PC game's capsule shows its name under its art (PC Games' List options and onboarding's look step,
-     * docs/SPEC.md 7i, Droidtop/tracker#578); on until changed. A capsule with no art shows its name either way.
+     * docs/SPEC.md 7i, mytop-project/tracker#578); on until changed. A capsule with no art shows its name either way.
      * A preferences read.
      */
     fun namesUnderImages(context: Context): Boolean =

@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * Which XKB layout the desktop's physical keyboard types in (docs/SPEC.md 6b
- * "Keyboard layout", Droidtop/tracker#387), and how the container compiles
+ * "Keyboard layout", mytop-project/tracker#387), and how the container compiles
  * it. droidtop ships no keymap data: the keymap is compiled in the primary by
  * the distro's own xkbcommon tool ([compileCommand]) from the distro's own
  * xkeyboard-config, and the list of layouts a person may pick is that

@@ -3,7 +3,7 @@ package dev.droidtop.library.achievements
 import android.content.Context
 
 /**
- * What the person said about a RetroAchievements game proposed by name (Droidtop/tracker#318, owner decision 7a: the
+ * What the person said about a RetroAchievements game proposed by name (mytop-project/tracker#318, owner decision 7a: the
  * title fallback "becomes a Tier C review card, never automatic"). A file whose hash RetroAchievements lists needs no
  * answer; a game recognised only by its title shows achievements and progress once the person confirms it, and never
  * after they said it is not that game. Kept per library game on this device.

@@ -21,7 +21,7 @@ import android.widget.TextView
 import kotlin.math.roundToInt
 
 /**
- * The one-handed mode's keys with their three controls on the free side (Droidtop/tracker#903 H12c; docs/SPEC.md 6a,
+ * The one-handed mode's keys with their three controls on the free side (mytop-project/tracker#903 H12c; docs/SPEC.md 6a,
  * "Modes"): switch side, back to full (Normal), and a handle dragged sideways to make the keys wider or narrower. The
  * width is kept per orientation ([KeyboardModes.setOneHandedWidth]); the input method builds the keys again at the new
  * width when the handle is let go.
@@ -140,7 +140,7 @@ internal class OneHandedFrame(
 }
 
 /**
- * The floating mode's keyboard (Droidtop/tracker#903 H12c; docs/SPEC.md 6a, "Modes"): the keys with their tool strip
+ * The floating mode's keyboard (mytop-project/tracker#903 H12c; docs/SPEC.md 6a, "Modes"): the keys with their tool strip
  * in a frame over the app, with a bar along its top to drag it by and a corner to drag to resize it. It fills the
  * input method's window, so the frame can go anywhere on the screen; [computeInsets] tells Android the app keeps the
  * whole screen and only the frame takes touches. The place and size are kept per orientation; the place is kept on the

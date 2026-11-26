@@ -16,7 +16,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Superseded keys, the owner's design (Droidtop/tracker#887): a source marks an old key "superseded by" its current
+ * Superseded keys, the owner's design (mytop-project/tracker#887): a source marks an old key "superseded by" its current
  * key, droidtop follows it for trust that came from that source, and what the old key signed stays valid.
  */
 class KeySupersessionTest {

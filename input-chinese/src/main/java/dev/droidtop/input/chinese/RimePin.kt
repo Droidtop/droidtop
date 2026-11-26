@@ -1,7 +1,7 @@
 package dev.droidtop.input.chinese
 
 /**
- * input-chinese/rime-engine.pin (Droidtop/tracker#903 H8b), as the build hands it over in BuildConfig.RIME_PIN: the
+ * input-chinese/rime-engine.pin (mytop-project/tracker#903 H8b), as the build hands it over in BuildConfig.RIME_PIN: the
  * release librime came from, and the checks a download of its data must pass. The same file fetches librime.so at
  * build time (build-scripts/fetch-rime-engine.sh), so the library and its data cannot come from different releases.
  * Pure.
@@ -22,7 +22,7 @@ class RimePin(
     val sourcesUrl: String get() = "$RELEASES/$tag/$SOURCES_GZ"
 
     companion object {
-        const val RELEASES = "https://github.com/Droidtop/droidtop/releases/download"
+        const val RELEASES = "https://github.com/mytop-project/droidtop/releases/download"
         const val DATA_GZ = "rime-data-luna.tar.gz"
         const val SOURCES_GZ = "rime-data-luna-sources.tar.gz"
 

@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * The one function that names a PC game's origin (docs/SPEC.md 7i,
- * "Badges", Droidtop/tracker#397 slice G): a table over kind, source,
+ * "Badges", mytop-project/tracker#397 slice G): a table over kind, source,
  * holding and how many origins the library has.
  */
 class OriginLabelTest {

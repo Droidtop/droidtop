@@ -10,7 +10,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * Who L1/R1 belong to on the page in front (docs/SPEC.md 7j, "Gaming
- * controls", Droidtop/tracker#258).
+ * controls", mytop-project/tracker#258).
  *
  * The shoulders step the nearest page tab strip. Pages without a strip
  * leave L1/R1 unhandled; they never change the shell destination.

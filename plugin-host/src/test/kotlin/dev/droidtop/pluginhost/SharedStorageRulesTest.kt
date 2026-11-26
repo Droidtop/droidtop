@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * An open process's file rules for shared storage (docs/plugin-api.md 5.3 and D5, Droidtop/tracker#553): the folders
+ * An open process's file rules for shared storage (docs/plugin-api.md 5.3 and D5, mytop-project/tracker#553): the folders
  * its granted `files.shared` entries declare, and never other apps' folders under `Android`.
  */
 class SharedStorageRulesTest {

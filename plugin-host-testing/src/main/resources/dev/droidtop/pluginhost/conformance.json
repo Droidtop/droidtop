@@ -1,5 +1,5 @@
 {
-  "about": "The conformance cases (docs/plugin-api.md 1.3 and 3 I2, Droidtop/tracker#71): every plugin kind's test fixture must pass each one. Read by FakeHost's Conformance (JVM) and droidtop_fake_host.py (python); a case is changed here only.",
+  "about": "The conformance cases (docs/plugin-api.md 1.3 and 3 I2, mytop-project/tracker#71): every plugin kind's test fixture must pass each one. Read by FakeHost's Conformance (JVM) and droidtop_fake_host.py (python); a case is changed here only.",
   "fixture": {
     "point": "ui.status_tile",
     "permission": "notify.post",

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 /**
  * A download ending says so in one short flash with its mark (docs/SPEC.md "Motion and visual status",
- * Droidtop/tracker#643: "Toast or banner cards that slide in and out, with an icon or glyph and one short line. Details
+ * mytop-project/tracker#643: "Toast or banner cards that slide in and out, with an icon or glyph and one short line. Details
  * on press, through facets in place"; "several downloads finishing become one card that counts up, not a flood"). A
  * finish is "Hades is ready" with a check; a failure "Hades did not download" with a cross, never the error itself,
  * which is one press away on the job's page. Several finishing while the first card is still up become "3 downloads

@@ -30,7 +30,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * The engine's API sockets (docs/SPEC.md 3d, "The Docker Engine API" and "The libpod API"; Droidtop/tracker#555 D14,
+ * The engine's API sockets (docs/SPEC.md 3d, "The Docker Engine API" and "The libpod API"; mytop-project/tracker#555 D14,
  * D15). While the desktop runs, droidtop listens on `docker.sock` and `podman.sock` in its app storage, which every
  * container sees as [DockerApi.DOCKER_HOST] and [LibpodApi.CONTAINER_HOST]; nothing runs inside a container for them.
  * Both sockets answer both APIs, as Podman's own service does: a `/libpod/` path is [LibpodApi]'s, any other
@@ -297,7 +297,7 @@ internal object EngineApiServer {
             is DockerApi.Call.Logs -> withContainer(libpod, runtime, call.id) { _, info ->
                 val tail = DockerApi.logFrames(EngineActions.logs(app, info, call.tail, call.sinceMs, call.untilMs))
                 val id = info.container.id
-                // follow (Droidtop/tracker#715): the tail, then what the program writes next, until it ends, as
+                // follow (mytop-project/tracker#715): the tail, then what the program writes next, until it ends, as
                 // Docker's follow ends with its container. A program not running has nothing more to follow, and
                 // neither has an until already past.
                 val untilAhead = call.untilMs.let { it == null || it > System.currentTimeMillis() }

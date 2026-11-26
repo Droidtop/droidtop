@@ -4,7 +4,7 @@ source tree, and the files of the ones in code droidtop writes (not the vendored
 
     scripts/lint-summary.py app/build/reports/lint-results-debug.xml [--ids ContentDescription,UnsafeIntentLaunch]
 
-The report itself is an artifact nobody can read from a log; this is what a sweep (Droidtop/tracker#734) reads.
+The report itself is an artifact nobody can read from a log; this is what a sweep (mytop-project/tracker#734) reads.
 """
 import collections
 import sys

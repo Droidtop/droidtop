@@ -42,7 +42,7 @@ import java.io.File
 
 /**
  * Brings a Nova or Apex backup into Standard (docs/SPEC.md, Launcher mode "Import from Nova or Apex";
- * Droidtop/tracker#564). [read] turns the file the person picked into a plan fitted to this device, touching nothing;
+ * mytop-project/tracker#564). [read] turns the file the person picked into a plan fitted to this device, touching nothing;
  * [apply] makes it the home screen. The parsing and the fitting are `dev.droidtop.runtime.launcherimport`, pure and
  * tested; this is the Android half: the file, the SQLite copy, what is installed, and the launcher's own stores.
  */
@@ -256,7 +256,7 @@ object LauncherImport {
 
     /**
      * The import's action (droidtop's `HomeAction`, from runtime-common's Nova and Apex readers) as the launcher's: the
-     * two share one stored form, so this is exact (Droidtop/tracker#921).
+     * two share one stored form, so this is exact (mytop-project/tracker#921).
      */
     private fun dev.droidtop.runtime.HomeAction.toLauncher(): HomeAction? = HomeAction.decode(encoded)
 

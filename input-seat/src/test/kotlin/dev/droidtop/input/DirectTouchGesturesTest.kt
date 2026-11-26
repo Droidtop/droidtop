@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Touch on the desktop surface (docs/SPEC.md 6b "Touch on the desktop", Droidtop/tracker#684). */
+/** Touch on the desktop surface (docs/SPEC.md 6b "Touch on the desktop", mytop-project/tracker#684). */
 class DirectTouchGesturesTest {
     private val events = mutableListOf<String>()
 

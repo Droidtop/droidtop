@@ -13,7 +13,7 @@ import timber.log.Timber
 
 /**
  * "Stream with Steam Link" (docs/SPEC.md 7o, "Starting a game on a
- * computer"; Droidtop/tracker#552), one of a Steam game's ways to play. The
+ * computer"; mytop-project/tracker#552), one of a Steam game's ways to play. The
  * Steam module owns it because it owns how Steam games are handled.
  *
  * Steam Link takes no link that picks a computer or a game (rig run on the

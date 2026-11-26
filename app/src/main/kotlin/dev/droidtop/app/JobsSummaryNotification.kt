@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * It only posts when the person has already allowed notifications for droidtop (the permission is
  * asked once, with its reason, where [DesktopNotificationPermission] asks it); without it the
  * summary is simply not shown and nothing else changes. It carries a bar of how far the running jobs
- * have got together (Droidtop/tracker#643: the status bar's download is shown filling, not read),
+ * have got together (mytop-project/tracker#643: the status bar's download is shown filling, not read),
  * moved in steps of [JobsSummary.STEP] percent, so it is posted again when the count or a step
  * changes, never per progress tick.
  */

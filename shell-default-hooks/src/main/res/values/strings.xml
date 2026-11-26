@@ -4,7 +4,7 @@
     <string name="home_menu_games">droidtop games</string>
     <string name="home_menu_quick_menu">Quick Menu</string>
     <string name="home_menu_companion">Companion</string>
-    <!-- The Standard launcher's droidtop screens and rows (moved from the Murine launcher, Droidtop/tracker#921). -->
+    <!-- The Standard launcher's droidtop screens and rows (moved from the Murine launcher, mytop-project/tracker#921). -->
     <plurals name="clear_all_confirm_title">
         <item quantity="one">Close %d app?</item>
         <item quantity="other">Close %d apps?</item>

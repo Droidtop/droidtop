@@ -159,7 +159,7 @@ object AccessibilityPrefs {
      * [context] at the text scale and canvas density of [displayId], for a window that is not an activity's: the
      * in-game overlays (InGameOverlays), drawn in a window context of droidtop's accessibility service or of a
      * draw-over-apps grant, whose Resources [applyTextScale] never sees. Without it the overlay's Quick Menu took
-     * Android's font scale instead of the Text size setting (Droidtop/tracker#740: "the QAM seems to scale weirdly").
+     * Android's font scale instead of the Text size setting (mytop-project/tracker#740: "the QAM seems to scale weirdly").
      */
     fun canvasContext(context: Context, displayId: Int): Context {
         val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)?.getDisplay(displayId)
@@ -201,7 +201,7 @@ object AccessibilityPrefs {
         val metrics = DisplayMetrics().also { display.getRealMetrics(it) }
         if (metrics.densityDpi <= 0 || metrics.widthPixels <= 0) return null
         val density = metrics.densityDpi / 160f
-        // The Interface size of the screen the window is on (Droidtop/tracker#656), on the canvas worked out from
+        // The Interface size of the screen the window is on (mytop-project/tracker#656), on the canvas worked out from
         // the display's own density: the one rule ProvideShellCanvas applies too, so the two agree.
         val target = scaledCanvasDensity(
             density,

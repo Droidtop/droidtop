@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Kaomoji in the emoji panel (Droidtop/tracker#903 H4). */
+/** Kaomoji in the emoji panel (mytop-project/tracker#903 H4). */
 class KaomojiTest {
     private val sample = """
         # a comment

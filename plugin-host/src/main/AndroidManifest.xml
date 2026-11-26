@@ -13,7 +13,7 @@
     -->
     <application>
         <!--
-          The door for app interface plugins (docs/plugin-api.md 1.3, Droidtop/tracker#547): exported so an approved
+          The door for app interface plugins (docs/plugin-api.md 1.3, mytop-project/tracker#547): exported so an approved
           plugin's app can ask droidtop to connect it, and nothing else. It answers only an app whose plugin is
           installed, approved, turned on and still verified, and carries no data: everything after it goes through the
           plugin's broker.
@@ -161,7 +161,7 @@
           SystemShizukuOps). It was in :pluginhost, so the main process asked
           another process for it at start: on a slow device :pluginhost missed
           Android's ten seconds to publish, and Android killed the main process
-          with it, waiting on the provider (Droidtop/tracker#775).
+          with it, waiting on the provider (mytop-project/tracker#775).
           Every other plugin reaches privilege through the priv.* APIs.
           The permission is the one Shizuku's own documentation asks for: only
           the Shizuku server (the shell or root) holds it.

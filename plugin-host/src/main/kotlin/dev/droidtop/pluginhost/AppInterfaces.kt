@@ -15,7 +15,7 @@ import java.util.zip.ZipFile
 import org.json.JSONObject
 
 /**
- * Installed apps that are also plugins (docs/plugin-api.md 1.3, kind [PluginKind.APP_INTERFACE], Droidtop/tracker#547):
+ * Installed apps that are also plugins (docs/plugin-api.md 1.3, kind [PluginKind.APP_INTERFACE], mytop-project/tracker#547):
  * finding them, checking each app's signature in process, and installing one as a plugin record beside the bundle
  * plugins, so it goes through the same approval, grants, Permissions screen and Activity as any plugin.
  *
@@ -109,7 +109,7 @@ object AppInterfaces {
             .distinctBy { it.packageName }
             .map { inspect(context, it.packageName, it.name) }
         // What was found and what droidtop decided, so a missing "In your apps" row can be told apart on a device
-        // (Droidtop/tracker#547: Enginehost dev.658 was not listed on the AVD and nothing said why).
+        // (mytop-project/tracker#547: Enginehost dev.658 was not listed on the AVD and nothing said why).
         android.util.Log.i(
             TAG,
             "apps that carry a plugin: ${services.size} service(s)" +

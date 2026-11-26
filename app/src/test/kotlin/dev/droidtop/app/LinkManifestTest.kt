@@ -9,7 +9,7 @@ import org.junit.Test
 
 /**
  * The hosts LinkActivity declares for droidtop's own scheme against the hosts the parser answers
- * (Droidtop/tracker#477: the manifest said `do` while ActionLinks wanted `call`, so no
+ * (mytop-project/tracker#477: the manifest said `do` while ActionLinks wanted `call`, so no
  * droidtop://call link ever resolved).
  */
 class LinkManifestTest {

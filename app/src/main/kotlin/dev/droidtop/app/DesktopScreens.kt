@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Puts the desktop on the screens the person said it extends to (docs/SPEC.md 2b, "The desktop on a second screen",
- * Droidtop/tracker#908 step D5). While the desktop is up in Desktop mode, every screen other than its own whose
+ * mytop-project/tracker#908 step D5). While the desktop is up in Desktop mode, every screen other than its own whose
  * Desktop answer is Extend ([ScreenRoles.desktopExtends]) gets it ([DesktopSecondScreen.show]); a screen whose answer
  * changes, the desktop stopping, or a switch to another mode takes it off again ([DesktopSecondScreen.hide]). Each
  * pass also asks about a screen with no answer yet ([ScreenRoleAsk.check], once per screen).

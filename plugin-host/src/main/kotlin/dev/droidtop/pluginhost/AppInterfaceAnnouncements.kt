@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
- * Apps that carry a droidtop plugin making themselves known (docs/plugin-api.md 1.3, Droidtop/tracker#547). The owner:
+ * Apps that carry a droidtop plugin making themselves known (docs/plugin-api.md 1.3, mytop-project/tracker#547). The owner:
  * "Might be worth having every app with a droidtop Application Interface plugin layer make a call to announce its
  * presence to droidtop, self-registering", with droidtop also noticing installs on its own, since droidtop is not
  * always running. Three ways in, one decision ([consider]):
@@ -73,7 +73,7 @@ object AppInterfaceAnnouncements {
             .getOrNull()?.firstOrNull()?.serviceInfo ?: return
         val updatedAt = runCatching { pm.getPackageInfo(packageName, 0).lastUpdateTime }.getOrDefault(0L)
         // An app plugin already added that lists engine cores is asked for them again when its app changes
-        // (Droidtop/tracker#854): an update can bring cores, and a list from before would offer "Get … support" for one
+        // (mytop-project/tracker#854): an update can bring cores, and a list from before would offer "Get … support" for one
         // that is installed.
         PluginStore.installed(context)
             .filter { it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == packageName }

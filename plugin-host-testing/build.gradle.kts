@@ -1,4 +1,4 @@
-// Test-only: the fake host (docs/plugin-api.md 3 I2, Droidtop/tracker#71). A plugin's host without a device: the real
+// Test-only: the fake host (docs/plugin-api.md 3 I2, mytop-project/tracker#71). A plugin's host without a device: the real
 // broker over an in-memory droidtop, and the conformance cases every plugin kind's test fixture must pass. Never a
 // dependency of anything shipped.
 plugins {

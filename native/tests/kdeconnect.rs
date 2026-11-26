@@ -1,4 +1,4 @@
-//! droidtop's KDE Connect operations reach lib-kdeconnect's table through the one JNI entry point
+//! droidtop's KDE Connect operations reach mytop-kdeconnect's table through the one JNI entry point
 //! (docs/SPEC.md 7q "KDE Connect").
 
 use droidtop_agent::api::call;

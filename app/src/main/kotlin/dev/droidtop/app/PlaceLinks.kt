@@ -9,7 +9,7 @@ import dev.droidtop.shell.standard.BackButtonMenu
 
 /**
  * What opens a place from outside every screen (a notification), in the mode the person is using
- * (docs/SPEC.md 7j "Places in every mode", Droidtop/tracker#346): Gaming on that place when Gaming is
+ * (docs/SPEC.md 7j "Places in every mode", mytop-project/tracker#346): Gaming on that place when Gaming is
  * the mode in use, else droidtop's screen host. Message and plugin-update notifications used to open
  * Gaming whatever the mode, which with Gaming off landed in Desktop or nowhere.
  */

@@ -35,7 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Recent apps on the companion Home (docs/SPEC.md "The companion's tabs", Droidtop/tracker#347): the apps
+ * Recent apps on the companion Home (docs/SPEC.md "The companion's tabs", mytop-project/tracker#347): the apps
  * last opened from the launcher, from its own launch history ([RecentAppsStore], the drawer's Recent row),
  * one tap to open on this screen. It was Standard's own second-screen surface's quick-launch row; with
  * Standard drawing the companion tabs like every other mode it is a Home section, so a general-purpose app

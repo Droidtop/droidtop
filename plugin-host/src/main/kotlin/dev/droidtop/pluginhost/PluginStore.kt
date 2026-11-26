@@ -34,7 +34,7 @@ object PluginStore {
 
     /**
      * The plugin's own icon (its presentation's `icon`) as a path in its payload; null when it declares none. One
-     * answer for the plugin's card, its page, its catalog row and its panel's title (Droidtop/tracker#513, #515).
+     * answer for the plugin's card, its page, its catalog row and its panel's title (mytop-project/tracker#513, #515).
      * It reads nothing, so any thread may ask: the manifest keeps only a .png or .webp among its signed payload files
      * (PluginPresentation.fromJson), a path that climbs out of the payload is refused here, and every renderer loads
      * the file off the main thread and draws nothing when it is missing.
@@ -56,7 +56,7 @@ object PluginStore {
     data class Unreadable(val id: String, val label: String)
 
     /**
-     * The plugins [installed] leaves out because their record does not read (Droidtop/tracker#854): an app's plugin
+     * The plugins [installed] leaves out because their record does not read (mytop-project/tracker#854): an app's plugin
      * made for another droidtop, a kind or shape this build does not know. Listed, never dropped silently, so the
      * person sees it and can remove it. Reads every record: off the main thread.
      */
@@ -90,7 +90,7 @@ object PluginStore {
     fun importFromPicker(context: Context, uri: Uri): String {
         val tmp = File.createTempFile("plugin-import", ".droidplugin.tar.xz", context.cacheDir)
         return try {
-            // Copied to disk, never read whole into the heap (Droidtop/tracker#545).
+            // Copied to disk, never read whole into the heap (mytop-project/tracker#545).
             val copied = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } } != null
             }.getOrDefault(false)
@@ -136,7 +136,7 @@ object PluginStore {
      * After the person confirmed [origin]'s new key in place of its old one ([UserOriginKeys.replace]): every plugin of
      * that origin an update had sent back to waiting only because it was signed by the new key, approved before under
      * the key it replaced, is approved again with the grants it had (new items wait at Ask first, as in any update), so
-     * a publisher's key change is one decision, not one per plugin (Droidtop/tracker#270). Root, which needs its own
+     * a publisher's key change is one decision, not one per plugin (mytop-project/tracker#270). Root, which needs its own
      * yes, is not restored. Returns how many came back.
      */
     fun keyReplaced(context: Context, origin: String): Int {
@@ -238,7 +238,7 @@ object PluginStore {
 
     /**
      * :app sets this at start: what droidtop keeps about a plugin outside this module, removed with it (a source's own
-     * index, Droidtop/tracker#937).
+     * index, mytop-project/tracker#937).
      */
     @Volatile var onUninstalled: (context: Context, pluginId: String) -> Unit = { _, _ -> }
 
@@ -261,7 +261,7 @@ object PluginStore {
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.forget(appContext, pluginId) } }, "devices-forget").start()
         File(root(context), pluginId).deleteRecursively()
         runCatching { PluginProcesses.retire(pluginId) }
-        // An app's plugin: droidtop lets the app go now. The app itself stays installed (Droidtop/tracker#547).
+        // An app's plugin: droidtop lets the app go now. The app itself stays installed (mytop-project/tracker#547).
         runCatching { AppInterfaceConnections.forget(context, pluginId) }
         PluginEpoch.bump()
     }

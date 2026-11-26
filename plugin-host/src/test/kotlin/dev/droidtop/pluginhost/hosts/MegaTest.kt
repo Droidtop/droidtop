@@ -20,7 +20,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Mega through its own API (Droidtop/tracker#638 part 5): the four link forms, the key's parts, the attributes, the CTR
+ * Mega through its own API (mytop-project/tracker#638 part 5): the four link forms, the key's parts, the attributes, the CTR
  * decryption and the meta-MAC against vectors made with OpenSSL (python cryptography) from the SDK's published scheme,
  * and a file and a folder resolved from recorded replies through the replaceable transport.
  */

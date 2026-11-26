@@ -115,7 +115,7 @@ object SteamStoreClient {
     }
 
     /**
-     * The game's genres, without the content descriptors Steam lists among them (Droidtop/tracker#756: a card read
+     * The game's genres, without the content descriptors Steam lists among them (mytop-project/tracker#756: a card read
      * "Sexual Content, Visua..." where its kind belongs). Pure.
      */
     internal fun genres(array: org.json.JSONArray?): String? = array?.let {

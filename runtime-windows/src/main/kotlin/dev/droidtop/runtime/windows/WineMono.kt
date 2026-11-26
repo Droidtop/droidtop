@@ -12,7 +12,7 @@ import java.io.RandomAccessFile
 import timber.log.Timber
 
 /**
- * Wine Mono for .NET Framework games on any Wine build (Droidtop/tracker#895).
+ * Wine Mono for .NET Framework games on any Wine build (mytop-project/tracker#895).
  *
  * A .NET Framework program (XNA and FNA games among them, Reus) exits at once when Wine's mscoree finds no Mono
  * runtime: "Wine Mono is not installed". No Wine build droidtop runs carries one: GameNative's do not, and
@@ -33,8 +33,8 @@ internal object WineMono {
         DIR,
         "Wine Mono, which .NET Framework games need",
         urls = listOf(
-            // Re-hosted unmodified (Droidtop/droidtop-components sources/mirror.json, group windows-runtime), then Wine Mono's own.
-            "https://github.com/Droidtop/droidtop-components/releases/download/windows-runtime/wine-mono-$VERSION-x86.tar.xz",
+            // Re-hosted unmodified (mytop-project/droidtop-components sources/mirror.json, group windows-runtime), then Wine Mono's own.
+            "https://github.com/mytop-project/droidtop-components/releases/download/windows-runtime/wine-mono-$VERSION-x86.tar.xz",
             "https://github.com/madewokherd/wine-mono/releases/download/wine-mono-$VERSION/wine-mono-$VERSION-x86.tar.xz",
         ),
         type = TarCompressorUtils.Type.XZ,

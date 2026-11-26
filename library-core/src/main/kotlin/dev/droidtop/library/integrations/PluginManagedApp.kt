@@ -11,7 +11,7 @@ import dev.droidtop.pluginhost.PluginRecord
 import org.json.JSONObject
 
 /**
- * The app a bridge plugin manages (docs/plugin-api.md 3 F1, `apps.bridge`; Droidtop/tracker#520), read from its manifest
+ * The app a bridge plugin manages (docs/plugin-api.md 3 F1, `apps.bridge`; mytop-project/tracker#520), read from its manifest
  * so no panel calls the plugin to learn it: the `apps.bridge` entry's `app` (its name), `packages` and `get` (an https
  * page to get it from), or else the packages its `apps.check` permission declares. When none of the packages is
  * installed, droidtop says so once, the same way for every plugin: a notice at the top of the plugin's panel with Get,

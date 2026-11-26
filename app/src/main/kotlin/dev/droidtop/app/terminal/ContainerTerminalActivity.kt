@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A terminal into a container on Android, desktop up or not (docs/SPEC.md 3d, "A terminal on Android";
- * Droidtop/tracker#909): Termux's [TerminalView] over a [ContainerShellSession], in droidtop's own look, with the
+ * mytop-project/tracker#909): Termux's [TerminalView] over a [ContainerShellSession], in droidtop's own look, with the
  * shell's hint row. Opened by Settings > Containers > a container > Terminal (Terminal here while the desktop is up).
  *
  * - Typing: the on-screen keyboard (Hacker Keyboard Reborn or any other) and a hardware keyboard both reach the shell
@@ -91,14 +91,14 @@ class ContainerTerminalActivity : AppCompatActivity() {
             setTypeface(Typeface.MONOSPACE)
             // The emulator draws its text in the terminal's own colours (light on dark) and leaves the background to
             // its view, which showed droidtop's light page through: white on near-white (AVD rig check of build
-            // 3184, Droidtop/tracker#909). The terminal's default background goes under it.
+            // 3184, mytop-project/tracker#909). The terminal's default background goes under it.
             setBackgroundColor(com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND.let { com.termux.terminal.TerminalColors.COLOR_SCHEME.mDefaultColors[it] })
             isFocusable = true
             isFocusableInTouchMode = true
         }
         status = getString(R.string.terminal_opening)
         onBackPressedDispatcher.addCallback(this) { requestLeave() }
-        // On Desktop's bar while it is open (Droidtop/tracker#750), as droidtop's other screens are.
+        // On Desktop's bar while it is open (mytop-project/tracker#750), as droidtop's other screens are.
         @Suppress("DEPRECATION")
         OwnScreens.opened(OwnScreen(taskId, title, windowManager.defaultDisplay.displayId))
         setContent {

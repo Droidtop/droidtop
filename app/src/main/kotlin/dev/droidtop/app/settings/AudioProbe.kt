@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Per-app volume and EQ, slice 0: the probe (Droidtop/tracker#836). Developer menu only, run on the rig, nothing kept
+ * Per-app volume and EQ, slice 0: the probe (mytop-project/tracker#836). Developer menu only, run on the rig, nothing kept
  * running. It answers the design's open questions on a real device before anything is built on them:
  * - whether this build has DynamicsProcessing ([AudioEffect.queryEffects], no grant);
  * - what `dumpsys audio` and AudioFlinger's dump say on this Android version, saved as fixtures for the parser;

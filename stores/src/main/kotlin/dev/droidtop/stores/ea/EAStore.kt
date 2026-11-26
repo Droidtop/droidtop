@@ -23,7 +23,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * The EA app's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), after Lutris's EA app
+ * The EA app's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after Lutris's EA app
  * service (GPL-3.0, `lutris/services/ea_app.py`): the person signs in on EA's own page, the session cookies of
  * `accounts.ea.com` are traded for an access token (`connect/auth`, EA's own `ORIGIN_JS_SDK` client, a public client
  * id), and EA's GraphQL service lists the account's PC base games (`ownedGameProducts`) and their titles and art

@@ -296,7 +296,7 @@ private suspend fun resolveState(context: Context, uri: Uri?, desktopConnected: 
 
 /**
  * [state] with the plugins that open its file after droidtop's own choices (docs/plugin-api.md 1.12,
- * Droidtop/tracker#221): one row each, handing the plugin the file as a read-only token when it is picked.
+ * mytop-project/tracker#221): one row each, handing the plugin the file as a read-only token when it is picked.
  */
 private fun withPlugins(context: Context, state: OpenWithState, uri: Uri?): OpenWithState {
     val ready = state as? OpenWithState.Ready ?: return state

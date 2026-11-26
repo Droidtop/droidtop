@@ -7,10 +7,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A plugin's side of a site that answers with a browser check (docs/SPEC.md 12a, "A site that checks the browser";
- * Droidtop/tracker#600, #751): the plugin gets one plain `BROWSER_CHECK_REQUIRED` and never the challenge's HTML,
+ * mytop-project/tracker#600, #751): the plugin gets one plain `BROWSER_CHECK_REQUIRED` and never the challenge's HTML,
  * droidtop remembers the site waits for a check ([pending]), the person passes it in droidtop's web view, and the
  * clearance the view earned goes with droidtop's requests to that site after. Telling a check from the page, the
- * clearance cookies and the pass test are the shared `SiteCheck` and `Clearance` (lib-net `:sitecheck`),
+ * clearance cookies and the pass test are the shared `SiteCheck` and `Clearance` (mytop-net `:sitecheck`),
  * which Enginehost uses too; what is here is what only a plugin has: its vault, and what it was last refused.
  */
 object SiteChecks {
@@ -27,7 +27,7 @@ object SiteChecks {
 
     /**
      * What droidtop has kept for [pluginId]'s requests: the one clearance store every request of droidtop shares
-     * (Droidtop/tracker#751), since a check is the site's and not the plugin's. A clearance an earlier build kept in the
+     * (mytop-project/tracker#751), since a check is the site's and not the plugin's. A clearance an earlier build kept in the
      * plugin's own vault moves into the store the first time it is read, and leaves the vault. Without a store (a test)
      * the vault is the place, as it was.
      */
@@ -76,7 +76,7 @@ object SiteChecks {
 
     /**
      * The words every [refusal] carries, so droidtop knows its own sentence when a plugin hands it back inside a
-     * failure of its own (a plugin built before the shared codes passed through, Droidtop/tracker#881).
+     * failure of its own (a plugin built before the shared codes passed through, mytop-project/tracker#881).
      */
     const val REFUSAL_MARK = "checks the browser first"
 }

@@ -16,7 +16,7 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import java.io.File
 
 /**
- * Offline voice typing (Droidtop/tracker#343): the voice key's first provider once [OfflineVoice] has its engine and
+ * Offline voice typing (mytop-project/tracker#343): the voice key's first provider once [OfflineVoice] has its engine and
  * model and the microphone is allowed. The voice key starts listening and the suggestion strip says so; the words
  * appear as composing text while they are spoken and are committed at each pause. The voice key again, a tap on the
  * strip, or leaving the field stops it. Nothing leaves the device.
@@ -199,7 +199,7 @@ internal object OfflineVoiceTyping : VoiceProvider {
     }
 }
 
-/** Settings > Voice input > Offline voice typing: download, or remove, the engine and model (Droidtop/tracker#343). */
+/** Settings > Voice input > Offline voice typing: download, or remove, the engine and model (mytop-project/tracker#343). */
 internal object OfflineVoiceRow {
     const val KEY = "pref_offline_voice"
     private const val MIC_REQUEST = 3430

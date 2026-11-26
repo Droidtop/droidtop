@@ -19,7 +19,7 @@ import org.junit.Test
 
 /**
  * A console game's page in the one frame every game's page shares (EntryDetailScreen.kt; docs/SPEC.md 7i, "The
- * page's frame"; Droidtop/tracker#845 slice U2): which tab each of its facts lands on, and what its primary action
+ * page's frame"; mytop-project/tracker#845 slice U2): which tab each of its facts lands on, and what its primary action
  * and status row say about the emulator.
  */
 class ConsoleGamePageTest {

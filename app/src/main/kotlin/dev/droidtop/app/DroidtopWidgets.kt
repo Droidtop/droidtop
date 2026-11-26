@@ -22,7 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The one renderer every droidtop home-screen widget goes through (docs/SPEC.md, "Widgets on any launcher";
- * Droidtop/tracker#563): any launcher's pages (Niagara, Lawnchair, a stock one, Standard's own) host them through
+ * mytop-project/tracker#563): any launcher's pages (Niagara, Lawnchair, a stock one, Standard's own) host them through
  * Android's AppWidget surface. A widget's views are built off the main thread in [scope], from what droidtop already
  * holds in memory, and drawn in the role tokens ([RoleTokens], the palette Light or dark and the Gaming theme give,
  * #559), so a widget looks like droidtop's own screens and follows Appearance. Taps go through droidtop's own entry

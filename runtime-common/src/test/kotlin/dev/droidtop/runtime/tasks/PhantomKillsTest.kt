@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Recognising Android's phantom process kills (docs/SPEC.md "Child processes and Android's limit", Droidtop/tracker#816). */
+/** Recognising Android's phantom process kills (docs/SPEC.md "Child processes and Android's limit", mytop-project/tracker#816). */
 class PhantomKillsTest {
     private val log = """
         1761800000.123  1000  1500 I ActivityManager: Killing PhantomProcessRecord {d4b8d5c 21391:10174/u0a174 proot}: Trimming phantom processes

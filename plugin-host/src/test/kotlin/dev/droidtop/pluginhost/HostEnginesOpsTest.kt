@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/plugin-api.md 3 A7b (Droidtop/tracker#752): an app's plugin lists its engine cores, and says when they change. */
+/** docs/plugin-api.md 3 A7b (mytop-project/tracker#752): an app's plugin lists its engine cores, and says when they change. */
 class HostEnginesOpsTest {
     private fun app(provides: Boolean, kind: String = "app_interface") = TestPlugins.record(
         PluginManifest.fromJson(

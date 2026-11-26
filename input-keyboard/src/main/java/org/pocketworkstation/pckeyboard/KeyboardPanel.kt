@@ -15,11 +15,11 @@ import android.widget.FrameLayout
  *
  * [suppressImeView] is for surfaces that type into the input method's editor: while one is on screen, the input
  * method does not also put its own view up ([SecondScreenKeyboard.setAttached]). It follows window visibility,
- * not attachment, because a stopped Activity's views stay attached (Droidtop/tracker#156).
+ * not attachment, because a stopped Activity's views stay attached (mytop-project/tracker#156).
  *
  * [context] must belong to the display the panel is drawn on: the key grid sizes itself from its metrics. On the add-on
  * screen of a handheld (any display but the device's own, whose short side is a handheld's) the panel is compact
- * (Droidtop/tracker#903 H12c): Hacker's Compact 5-row layout, at [KeyboardModes.compactHeightPercent] of the height
+ * (mytop-project/tracker#903 H12c): Hacker's Compact 5-row layout, at [KeyboardModes.compactHeightPercent] of the height
  * asked for, never a row shorter than a finger's press target.
  */
 class KeyboardPanel(
@@ -31,7 +31,7 @@ class KeyboardPanel(
 
     private var functionLayer = false
 
-    // Compact on the add-on screen (Droidtop/tracker#903 H12c), decided once from the display the panel is built for.
+    // Compact on the add-on screen (mytop-project/tracker#903 H12c), decided once from the display the panel is built for.
     private val compact: Boolean = context.resources.displayMetrics.let { metrics ->
         KeyboardModes.compactPanel(
             onDefaultDisplay(context),
@@ -71,7 +71,7 @@ class KeyboardPanel(
     }
 
     /**
-     * The panel's keys with a haptic per key class (Droidtop/tracker#903 H12a). droidtop has no vibration setting of
+     * The panel's keys with a haptic per key class (mytop-project/tracker#903 H12a). droidtop has no vibration setting of
      * its own, and its text-entry slab follows Android's touch feedback ([SlabView]), so these keys do too
      * ([KeyHapticsPlayer.viewFeedback]); the input method's "Vibration strength" is the input method's.
      */
@@ -134,7 +134,7 @@ class KeyboardPanel(
 
     private var countedForIme = false
 
-    /** The animation settings, read each time the panel comes on screen (Droidtop/tracker#903 H12a). */
+    /** The animation settings, read each time the panel comes on screen (mytop-project/tracker#903 H12a). */
     private fun refreshMotion() {
         if (isAttachedToWindow && windowVisibility == View.VISIBLE) KeyboardMotion.refresh(context)
     }

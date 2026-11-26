@@ -310,7 +310,7 @@ fn three_handhelds_and_three_computers_in_a_partial_mesh() {
     assert_eq!(game.installs.len(), 2, "one entry, installed on two computers: {on:?}");
     assert!(on.contains(&"PC-1") && on.contains(&"PC-2"));
     assert!(lib.games.contains_key("steam:2") && lib.games.contains_key("gog:5"));
-    // Each computer's version of it, remembered three hops away (Droidtop/tracker#469 part 2).
+    // Each computer's version of it, remembered three hops away (mytop-project/tracker#469 part 2).
     let seen: Vec<&str> = game.versions.iter().map(|v| v.version.as_str()).collect();
     assert!(seen.contains(&"PC-1 build") && seen.contains(&"PC-2 build"), "{seen:?}");
     // And back the other way: PC-3's game reaches H1 through H2 and PC-2.
@@ -318,7 +318,7 @@ fn three_handhelds_and_three_computers_in_a_partial_mesh() {
     h1.library(&c2);
     assert!(Library::load(&h1.dir.join("library.json")).unwrap().games.contains_key("gog:5"));
 
-    // Organization travels too, newest change per field (Droidtop/tracker#469):
+    // Organization travels too, newest change per field (mytop-project/tracker#469):
     // H1 rates a game and puts it in a collection; H3, three hops away,
     // is told to write both.
     let unset = json!({ "steam:1": { "rating": 0.0, "collections": [], "title": "" } });
@@ -336,7 +336,7 @@ fn three_handhelds_and_three_computers_in_a_partial_mesh() {
     fs::write(games.join("DtSyncTest v1.1/DtSyncTest.exe"), b"MZ").unwrap();
     let (pca, dirs) = start_agent("PC-A", &games, vec![h1.id, h3.id]);
     // A copy of the agent opened before anything happens, like the headless
-    // `run` while a window or a command line is used (Droidtop/tracker#528, #531).
+    // `run` while a window or a command line is used (mytop-project/tracker#528, #531).
     let stale = Agent::open_in(dirs.clone()).unwrap();
     let game = "title2:dt-sync-test";
     // H1 has the same game from a folder "DtSyncTest v1.0", titled the way droidtop
@@ -345,12 +345,12 @@ fn three_handhelds_and_three_computers_in_a_partial_mesh() {
         "install": { "installed": true, "version": "1.0", "path": "/sdcard/Download/dt-games/DtSyncTest v1.0", "launcher": "droidtop" } }]);
     let favourite = json!({ game: { "favourite": true, "hidden": false, "collections": [] } });
     h1.library_scanning(&pca, on_h1.clone(), favourite.clone());
-    // Droidtop/tracker#529: it is one game on both, so H1 knows the computer's v1.1 beside its own v1.0.
+    // mytop-project/tracker#529: it is one game on both, so H1 knows the computer's v1.1 beside its own v1.0.
     let h1_lib = Library::load(&h1.dir.join("library.json")).unwrap();
     let versions: Vec<(&str, &str)> = h1_lib.games[game].versions.iter().map(|v| (v.device_name.as_str(), v.version.as_str())).collect();
     assert!(versions.contains(&("PC-A", "1.1")) && versions.contains(&("H1", "1.0")), "{versions:?}");
     assert_eq!(h1_lib.games[game].installs.len(), 2);
-    // Droidtop/tracker#531: the agent restarts and rescans twice, and the stale copy scans and records a
+    // mytop-project/tracker#531: the agent restarts and rescans twice, and the stale copy scans and records a
     // visit as well; the favourite is still there.
     let restarted = Agent::open_in(dirs.clone()).unwrap();
     restarted.rescan();
@@ -448,7 +448,7 @@ fn a_computer_that_moved_to_windowcasts_identity_tells_its_handhelds() {
     assert!(again.get("moved_to").is_none(), "{again}");
 }
 
-/// Droidtop/tracker#529 and #469 part 3, the console check in one test: the
+/// mytop-project/tracker#529 and #469 part 3, the console check in one test: the
 /// real agent, reached only through its WireGuard endpoint, has a newer
 /// version of a game the handheld has. The library sync tells the handheld
 /// about it (what the Versions tab shows), and droidtop's `game_pull` (what

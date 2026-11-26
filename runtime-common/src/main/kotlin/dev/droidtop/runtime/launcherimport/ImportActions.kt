@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
 /**
- * Nova's and Apex's own home-screen actions in droidtop's terms (Droidtop/tracker#564, the format document's
+ * Nova's and Apex's own home-screen actions in droidtop's terms (mytop-project/tracker#564, the format document's
  * mapping): an action Standard has becomes its gesture action's name; one it has not is null, and the import says
  * so. Pure.
  */

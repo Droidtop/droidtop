@@ -13,7 +13,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * The Windows setup consent gate (Droidtop/tracker#140): the one setup
+ * The Windows setup consent gate (mytop-project/tracker#140): the one setup
  * action that downloads hundreds of megabytes must not run until the
  * registered shell's ask comes back, and a decline must not be reported
  * as a failure -- nothing was fetched, and the offer going away IS the

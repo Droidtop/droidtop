@@ -57,7 +57,7 @@ enum class CloseStep {
 
     /**
      * Enginehost only: ask it to end its running game (`dev.enginehost.END_GAME`, answered to droidtop alone, by
-     * signature). Confirmed by Enginehost's own answer, so it needs no helper (Droidtop/tracker#289).
+     * signature). Confirmed by Enginehost's own answer, so it needs no helper (mytop-project/tracker#289).
      */
     ENGINEHOST_END_GAME,
 
@@ -91,7 +91,7 @@ object TaskPolicy {
      * The home apps among [candidates] (each a package that answers Android's home intent, with the priority it
      * declares there): only those at priority 0 or above. Settings answers it too, at -1000, with a screen Android
      * shows only while a phone starts up locked (AOSP's FallbackHome); counting it hid Settings from the running list
-     * and the Desktop bar, and the launch watchdog then read Settings, still open, as closed (Droidtop/tracker#750,
+     * and the Desktop bar, and the launch watchdog then read Settings, still open, as closed (mytop-project/tracker#750,
      * console 0.2.0-dev.2554).
      */
     fun homeApps(candidates: List<Pair<String, Int>>): Set<String> =
@@ -103,7 +103,7 @@ object TaskPolicy {
 
     /**
      * The apps Clear all would close, one per package, in list order: never a protected one, and never one open on
-     * [keepDisplays] (the companion's own screen: an app the person opened there is theirs to keep, Droidtop/tracker#414).
+     * [keepDisplays] (the companion's own screen: an app the person opened there is theirs to keep, mytop-project/tracker#414).
      */
     fun clearAllTargets(apps: List<RunningApp>, protected: Set<String>, keepDisplays: Set<Int> = emptySet()): List<RunningApp> {
         val kept = apps.filter { it.displayId in keepDisplays }.mapTo(HashSet()) { it.packageName }
@@ -112,7 +112,7 @@ object TaskPolicy {
 
     /**
      * What Clear all says when it closes nothing ([clearAllTargets] empty) although [apps] lists some: which it kept and
-     * why, never "Nothing to close" over a list that is plainly not empty (Droidtop/tracker#252, console 3061: Firefox,
+     * why, never "Nothing to close" over a list that is plainly not empty (mytop-project/tracker#252, console 3061: Firefox,
      * open on the companion's own screen, was kept as #414 says, and the page read "Nothing to close"). [label] names an
      * app as the list does. "Nothing to close" only when nothing is listed. Pure.
      */
@@ -146,7 +146,7 @@ object TaskPolicy {
     fun closeSteps(privileges: TaskPrivileges, packageName: String? = null): List<CloseStep> =
         buildList {
             // Enginehost's own answer first: it needs no helper, so it never opens the helper's full-access sheet, and
-            // "none running" settles a stale session without asking anything else (Droidtop/tracker#289).
+            // "none running" settles a stale session without asking anything else (mytop-project/tracker#289).
             if (packageName == ENGINEHOST_PACKAGE) add(CloseStep.ENGINEHOST_END_GAME)
             if (privileges.forceStop) add(CloseStep.FORCE_STOP)
             add(CloseStep.KILL_BACKGROUND)

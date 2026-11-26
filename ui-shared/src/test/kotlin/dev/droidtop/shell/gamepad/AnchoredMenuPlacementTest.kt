@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.IntOffset
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Where an anchored menu opens beside its item (Droidtop/tracker#827): [anchoredMenuPosition]. */
+/** Where an anchored menu opens beside its item (mytop-project/tracker#827): [anchoredMenuPosition]. */
 class AnchoredMenuPlacementTest {
     private val windowWidth = 1280
     private val windowHeight = 720

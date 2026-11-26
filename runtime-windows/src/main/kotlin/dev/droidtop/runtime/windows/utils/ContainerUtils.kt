@@ -47,9 +47,9 @@ object ContainerUtils {
     const val WRAPPER_ADRENO_A12 = "Turnip v26.1.0 A12 Fix"
 
     /**
-     * The Wine new containers get: droidtop's own builds (Droidtop/proton-wine-tux, catalog source "droidtop"),
+     * The Wine new containers get: droidtop's own builds (mytop-project/proton-wine-tux, catalog source "droidtop"),
      * whose patches let a game load from shared storage and SD cards. Owner, relayed 2026-11-04
-     * (Droidtop/tracker#857): proton-wine-tux 11.0-2 is the default for new containers, after a console check of
+     * (mytop-project/tracker#857): proton-wine-tux 11.0-2 is the default for new containers, after a console check of
      * a game on internal storage and one on an SD card. Existing containers keep the Wine they have.
      */
     const val DEFAULT_WINE_ARM64EC = "proton-11.0-2-arm64ec-1"

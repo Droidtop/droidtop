@@ -159,7 +159,7 @@ class ModesTest {
     @Test
     fun `home and a plain start go back to a running desktop the person is in`() {
         val all = setOf(Mode.LAUNCHER, Mode.GAMING, Mode.DESKTOP)
-        // Desktop > Start > Calendar, then Home, with Gaming as the default (rig 2398, Droidtop/tracker#352).
+        // Desktop > Start > Calendar, then Home, with Gaming as the default (rig 2398, mytop-project/tracker#352).
         assertEquals(Mode.DESKTOP, ModeGate.homeTarget("gaming", "desktop", all, desktopLive = true))
         assertEquals(Mode.DESKTOP, ModeGate.resolveAppMode(null, "gaming", "desktop", all, desktopLive = true))
         // A switch the person names still wins.

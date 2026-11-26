@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * "Child processes" on Desktop's and Windows games' pages (docs/SPEC.md "Child processes and Android's limit",
- * Droidtop/tracker#816): how many droidtop runs against Android's limit, with the device-setup item's lift and undo
+ * mytop-project/tracker#816): how many droidtop runs against Android's limit, with the device-setup item's lift and undo
  * ([DeviceSetup.childProcesses], the same as Settings > Device setup). Absent before Android 12, which has no limit.
  */
 internal object PhantomProcessRow {

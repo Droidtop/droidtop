@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A plugin's words are cleaned where they enter droidtop (Droidtop/tracker#784 slice 4: "sanitize it against any injection attacks"). */
+/** A plugin's words are cleaned where they enter droidtop (mytop-project/tracker#784 slice 4: "sanitize it against any injection attacks"). */
 class PluginTextTest {
     @Test
     fun `markup and entities are removed, so nothing reads as a page's own`() {

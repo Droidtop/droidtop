@@ -25,7 +25,7 @@ class SimilarGamesTest {
     fun `a game whose name drifted is offered, and nothing unlike it is`() {
         val candidates = SimilarGames.candidates(holding("/games/renpy/StarHarbor-0.3-pc"), groups)
 
-        // The folder game and, since Droidtop/tracker#745, the store's row of the same name (a link, not a merge).
+        // The folder game and, since mytop-project/tracker#745, the store's row of the same name (a link, not a merge).
         assertEquals(setOf("/games/renpy/Star_Harbour-0.4-pc", "steam:1"), candidates.flatMap { it.group.entriesByPath.keys }.toSet())
         assertTrue(candidates.all { it.score >= GameNaming.NAME_SIMILARITY_THRESHOLD })
         assertEquals("steam:1", candidates.single { "steam:1" in it.group.entriesByPath }.store)

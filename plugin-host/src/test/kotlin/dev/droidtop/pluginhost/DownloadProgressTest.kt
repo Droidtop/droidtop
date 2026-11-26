@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * A download draws a bar, not a spinner, once anything says how big it is (Droidtop/tracker#877): the engine's length,
+ * A download draws a bar, not a spinner, once anything says how big it is (mytop-project/tracker#877): the engine's length,
  * else the size the caller was told, and a row reads either its percent or its numbers.
  */
 class DownloadProgressTest {

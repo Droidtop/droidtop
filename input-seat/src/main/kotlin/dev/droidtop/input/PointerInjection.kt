@@ -4,7 +4,7 @@ import kotlin.math.hypot
 
 /**
  * The trackpad as a pointer on a screen droidtop does not own, as pure logic (docs/SPEC.md "The companion's tabs",
- * Input; Droidtop/tracker#486 item 3).
+ * Input; mytop-project/tracker#486 item 3).
  *
  * Nothing an ordinary app can do moves a system cursor over another app's window (`INJECT_EVENTS` is a signature
  * permission). What it can have is an accessibility service, whose `dispatchGesture` plays touches on any screen:
@@ -244,7 +244,7 @@ class PointerGestureQueue(
  * Which output the companion trackpad drives (docs/SPEC.md, Input). Pointer and focus are one selection in droidtop's
  * own shell, so while the shell is what the target screen shows the trackpad moves that selection (focus steps,
  * confirm, back); while droidtop's own game screen (a Windows game) is there it is that game's mouse, through the
- * pointer controller mouse mode drives (Droidtop/tracker#565); in any other app it is a pointer, which needs the
+ * pointer controller mouse mode drives (mytop-project/tracker#565); in any other app it is a pointer, which needs the
  * accessibility service.
  */
 enum class TrackpadRoute {

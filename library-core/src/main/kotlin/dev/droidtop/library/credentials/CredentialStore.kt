@@ -71,7 +71,7 @@ object CredentialStore {
     /**
      * A vault of its own for one store's sign-in (its own preferences [file] and Keystore [alias]): the same sealing as
      * this one, never part of [KEYS], so no settings backup carries it. For a store that must keep a password
-     * (Legacy Games, Droidtop/tracker#913).
+     * (Legacy Games, mytop-project/tracker#913).
      */
     fun vaultFor(context: Context, file: String, alias: String): CredentialVault =
         CredentialVault(PrefsStringStore(context.applicationContext.getSharedPreferences(file, Context.MODE_PRIVATE)), KeystoreSecretCipher(alias))

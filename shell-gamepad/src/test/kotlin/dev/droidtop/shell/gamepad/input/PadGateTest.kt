@@ -67,7 +67,7 @@ class PadGateTest {
 
     @Test
     fun `a keyboard's doubled letter typed fast is two presses, never a bounce`() {
-        // Droidtop/tracker#569: "Goodbye" typed by adb arrived as "Godbye" in the search field.
+        // mytop-project/tracker#569: "Goodbye" typed by adb arrived as "Godbye" in the search field.
         val o = KeyEvent.KEYCODE_O
         assertTrue(gate.onKey(o, down = true, repeatCount = 0, deviceId = 7, fallback = false, now = 0, fromPad = false))
         assertTrue(gate.onKey(o, down = false, repeatCount = 0, deviceId = 7, fallback = false, now = 2, fromPad = false))
@@ -131,7 +131,7 @@ class PadGateTest {
 
     @Test
     fun `a direction the device also sends as a real key is not translated again, per key`() {
-        // The Retroid Pocket 5's shape (Droidtop/tracker#1/#43): Down is a
+        // The Retroid Pocket 5's shape (mytop-project/tracker#1/#43): Down is a
         // real key, Up only comes from the hat.
         gate.onKey(KeyEvent.KEYCODE_DPAD_DOWN, down = true, repeatCount = 0, deviceId = pad, fallback = false, now = 0)
         gate.onKey(KeyEvent.KEYCODE_DPAD_DOWN, down = false, repeatCount = 0, deviceId = pad, fallback = false, now = 50)
@@ -198,7 +198,7 @@ class PadGateTest {
         assertTrue(emitted.isEmpty())
     }
 
-    // ---- Start: the same rule, held to L2 (Droidtop/tracker#621) ----
+    // ---- Start: the same rule, held to L2 (mytop-project/tracker#621) ----
 
     private fun start(down: Boolean, repeat: Int = 0, at: Long) =
         gate.onKey(KeyEvent.KEYCODE_BUTTON_START, down, repeat, pad, fallback = false, now = at)

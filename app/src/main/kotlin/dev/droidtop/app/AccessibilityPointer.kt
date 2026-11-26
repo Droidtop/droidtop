@@ -25,7 +25,7 @@ import dev.droidtop.input.PointerOp
 import kotlinx.coroutines.launch
 
 /**
- * The companion trackpad's pointer on the main screen (docs/SPEC.md "The companion's tabs", Input; Droidtop/tracker#486
+ * The companion trackpad's pointer on the main screen (docs/SPEC.md "The companion's tabs", Input; mytop-project/tracker#486
  * item 3). It needs no root: droidtop's accessibility service (the one that already types for other apps) draws the
  * cursor in an accessibility overlay and plays the touches a pointer implies with `dispatchGesture`, on any screen from
  * Android 11 (`GestureDescription.Builder.setDisplayId`) and on the default screen before. The gesture logic is
@@ -67,7 +67,7 @@ internal object AccessibilityPointer {
     }
 
     /**
-     * Whether the helper app's shell can play a touch (Droidtop/tracker#811): a running `priv.shell` provider, for a
+     * Whether the helper app's shell can play a touch (mytop-project/tracker#811): a running `priv.shell` provider, for a
      * device where the accessibility service is off or cannot reach the screen. Cheap: no provider call.
      */
     fun shellCanPoint(): Boolean = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
@@ -91,7 +91,7 @@ internal object AccessibilityPointer {
 }
 
 /**
- * The accessibility service where it can reach the screen, else the helper's shell (Droidtop/tracker#811). A drag stays
+ * The accessibility service where it can reach the screen, else the helper's shell (mytop-project/tracker#811). A drag stays
  * on the route it started on until it ends, since each route keeps its own stroke.
  */
 internal class RoutedPointerRunner(
@@ -253,7 +253,7 @@ internal class PointerGestureRunner(
 
 /**
  * The pointer's cursor: a small arrow in an accessibility overlay on the target screen, never touchable, so a touch
- * played under it reaches the app. Without the service (the shell route, Droidtop/tracker#811) it is an ordinary
+ * played under it reaches the app. Without the service (the shell route, mytop-project/tracker#811) it is an ordinary
  * overlay window when droidtop may draw over other apps, else there is no arrow. It moves with the pointer (one layout update a frame) and goes away after a few
  * seconds without movement and when the trackpad goes.
  */

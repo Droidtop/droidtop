@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds droidtop's native library (libdroidtop_agent.so; docs/SPEC.md 7o) from native/ for arm64-v8a and
 # x86_64 into net-core/agent/jniLibs/, where net-core/build.gradle.kts reads it. It replaced fetching
-# droidtop-agent's prebuilt release (Droidtop/tracker#867: each program builds its own scaffold over the
+# droidtop-agent's prebuilt release (mytop-project/tracker#867: each program builds its own scaffold over the
 # shared libraries). Needs rustup's aarch64-linux-android and x86_64-linux-android targets and the NDK at
 # ANDROID_NDK_HOME; links against API 26, droidtop's minSdk, as droidtop-agent's CI did.
 set -eu

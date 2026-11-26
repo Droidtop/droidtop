@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 
 /**
- * The environment Proton's media converter needs (Droidtop/tracker#897, #601).
+ * The environment Proton's media converter needs (mytop-project/tracker#897, #601).
  *
  * The Wine builds droidtop runs carry Proton's GStreamer media converter, which Media Foundation decodes through. It
  * opens the files these variables name (a dump of the media it met, Valve's transcoded media, and a blank video and

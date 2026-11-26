@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Bridges host audio into proot containers, the missing half of
- * docs/SPEC.md's container Sockets row (Droidtop/tracker#95): proot has
+ * docs/SPEC.md's container Sockets row (mytop-project/tracker#95): proot has
  * no kernel namespace and no access to Android's audio HAL the way
  * runtime-linux-root's DroidSpacesRuntime does (its own doc comment:
  * "droidspaces already bridges Android's audio HAL to a single host-side
@@ -46,7 +46,7 @@ import kotlinx.coroutines.withContext
  * ([dev.droidtop.runtime.ContainerLayout.clientEnvironment]) exactly the
  * way it would reach a real Linux desktop's PulseAudio.
  *
- * The microphone (Droidtop/tracker#80) rides the same server: with the
+ * The microphone (mytop-project/tracker#80) rides the same server: with the
  * person's opt-in and the RECORD_AUDIO grant, [start] also loads PulseAudio's
  * stock `module-pipe-source` on a FIFO that [MicrophonePump] fills from
  * `AudioRecord`, and makes it the default source. Programs see a normal
@@ -82,7 +82,7 @@ internal class HostAudioServer(private val context: Context) {
 
     /**
      * The Desktop session's part of the launch audio hand-off
-     * ([AudioHandOff], Droidtop/tracker#160). The server runs with no
+     * ([AudioHandOff], mytop-project/tracker#160). The server runs with no
      * idle suspend (the packaged modules have no module-suspend-on-idle),
      * so its AAudio sink keeps a low-latency output stream open and
      * writing silence for the whole session, including while another app
@@ -254,7 +254,7 @@ internal class HostAudioServer(private val context: Context) {
         /**
          * Which packaged asset holds [abi]'s modules and pactl:
          * `pulseaudio-gamenative-<abi>.tzst`, droidtop's own build for both
-         * ABIs (build-scripts/build-vendor-deps.sh, Droidtop/tracker#857),
+         * ABIs (build-scripts/build-vendor-deps.sh, mytop-project/tracker#857),
          * module-pipe-source included. Null for an ABI droidtop does not
          * package or a build without the asset. Pure so it is testable
          * without an AssetManager.
@@ -269,7 +269,7 @@ internal class HostAudioServer(private val context: Context) {
          * container that has the shared socket directory bound, same
          * trust boundary as the Wayland and CUPS sockets beside it), and
          * the AAudio sink module module-aaudio-sink.c
-         * (Droidtop/pulseaudio's droidtop branch) exists for. Pure so it is
+         * (mytop-project/pulseaudio's droidtop branch) exists for. Pure so it is
          * testable without touching a filesystem.
          */
         internal fun defaultPaConfig(socketPath: String, micPipePath: String? = null): String =

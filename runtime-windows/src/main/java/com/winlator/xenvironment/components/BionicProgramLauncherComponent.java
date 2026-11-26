@@ -282,14 +282,14 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         envVars.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
         envVars.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
         envVars.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
-        // droidtop: the media handoff's plugin first, while this session's decode server listens (Droidtop/tracker#601).
+        // droidtop: the media handoff's plugin first, while this session's decode server listens (mytop-project/tracker#601).
         dev.droidtop.runtime.windows.WineMediaDecode.applyLaunchEnv(context, envVars);
         envVars.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
         envVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
         envVars.put("PREFIX", rootDir.getPath() + "/usr");
         envVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
         envVars.put("ENABLE_UTIL_LAYER", "1");
-        // droidtop: and asfdemux out of autoplugging, so Proton's media converter takes ASF media (Droidtop/tracker#897).
+        // droidtop: and asfdemux out of autoplugging, so Proton's media converter takes ASF media (mytop-project/tracker#897).
         envVars.put("GST_PLUGIN_FEATURE_RANK", dev.droidtop.runtime.windows.WineMediaConverter.GST_FEATURE_RANK);
         envVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
         envVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
@@ -376,12 +376,12 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         // person's own Lossless Scaling is installed in droidtop's Steam.
         LsfgVkManager.applyLaunchEnv(context, container, envVars);
 
-        // droidtop: mimalloc first on LD_PRELOAD for a game that chose it (Droidtop/tracker#894), after every preload
+        // droidtop: mimalloc first on LD_PRELOAD for a game that chose it (mytop-project/tracker#894), after every preload
         // above, so its malloc comes before bionic's Scudo.
         dev.droidtop.runtime.windows.WineAllocator.applyLaunchEnv(context, container, envVars);
 
         // droidtop: the game's whole tree under the sandbox broker, learning only and behind a Developer menu
-        // switch (Droidtop/tracker#584 piece 0). Last, since it puts libsbx_child.so first on the LD_PRELOAD
+        // switch (mytop-project/tracker#584 piece 0). Last, since it puts libsbx_child.so first on the LD_PRELOAD
         // every hook above has finished.
         dev.droidtop.runtime.windows.WineSandbox.applyLaunchEnv(context, envVars);
 

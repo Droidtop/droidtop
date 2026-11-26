@@ -22,7 +22,7 @@ import dev.droidtop.library.settings.WordsForTests
  * reads is pinned here rather than only on hardware.
  */
 class PcPageAboutTest {
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 
@@ -177,7 +177,7 @@ class PcPageAboutTest {
         var opened: String? = null
         val linked = sourceRows(listOf(source), links, {}, { _, url -> opened = url })
         assertEquals(listOf("Forum thread", VIEW_THREAD_ROW), linked.map { it.title })
-        // The source's own page is the Show thread tab's row (Droidtop/tracker#845, #859); linking it stays under Versions.
+        // The source's own page is the Show thread tab's row (mytop-project/tracker#845, #859); linking it stays under Versions.
         assertEquals(listOf(PageTab.VERSIONS, PageTab.THREAD), linked.map { it.tab })
         assertEquals("#123", linked[0].value)
         // Only the host is shown; the whole link is the tip and what opens.
@@ -258,7 +258,7 @@ class PcPageAboutTest {
         assertEquals(listOf("Times played"), activityRows(entry().copy(playCount = 3), now).map { it.title })
         // Never played: no rows, so the tab says its empty line.
         assertEquals(emptyList<PageFact>(), activityRows(entry(), now))
-        // Played on another device too: the total, with where under it (Droidtop/tracker#469).
+        // Played on another device too: the total, with where under it (mytop-project/tracker#469).
         val desktop = dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere("DESKTOP", 36000, 0)
         val elsewhere = activityRows(played, now, playedElsewhere = listOf(desktop)).single { it.title == "Play time" }
         assertEquals("11 h" to "Here 1 h · DESKTOP 10 h", elsewhere.value to elsewhere.subtitle)

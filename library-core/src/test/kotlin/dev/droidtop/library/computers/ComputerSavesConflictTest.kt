@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The agent's `conflict` answer as the question droidtop asks (Droidtop/tracker#814: "nobody 'wins' ... We ask the user"). */
+/** The agent's `conflict` answer as the question droidtop asks (mytop-project/tracker#814: "nobody 'wins' ... We ask the user"). */
 class ComputerSavesConflictTest {
     private val answer = JSONObject(
         """{"outcome":"conflict","here":{"device":"Retroid Pocket 5","files":3,"newest_ms":1000},"there":{"device":"DESKTOP_PC","files":4,"newest_ms":2000}}""",

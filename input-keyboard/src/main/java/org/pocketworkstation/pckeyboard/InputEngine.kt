@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * The engine seam (Droidtop/tracker#903 H6, extended for conversion engines in H7a; docs/SPEC.md 6a, "The engine
+ * The engine seam (mytop-project/tracker#903 H6, extended for conversion engines in H7a; docs/SPEC.md 6a, "The engine
  * seam"): keys in, composing text and candidates out. Hacker's own Latin path is the first engine ([LatinEngine]); a
  * conversion engine (Mozc for Japanese, librime for Chinese, libhangul for Korean, #903 H7 to H9) is another, registered
  * in [InputEngines], and the input method drives it through [EngineSession] without anything Latin changing.
@@ -217,7 +217,7 @@ interface InputEngine {
 }
 
 /**
- * Code points to UTF-16 chars (Droidtop/tracker#903 H7a), for an engine whose positions count code points, as Mozc's
+ * Code points to UTF-16 chars (mytop-project/tracker#903 H7a), for an engine whose positions count code points, as Mozc's
  * do. "𠮷" and most emoji are one code point and two chars.
  */
 object CodePoints {

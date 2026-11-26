@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** What a "Restore droidtop" archive may put where (Droidtop/tracker#625): only its own files, never outside them. */
+/** What a "Restore droidtop" archive may put where (mytop-project/tracker#625): only its own files, never outside them. */
 class DroidtopBackupTest {
     @Test
     fun `the archive's own files go where they came from`() {

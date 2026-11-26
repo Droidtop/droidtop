@@ -43,21 +43,21 @@ sealed interface DesktopSessionState {
     /**
      * [detail] is the latest thing the container reported while booting (a first boot installs the desktop), if any.
      * [firstStart]: this start made the Linux system, so it downloads and installs, which takes minutes; a restart or
-     * a later start reuses it (Droidtop/tracker#687, #693).
+     * a later start reuses it (mytop-project/tracker#687, #693).
      */
     data class Connecting(val detail: String? = null, val firstStart: Boolean = false) : DesktopSessionState
     data class Connected(
         val hostBridge: HostBridge,
         /**
          * The compositor outputs the desktop has, each with the Android display it is for: the primary's first, then
-         * any [DesktopSessionService.extendTo] added for another display (Droidtop/tracker#908, step D2).
+         * any [DesktopSessionService.extendTo] added for another display (mytop-project/tracker#908, step D2).
          */
         val outputs: List<DesktopOutput>,
         /**
          * The taskbar's window actions for the compositor the session started
          * ([PrimaryProvisioning.compositorCommand], "sway" or "labwc" today): the Wayland
          * protocol has no way to ask a compositor what it implements, and sway ignores
-         * zwlr_foreign_toplevel_handle_v1's set_minimized (Droidtop/tracker#145, #391).
+         * zwlr_foreign_toplevel_handle_v1's set_minimized (mytop-project/tracker#145, #391).
          */
         val windows: DesktopWindows,
         /** The running primary container + the runtime that created it — what a native Linux game needs to run as a Wayland client sharing this same desktop (Windows games go through `:runtime-windows`'s own `WineEngine` and need neither). */
@@ -117,7 +117,7 @@ class DesktopSessionService : Service() {
     @Volatile
     private var libraryEntries: DesktopLibraryEntries? = null
 
-    /** The session's windows for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221), while it is connected. */
+    /** The session's windows for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221), while it is connected. */
     private var pluginWindows: DesktopPluginWindows? = null
 
     /** Why the session is ending on its own (its compositor went away), for the page shown after it; null when it was stopped. */
@@ -181,7 +181,7 @@ class DesktopSessionService : Service() {
         dev.droidtop.input.InputSeats.clear()
         scope.cancel()
         super.onDestroy()
-        // Restart desktop (Droidtop/tracker#687): the new session starts once this one has ended; its connect()
+        // Restart desktop (mytop-project/tracker#687): the new session starts once this one has ended; its connect()
         // waits for the container stop launched above.
         if (restartAfterStop) {
             restartAfterStop = false
@@ -199,7 +199,7 @@ class DesktopSessionService : Service() {
         val check = runtime.checkSystemRequirements()
         if (!check.succeeded) {
             val detail = check.stderr.ifBlank { check.stdout }.trim()
-            // A kernel that refuses ptrace has one way that works, said as onboarding says it (Droidtop/tracker#555).
+            // A kernel that refuses ptrace has one way that works, said as onboarding says it (mytop-project/tracker#555).
             fail(
                 if (runtime !is dev.droidtop.runtime.linux.root.DroidSpacesRuntime && detail.contains("ptrace", ignoreCase = true)) {
                     desktopCheckMessage(false, rooted = false, error = detail)
@@ -291,7 +291,7 @@ class DesktopSessionService : Service() {
         )
         pluginWindows = DesktopPluginWindows(applicationContext, hostBridge, windows).also { it.start(scope) }
         scope.launch { watchCompositor(hostBridge) }
-        // Outputs for other displays (Droidtop/tracker#908, step D2): sway alone can make a headless output on demand.
+        // Outputs for other displays (mytop-project/tracker#908, step D2): sway alone can make a headless output on demand.
         if (provisioning.compositorCommand.substringBefore(' ') == "sway") {
             swayOutputs = SwayOutputs(hostBridge, runtime.hostSocketDir())
             watchDisplayRemovals()
@@ -302,9 +302,9 @@ class DesktopSessionService : Service() {
         EngineApiServer.start(applicationContext, scope)
         // App containers whose program starts with the desktop (docs/SPEC.md 3, "The image's own program").
         scope.launch { runCatching { ContainerPrograms.startWithDesktop(applicationContext, runtime) } }
-        // The physical keyboard's layout, compiled in the container (docs/SPEC.md 6b, Droidtop/tracker#387).
+        // The physical keyboard's layout, compiled in the container (docs/SPEC.md 6b, mytop-project/tracker#387).
         DesktopKeyboardLayout.startWatching(applicationContext)
-        // Fonts for all languages are a Downloads job, not part of the boot (Droidtop/tracker#390): started only
+        // Fonts for all languages are a Downloads job, not part of the boot (mytop-project/tracker#390): started only
         // when this desktop does not have them yet, which one cheap test in the container answers.
         if (DesktopSetupPrefs.allLanguageFonts(applicationContext)) {
             scope.launch {
@@ -318,7 +318,7 @@ class DesktopSessionService : Service() {
 
     /**
      * Ends the session when its compositor goes away (docs/SPEC.md 6b "When the desktop stops",
-     * Droidtop/tracker#688): sway crashed, or something in the container killed it. Nothing reaches the desktop
+     * mytop-project/tracker#688): sway crashed, or something in the container killed it. Nothing reaches the desktop
      * after that, yet the session read "Connected" and the viewport kept its last frame with input going nowhere.
      * The session ends as a stop does, so the container's leftovers are stopped and Try again boots it afresh,
      * and the page says the desktop stopped.
@@ -331,7 +331,7 @@ class DesktopSessionService : Service() {
     }
 
     /**
-     * Retracts the desktop's output for a display Android removes (Droidtop/tracker#908, step D2). The callback runs on
+     * Retracts the desktop's output for a display Android removes (mytop-project/tracker#908, step D2). The callback runs on
      * the main thread and only queues the retract, which talks to sway, on the session's IO scope; a display with no
      * output of the desktop's makes it a no-op.
      */
@@ -461,7 +461,7 @@ class DesktopSessionService : Service() {
     // debugging the first real on-device pipeline run meant screenshotting
     // the shell to read error strings. Every failure now also lands in
     // logcat with its stack trace.
-    // [message] is what the page says, in plain words with the one thing to do (Droidtop/tracker#693); [log] is the
+    // [message] is what the page says, in plain words with the one thing to do (mytop-project/tracker#693); [log] is the
     // same failure in droidtop's own terms (the container, the compositor, the socket) for logcat.
     private fun fail(message: String, cause: Throwable? = null, log: String = message) {
         android.util.Log.e(TAG, "Desktop session failed: $log", cause)
@@ -508,7 +508,7 @@ class DesktopSessionService : Service() {
         }
 
         /**
-         * Stops the desktop session and starts it again (Start > System > Restart desktop, Droidtop/tracker#687),
+         * Stops the desktop session and starts it again (Start > System > Restart desktop, mytop-project/tracker#687),
          * so the settings that apply "when the desktop next starts" apply now. Keep the desktop running and its
          * answer are untouched. With no session running it is a plain start.
          */
@@ -540,7 +540,7 @@ class DesktopSessionService : Service() {
         val state: StateFlow<DesktopSessionState> = _stateHolder.asStateFlow()
 
         init {
-            // Home and droidtop's icon go back to a running desktop (SPEC 2c, Droidtop/tracker#352). Nothing reads
+            // Home and droidtop's icon go back to a running desktop (SPEC 2c, mytop-project/tracker#352). Nothing reads
             // the session before this class loads, and before then none is running.
             dev.droidtop.library.settings.Modes.desktopLive = { _stateHolder.value is DesktopSessionState.Connected }
         }
@@ -560,7 +560,7 @@ class DesktopSessionService : Service() {
         private val outputsLock = Mutex()
 
         /**
-         * Gives the Android display [display] its own output in the desktop (Droidtop/tracker#908, step D2): a new
+         * Gives the Android display [display] its own output in the desktop (mytop-project/tracker#908, step D2): a new
          * sway headless output, sized to the display's pixels at the scale the primary's output would have on it
          * (the Desktop scale and resolution settings with the display's own density, [DesktopScale]), placed right
          * of the outputs already there. [DesktopSecondScreen] shows it there (D3) and calls this again with the size of
@@ -590,7 +590,7 @@ class DesktopSessionService : Service() {
 
         /**
          * The primary's output was asked for [width] x [height] pixels at [scale] (a rotation, another Desktop scale
-         * or render resolution; DesktopViewport, Droidtop/tracker#908 step D3): every display [extendTo] gave an
+         * or render resolution; DesktopViewport, mytop-project/tracker#908 step D3): every display [extendTo] gave an
          * output is extended again, which sizes it at the current settings and places it right of the primary's new
          * box. The placing waits until the compositor reports the primary's new size, since the box is read from
          * that. Nothing happens with the primary alone, so the one-screen desktop does exactly what it did. Returns

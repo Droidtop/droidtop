@@ -101,7 +101,7 @@ object DroidtopWideSettings {
                             },
                         ),
                         // Which of droidtop's UIs Home opens, beside the row that makes droidtop Home
-                        // (Droidtop/tracker#571 row 11).
+                        // (mytop-project/tracker#571 row 11).
                         defaultModeItem(context),
                     ) + listOfNotNull(usersItem(context)),
                 ),
@@ -132,7 +132,7 @@ object DroidtopWideSettings {
                     category = "Appearance",
                     items = listOf(
                         dev.droidtop.library.settings.AppearancePrefs.item(context),
-                        // The colour source and the theme tint (docs/SPEC.md 7k, Droidtop/tracker#827 and #844).
+                        // The colour source and the theme tint (docs/SPEC.md 7k, mytop-project/tracker#827 and #844).
                         dev.droidtop.library.settings.AppearancePrefs.colourSourceItem(context),
                         dev.droidtop.library.settings.AppearancePrefs.customAccentItem(context),
                         dev.droidtop.library.settings.AppearancePrefs.tintThemesItem(context),
@@ -143,7 +143,7 @@ object DroidtopWideSettings {
                     title = "Accessibility",
                     category = "Appearance",
                     items = listOf(
-                        // droidtop's own language (Droidtop/tracker#627): Follow Android, or a shipped language.
+                        // droidtop's own language (mytop-project/tracker#627): Follow Android, or a shipped language.
                         dev.droidtop.app.AppLanguage.item(context),
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
@@ -177,7 +177,7 @@ object DroidtopWideSettings {
                             onSelect = { ctx, value ->
                                 CatalogPrefs.prefs(ctx).edit().putString(AccessibilityPrefs.KEY_TEXT_SCALE, value).apply()
                             },
-                            // Each size shows itself on a sample line (Droidtop/tracker#673).
+                            // Each size shows itself on a sample line (mytop-project/tracker#673).
                             sampleScale = { it.toFloatOrNull() },
                         ),
                         dev.droidtop.library.settings.ReadingPrefs.infoTextItem(context),
@@ -217,7 +217,7 @@ object DroidtopWideSettings {
                             current = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false),
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_BACKUP_CREDENTIALS, on).apply() },
                         ),
-                        // One archive of what a person did in droidtop (docs/SPEC.md "Data", Droidtop/tracker#625).
+                        // One archive of what a person did in droidtop (docs/SPEC.md "Data", mytop-project/tracker#625).
                         DocumentPickItem(
                             id = "pref_global_backup",
                             title = "Back up droidtop",
@@ -241,7 +241,7 @@ object DroidtopWideSettings {
                     title = "About droidtop",
                     category = "System",
                     items = listOfNotNull(
-                        // The one Updates screen, in About where people look for it (Droidtop/tracker#792: "There's no plugin,
+                        // The one Updates screen, in About where people look for it (mytop-project/tracker#792: "There's no plugin,
                         // or DROIDTOP even, update path in the UI"). Gaming also has it as a left-menu place, and the Quick
                         // Menu opens that place; all are links to this screen. Its value says when droidtop has a newer build.
                         dev.droidtop.library.settings.NestedScreenItem(
@@ -336,7 +336,7 @@ object DroidtopWideSettings {
                         ),
                         desktopScaleChoice(context),
                         desktopResolutionChoice(context),
-                        // The seat's one input method, left to a container's fcitx5 or ibus (Droidtop/tracker#809).
+                        // The seat's one input method, left to a container's fcitx5 or ibus (mytop-project/tracker#809).
                         ToggleItem(
                             id = DesktopPrefs.KEY_CONTAINER_INPUT_METHOD,
                             title = "A container's own input method",
@@ -386,8 +386,8 @@ object DroidtopWideSettings {
                                 }
                             },
                         ),
-                        // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
-                        // What Android allows droidtop's programs before it ends them (Droidtop/tracker#816).
+                        // The rows above that apply "when the desktop next starts" can apply now (mytop-project/tracker#687).
+                        // What Android allows droidtop's programs before it ends them (mytop-project/tracker#816).
                         PhantomProcessRow.item(context, "pref_desktop_child_processes"),
                         PhantomBreakdownRow.item(context, "pref_desktop_child_processes_what"),
                         ActionItem(
@@ -410,7 +410,7 @@ object DroidtopWideSettings {
                             registryId = ContainersCatalog.SCREEN_ID,
                             icon = dev.droidtop.library.settings.CatalogIcon.CONTAINERS,
                         ),
-                        // Desktop's Start > Settings opens this page in droidtop's screen host (Droidtop/tracker#692):
+                        // Desktop's Start > Settings opens this page in droidtop's screen host (mytop-project/tracker#692):
                         // the rest of Settings is one row away.
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_desktop_all_settings",
@@ -437,11 +437,11 @@ object DroidtopWideSettings {
 
     /**
      * How large the Linux desktop draws (dev.droidtop.runtime.DesktopScale,
-     * Droidtop/tracker#386). Automatic names the scale it works out for the
+     * mytop-project/tracker#386). Automatic names the scale it works out for the
      * desktop's own screen; the desktop takes a change at once.
      */
     private fun desktopScaleChoice(context: Context): ChoiceItem {
-        // The desktop's own screen, as the desktop recorded it (Droidtop/tracker#386): Settings may be on another
+        // The desktop's own screen, as the desktop recorded it (mytop-project/tracker#386): Settings may be on another
         // screen, whose density would name a scale the desktop does not use.
         val dpi = dev.droidtop.library.settings.DesktopPrefs.screenDpi(context) ?: context.resources.displayMetrics.densityDpi
         val automatic = dev.droidtop.runtime.DesktopScale.automatic(dpi)
@@ -460,7 +460,7 @@ object DroidtopWideSettings {
     }
 
     /**
-     * How many of the screen's pixels the Linux desktop draws (Droidtop/tracker#426): fewer is faster and
+     * How many of the screen's pixels the Linux desktop draws (mytop-project/tracker#426): fewer is faster and
      * blurrier. Beside [desktopScaleChoice], which sets how large things are, not how sharp.
      */
     private fun desktopResolutionChoice(context: Context): ChoiceItem {
@@ -479,13 +479,13 @@ object DroidtopWideSettings {
     }
 
     /**
-     * The desktop keyboard's layout (Droidtop/tracker#387): Automatic, named
+     * The desktop keyboard's layout (mytop-project/tracker#387): Automatic, named
      * with what it resolves to and where that came from, or one of the
      * container's own layouts (its list is copied the first time a desktop
      * runs; before that, the layouts droidtop can name from a language).
      */
     /**
-     * Whether the keys Android keeps (Super, Alt+Tab, Ctrl+Space) reach the desktop (Droidtop/tracker#697): a grant
+     * Whether the keys Android keeps (Super, Alt+Tab, Ctrl+Space) reach the desktop (mytop-project/tracker#697): a grant
      * the person gives once, through droidtop's accessibility service, and takes back in Android's list.
      */
     private suspend fun desktopSystemKeysItem(context: Context): AsyncActionItem {
@@ -579,7 +579,7 @@ object DroidtopWideSettings {
     }
 
     /**
-     * Android's own Users screen, for a shared device (Droidtop/tracker#79). An
+     * Android's own Users screen, for a shared device (mytop-project/tracker#79). An
      * app cannot switch users itself (that needs a system-only permission), so
      * this hands over to the screen that can, and is offered only where the
      * device supports more than one user and a Settings activity answers.
@@ -603,13 +603,13 @@ object DroidtopWideSettings {
      * `am crash` does not exist on the rigs, and the fresh-install
      * onDestroy crash stops reproducing after onboarding, which left the
      * third-crash Global settings route and the one-minute counter reset
-     * unverified (rig, verify-2026-09-29, Droidtop/tracker#49). The throw
+     * unverified (rig, verify-2026-09-29, mytop-project/tracker#49). The throw
      * is posted to the main looper so it reaches CrashRecovery's
      * uncaught-exception handler exactly like a real crash, whichever
      * surface runs the row.
      */
     /**
-     * The Developer menu (docs/SPEC.md 7, "Developer menu"; Droidtop/tracker#579): what is for finding faults in droidtop rather than
+     * The Developer menu (docs/SPEC.md 7, "Developer menu"; mytop-project/tracker#579): what is for finding faults in droidtop rather than
      * for playing. Its own rows are droidtop-wide; a plugin's, an emulator's or a page's technical rows stay on their
      * page and show there only while this menu is on ([DeveloperMenu.on]).
      */
@@ -628,7 +628,7 @@ object DroidtopWideSettings {
                         debugDesktopSecondScreenItem(context),
                     ),
                 ),
-                // The calibration set for name matching (Droidtop/tracker#318 §3.3): a scrape run with this on writes what
+                // The calibration set for name matching (mytop-project/tracker#318 §3.3): a scrape run with this on writes what
                 // each source answered, and a person fills in which answer was right.
                 CatalogGroup(
                     id = "developer_matching",
@@ -644,7 +644,7 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
-                // Per-app volume and EQ's open questions, answered on a device (Droidtop/tracker#836, slice 0).
+                // Per-app volume and EQ's open questions, answered on a device (mytop-project/tracker#836, slice 0).
                 CatalogGroup(
                     id = "developer_audio",
                     title = "Sound",
@@ -657,7 +657,7 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
-                // Wine's tree under the sandbox broker, learning only (docs/SPEC.md 5b, Droidtop/tracker#584 piece 0).
+                // Wine's tree under the sandbox broker, learning only (docs/SPEC.md 5b, mytop-project/tracker#584 piece 0).
                 CatalogGroup(
                     id = "developer_wine_sandbox",
                     title = "Windows games",
@@ -704,7 +704,7 @@ object DroidtopWideSettings {
     }
 
     /**
-     * A debug build's shortcut for a rig check of the desktop on a second screen (Droidtop/tracker#908): flips the
+     * A debug build's shortcut for a rig check of the desktop on a second screen (mytop-project/tracker#908): flips the
      * first other screen's Desktop answer between Extend and Keep it as it is, the answer the question and
      * Settings > Displays set (step D5), so it goes through the same path ([dev.droidtop.app.DesktopScreens]) and the
      * companion is kept off the screen the same way.
@@ -845,7 +845,7 @@ object DroidtopWideSettings {
     }
 
     /**
-     * Back up droidtop to one of the person's shares, and restore from one (docs/SPEC.md 7p, Droidtop/tracker#573): one
+     * Back up droidtop to one of the person's shares, and restore from one (docs/SPEC.md 7p, mytop-project/tracker#573): one
      * row per share under Restore droidtop. Nothing is shown until a share is added. Preferences: off the main thread.
      */
     private fun shareBackupRows(context: Context): List<dev.droidtop.library.settings.CatalogItem> =

@@ -27,7 +27,7 @@ class PluginVault(
 
     private val store = PerPluginJsonStore(dir)
 
-    // A vault file that does not parse is set aside, not read as empty and then written over (Droidtop/tracker#766).
+    // A vault file that does not parse is set aside, not read as empty and then written over (mytop-project/tracker#766).
     private fun read(pluginId: String): JSONObject = store.readOrSetAside(pluginId) ?: JSONObject()
 
     private fun write(pluginId: String, json: JSONObject) = store.write(pluginId, json)

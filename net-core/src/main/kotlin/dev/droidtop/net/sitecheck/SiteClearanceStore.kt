@@ -6,7 +6,7 @@ import dev.droidtop.shared.sitecheck.SiteCheck
 import java.io.File
 
 /**
- * What passing browser checks earned, one store for all of droidtop (docs/SPEC.md 12a, Droidtop/tracker#751): per site
+ * What passing browser checks earned, one store for all of droidtop (docs/SPEC.md 12a, mytop-project/tracker#751): per site
  * (a site covers its subdomains) the clearance cookies and the date they were earned, and the user agent of the web
  * view that earned them, which the clearance is bound to. A plugin's account cookies are not here; they stay in its
  * vault. Kept in [storage] as plain text so that a restart does not ask again.

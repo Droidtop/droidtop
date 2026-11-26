@@ -10,7 +10,7 @@ import java.io.File
 
 /**
  * A search row's Get, and a JSON integration's hand-off (docs/SPEC.md 13, "There is no Get games sheet"; docs/plugin-api.md "Fetchers answer in the one
- * search", Droidtop/tracker#218): the source's `acquire` job for a result that carries `get`, started from the row.
+ * search", mytop-project/tracker#218): the source's `acquire` job for a result that carries `get`, started from the row.
  * It runs in a scope of its own, not the search's, because it is a download: leaving the search does not stop it, and
  * its progress is in Downloads like every other.
  */

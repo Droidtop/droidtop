@@ -29,7 +29,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * Elevated access through Android's own wireless debugging (docs/SPEC.md "Wireless debugging", Droidtop/tracker#816):
+ * Elevated access through Android's own wireless debugging (docs/SPEC.md "Wireless debugging", mytop-project/tracker#816):
  * droidtop pairs with it once, with the code Android shows, and then talks to it as `adb` does, so it runs commands as
  * the shell user, as Shizuku does, with nothing else installed. Android 11 and later.
  *
@@ -75,7 +75,7 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
     /**
      * Pairs with the code Android shows under "Pair device with pairing code". The pairing service's port is found on
      * the device itself (`_adb-tls-pairing._tcp`), so the person types only the six digits. Throws with a reason the
-     * person can read when it fails. Every step is bounded and logged (Droidtop/tracker#851: the notification spun for
+     * person can read when it fails. Every step is bounded and logged (mytop-project/tracker#851: the notification spun for
      * over 40 s with nothing in the log when no pairing service answered): finding the service by [timeoutMs], the
      * pairing itself by [PAIR_MS].
      */
@@ -111,7 +111,7 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
 
     /**
      * Whether Settings is showing a pairing code now: Android advertises the pairing service only while that dialog is
-     * open. The pairing guide asks it to know when to take the code (Droidtop/tracker#363). Blocks up to [timeoutMs].
+     * open. The pairing guide asks it to know when to take the code (mytop-project/tracker#363). Blocks up to [timeoutMs].
      */
     fun pairingCodeShowing(timeoutMs: Long): Boolean = supported && discoverPort(PAIRING_SERVICE, timeoutMs) != null
 

@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which real game a library entry is: a uid, claims and locators (Droidtop/tracker#318, "One identity model"). */
+/** Which real game a library entry is: a uid, claims and locators (mytop-project/tracker#318, "One identity model"). */
 class GameIdentitiesTest {
     /** The store as maps, the way the database holds it. */
     private class Memory : IdentityStore {

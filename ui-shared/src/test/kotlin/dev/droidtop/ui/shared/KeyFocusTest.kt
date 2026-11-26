@@ -31,7 +31,7 @@ import org.robolectric.annotation.Config
 
 /**
  * A pad panel whose only focusable child is a text field keeps hearing the pad after the field gives its focus up, as
- * it does when Back hides the on-screen keyboard (Droidtop/tracker#747: D-pad Up and A did nothing in the Search sheet).
+ * it does when Back hides the on-screen keyboard (mytop-project/tracker#747: D-pad Up and A did nothing in the Search sheet).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])

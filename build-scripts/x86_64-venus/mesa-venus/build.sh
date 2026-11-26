@@ -1,5 +1,5 @@
 # Termux package recipe for Mesa's Venus Vulkan driver (libvulkan_virtio.so), for droidtop's x86_64 Wine guest
-# (docs/SPEC.md 10b "The x86_64 Windows runtime", Droidtop/tracker#608). The x86_64 graphics workflow adds it to
+# (docs/SPEC.md 10b "The x86_64 Windows runtime", mytop-project/tracker#608). The x86_64 graphics workflow adds it to
 # termux-packages as packages/mesa-venus and builds it with Termux's package builder. Its source, vendor/mesa-venus,
 # carries Termux's Mesa patches except 0005-virgl-socket-path, which droidtop's own 0005 replaces: the socket of the
 # app's vtest server comes from VTEST_SOCKET_NAME, not from a path under Termux's prefix.
@@ -37,8 +37,8 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -Dbuild-tests=false
 "
 
-# The source is vendor/mesa-venus (Droidtop/mesa, branch droidtop-venus): Mesa 26.2.4 with Termux's Mesa patches (all but 0005) and droidtop's 0005 as commits, never patched here
-# (Droidtop/tracker#921). The workflow copies that tree into the termux-packages checkout as droidtop-src/mesa-venus, the
+# The source is vendor/mesa-venus (mytop-project/mesa, branch droidtop-venus): Mesa 26.2.4 with Termux's Mesa patches (all but 0005) and droidtop's 0005 as commits, never patched here
+# (mytop-project/tracker#921). The workflow copies that tree into the termux-packages checkout as droidtop-src/mesa-venus, the
 # only place the builder's container can read it.
 termux_step_get_source() {
 	mkdir -p "$TERMUX_PKG_SRCDIR"

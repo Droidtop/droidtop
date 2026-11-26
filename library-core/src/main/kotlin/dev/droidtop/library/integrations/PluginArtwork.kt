@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Artwork from plugins (docs/plugin-api.md 3 A4, `library.artwork@1`, Droidtop/tracker#714): a SteamGridDB-style
+ * Artwork from plugins (docs/plugin-api.md 3 A4, `library.artwork@1`, mytop-project/tracker#714): a SteamGridDB-style
  * provider is asked during a PC game's scrape, after droidtop's own sources, for the roles they left empty. It answers
  * `list {entry, kinds}` with pictures by role; droidtop downloads each, checks it is an image of a sensible size and
  * files it under the role's folder, exactly as it does a built-in source's (the scrape's own write path). A plugin

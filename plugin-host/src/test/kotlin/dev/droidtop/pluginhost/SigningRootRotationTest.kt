@@ -22,7 +22,7 @@ import org.junit.rules.TemporaryFolder
 
 /**
  * The signing-key rotation of 2026-11-04 (docs/SPEC.md 12a "Signatures: certificate chains to droidtop's signing root",
- * Droidtop/tracker#876 and #550): the new root is trusted with no end, the old one until
+ * mytop-project/tracker#876 and #550): the new root is trusted with no end, the old one until
  * [DroidtopSigningRoot.OLD_ROOT_EXPIRES_AT] and not a second longer, at every place a chain to droidtop's root is
  * accepted. Both roots here are throwaway test keys.
  */

@@ -37,7 +37,7 @@ import dev.droidtop.shell.gamepad.TypeRole
 
 /**
  * The screen droidtop shows instead of itself when its storage is too full to start (docs/SPEC.md 10c, "Storage
- * full"; Droidtop/tracker#849): "a plain message that storage is full, no ANR, no stuck state". With about 12 MB free,
+ * full"; mytop-project/tracker#849): "a plain message that storage is full, no ANR, no stuck state". With about 12 MB free,
  * opening droidtop timed out with "Application does not have a focused window" and drew nothing.
  *
  * It is decided first thing in an activity's onCreate, before any preference is read or any shell is built, and it

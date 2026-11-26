@@ -3,7 +3,7 @@ package dev.droidtop.input
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The companion pointer through the helper app's shell (Droidtop/tracker#811). */
+/** The companion pointer through the helper app's shell (mytop-project/tracker#811). */
 class ShellPointerCommandsTest {
     private fun argv(op: PointerOp) = ShellPointerCommands.argv(op, displayId = 2, maxX = 1919f, maxY = 1079f)
 

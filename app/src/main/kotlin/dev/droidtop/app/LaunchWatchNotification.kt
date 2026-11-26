@@ -49,7 +49,7 @@ object LaunchWatchNotification {
         val back = PendingIntent.getActivity(
             context,
             0,
-            // Back to the mode in use, never the default one over it (Droidtop/tracker#639).
+            // Back to the mode in use, never the default one over it (mytop-project/tracker#639).
             ModeReturn.intent(context),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

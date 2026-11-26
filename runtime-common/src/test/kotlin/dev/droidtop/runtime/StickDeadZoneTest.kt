@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The stick dead zone's thresholds (Droidtop/tracker#723). */
+/** The stick dead zone's thresholds (mytop-project/tracker#723). */
 class StickDeadZoneTest {
     @Test
     fun `the default is the shell's long-standing band`() {

@@ -220,7 +220,7 @@ object GamepadKeyMap {
 
     /**
      * L2's and R2's names: the printed ones, or on a pad with no triggers the hold that stands in for each (a held
-     * Start is L2, a held Select R2), so the hint names a press the pad can make (Droidtop/tracker#621 M9). Pure.
+     * Start is L2, a held Select R2), so the hint names a press the pad can make (mytop-project/tracker#621 M9). Pure.
      */
     fun triggerLabel(action: GamepadAction, triggerless: Boolean): String = when (action) {
         GamepadAction.L2 -> if (triggerless) "Hold Start" else "L2"

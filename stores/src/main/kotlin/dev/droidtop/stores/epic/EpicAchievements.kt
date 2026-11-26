@@ -17,7 +17,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * An Epic game's achievements and the signed-in account's progress, read-only, for its page (Droidtop/tracker#230;
+ * An Epic game's achievements and the signed-in account's progress, read-only, for its page (mytop-project/tracker#230;
  * owner, 2026-10-23: "read-only and for display"). Epic's launcher reads them from its store GraphQL service
  * (`launcher.store.epicgames.com/graphql`, the host Legendary's launcher calls use, with the launcher's own token): the
  * game's achievements by its namespace (`Achievement.productAchievementsRecordBySandbox`), then the account's records

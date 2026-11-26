@@ -1,7 +1,7 @@
 package com.google.android.apps.inputmethod.libs.mozc.session;
 
 /**
- * The Java side of libmozc.so (Droidtop/tracker#903 H7c). The library binds to this class by name, so its package and
+ * The Java side of libmozc.so (mytop-project/tracker#903 H7c). The library binds to this class by name, so its package and
  * name are Mozc's and must not change (consumer-rules.pro keeps them through R8). From google/mozc
  * src/android/jni/mozcjni.cc at 0136c35782536cb43d710575c311cd4185982738 (3.35.6354):
  *

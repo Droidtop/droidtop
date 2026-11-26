@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Hacker Keyboard Reborn's key plates (Droidtop/tracker#903 H2): which keys are function keys, and their colours. */
+/** Hacker Keyboard Reborn's key plates (mytop-project/tracker#903 H2): which keys are function keys, and their colours. */
 class KeyPlatesTest {
     private val colors = KeyboardColors(
         ground = 0xFF202124.toInt(), panel = 0xFF292A2D.toInt(), key = 0xFF3C4043.toInt(), keyFocused = 0xFF5F6368.toInt(),

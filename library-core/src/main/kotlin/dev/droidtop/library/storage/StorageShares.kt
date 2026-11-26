@@ -11,7 +11,7 @@ import java.util.UUID
 
 /**
  * One of the person's own network shares or cloud storages (docs/SPEC.md "Network and cloud storage",
- * Droidtop/tracker#573). droidtop reaches it through lib-net's share client in its native library. The
+ * mytop-project/tracker#573). droidtop reaches it through mytop-net's share client in its native library. The
  * password is never here: it is in the [CredentialStore] vault under [passwordKey].
  *
  * [trusted] is the person's answer to "Do you trust this share?" (owner, 2026-11-05: "That depends on their

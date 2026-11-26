@@ -124,7 +124,7 @@ internal fun CompanionLogs() {
 
 /**
  * The Logs card on Performance, only where the mode allows it and while the Developer menu is on (docs/SPEC.md 7, "Developer menu",
- * Droidtop/tracker#579): a log is for finding faults, not for playing.
+ * mytop-project/tracker#579): a log is for finding faults, not for playing.
  */
 @Composable
 internal fun CompanionLogsCard() {

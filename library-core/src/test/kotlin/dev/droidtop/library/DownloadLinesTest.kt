@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** One grouping of a record's downloads for every page that lists them (Droidtop/tracker#845). */
+/** One grouping of a record's downloads for every page that lists them (mytop-project/tracker#845). */
 class DownloadLinesTest {
     private fun d(section: String, host: String, vararg systems: String, role: String = "build") =
         UpdateSources.Download(section, host, host, "", "https://${host.lowercase()}.example/$section", systems.toList(), role = role)

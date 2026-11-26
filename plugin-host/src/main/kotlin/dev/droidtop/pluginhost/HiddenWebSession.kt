@@ -18,7 +18,7 @@ import org.json.JSONArray
 
 /**
  * A plugin's download link opened out of sight first (docs/SPEC.md 12a "A download link opens out of sight first",
- * Droidtop/tracker#783). The owner: "open the link in the hidden webview, check for the text currently onscreen, and if
+ * mytop-project/tracker#783). The owner: "open the link in the hidden webview, check for the text currently onscreen, and if
  * we see it, refresh the link and launch that. Otherwise, display the webview to the user (if they need to look at
  * it)". The view gets the same session as the visible one ([WebSessionCookies]) in droidtop's window
  * ([HiddenWebViews]), and ends on one of [End]; only [End.PERSON] opens droidtop's visible view. Blocking: never on the
@@ -54,7 +54,7 @@ object HiddenWebSession {
 
     /**
      * Opens [request] (an Open view's) out of sight and returns how it ended. Null when there is no droidtop screen in
-     * front to run it in: a page in no window passes no check (Droidtop/tracker#783), so the visible view opens instead.
+     * front to run it in: a page in no window passes no check (mytop-project/tracker#783), so the visible view opens instead.
      */
     fun open(context: Context, request: WebSessionRequest, expiredText: List<String>): Outcome? {
         check(Looper.myLooper() != Looper.getMainLooper()) { "HiddenWebSession blocks; call it off the main thread" }
@@ -120,7 +120,7 @@ object HiddenWebSession {
             override fun shouldOverrideUrlLoading(view: WebView, asked: WebResourceRequest): Boolean {
                 val scheme = asked.url.scheme?.lowercase()
                 val target = asked.url.toString()
-                // A host droidtop serves, as in the visible view (Droidtop/tracker#650): with the person's TorBox key a
+                // A host droidtop serves, as in the visible view (mytop-project/tracker#650): with the person's TorBox key a
                 // pixeldrain link comes "via your TorBox", and no page is shown.
                 if (asked.isForMainFrame && scheme == "https" && dev.droidtop.pluginhost.hosts.HostLinks.served(target)) {
                     view.post { finish(End.HANDOFF, handoff = target) }

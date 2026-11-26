@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The companion Home's sections, in page order (docs/SPEC.md "The companion's tabs", Droidtop/tracker#328).
+ * The companion Home's sections, in page order (docs/SPEC.md "The companion's tabs", mytop-project/tracker#328).
  * [key] is what the preferences store; [label] is the section heading and the settings row.
  */
 enum class CompanionHomeSection(val key: String, val label: String) {

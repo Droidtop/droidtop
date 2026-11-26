@@ -4,7 +4,7 @@ import android.content.Context
 
 /**
  * The version a person set for a folder game (docs/SPEC.md 7i, "The game
- * page", Droidtop/tracker#397 slice G): it wins over what the folder's name
+ * page", mytop-project/tracker#397 slice G): it wins over what the folder's name
  * says until it is cleared. Kept by the game's entry id, which a version bump
  * keeps ([GameFolderIds]), so a set version survives a rename. Preferences
  * reads and writes: off the main thread.

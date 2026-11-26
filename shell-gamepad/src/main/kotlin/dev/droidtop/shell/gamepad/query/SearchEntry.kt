@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.query
 
 /**
- * The ways into the one search (docs/SPEC.md 12a, "One search: where it opens"; Droidtop/tracker#485 F7c, the
+ * The ways into the one search (docs/SPEC.md 12a, "One search: where it opens"; mytop-project/tracker#485 F7c, the
  * owner's "we also want per-console search items", 2026-10-14). There is one search runner (UnifiedSearch,
  * drawn by [LibrarySearchDialog]); what changes is its scope:
  *

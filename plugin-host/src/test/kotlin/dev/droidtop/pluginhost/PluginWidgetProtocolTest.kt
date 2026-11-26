@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
 
-/** C10 widget templates and which points may be on a widget (docs/plugin-api.md 3 C10, Droidtop/tracker#563). */
+/** C10 widget templates and which points may be on a widget (docs/plugin-api.md 3 C10, mytop-project/tracker#563). */
 class PluginWidgetProtocolTest {
     private val png = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 0x0D, 0x0A, 0x1A, 0x0A, 0, 0)
     private fun b64(bytes: ByteArray) = Base64.getEncoder().encodeToString(bytes)

@@ -13,7 +13,7 @@ name: lsfg-vk layer
 # which no longer exists (lsfg-vk moved off GitHub). The exact tree of the
 # pinned commit 78ab59a8 is kept in build-scripts/lsfg-dxbc (zlib, DXVK's
 # DXBC compiler; git tree f19b5a7a, the same as that commit's), so this
-# build no longer depends on that repository (Droidtop/tracker#857). Its
+# build no longer depends on that repository (mytop-project/tracker#857). Its
 # other submodules (pe-parse, toml11, volk) still resolve upstream.
 
 on:

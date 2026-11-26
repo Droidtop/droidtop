@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * The version a folder game shows (docs/SPEC.md 7i, "The game page",
- * Droidtop/tracker#397 slice G): the person's own wins until cleared, a
+ * mytop-project/tracker#397 slice G): the person's own wins until cleared, a
  * store marker's build beats the folder's name, and the folder's name is the
  * same parse the title is stripped by.
  */

@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 /**
  * Every droidtop text field under [content] asks the input method not to go full screen (IME_FLAG_NO_FULLSCREEN and
  * IME_FLAG_NO_EXTRACT_UI). On a landscape screen Gboard otherwise replaces the whole window with its own editor, and
- * the search's results were under it with no way back (rig on the console, 2026-10-16, Droidtop/tracker#485 comment
+ * the search's results were under it with no way back (rig on the console, 2026-10-16, mytop-project/tracker#485 comment
  * 6224857113: its Search and Enter did not close it). The themes' roots wrap their content in it, so it reaches every
  * Compose field, dialogs included, and the S7 TextEntry.
  */

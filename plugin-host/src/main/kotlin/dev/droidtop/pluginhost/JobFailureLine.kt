@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 /**
- * A plugin job's failure as the person reads it (Droidtop/tracker#790): one plain sentence on the job's line, and a
+ * A plugin job's failure as the person reads it (mytop-project/tracker#790): one plain sentence on the job's line, and a
  * technical message's own words kept behind it as the job's Details. On the console the Syncthing plugin's job line was
  * a class loader's exception text ("dalvik.system.InMemoryDexClassLoader[DexPathList[[dex file ..."), which the owner
  * read as "internal context data". A plugin's own plain sentence ("Sign in to F95zone first") stays the line as it is.
@@ -28,7 +28,7 @@ object JobFailureLine {
     /** The line for [error], a failed job of the plugin called [label]. */
     fun of(label: String, error: String?): Line {
         val text = error?.trim().orEmpty()
-        // droidtop's words, the subject the feature's own name (Droidtop/tracker#883 §3.7), never "couldn't finish this".
+        // droidtop's words, the subject the feature's own name (mytop-project/tracker#883 §3.7), never "couldn't finish this".
         if (text.isEmpty()) return Line(PluginFailureWords.of(null, label).title, null)
         if (text.length <= MAX_PLAIN && '\n' !in text && !TECHNICAL.containsMatchIn(text)) return Line(text, null)
         val sentence = if (NATIVE.containsMatchIn(text)) {

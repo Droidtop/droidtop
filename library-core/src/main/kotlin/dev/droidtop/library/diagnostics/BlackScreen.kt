@@ -1,7 +1,7 @@
 package dev.droidtop.library.diagnostics
 
 /**
- * Whether a shown frame is a black screen (docs/SPEC.md 7e2, "A black screen is noticed"; Droidtop/tracker#601): one
+ * Whether a shown frame is a black screen (docs/SPEC.md 7e2, "A black screen is noticed"; mytop-project/tracker#601): one
  * flat dark colour, a pointer allowed. The frame is a small copy of what the person sees, read whichever renderer drew
  * it. Pure.
  */
@@ -14,7 +14,7 @@ object FrameDarkness {
 
     /**
      * Whether [argb] holds anything at all: some pixel whose colour is not exactly zero. A dark frame with a pointer or
-     * a near-black loading screen has; a copy that read nothing does not (Droidtop/tracker#896: on BlueStacks PixelCopy
+     * a near-black loading screen has; a copy that read nothing does not (mytop-project/tracker#896: on BlueStacks PixelCopy
      * answers SUCCESS with every pixel 0 for the Wine surface while the game draws its menu).
      */
     fun hasPicture(argb: IntArray): Boolean = argb.any { it and 0xFFFFFF != 0 }
@@ -42,7 +42,7 @@ object FrameDarkness {
  * waiting ([keepWaiting]) starts a new count. Pure: the caller samples and gives the time.
  *
  * A dark frame counts only once the copies have shown some picture in this run ([FrameDarkness.hasPicture]): a copy that
- * is exactly zero every time says nothing about the game (Droidtop/tracker#896, BlueStacks: Kingdom Two Crowns drew its
+ * is exactly zero every time says nothing about the game (mytop-project/tracker#896, BlueStacks: Kingdom Two Crowns drew its
  * menu and the notice came anyway). A real black screen still counts once anything (the pointer, a near-black frame)
  * has shown. Built to the issue's recommendation, owner to confirm: a game black from its very first frame with no
  * pointer, on a device whose copies work, is no longer said.

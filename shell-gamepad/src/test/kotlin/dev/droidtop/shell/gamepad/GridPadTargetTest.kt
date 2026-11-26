@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * [gridPadTarget]'s own edge math (Droidtop/tracker#1, owner on the
+ * [gridPadTarget]'s own edge math (mytop-project/tracker#1, owner on the
  * console: "Up and Left in a game list are simply INERT... trace where
  * Up and Left go in the game-list path... write unit tests covering
  * previous-direction navigation from the middle of a long list and from

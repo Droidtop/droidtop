@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * How the Linux desktop looks against droidtop's own Light or dark (docs/SPEC.md 2b "Desktop appearance",
- * Droidtop/tracker#694): its background, which droidtop's sway config sets, and the dark or light look of the
+ * mytop-project/tracker#694): its background, which droidtop's sway config sets, and the dark or light look of the
  * container's GTK apps, which [ContainerLayout.clientEnvironment] gives every program it starts.
  */
 object DesktopAppearance {

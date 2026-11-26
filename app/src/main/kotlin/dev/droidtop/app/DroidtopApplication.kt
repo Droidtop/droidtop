@@ -40,17 +40,17 @@ import dev.droidtop.runtime.AudioHandOff
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
     override fun attachBaseContext(base: android.content.Context) {
         super.attachBaseContext(base)
-        // Catalog words are string resources read through Words (Droidtop/tracker#177); the content providers that
+        // Catalog words are string resources read through Words (mytop-project/tracker#177); the content providers that
         // register the catalogs start before onCreate, so it gets the Context here, first.
         dev.droidtop.library.settings.Words.init(base)
         // Whether storage is too full to start, known before any content provider or onCreate runs (one statfs, no
         // write): MainActivity and onboarding then show the storage-full screen instead of themselves (docs/SPEC.md
-        // 10c, "Storage full", Droidtop/tracker#849).
+        // 10c, "Storage full", mytop-project/tracker#849).
         dev.droidtop.runtime.StorageGuard.check(base)
     }
 
     override fun onCreate() {
-        // droidtop's side of the Murine launcher's hooks (Droidtop/tracker#921), before LauncherApplication's own start,
+        // droidtop's side of the Murine launcher's hooks (mytop-project/tracker#921), before LauncherApplication's own start,
         // which already reads them (its light or dark). It only sets references, so it is the same in every process.
         dev.droidtop.shell.standard.hooks.ShellDefaultHooks.install(this)
         super.onCreate()
@@ -61,7 +61,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The download engine's process (docs/SPEC.md 12a "One download engine") is the same: libaria2 reads untrusted
         // network data there, so droidtop starts nothing beside it, and in the default `:aria2_open` process the UID is droidtop's.
         if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode() || dev.droidtop.runtime.util.IsolatedProcess.runsDownloadEngine()) return
-        // A full-access plugin's process (`:pluginhost*`) runs none of droidtop's start (Droidtop/tracker#775): droidtop
+        // A full-access plugin's process (`:pluginhost*`) runs none of droidtop's start (mytop-project/tracker#775): droidtop
         // starts in its own process, then starts the plugin host, which starts the plugins. Run here, droidtop's start
         // would restore backups, start modes and start plugins of its own from a plugin's process. It gets only what the
         // plugin's code there uses: the network platform, the shared Shizuku binder, and the look of its own screen.
@@ -73,18 +73,18 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             dev.droidtop.ui.shared.MotionWatch.install(this)
             return
         }
-        // Main-thread file, database and network work is logged in debuggable builds, from here on (Droidtop/tracker#729).
+        // Main-thread file, database and network work is logged in debuggable builds, from here on (mytop-project/tracker#729).
         DebugStrictMode.install(this)
-        // The console table, for the shell's input pipeline, which does not depend on :library-core (Droidtop/tracker#827 F1a).
+        // The console table, for the shell's input pipeline, which does not depend on :library-core (mytop-project/tracker#827 F1a).
         dev.droidtop.library.controller.ConsoleLookup.forThisDevice = dev.droidtop.library.controller.HardwareDatabase::forThisDevice
         // The feature steps, before onboarding or What's new reads them (docs/SPEC.md 7b, "Update onboarding").
         WhatsNew.registerSteps()
-        // Every entry to Updates says how many are waiting (Droidtop/tracker#792): the page lists them, off the main thread.
+        // Every entry to Updates says how many are waiting (mytop-project/tracker#792): the page lists them, off the main thread.
         dev.droidtop.library.settings.UpdatesWaiting.refresh = { context ->
             val app = context.applicationContext
             dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { dev.droidtop.app.settings.UpdatesPage.publishCount(app) } }
         }
-        // A restore staged by "Restore droidtop" goes into place before anything opens a database (Droidtop/tracker#625).
+        // A restore staged by "Restore droidtop" goes into place before anything opens a database (mytop-project/tracker#625).
         dev.droidtop.app.settings.DroidtopBackup.finishPendingRestore(this)
         // The scan log goes to logcat AND to a file droidtop owns, and
         // says which build is writing it -- shared core, every mode, so
@@ -95,11 +95,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
         // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
         PlayTimeLimiter.install(this)
-        // The stick's dead zone (Settings > Controls, Droidtop/tracker#723), read off the main thread.
+        // The stick's dead zone (Settings > Controls, mytop-project/tracker#723), read off the main thread.
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.StickDeadZone.load(this@DroidtopApplication) }
-        // The person's own ratings and statuses, in memory for the lists' filters and sorts (Droidtop/tracker#722).
+        // The person's own ratings and statuses, in memory for the lists' filters and sorts (mytop-project/tracker#722).
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.settings.GameMarks.warm(this@DroidtopApplication) }
-        // The power policy (docs/SPEC.md "Power policy", Droidtop/tracker#841): a game droidtop launches gets its level, off
+        // The power policy (docs/SPEC.md "Power policy", mytop-project/tracker#841): a game droidtop launches gets its level, off
         // the main thread; droidtop's own screen coming back puts every changed game back (onActivityResumed below).
         val powerApp = this
         dev.droidtop.runtime.power.PowerController.install(this)
@@ -107,7 +107,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { dev.droidtop.runtime.power.PowerController.applyFor(powerApp, pkg) } }
         }
         // Game modes droidtop changed and did not put back before it stopped (docs/SPEC.md "Power policy", the journal,
-        // Droidtop/tracker#841): put back first, once the elevated shell has had its moment to connect.
+        // mytop-project/tracker#841): put back first, once the elevated shell has had its moment to connect.
         dev.droidtop.runtime.util.AppScopes.io.launch {
             if (dev.droidtop.runtime.power.PowerJournal.entries(powerApp).isEmpty()) return@launch
             val shell = dev.droidtop.runtime.tasks.TaskManager.shell
@@ -122,7 +122,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // is unreadable until it gets the context here (SPEC 10b).
         dev.droidtop.runtime.windows.OkHttpPlatform.install(this)
         // What passing a site's browser check earned is kept once for every request droidtop makes (SPEC 12a,
-        // Droidtop/tracker#751); the file is read on first use, not here.
+        // mytop-project/tracker#751); the file is read on first use, not here.
         val clearanceFile = java.io.File(filesDir, "site-clearance.txt")
         dev.droidtop.net.sitecheck.SiteClearances.install {
             dev.droidtop.net.sitecheck.SiteClearanceStore(dev.droidtop.net.sitecheck.SiteClearanceStore.FileStorage(clearanceFile))
@@ -144,11 +144,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         Seams.install(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
-        // Android's Remove animations reaches every surface's motion, not only Gaming's (Droidtop/tracker#643).
+        // Android's Remove animations reaches every surface's motion, not only Gaming's (mytop-project/tracker#643).
         dev.droidtop.ui.shared.MotionWatch.install(this)
-        // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", Droidtop/tracker#179).
+        // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", mytop-project/tracker#179).
         dev.droidtop.library.integrations.PluginChannels.install(this)
-        // The plugin host starts after droidtop, by droidtop (Droidtop/tracker#775): PluginHostStart, once droidtop's
+        // The plugin host starts after droidtop, by droidtop (mytop-project/tracker#775): PluginHostStart, once droidtop's
         // first screen has drawn, or a little after a start with no screen. Nothing above or below needs it.
         PluginHostStart.armAfterStart(this)
         // The library goes to and from the paired computers by itself (docs/SPEC.md 7o, "When the library syncs").
@@ -172,21 +172,21 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // HOME + R2, without backgrounding it. Main process only.
         InGameOverlays.install(this)
         // A screen connected for the first time is asked about once (docs/SPEC.md 4c, "What each screen is for",
-        // Droidtop/tracker#776). Main process only.
+        // mytop-project/tracker#776). Main process only.
         ScreenRoleAsk.install(this)
         // The desktop on the screens the person said it extends to, asked once per screen (docs/SPEC.md 2b, "The
-        // desktop on a second screen", Droidtop/tracker#908 step D5). Main process only.
+        // desktop on a second screen", mytop-project/tracker#908 step D5). Main process only.
         DesktopScreens.install(this)
         // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.
         if (Build.VERSION.SDK_INT < 28 || Application.getProcessName() == packageName) {
-            // Apps that carry a droidtop plugin (Droidtop/tracker#547): told to the person once per app version when the app
+            // Apps that carry a droidtop plugin (mytop-project/tracker#547): told to the person once per app version when the app
             // announces itself at the door; the plugin host's start (PluginHostStart) watches installs and catches up.
             dev.droidtop.pluginhost.AppInterfaceAnnouncements.notify = { context, app -> AppInterfaceNotification.show(context, app) }
             dev.droidtop.pluginhost.DownloadGate.install(this)
             dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
-            // PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568).
+            // PC and engine games get their details by themselves (docs/SPEC.md 7h, mytop-project/tracker#568).
             dev.droidtop.library.scraper.PcAutoScrape.requestLater(this)
         }
         // Shared core too: a games folder added in onboarding or Settings
@@ -224,7 +224,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 dev.droidtop.shell.gamepad.InWindowKeyboard.attach(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
                 // The first of droidtop's own screens in front after an update opens What's new (SPEC 7b, "Update onboarding").
-                // Not over the storage-full screen, which only says that storage is full (Droidtop/tracker#849).
+                // Not over the storage-full screen, which only says that storage is full (mytop-project/tracker#849).
                 if (activity.isShell()) dev.droidtop.library.computers.ComputerLibraryCycle.shown(activity)
                 if ((activity is MainActivity && !activity.storageFull) || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
                     WhatsNew.onShellResumed(activity)

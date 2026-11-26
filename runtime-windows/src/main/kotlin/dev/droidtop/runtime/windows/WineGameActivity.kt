@@ -83,7 +83,7 @@ class WineGameActivity : Activity() {
     private var softKeyboard: WineKeyboard? = null
     private var winHandler: WinHandler? = null
     private var blackScreen: WineBlackScreen? = null
-    /** The redistributables this launch installs before the game, and their licence sheet (Droidtop/tracker#916). */
+    /** The redistributables this launch installs before the game, and their licence sheet (mytop-project/tracker#916). */
     private var redistInstall: dev.droidtop.runtime.windows.redist.RedistInstall? = null
 
     /** The run's setup, said in its record and in a report: Wine, Direct3D, the graphics driver and the emulator. */
@@ -108,7 +108,7 @@ class WineGameActivity : Activity() {
     private var gameWorkingDir: File? = null
     private var prefixRoot: File? = null
 
-    /** The kernel drivers in the prefix when the run started (Droidtop/tracker#607), to tell which ones it installed. */
+    /** The kernel drivers in the prefix when the run started (mytop-project/tracker#607), to tell which ones it installed. */
     @Volatile private var driversAtStart: List<dev.droidtop.library.KernelDriver>? = null
 
     /** When the run started, on the wall clock (startedAtMs is the monotonic one): to tell a log this run wrote. */
@@ -160,7 +160,7 @@ class WineGameActivity : Activity() {
         // view and renderer code. Opening them does no disk work; the
         // runtime's start loaded them off the main thread (PrefManager.load).
         GameNativePrefManager.init(this)
-        // The failure screen's colours, droidtop's own for its Light or dark (docs/SPEC.md 7k, Droidtop/tracker#561):
+        // The failure screen's colours, droidtop's own for its Light or dark (docs/SPEC.md 7k, mytop-project/tracker#561):
         // read once here, off the main thread, since they come from a preference.
         startupExecutor.execute { chrome = runCatching { dev.droidtop.library.theme.RoleTokens.current(applicationContext) }.getOrNull() }
         // Not optional, and not cosmetic: WinHandler.start() asks the
@@ -196,7 +196,7 @@ class WineGameActivity : Activity() {
             "Wine" to prefix.wineVersion.orEmpty(),
             "Direct3D" to prefix.dxWrapper.orEmpty(),
             "Graphics driver" to listOf(prefix.graphicsDriver, prefix.graphicsDriverVersion).filterNot { it.isNullOrBlank() }.joinToString(" "),
-            // What actually runs: an x86_64 device runs Wine's code itself, whatever the prefix names (Droidtop/tracker#896:
+            // What actually runs: an x86_64 device runs Wine's code itself, whatever the prefix names (mytop-project/tracker#896:
             // the record said Box64 where the game's page said None).
             "Emulator" to if (dev.droidtop.runtime.windows.utils.X86_64GuestLibs.isX86_64Host()) "None" else prefix.emulator.orEmpty(),
         ).filter { it.second.isNotBlank() }
@@ -266,11 +266,11 @@ class WineGameActivity : Activity() {
         }
         touchMouse = TouchMouse(xServer)
         keyboard = Keyboard(xServer)
-        // The game's one pointer: mouse mode, the layouts and the companion's trackpad all drive it (Droidtop/tracker#565).
+        // The game's one pointer: mouse mode, the layouts and the companion's trackpad all drive it (mytop-project/tracker#565).
         val pointer = XServerPointer(xServer) { window?.decorView?.display?.displayId }
         gamePointer = pointer
 
-        // The pad's layouts (Droidtop/tracker#618), mouse mode's among them (C4): read and parsed off the main thread;
+        // The pad's layouts (mytop-project/tracker#618), mouse mode's among them (C4): read and parsed off the main thread;
         // the one this game was left with is played, and mouse mode, when the game was left in it, over it.
         startupExecutor.execute {
             fun read(raw: Int) = runCatching {
@@ -280,7 +280,7 @@ class WineGameActivity : Activity() {
             val mouse = read(R.raw.controls_mouse_mode)
             val chosen = entryId?.let { GameControlsPrefs.layout(applicationContext, it) }
             // A game whose genre is played with a pointer starts with mouse mode on until the person chooses
-            // (Droidtop/tracker#618 C2); the library's launch carries the genre. Its first start says how to reach it.
+            // (mytop-project/tracker#618 C2); the library's launch carries the genre. Its first start says how to reach it.
             val genre = entryId?.let { id -> dev.droidtop.library.LaunchDisplay.runningGame?.takeIf { it.gameId == id }?.genre }
             val mouseOn = entryId?.let { GameControlsPrefs.mouseMode(applicationContext, it, MouseModeDefault.genreNeedsMouse(genre)) } ?: false
             val hint = entryId?.let { GameControlsPrefs.firstMouseHint(applicationContext, it) } ?: false
@@ -329,7 +329,7 @@ class WineGameActivity : Activity() {
         touchpad.setShowKeyboardCallback { soft.toggle() }
         touchpad.setKeyboardSwipeCallback { soft.show() }
         setContentView(root)
-        // A black screen is noticed and can be reported (docs/SPEC.md 7e2, Droidtop/tracker#601).
+        // A black screen is noticed and can be reported (docs/SPEC.md 7e2, mytop-project/tracker#601).
         blackScreen = WineBlackScreen(
             activity = this,
             parent = root,
@@ -344,7 +344,7 @@ class WineGameActivity : Activity() {
         startedAtMs = SystemClock.elapsedRealtime()
         startedAtWallMs = System.currentTimeMillis()
         // The redistributables the game ships that this prefix hasn't run (docs/SPEC.md 9, "Redistributable installers";
-        // Droidtop/tracker#916): installed first, after their licence, out of sight.
+        // mytop-project/tracker#916): installed first, after their licence, out of sight.
         val redists = dev.droidtop.runtime.windows.redist.RedistPlan.fromJson(
             prefix.launchOverrides[DroidtopPcGameRuntime.REDISTS_OVERRIDE],
         )
@@ -367,7 +367,7 @@ class WineGameActivity : Activity() {
      * last lines it printed. This screen is droidtop's own, so the launch
      * watchdog leaves it alone (LaunchDisplay): its "closed straight after it
      * started" named droidtop and gave emulator advice for a Windows game
-     * (Droidtop/tracker#302).
+     * (mytop-project/tracker#302).
      */
     private fun onGuestTerminated(status: Int, output: String) {
         val ranMs = SystemClock.elapsedRealtime() - startedAtMs
@@ -379,7 +379,7 @@ class WineGameActivity : Activity() {
         android.util.Log.i(WinePresentation.LOG_TAG, "Wine exited $status after $ranMs ms, window shown: $guestShowedWindow")
         writeRunRecord(status, ranMs, output)
         // Killed (137) while the person was still playing: Android's limit on child processes may have done it, and the
-        // log says so when the privileged shell can read it (Droidtop/tracker#816). Read on its own thread.
+        // log says so when the privileged shell can read it (mytop-project/tracker#816). Read on its own thread.
         if (status == dev.droidtop.runtime.tasks.PhantomKills.KILLED_STATUS && !isFinishing) {
             val since = startedAtWallMs
             Thread({
@@ -403,14 +403,14 @@ class WineGameActivity : Activity() {
                 return@runOnUiThread
             }
             // The game closed itself: droidtop's own Quit, Kill and Back finish this screen first and never get here.
-            // It is said, not left to a silent return to the shell (the owner, 2026-11-05, Droidtop/tracker#896: "yes,
+            // It is said, not left to a silent return to the shell (the owner, 2026-11-05, mytop-project/tracker#896: "yes,
             // an end screen for clean self-exits"). A prefix tool closing is its work done, and just closes.
             val ended = WinePresentation.selfExitEnd(SystemClock.elapsedRealtime() - startedAtMs, tool = tool != null)
             if (ended != null) {
                 showFailure(ended.detail, title = ended.title, ended = true)
             } else {
                 // A clean end is an end too: the shell must not open the running game's sheet for it
-                // (Droidtop/tracker#896: Quit, Restart and Kill were offered for a game that was gone).
+                // (mytop-project/tracker#896: Quit, Restart and Kill were offered for a game that was gone).
                 nothingRunning()
                 finish()
             }
@@ -419,7 +419,7 @@ class WineGameActivity : Activity() {
 
     /**
      * Nothing is running any more: the Quick Menu must not offer Resume, Quit, Restart or Kill for this launch
-     * (Droidtop/tracker#171, rig 2026-10-01 r18; #896, after a game that ended with code 0).
+     * (mytop-project/tracker#171, rig 2026-10-01 r18; #896, after a game that ended with code 0).
      */
     private fun nothingRunning() {
         if (dev.droidtop.library.LaunchDisplay.runningPackageName == packageName) dev.droidtop.library.LaunchDisplay.clearRunning()
@@ -461,7 +461,7 @@ class WineGameActivity : Activity() {
 
     /**
      * The kernel drivers in the prefix now, one record line each (docs/SPEC.md 5b, "Kernel drivers";
-     * Droidtop/tracker#607), read only. With [remember], at the end of a run, the game's Drivers list learns the ones
+     * mytop-project/tracker#607), read only. With [remember], at the end of a run, the game's Drivers list learns the ones
      * this run installed (new since [driversAtStart]) and everything its prefix holds. Disk: off the main thread.
      */
     private fun driverFacts(context: android.content.Context, prefixDir: File?, remember: Boolean): List<Pair<String, String>> {
@@ -490,7 +490,7 @@ class WineGameActivity : Activity() {
 
     /**
      * Report a problem (docs/SPEC.md 7e2, "A black screen is noticed"; from the Quick Menu too, owner 2026-10-28,
-     * Droidtop/tracker#601: "Yes"): the run's record as it stands, made while the game still runs (Wine's output so far,
+     * mytop-project/tracker#601: "Yes"): the run's record as it stands, made while the game still runs (Wine's output so far,
      * the run's setup and the game's own logs), [frame] beside it as a PNG when there is one, then Share diagnostics so
      * the person chooses where it goes. Nothing is sent by droidtop, and no tracker link is offered (owner: "no. The
      * tracker is private"). Off the main thread; [done] gets the line to say.
@@ -580,7 +580,7 @@ class WineGameActivity : Activity() {
                     (if (ended) "" else "Check Windows games setup in Settings." + "\n" + "\n") +
                     "B to go back"
                 gravity = Gravity.CENTER
-                // droidtop's own screen, not the game's frame: it follows Light or dark (Droidtop/tracker#561).
+                // droidtop's own screen, not the game's frame: it follows Light or dark (mytop-project/tracker#561).
                 val tokens = chrome
                 setBackgroundColor(tokens?.color("ground") ?: Color.BLACK)
                 setTextColor(tokens?.color("onSurface") ?: Color.WHITE)
@@ -592,7 +592,7 @@ class WineGameActivity : Activity() {
     /**
      * Leaves the failure screen for droidtop's shell. This screen is its own task (taskAffinity
      * `:wine`), so finishing it alone shows whatever task Android has beneath it, which on the rig was
-     * a browser left open earlier (Droidtop/tracker#171, r09-after-back.png); the shell is brought to
+     * a browser left open earlier (mytop-project/tracker#171, r09-after-back.png); the shell is brought to
      * the front explicitly, the same way the launch watchdog's "Return to droidtop" does.
      */
     private fun leaveFailure() {
@@ -735,7 +735,7 @@ class WineGameActivity : Activity() {
     private val endMouseHint = Runnable { showPadMouse(mouseMode, announce = false) }
 
     /**
-     * A game's first start says how mouse mode is reached (Droidtop/tracker#618 C2), on or off, so a game that wants a
+     * A game's first start says how mouse mode is reached (mytop-project/tracker#618 C2), on or off, so a game that wants a
      * pointer never looks dead to someone who has not heard of the combination. Gone after [MOUSE_HINT_MS].
      */
     private fun showMouseHint(on: Boolean) {
@@ -866,7 +866,7 @@ object WinePresentation {
     /**
      * The keys that leave the failure screen: Back, and the pad's B, because most pads report B as
      * KEYCODE_BUTTON_B rather than KEYCODE_BACK, and on the rig six B presses did nothing while the
-     * screen said "Press Back" (Droidtop/tracker#171, r03..r08). Escape for a keyboard. Not A: the
+     * screen said "Press Back" (mytop-project/tracker#171, r03..r08). Escape for a keyboard. Not A: the
      * release of the A press that started the launch can arrive here when the screen fails at once.
      */
     fun dismissesFailure(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_BACK ||
@@ -955,7 +955,7 @@ object WinePresentation {
 
     /**
      * What to say when a game ended by itself after [ranMs], cleanly (code 0, a window shown, no crash line): the
-     * owner, 2026-11-05 (Droidtop/tracker#896): "yes, an end screen for clean self-exits". Null for a prefix [tool],
+     * owner, 2026-11-05 (mytop-project/tracker#896): "yes, an end screen for clean self-exits". Null for a prefix [tool],
      * which closes when its work is done. Pure.
      */
     fun selfExitEnd(ranMs: Long, tool: Boolean): ExitReport? {
@@ -973,7 +973,7 @@ object WinePresentation {
      * Whether Wine's last lines say the game crashed: an unhandled exception, an unhandled page fault or a failed
      * assertion, as Wine itself prints them. A game started through the Steam loader (`steamclient_loader_x64.exe`,
      * [dev.droidtop.runtime.windows.utils.SteamworksShim]) ends with the loader's code, 0, however the game ended
-     * (Droidtop/tracker#896: Stardew Valley's c0000409 and Slime Rancher's assertion both read "exited with code 0"),
+     * (mytop-project/tracker#896: Stardew Valley's c0000409 and Slime Rancher's assertion both read "exited with code 0"),
      * so Wine's own words are what tell. Only the last [CRASH_TAIL_LINES] lines count: a helper that crashed early,
      * while the game played on, is not the game's end. Pure.
      */

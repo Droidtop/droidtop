@@ -73,7 +73,7 @@ class LocalSimilarityRecommendations(
     override suspend fun recommend(context: Context, scope: RecommendationScope, limit: Int): List<Recommendation> =
         try {
             val entries = library()
-            // The games the person does not own (Droidtop/tracker#52): read as last built, and rebuilt in the background
+            // The games the person does not own (mytop-project/tracker#52): read as last built, and rebuilt in the background
             // from the most played games when a week old. Nothing here waits for IGDB.
             val pool = withContext(Dispatchers.IO) {
                 val nowMs = now()

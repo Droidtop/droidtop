@@ -176,7 +176,7 @@ class WineLaunchPlanTest {
 
     @Test
     fun `a code 0 exit at once without a window is reported with what Wine printed`() {
-        // The rig case (Droidtop/tracker#302): a Unity game with no Direct3D 11 device quit cleanly at once.
+        // The rig case (mytop-project/tracker#302): a Unity game with no Direct3D 11 device quit cleanly at once.
         val report = WinePresentation.exitReport(0, 3_400, showedWindow = false, output = "line one\n\nline two\n")
         assertNotNull(report)
         assertEquals("This Windows game closed right after starting", report!!.title)
@@ -215,7 +215,7 @@ class WineLaunchPlanTest {
 
     @Test
     fun `a game behind the Steam loader that crashed is reported though the loader exited 0`() {
-        // Droidtop/tracker#896: Stardew Valley (c0000409) and Slime Rancher (an assertion) read "exited with code 0".
+        // mytop-project/tracker#896: Stardew Valley (c0000409) and Slime Rancher (an assertion) read "exited with code 0".
         val stardew = "00c8:err:module:find_forwarded_export module not found for forward 'icuuc68.u_charsToUChars_68'\n" +
             "00c8:err:seh:NtRaiseException Unhandled exception code c0000409 flags 1 addr 0x6ffffc79dd7e\n"
         val report = WinePresentation.exitReport(0, 5_000, showedWindow = false, output = stardew)!!
@@ -235,7 +235,7 @@ class WineLaunchPlanTest {
 
     @Test
     fun `a game that closed itself cleanly is said, a prefix tool just closes`() {
-        // The owner, 2026-11-05 (Droidtop/tracker#896): "yes, an end screen for clean self-exits".
+        // The owner, 2026-11-05 (mytop-project/tracker#896): "yes, an end screen for clean self-exits".
         val ended = WinePresentation.selfExitEnd(754_000, tool = false)!!
         assertEquals("This Windows game closed", ended.title)
         assertEquals("Ran 12 min, no error", ended.detail)

@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * The rules of Hacker Keyboard Reborn's motion (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
+ * The rules of Hacker Keyboard Reborn's motion (mytop-project/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
  * how long each movement takes, how a pressed key eases, and when there is no motion at all. Pure, so it is tested on
  * the JVM; [KeyboardMotion] reads the device's settings into [durationScale] once per keyboard show, and the views ask
  * here for each frame's values with plain numbers, never allocating.

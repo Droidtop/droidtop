@@ -6,7 +6,7 @@ import android.webkit.WebView
 
 /**
  * What a web view and its page look like to a site's check, logged the same way for droidtop's visible view and its
- * hidden ones (Droidtop/tracker#783): on the console F95's check passed at once in the visible view and not in the
+ * hidden ones (mytop-project/tracker#783): on the console F95's check passed at once in the visible view and not in the
  * hidden one, in droidtop's window too. Each line names the view, the host, the time since it started loading, the
  * view's size and whether it is shown and focused, and what the page reports: `document.visibilityState`,
  * `document.hasFocus()`, its viewport and its user agent. Cookies are named, never their values. Call on the main

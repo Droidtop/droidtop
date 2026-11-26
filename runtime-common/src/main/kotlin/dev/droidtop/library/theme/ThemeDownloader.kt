@@ -95,9 +95,9 @@ object ThemeDownloader {
     // Real per-system metadata overlay for droidtop's own invented engine
     // systems (Ren'Py, RPG Maker variants, KiriKiri) -- no real ES-DE
     // theme has any metadata for these, since they're not consoles. See
-    // https://github.com/droidtop/droidtop-theme-patches's own
+    // https://github.com/mytop-project/droidtop-theme-patches's own
     // README for the real overlay format/mechanism.
-    private const val THEME_PATCHES_URL = "https://github.com/droidtop/droidtop-theme-patches.git"
+    private const val THEME_PATCHES_URL = "https://github.com/mytop-project/droidtop-theme-patches.git"
 
     enum class ThemeSyncStatus { CLONED, UPDATED, UP_TO_DATE, DIVERGED, FAILED, CANCELLED }
     data class ThemeSyncResult(val status: ThemeSyncStatus, val error: Throwable? = null)
@@ -134,7 +134,7 @@ object ThemeDownloader {
         val screenshots: List<ThemeScreenshot>,
         /**
          * Who offers it, when not ES-DE's own list: a plugin's name (docs/plugin-api.md 3 C7, `theme.pack`,
-         * Droidtop/tracker#714). Its screenshots are then whole https addresses.
+         * mytop-project/tracker#714). Its screenshots are then whole https addresses.
          */
         val source: String? = null,
     )

@@ -13,7 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** Humble Bundle: its orders, the file a device takes, the kept library and the sign-in cookie (Droidtop/tracker#335). */
+/** Humble Bundle: its orders, the file a device takes, the kept library and the sign-in cookie (mytop-project/tracker#335). */
 class HumbleTest {
     @get:Rule
     val temp = TemporaryFolder()

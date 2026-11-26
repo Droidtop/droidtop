@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The one screenshot entry point (Capture.kt, Droidtop/tracker#414 slice C15). */
+/** The one screenshot entry point (Capture.kt, mytop-project/tracker#414 slice C15). */
 class CaptureTest {
     @Test fun `the helper app takes the main screen, the accessibility service any screen`() {
         assertEquals(Capture.Route.PROVIDER, Capture.route(providerShell = true, displayId = 0, accessibilityReady = true))

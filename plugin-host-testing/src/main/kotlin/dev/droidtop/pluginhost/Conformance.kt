@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The conformance script (docs/plugin-api.md 1.3 and 3 I2, Droidtop/tracker#71) for a plugin in a [FakeHost]: every
+ * The conformance script (docs/plugin-api.md 1.3 and 3 I2, mytop-project/tracker#71) for a plugin in a [FakeHost]: every
  * case of `conformance.json`, the one file the python fake host (`droidtop_fake_host.py`) reads too. A case gets a
  * fresh host with its own grants. A kind's fixture that fails a case is a bug in that kind's adapter or fixture.
  */

@@ -2,7 +2,7 @@ package dev.droidtop.input
 
 /**
  * Where a surface's absolute pointer motion (a finger, a stylus, a mouse Android places) goes in the compositor
- * (Droidtop/tracker#908, step D3).
+ * (mytop-project/tracker#908, step D3).
  */
 sealed interface PointerTarget {
     /**

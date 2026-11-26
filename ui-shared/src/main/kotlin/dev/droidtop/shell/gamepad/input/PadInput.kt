@@ -50,7 +50,7 @@ class PadCadence(private val tiers: List<Pair<Long, Long>>) {
 
         /**
          * A themed carousel: ES-DE's SLOW tiers, what CarouselComponent is built with (CarouselComponent.h:225,
-         * IList.h:77), so a held direction steps every 200 ms and the 400 ms camera keeps up (Droidtop/tracker#782).
+         * IList.h:77), so a held direction steps every 200 ms and the 400 ms camera keeps up (mytop-project/tracker#782).
          */
         val THEMED_CAROUSEL = PadCadence(listOf(500L to 500L, 0L to 200L))
 

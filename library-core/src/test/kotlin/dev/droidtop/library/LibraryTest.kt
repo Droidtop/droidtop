@@ -125,7 +125,7 @@ class LibraryTest {
         // The list is on screen (published) before the launch, as it is
         // when a game is launched from its own detail page: the recorded
         // play must reach that list at once or the detail still reads
-        // "Never played" over the running game (Droidtop/tracker#82).
+        // "Never played" over the running game (mytop-project/tracker#82).
         library.rescanNow(setOf(LibraryEntryKind.NATIVE_ANDROID_APP))
         library.launch(nativeEntry)
         val published = library.backgroundScanState(setOf(LibraryEntryKind.NATIVE_ANDROID_APP)).value ?: emptyList()
@@ -426,7 +426,7 @@ class LibraryTest {
 
     @Test
     fun `quit never clears droidtop's own running-game state unless the game really ended`() {
-        // The state rule (docs/SPEC.md, Droidtop/tracker#82): droidtop's
+        // The state rule (docs/SPEC.md, mytop-project/tracker#82): droidtop's
         // bookkeeping clears ONLY on QuitResult.Ended. A quit that left
         // the emulator alive (the Android 13 case) must not be reported
         // as a success, so the row's subtitle says what happened.

@@ -15,7 +15,7 @@ import dev.droidtop.shell.standard.LauncherSearch
 import dev.droidtop.shell.standard.ModeSwitcher
 
 /**
- * droidtop's full-page widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): a whole launcher page of
+ * droidtop's full-page widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): a whole launcher page of
  * droidtop, so the person can swipe across their own home screen to it. The one search's bar, the games last played
  * (as Continue playing shows them), then droidtop's places: the Quick Menu, Downloads, Switch mode, and Gaming or
  * Desktop while that mode is on. Drawn by the shared renderer in the `widget_page` layout.

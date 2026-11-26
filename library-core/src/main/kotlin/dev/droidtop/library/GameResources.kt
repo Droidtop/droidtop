@@ -3,7 +3,7 @@ package dev.droidtop.library
 import java.net.URLEncoder
 
 /**
- * Where to read about a game beyond droidtop (DroidDeck's resources row, Droidtop/tracker#363; the way into the guide
+ * Where to read about a game beyond droidtop (DroidDeck's resources row, mytop-project/tracker#363; the way into the guide
  * reader of #817): PCGamingWiki's fixes and settings, GameFAQs' guides and walkthroughs, and a web search for a
  * walkthrough. Each is a search by the game's name, so nothing is asked of a site before the person presses, and a
  * link opens through [Links]. Pure.

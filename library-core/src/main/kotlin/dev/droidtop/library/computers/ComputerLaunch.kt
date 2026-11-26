@@ -13,7 +13,7 @@ import java.io.File
 
 /**
  * Asking a paired computer to start one of its games (docs/SPEC.md 7o,
- * "Starting a game on a computer"; Droidtop/tracker#552), the one way for
+ * "Starting a game on a computer"; mytop-project/tracker#552), the one way for
  * every caller: the Steam module's "Stream with Steam Link" and opening a
  * computer's game from the library. The agent's request is `launch_game`
  * (droidtop-agent docs/DESIGN.md section 17); a Steam key is started by Steam
@@ -21,7 +21,7 @@ import java.io.File
  * `stream: windowcast` when windowcast shows the game's window.
  *
  * "Stream from <computer>" ([stream]) asks to watch as well
- * (Droidtop/tracker#860, droidtop-agent docs/DESIGN.md section 22): the
+ * (mytop-project/tracker#860, droidtop-agent docs/DESIGN.md section 22): the
  * request names this device's windowcast viewer, which the computer's agent
  * trusts because this device is paired with it, so no PIN is asked; the
  * agent starts windowcast's host and the game, and the stream screen opens
@@ -41,7 +41,7 @@ object ComputerLaunch {
     const val EXTRA_ADDRESS = "dev.droidtop.app.extra.ADDRESS"
     const val EXTRA_WINDOW = "dev.droidtop.app.extra.WINDOW"
 
-    /** The library entry the stream is the running game of (Droidtop/tracker#428): the companion's Game tab names it. */
+    /** The library entry the stream is the running game of (mytop-project/tracker#428): the companion's Game tab names it. */
     const val EXTRA_ENTRY_ID = "dev.droidtop.app.extra.ENTRY_ID"
 
     /** The port a windowcast host listens on unless its owner changed it (windowcast `app/src/config.rs`, `listen`). */
@@ -250,7 +250,7 @@ object ComputerLaunch {
     fun openWindowcast(context: Context, computer: Computer, answered: String?, title: String, started: String, entryId: String?): String {
         val open = streamIntent(context, computer, answered, title)
             ?: return "$started ${computer.name} has no address to show it from."
-        // The stream is the running game, as a Windows game's screen is (Droidtop/tracker#428): it goes through the one
+        // The stream is the running game, as a Windows game's screen is (mytop-project/tracker#428): it goes through the one
         // launch path, so the companion's Game tab and the Quick Menu name it and Quit is Disconnect.
         val ctx = entryId?.let { id -> LaunchDisplay.launchContext?.takeIf { it.gameId == id } ?: LaunchContext(id, null) }
         ctx?.let { open.putExtra(EXTRA_ENTRY_ID, it.gameId) }

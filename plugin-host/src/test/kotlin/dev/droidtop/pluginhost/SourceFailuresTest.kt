@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A source's failure reaches the list as a plain sentence (Droidtop/tracker#375, #485); what it said stays behind "Technical details". */
+/** A source's failure reaches the list as a plain sentence (mytop-project/tracker#375, #485); what it said stays behind "Technical details". */
 class SourceFailuresTest {
     private val lewdCorner = "JavaScript is disabled. For a better experience, please enable JavaScript in your browser before proceeding."
 
@@ -18,7 +18,7 @@ class SourceFailuresTest {
 
     @Test
     fun `droidtop's own browser-check refusal handed back in a failure is the check, not a link`() {
-        // Droidtop/tracker#881: F95zone 0.4.0 wrapped the broker's refusal in FAILED, and the host name read as a link.
+        // mytop-project/tracker#881: F95zone 0.4.0 wrapped the broker's refusal in FAILED, and the host name read as a link.
         assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.plain(SiteChecks.refusal("f95zone.to")))
         assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.forCode(PluginErrorCode.FAILED, "Request failed: " + SiteChecks.refusal("f95zone.to")))
         assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.plain("BROWSER_CHECK_REQUIRED"))

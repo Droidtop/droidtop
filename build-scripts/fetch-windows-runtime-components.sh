@@ -4,7 +4,7 @@
 # input DLLs, the redirect libraries) into runtime-windows/components/, where
 # runtime-windows/build.gradle.kts reads its jniLibs and assets
 # (docs/SPEC.md 9). Each comes from the windows-runtime release of
-# Droidtop/droidtop-components or, where that copy is not there, from the
+# mytop-project/droidtop-components or, where that copy is not there, from the
 # maker's URL in runtime-windows/components.pin. Either way only bytes with
 # the pinned SHA-256 are kept: a mismatch fails the build rather than
 # packaging something else.
@@ -16,7 +16,7 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PIN="$ROOT/runtime-windows/components.pin"
 DEST="$ROOT/runtime-windows/components"
-RELEASE="https://github.com/Droidtop/droidtop-components/releases/download/windows-runtime"
+RELEASE="https://github.com/mytop-project/droidtop-components/releases/download/windows-runtime"
 
 grep -v '^#' "$PIN" | while read -r path sha maker; do
     [ -n "$path" ] || continue

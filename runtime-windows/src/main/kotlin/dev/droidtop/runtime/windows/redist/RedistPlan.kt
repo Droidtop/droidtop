@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 /**
  * What a game's first launch in a prefix installs before the game starts (docs/SPEC.md 9, "Redistributable installers";
- * Droidtop/tracker#916): every installer [RedistFinder] finds whose [PeInfo] matches a [RedistTable] row that droidtop
+ * mytop-project/tracker#916): every installer [RedistFinder] finds whose [PeInfo] matches a [RedistTable] row that droidtop
  * does not provide and this prefix has not run yet ([RedistRecord]), one per row and architecture.
  */
 object RedistPlan {

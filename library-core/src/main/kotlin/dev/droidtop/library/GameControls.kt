@@ -3,7 +3,7 @@ package dev.droidtop.library
 import android.content.Context
 
 /**
- * The layouts a Windows game's pad can be played through (Droidtop/tracker#618 C5, #228; docs/SPEC.md 5b
+ * The layouts a Windows game's pad can be played through (mytop-project/tracker#618 C5, #228; docs/SPEC.md 5b
  * "Controller layouts"), droidtop's own, in the order the Quick Menu's Controls row steps through them after Gamepad
  * (null: no layout, the pad reaches the game as a pad). Game properties sets the same choice before a launch; the
  * runtime holds each layout's file.
@@ -55,7 +55,7 @@ object GameControlsPrefs {
     /**
      * Whether the game's pad is in mouse mode (docs/SPEC.md 5b, "Controller mouse mode"): the person's choice for it,
      * else [byDefault] (on for a game whose genre is played with a pointer, the runtime's MouseModeDefault;
-     * Droidtop/tracker#618 C2).
+     * mytop-project/tracker#618 C2).
      */
     fun mouseMode(context: Context, entryId: String, byDefault: Boolean = false): Boolean {
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)

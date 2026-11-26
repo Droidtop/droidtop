@@ -8,7 +8,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * Droidtop/tracker#891, from the console: after a run, "Love & Sex: Second Base" (a Steam install of a Ren'Py game)
+ * mytop-project/tracker#891, from the console: after a run, "Love & Sex: Second Base" (a Steam install of a Ren'Py game)
  * showed on Home as "Love Sex Second Base", its install folder's name, with another genre and art, and a later walk
  * put it back. The engine walk that rebuilt the entry ran before the stores had answered, so it had no store install
  * for the folder. Now it keeps the store facts the folder's own record last carried until the stores answer.

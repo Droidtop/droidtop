@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion app picker's list (CompanionAppPicker.kt, Droidtop/tracker#488 item 3). */
+/** The companion app picker's list (CompanionAppPicker.kt, mytop-project/tracker#488 item 3). */
 class CompanionAppPickerTest {
     private fun app(pkg: String, label: String, game: Boolean = false) = AppPicker.App(pkg, label, game)
 

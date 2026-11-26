@@ -75,7 +75,7 @@ interface ConsoleSystemDao {
  * Built-in RetroArch cores that the old Linux-derived platform data named
  * and that RetroArch for Android does not have under that name, with the
  * name ES-DE's Android es_systems.xml uses (droidtop-platforms
- * generator/from_esde_systems.py, Droidtop/tracker#271). Triples are
+ * generator/from_esde_systems.py, mytop-project/tracker#271). Triples are
  * (system id, old shipped core, new core); null means no core.
  *
  * A database refresh never rewrites a row the person may have edited

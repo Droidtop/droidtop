@@ -74,7 +74,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     androidx.activity.compose.BackHandler { onDismiss() }
     val scope = rememberCoroutineScope()
     var loaded by remember { mutableStateOf<GameMetadataEntity?>(null) }
-    // The person's own rating and status (Droidtop/tracker#722), read off the main thread.
+    // The person's own rating and status (mytop-project/tracker#722), read off the main thread.
     val context = androidx.compose.ui.platform.LocalContext.current
     var mark by remember { mutableStateOf(dev.droidtop.library.settings.GameMark()) }
     LaunchedEffect(entry.id) {
@@ -177,7 +177,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                     }
                 }
 
-                // The person's own marks (Droidtop/tracker#722): saved at once, apart from the scraped fields above, so
+                // The person's own marks (mytop-project/tracker#722): saved at once, apart from the scraped fields above, so
                 // a scrape never changes them and the scraped rating stays the scraped one.
                 item { SectionLabel("Yours") }
                 item {
@@ -301,7 +301,7 @@ private fun MetadataTextRow(
         onValueChange = onValueChange,
         label = { Text(label) },
         singleLine = !multiline,
-        // Android's keyboard only where droidtop raises one with focus (Droidtop/tracker#832).
+        // Android's keyboard only where droidtop raises one with focus (mytop-project/tracker#832).
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, showKeyboardOnFocus = raisesKeyboardWithFocus),
         colors = TextFieldDefaults.colors(
             focusedTextColor = MenuTokens.OnSurface,
@@ -327,7 +327,7 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
-        // Show, then say (Droidtop/tracker#738): the state is the switch every settings row draws.
+        // Show, then say (mytop-project/tracker#738): the state is the switch every settings row draws.
         ShellSwitch(value, Modifier.semantics { stateDescription = if (value) "On" else "Off" })
     }
 }

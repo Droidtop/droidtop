@@ -45,12 +45,12 @@ import org.pocketworkstation.pckeyboard.KeyboardColors
 import org.pocketworkstation.pckeyboard.SlabView
 
 /**
- * The one text entry (docs/SPEC.md 4c, "The text-entry slab"; Droidtop/tracker#485 S7; owner, 2026-10-14: "our text
+ * The one text entry (docs/SPEC.md 4c, "The text-entry slab"; mytop-project/tracker#485 S7; owner, 2026-10-14: "our text
  * popup appears a lot different than steams, which is weird"). Two forms of one thing:
  *
  * - [TextEntryField]: a field in place (a search bar docked under its header, a form field), with the slab under it.
  *   B keeps the text and leaves. The prompt form (Steam's rename dialog) is gone: text is typed where it stands,
- *   never in a panel (owner, 2026-11-19, Droidtop/tracker#954 item 12).
+ *   never in a panel (owner, 2026-11-19, mytop-project/tracker#954 item 12).
  *
  * The plate is a real text field (TalkBack reads its text, caret and selection) whose input method stays away: keys
  * come from the slab, which the pad drives through this entry's key handling while the field keeps focus. Where the

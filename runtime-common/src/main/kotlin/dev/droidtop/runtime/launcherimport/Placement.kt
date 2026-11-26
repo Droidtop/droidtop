@@ -4,7 +4,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * Puts a backup's items on droidtop's grid (Droidtop/tracker#564). droidtop's cells are whole numbers on a grid of
+ * Puts a backup's items on droidtop's grid (mytop-project/tracker#564). droidtop's cells are whole numbers on a grid of
  * [MIN_GRID] to [MAX_GRID] a side; Nova's subgrid allows half cells and overlapping items. If any home position or size
  * is fractional, the grid is doubled when that still fits, so every position is whole; otherwise positions are rounded
  * down. Then each item that would overlap one already placed, or not fit, moves to the first free cells on its page,

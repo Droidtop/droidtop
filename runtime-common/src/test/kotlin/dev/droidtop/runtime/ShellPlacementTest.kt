@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** One shell start per Home press (Droidtop/tracker#824): where Home starts the shell, and that the placement then moves nothing. */
+/** One shell start per Home press (mytop-project/tracker#824): where Home starts the shell, and that the placement then moves nothing. */
 class ShellPlacementTest {
 
     @Test

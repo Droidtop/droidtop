@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * The one resolver behind the launcher and the emulator screens
- * (Droidtop/tracker#248): game choice, then system choice, then the global
+ * (mytop-project/tracker#248): game choice, then system choice, then the global
  * default emulator, then the first installed candidate. The players here
  * are stand-ins with placeholder ids; only the ordering rules are tested.
  */

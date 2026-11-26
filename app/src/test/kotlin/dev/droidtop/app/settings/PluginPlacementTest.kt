@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A plugin's approval list names the mode a point shows in, and never the internal placeholder (Droidtop/tracker#512). */
+/** A plugin's approval list names the mode a point shows in, and never the internal placeholder (mytop-project/tracker#512). */
 class PluginPlacementTest {
     @Test
     fun `a point with a mode shows it and a point with no particular place shows nothing`() {

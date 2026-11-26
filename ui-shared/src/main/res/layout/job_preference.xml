@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A job's row in a Preference list (Droidtop/tracker#643): its title, the shared job bar JobViews draws into job_bar, then its line. -->
+<!-- A job's row in a Preference list (mytop-project/tracker#643): its title, the shared job bar JobViews draws into job_bar, then its line. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

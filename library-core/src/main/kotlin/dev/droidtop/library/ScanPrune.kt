@@ -61,7 +61,7 @@ import java.io.File
  *     `<root>/downloaded_media/<system>/<type>/`, and the system-folder
  *     walk, which allows one container level (`<root>/roms/<system>`),
  *     took `downloaded_media/gba` for a second gba system: the console
- *     listed gba, gbc, nds and ps2 twice (Droidtop/tracker#297, build
+ *     listed gba, gbc, nds and ps2 twice (mytop-project/tracker#297, build
  *     1397). The folder is named by the same constant the media reader
  *     uses, so the two cannot drift apart.
  *
@@ -279,7 +279,7 @@ object ScanPrune {
      * two siblings) tens of thousands of times. Each one is a `stat` that
      * Android's FUSE layer answers from user space, and on an SD card that
      * was a large part of a PC rescan taking five minutes for 79 games
-     * (Droidtop/tracker#275). A minute is far longer than a walk and far
+     * (mytop-project/tracker#275). A minute is far longer than a walk and far
      * shorter than anybody installing a Steam library, so a stale answer
      * is not something a person can meet.
      */

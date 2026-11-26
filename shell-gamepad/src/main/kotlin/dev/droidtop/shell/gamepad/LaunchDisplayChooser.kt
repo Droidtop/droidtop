@@ -32,7 +32,7 @@ import dev.droidtop.library.LaunchDisplayOption
  * the choice for THIS GAME so the question never comes back for it —
  * ask-per-launch is the honest default, a remembered per-game answer is
  * the steady state, and clearing lives in the game's metadata editor as
- * a first-class action. Then an "Every game" pair (Droidtop/tracker#590): on a console with a dock the answer is the
+ * a first-class action. Then an "Every game" pair (mytop-project/tracker#590): on a console with a dock the answer is the
  * same for every game, so one press sets Settings > Displays > Games launch on and the question stops for all of them.
  */
 @Composable

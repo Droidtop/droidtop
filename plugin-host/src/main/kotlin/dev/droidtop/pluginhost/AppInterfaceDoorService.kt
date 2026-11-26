@@ -12,7 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * The door (docs/plugin-api.md 1.3, Droidtop/tracker#547): the one thing droidtop exports for app interface plugins. An
+ * The door (docs/plugin-api.md 1.3, mytop-project/tracker#547): the one thing droidtop exports for app interface plugins. An
  * app whose plugin is installed, approved, turned on and still verified knocks when it needs its broker and has none;
  * droidtop connects it as a call would ([PluginCrashPolicy.connectApp]). The caller is told only yes or no, and the
  * door carries no data: everything after it goes through the plugin's broker, under its grants.
@@ -25,7 +25,7 @@ class AppInterfaceDoorService : Service() {
             val identity = Binder.clearCallingIdentity()
             try {
                 val record = recordFor(context, uid) ?: run {
-                    // An app not added yet announces itself (Droidtop/tracker#547): droidtop looks at it and tells the
+                    // An app not added yet announces itself (mytop-project/tracker#547): droidtop looks at it and tells the
                     // person once per version. Who knocked is the caller's uid; the answer is still no.
                     AppInterfaceAnnouncements.knocked(context, context.packageManager.getPackagesForUid(uid)?.toList().orEmpty())
                     return false

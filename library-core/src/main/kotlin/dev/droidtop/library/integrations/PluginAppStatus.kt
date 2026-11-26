@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
  * screen (docs/SPEC.md 12a: "status and actions for ONE OTHER INSTALLED
  * APP the plugin manages"). First real UI caller of this capability.
  *
- * **The wire contract** (docs/plugin-api.md 3 C, `apps.bridge`; Droidtop/tracker#544 item 5, #521 item 4):
+ * **The wire contract** (docs/plugin-api.md 3 C, `apps.bridge`; mytop-project/tracker#544 item 5, #521 item 4):
  * `invoke(APP_STATUS, {"action": "status"})` -> `PluginResult.success` with these documented fields:
  * - `package`: the managed app's package name. droidtop reads the app's own name and whether it is installed from
  *   Android itself, so a plugin cannot get either wrong;
@@ -124,9 +124,9 @@ object PluginAppStatus {
                             if (installed && version != null) {
                                 add(ActionItem(id = "plugin_app_status_${m.id}_version", title = "Version", value = version))
                             }
-                            // Undocumented values never reach the page as "Key: value" (Droidtop/tracker#544 item 5).
+                            // Undocumented values never reach the page as "Key: value" (mytop-project/tracker#544 item 5).
                             // A Developer menu row (docs/SPEC.md 7, "Developer menu").
-                            // Always, not only with the Developer menu (Droidtop/tracker#883 §3.7: Info always).
+                            // Always, not only with the Developer menu (mytop-project/tracker#883 §3.7: Info always).
                             if (technical.isNotEmpty()) {
                                 add(
                                     dev.droidtop.library.settings.NestedScreenItem(
@@ -153,7 +153,7 @@ object PluginAppStatus {
                                         subtitle = "The app this plugin manages",
                                         run = { ctx, _ ->
                                             // An app Android knows is opened by droidtop itself, the way it opens any app; the
-                                            // plugin is asked only for one it installs some other way (Droidtop/tracker#558:
+                                            // plugin is asked only for one it installs some other way (mytop-project/tracker#558:
                                             // the Shizuku plugin answers no "launch" action).
                                             val intent = pkg?.takeIf { app != null }?.let { ctx.packageManager.getLaunchIntentForPackage(it) }
                                             if (intent != null) {

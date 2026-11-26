@@ -123,7 +123,7 @@ object LutrisScraperClient {
                 // IGDB-sourced cover_big image) is the field that is
                 // actually populated in practice.
                 // A JSON null reads as the text "null" through optString, which was fetched as an address ("no
-                // protocol: null", Droidtop/tracker#834): an absent or null cover is no cover.
+                // protocol: null", mytop-project/tracker#834): an absent or null cover is no cover.
                 coverUrl = row.takeUnless { it.isNull("coverart") }?.optString("coverart", "")?.ifBlank { null },
                 year = row.optInt("year", 0).takeIf { it > 0 },
                 steamAppId = provided("steam")?.toIntOrNull(),

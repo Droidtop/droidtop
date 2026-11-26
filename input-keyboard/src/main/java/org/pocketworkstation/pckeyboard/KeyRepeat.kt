@@ -4,7 +4,7 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Hold-to-repeat for a destination that does not repeat a held key itself (Droidtop/tracker#772: the touch keyboard
+ * Hold-to-repeat for a destination that does not repeat a held key itself (mytop-project/tracker#772: the touch keyboard
  * and the slab each carried their own constants and their own timer). The timing is a hardware keyboard's default: a
  * pause, then about twenty a second.
  */

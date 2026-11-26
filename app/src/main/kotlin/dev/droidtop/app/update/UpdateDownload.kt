@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The self-update's APK transfer, done by droidtop's own download runner (docs/SPEC.md 10b, "Self-update
- * downloader"; Droidtop/tracker#226, the owner's rule: "We want to use our own internal downloader when we want to
+ * downloader"; mytop-project/tracker#226, the owner's rule: "We want to use our own internal downloader when we want to
  * put something somewhere specific. Using android's downloader spams the user with notifications from it").
  *
  * It is one [DownloadJobs] job like every other single-file download: `droidtop-<build>.apk` in droidtop's downloads
@@ -88,7 +88,7 @@ internal object UpdateDownload {
         return dev.droidtop.library.integrations.PluginJobsScreen.oneLine(entry)
     }
 
-    /** The running download job of a droidtop build, or null: what droidtop's Updates row shows (Droidtop/tracker#833). */
+    /** The running download job of a droidtop build, or null: what droidtop's Updates row shows (mytop-project/tracker#833). */
     fun liveJob(): PluginJobsCenter.Entry? = PluginJobsCenter.entries().value.firstOrNull { entry ->
         entry.nativeKind == DownloadJobs.KIND && !entry.done &&
             PluginJobsCenter.argsOf(entry.jobId)?.get("name")?.let { UpdateFiles.buildOf(it) } != null

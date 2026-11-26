@@ -10,7 +10,7 @@ import dev.droidtop.library.settings.UiMode
 import dev.droidtop.library.settings.UiModeRefresh
 
 /**
- * The one volume write path (docs/SPEC.md "The companion's tabs", Sound; Droidtop/tracker#414 slice C19): the Quick
+ * The one volume write path (docs/SPEC.md "The companion's tabs", Sound; mytop-project/tracker#414 slice C19): the Quick
  * Menu's slider, the companion's tile and steppers and its per-stream sliders all set volume here, and Kid's maximum
  * volume ([kidCapPercent], off by default) is applied here, so no caller can go past it. Hardware keys are clamped back
  * down by [watchKidCap] while Kid is on.

@@ -14,7 +14,7 @@ import dev.droidtop.pluginhost.AppInterfaces
 
 /**
  * The one notification an app that carries a droidtop plugin gets, once per app version, when it announces itself or
- * droidtop finds it (docs/plugin-api.md 1.3, [dev.droidtop.pluginhost.AppInterfaceAnnouncements]; Droidtop/tracker#547).
+ * droidtop finds it (docs/plugin-api.md 1.3, [dev.droidtop.pluginhost.AppInterfaceAnnouncements]; mytop-project/tracker#547).
  * Tapping it opens Plugins, where "In your apps" adds it. Posted only when notifications are already allowed for
  * droidtop, like [dev.droidtop.app.update.PluginRepoUpdateNotification]; without that the app is still under "In your
  * apps".

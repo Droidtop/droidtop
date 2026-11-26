@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * "Keys and accounts" (Droidtop/tracker#12; the owner, 2026-10-28: "Add one 'Keys and accounts' page under Settings >
+ * "Keys and accounts" (mytop-project/tracker#12; the owner, 2026-10-28: "Add one 'Keys and accounts' page under Settings >
  * Accounts and sources. It lists every key and token droidtop holds, where each is used, and a Remove. Each service's
  * own page keeps its row."). The page lists and stores nothing of its own: each row reads the place that already holds
  * the key, and Remove goes through the same clear that service's own page uses.

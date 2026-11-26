@@ -43,7 +43,7 @@ data class ConfigSpec(val file: String, val format: ConfigFormat, val settings: 
 
 /**
  * What an emulator needs from outside itself, beyond the launch: where it reads BIOS files and which of its options
- * droidtop can set (docs/SPEC.md "Emulator setup helper", Droidtop/tracker#248). The one source both the helper's
+ * droidtop can set (docs/SPEC.md "Emulator setup helper", mytop-project/tracker#248). The one source both the helper's
  * actions and the manual steps read. For a players-database emulator it is the row's `setup` object; for RetroArch,
  * whose launch droidtop generates, it is [EmulatorSetup.retroArch].
  *

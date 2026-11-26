@@ -2,7 +2,7 @@ package dev.droidtop.shell.gamepad.pc
 
 /**
  * The PC grid behind the search panel follows what is typed once the text rests, not on every key
- * (Droidtop/tracker#884). Each key used to narrow the grid at once, recomposing a new set of capsules behind a
+ * (mytop-project/tracker#884). Each key used to narrow the grid at once, recomposing a new set of capsules behind a
  * panel that covers them; on a device that keeps little file cache (BlueStacks, the rig) that work paged code in
  * from disk on the UI thread and the field dropped keys ("Stardew" kept "Sta", then an ANR). The panel's own
  * results still follow every key. Closing the panel applies the last text at once ([flush]), so the grid is never

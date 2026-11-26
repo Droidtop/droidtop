@@ -4,7 +4,7 @@ import java.math.BigDecimal
 import java.math.MathContext
 
 /**
- * The one search's calculator row (Droidtop/tracker#704): text that is a sum ("6*7", "(12.5 + 3) / 2", "2^10",
+ * The one search's calculator row (mytop-project/tracker#704): text that is a sum ("6*7", "(12.5 + 3) / 2", "2^10",
  * "15% of 80" is not one) answers with its value. Plus, minus, times (* x ×), divide (/ ÷), power (^), parentheses,
  * decimals and a leading minus; nothing else, so a game's name with a number in it never reads as a sum. Pure.
  */

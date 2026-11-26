@@ -31,7 +31,7 @@ import androidx.compose.ui.window.PopupProperties
 
 /**
  * True while the shell's pieces are drawn in an in-game overlay (docs/SPEC.md "In-game overlays: HOME chords",
- * Droidtop/tracker#740): a window over another app, not an activity of droidtop's own.
+ * mytop-project/tracker#740): a window over another app, not an activity of droidtop's own.
  */
 val LocalInGameOverlay = staticCompositionLocalOf { false }
 
@@ -40,7 +40,7 @@ val LocalInGameOverlay = staticCompositionLocalOf { false }
  * sub-window does not get the input focus: on the console the R2 Quick Menu over DuckStation was drawn in a focusable
  * Popup that the window manager named the focus while the input dispatcher listed no focused window at all, and
  * droidtop's leave-touch-mode step was refused for a window it did not own, so the D-pad did nothing
- * (Droidtop/tracker#820, dev.2778). The overlay window itself is focusable and focused, so every sheet lives in it.
+ * (mytop-project/tracker#820, dev.2778). The overlay window itself is focusable and focused, so every sheet lives in it.
  */
 class OverlayLayers {
     internal class Layer(onDismiss: () -> Unit, content: @Composable () -> Unit, locals: CompositionLocalContext) {
@@ -105,12 +105,12 @@ fun ShellDialog(
     content: @Composable () -> Unit,
 ) {
     if (!LocalInGameOverlay.current) {
-        // A dialog is a window of its own: it holds its own focus (PadFocusHolder, Droidtop/tracker#820).
+        // A dialog is a window of its own: it holds its own focus (PadFocusHolder, mytop-project/tracker#820).
         Dialog(onDismissRequest = onDismissRequest, properties = properties) { PadFocusHolder(content = content) }
         return
     }
     // In the overlay's own window when it has a host (every overlay does): a Popup is a sub-window, and over another app
-    // it never gets the pad (Droidtop/tracker#820).
+    // it never gets the pad (mytop-project/tracker#820).
     LocalOverlayLayers.current?.let { host ->
         val locals = currentCompositionLocalContext
         val layer = remember { OverlayLayers.Layer(onDismissRequest, content, locals) }

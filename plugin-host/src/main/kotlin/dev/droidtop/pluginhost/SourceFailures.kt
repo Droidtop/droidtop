@@ -2,7 +2,7 @@ package dev.droidtop.pluginhost
 
 /**
  * A plugin's failure in words a person reads (docs/SPEC.md 12a "One search",
- * Droidtop/tracker#375, #485): a source's line in the one search, and every
+ * mytop-project/tracker#375, #485): a source's line in the one search, and every
  * error notice a plugin page or action draws ([PluginViewCall.errorNotice]),
  * which is why it lives here and not in the library. A source reports whatever its code
  * saw: a site's own page text ("JavaScript is disabled. For a better
@@ -29,14 +29,14 @@ object SourceFailures {
     /** A source that answered NOT_FOUND: the record it was asked for is gone (docs/plugin-api.md 1.11, point 4). */
     const val GONE = "It is no longer on the site"
 
-    /** A message that carries a link: droidtop never shows a plugin's link as its sentence (Droidtop/tracker#784). */
+    /** A message that carries a link: droidtop never shows a plugin's link as its sentence (mytop-project/tracker#784). */
     const val SEE_DETAILS = "It stopped. What it said is in Info"
 
-    /** A plugin that needs its update to run on this droidtop (NEEDS_UPDATE, Droidtop/tracker#883 §3.7). */
+    /** A plugin that needs its update to run on this droidtop (NEEDS_UPDATE, mytop-project/tracker#883 §3.7). */
     const val NEEDS_UPDATE = "It needs its update"
 
     /**
-     * The one sentence for a failed answer, by its code first (docs/plugin-api.md 1.3 and 1.11 point 4, Droidtop/tracker#784
+     * The one sentence for a failed answer, by its code first (docs/plugin-api.md 1.3 and 1.11 point 4, mytop-project/tracker#784
      * slice 4): the shared codes are droidtop's words for every source, and only FAILED's own message may stand, through
      * [plain]. A plugin's words never decide what a sign-in, a check, a pause or a missing record says.
      */
@@ -60,7 +60,7 @@ object SourceFailures {
      * A source refused by droidtop's own permission check (PERMISSION_DENIED, or the broker's sentence passed through:
      * '"<label>" is turned off for <plugin>.' / '<plugin> needs you to allow "<label>".'), as one sentence naming the
      * permission, or null when [raw] is not such a refusal. Its page is where it is turned on, and the search offers it
-     * (Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission).
+     * (mytop-project/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission).
      */
     fun permissionOff(raw: String?, code: PluginErrorCode? = null): String? {
         val text = raw.orEmpty()
@@ -108,7 +108,7 @@ object SourceFailures {
         return when {
             // droidtop's own browser-check refusal (SiteChecks.refusal), handed back by a plugin inside a failure of its
             // own: the check is what to do, never "It could not do that" because the sentence names the site
-            // (Droidtop/tracker#881: F95zone's settings page on BlueStacks).
+            // (mytop-project/tracker#881: F95zone's settings page on BlueStacks).
             SiteChecks.REFUSAL_MARK in lower || BROWSER_CHECK.containsMatchIn(lower) -> NEEDS_BROWSER_CHECK
             SIGN_IN_WORDS.any { it in lower } || STATUS_CODE.containsMatchIn(lower) || LOG_IN.containsMatchIn(lower) -> SIGN_IN
             "too many requests" in lower || "rate limit" in lower || TOO_MANY.containsMatchIn(lower) -> SLOW_DOWN
@@ -128,7 +128,7 @@ object SourceFailures {
     private val LINK = Regex("(?i)\\b[a-z][a-z0-9+.-]{1,20}://|\\bwww\\.|\\b[a-z0-9-]{1,63}\\.(com|net|org|io|to|zone|ru|cc|me|xyz|co|app|dev|gg|link|site|top)\\b")
 
     /**
-     * "Technical details" for a failed call (Droidtop/tracker#746): what was asked of which plugin, what came back (the
+     * "Technical details" for a failed call (mytop-project/tracker#746): what was asked of which plugin, what came back (the
      * error code, or the exception when there was no reply), the source's own words and the time, one fact per line,
      * so it can be copied into a report. A line that would only repeat [headline], the sentence already on the row, is
      * left out; the call and the time always say more than the headline does.

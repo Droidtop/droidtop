@@ -35,7 +35,7 @@ data class SourceOutcome(
     val technical: String? = null,
     /**
      * Set when the source needs the person in its site first (SIGN_IN_REQUIRED, BROWSER_CHECK_REQUIRED): droidtop draws
-     * Sign in or Open the site under the source's name ([PluginWebAccount]), never the plugin (Droidtop/tracker#544).
+     * Sign in or Open the site under the source's name ([PluginWebAccount]), never the plugin (mytop-project/tracker#544).
      */
     val access: PluginWebAccount.Need? = null,
     /** Set when droidtop's own permission check refused it: the search offers the plugin's page, where it is allowed. */
@@ -129,7 +129,7 @@ object PluginSearchAggregator {
         val access = when (reply?.code) {
             PluginErrorCode.SIGN_IN_REQUIRED -> PluginWebAccount.Need.SIGN_IN
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> PluginWebAccount.Need.BROWSER_CHECK
-            // droidtop's own browser-check refusal, handed back inside the source's own failure (Droidtop/tracker#881).
+            // droidtop's own browser-check refusal, handed back inside the source's own failure (mytop-project/tracker#881).
             else -> PluginWebAccount.Need.BROWSER_CHECK.takeIf {
                 SourceFailures.plain(reply?.message ?: said) == SourceFailures.NEEDS_BROWSER_CHECK
             }
@@ -140,7 +140,7 @@ object PluginSearchAggregator {
             PluginWebAccount.Need.BROWSER_CHECK -> SourceFailures.NEEDS_BROWSER_CHECK
             null -> permission ?: SourceFailures.forCode(reply?.code, reply?.message ?: said)
         }
-        // What actually failed, never the headline again (Droidtop/tracker#746): the call, the plugin, the code or the
+        // What actually failed, never the headline again (mytop-project/tracker#746): the call, the plugin, the code or the
         // exception, the source's own words and when.
         val manifest = (source as? PluginGameSource)?.source?.record?.manifest
         val technical = SourceFailures.details(

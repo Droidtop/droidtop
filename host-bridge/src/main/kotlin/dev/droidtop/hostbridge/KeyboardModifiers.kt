@@ -2,7 +2,7 @@ package dev.droidtop.hostbridge
 
 /**
  * The modifier state of one virtual keyboard, kept on droidtop's side because the compositor does not keep it
- * (docs/SPEC.md 6b "Modifiers", Droidtop/tracker#147).
+ * (docs/SPEC.md 6b "Modifiers", mytop-project/tracker#147).
  *
  * wlroots handles `zwp_virtual_keyboard_v1.key` with `update_state = false` (wlroots
  * types/wlr_virtual_keyboard_v1.c, `virtual_keyboard_key`): a Shift or Ctrl key event reaches the focused client

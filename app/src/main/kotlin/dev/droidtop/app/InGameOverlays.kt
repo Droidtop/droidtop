@@ -35,7 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * The in-game overlays (docs/SPEC.md "In-game overlays: HOME chords", Droidtop/tracker#740): droidtop's own menus drawn
+ * The in-game overlays (docs/SPEC.md "In-game overlays: HOME chords", mytop-project/tracker#740): droidtop's own menus drawn
  * OVER the app in front, which keeps running and keeps its window. The owner: "Not backgrounding the game, just drawing
  * over it"; and, correcting the first plan, "We don't want to pause the game or etc when we do this": nothing is sent to
  * the app when an overlay opens or closes.
@@ -72,7 +72,7 @@ internal object InGameOverlays {
         scope.launch {
             OverlayRequests.requests.collect { request ->
                 // A window Android took away (its display went, the service unbound) is not open any more: the chord
-                // opens a new one instead of closing what is no longer there (Droidtop/tracker#740).
+                // opens a new one instead of closing what is no longer there (mytop-project/tracker#740).
                 shown?.takeIf { !it.view.isAttachedToWindow }?.let {
                     Log.i(TAG, "${it.kind} was no longer on screen")
                     close()
@@ -126,7 +126,7 @@ internal object InGameOverlays {
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
-                    // Power and mode's Search tile, the left menu's Search row until Droidtop/tracker#621 M4.
+                    // Power and mode's Search tile, the left menu's Search row until mytop-project/tracker#621 M4.
                     onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                 )
                 OverlayRequest.Kind.CONTEXT_MENU -> if (!gameInFront) {
@@ -204,7 +204,7 @@ internal object InGameOverlays {
     /**
      * The one host for an overlay's content, in a window that has no activity: its own lifecycle and saved state,
      * droidtop's theme, what an activity would give the shell's screens ([ProvideOverlayOwners][dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners],
-     * Droidtop/tracker#788) and [LocalInGameOverlay]. The overlays and the on-device check of every Quick Menu tab
+     * mytop-project/tracker#788) and [LocalInGameOverlay]. The overlays and the on-device check of every Quick Menu tab
      * (OverlayQuickMenuRigTest) both draw through it. Returns the view and its lifecycle, set to destroyed on close.
      */
     internal fun overlayView(
@@ -232,7 +232,7 @@ internal object InGameOverlays {
                     // What an activity would give the shell's screens: a catalog tab's pickers and Back.
                     dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners {
                         CompositionLocalProvider(LocalInGameOverlay provides true) {
-                            // An overlay window holds its own focus: its first D-pad press moves it (Droidtop/tracker#820).
+                            // An overlay window holds its own focus: its first D-pad press moves it (mytop-project/tracker#820).
                             // Its sheets are layers of this same window, never Popup sub-windows, which get no pad over
                             // another app (OverlayLayerHost).
                             dev.droidtop.shell.gamepad.OverlayLayerHost(androidx.compose.ui.Modifier.fillMaxSize()) {
@@ -294,7 +294,7 @@ internal object InGameOverlays {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
-     * Takes the overlay down and hands the pad back to what is under it (Droidtop/tracker#740: after the overlays the
+     * Takes the overlay down and hands the pad back to what is under it (mytop-project/tracker#740: after the overlays the
      * D-pad no longer reached RetroArch). In order: the composition first, while its window is still attached, so every
      * focusable sub-window it opened (a sheet's Popup) is removed and none is left holding window focus; then the window
      * itself, at once rather than on the next traversal; then the lifecycle. The window that has focus afterwards is

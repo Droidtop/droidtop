@@ -7,7 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /**
- * droidtop's one process-wide place for work that outlives the screen or call that starts it (Droidtop/tracker#763):
+ * droidtop's one process-wide place for work that outlives the screen or call that starts it (mytop-project/tracker#763):
  * [io] for disk, network and blocking calls, [main] for what must run on the main thread. A failure in one piece of
  * work is logged under [TAG] and touches nothing else; neither scope is ever cancelled. Work whose lifetime its
  * owner ends (a session, a screen) keeps a scope of its own.

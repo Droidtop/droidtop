@@ -15,7 +15,7 @@ data class GuidePosition(val page: Int = 0, val fraction: Float = 0f)
 data class GuideBookmark(val position: GuidePosition, val label: String)
 
 /**
- * What droidtop keeps for one game's guides (Droidtop/tracker#817): the guide last opened, where each was left, the
+ * What droidtop keeps for one game's guides (mytop-project/tracker#817): the guide last opened, where each was left, the
  * person's bookmarks and notes. Kept in droidtop's own data, never in the game's folder.
  */
 @Serializable

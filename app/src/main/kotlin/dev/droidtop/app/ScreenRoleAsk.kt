@@ -25,7 +25,7 @@ import dev.droidtop.shell.gamepad.hosted.HostedRow
 import java.util.concurrent.Executors
 
 /**
- * The one question a new screen gets (docs/SPEC.md 4c, "What each screen is for", Droidtop/tracker#776): a screen
+ * The one question a new screen gets (docs/SPEC.md 4c, "What each screen is for", mytop-project/tracker#776): a screen
  * nobody has answered for, connected while droidtop runs or found at its start, is asked about once, on the screen the
  * menus are on: "<name, size> connected. Use it as: Main screen / Companion / Mirror / Nothing". The suggestion comes
  * from what the screens report ([ScreenRoles.suggest]) and is only where the cursor starts; nothing is applied
@@ -34,7 +34,7 @@ import java.util.concurrent.Executors
  * Settings > Displays. Not while setup runs: its Your screens step asks the same.
  *
  * Desktop's question goes through the same flow and the same sheet (docs/SPEC.md 2b, "The desktop on a second screen",
- * Droidtop/tracker#908 step D5): while the desktop runs, a screen other than its own with a role but no Desktop answer
+ * mytop-project/tracker#908 step D5): while the desktop runs, a screen other than its own with a role but no Desktop answer
  * is asked once, on the desktop's screen, whether the desktop extends to it or it keeps what it has
  * ([ScreenRoles.desktopToAsk], [ScreenRoles.suggestDesktop]). Role questions come first; still one at a time.
  */
@@ -195,7 +195,7 @@ class ScreenRoleActivity : ComponentActivity() {
         }
     }
 
-    // Desktop's question (Droidtop/tracker#908 step D5): the same sheet, two answers, the suggestion marked.
+    // Desktop's question (mytop-project/tracker#908 step D5): the same sheet, two answers, the suggestion marked.
     private fun desktopRows(uniqueId: String): List<HostedRow> {
         val suggested = DesktopScreenChoice.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SUGGESTED) }
         val companionThere = intent.getBooleanExtra(EXTRA_COMPANION_THERE, false)

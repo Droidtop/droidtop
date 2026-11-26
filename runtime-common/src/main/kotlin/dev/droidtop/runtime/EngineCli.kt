@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * A command front of droidtop's own container engine (docs/SPEC.md 3d "The docker command" and "The podman command",
- * Droidtop/tracker#555 D6c, D11): `docker` ([DOCKER]) and `podman` ([PODMAN]) in every container, thin clients of one
+ * mytop-project/tracker#555 D6c, D11): `docker` ([DOCKER]) and `podman` ([PODMAN]) in every container, thin clients of one
  * engine, not second runtimes. Each front's wrapper runs [ContainerEnter.HELPER] with the front's own [token], so its
  * request travels the one request channel the enter path uses, with the same argument bound and the same stdin,
  * stdout, stderr and exit status. droidtop reads the arguments into an [EngineRequest] from a closed set ([parse]);
@@ -286,7 +286,7 @@ class EngineCli private constructor(val front: Front) {
         var entrypoint: List<String>? = null
         var workdir: String? = null
         var user: String? = null
-        // `--entrypoint ""` clears the image's entrypoint, as Docker's does (Droidtop/tracker#715).
+        // `--entrypoint ""` clears the image's entrypoint, as Docker's does (mytop-project/tracker#715).
         fun entrypointOf(value: String) = if (value.isEmpty()) emptyList() else listOf(value)
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
@@ -438,7 +438,7 @@ class EngineCli private constructor(val front: Front) {
 
     /**
      * `network create NAME`, `network ls|list [-q]`, `network rm NAME...`: the same networks the engine API keeps
-     * (Droidtop/tracker#555, rig 2011: the fronts refused `network` though the API had it). `create` takes
+     * (mytop-project/tracker#555, rig 2011: the fronts refused `network` though the API had it). `create` takes
      * `--driver bridge`, the one kind droidtop has; anything else is said as not built.
      */
     private fun network(args: List<String>): EngineRequest {
@@ -510,7 +510,7 @@ class EngineCli private constructor(val front: Front) {
      */
     /**
      * A bind mount given as Docker's `Mounts` gives it ([source], [target], [readOnly]) as the `-v` spec [volume]
-     * reads (Droidtop/tracker#715). The source is the folder's name or where it appears in the container
+     * reads (mytop-project/tracker#715). The source is the folder's name or where it appears in the container
      * (`<EXTRA_MOUNTS_DIR>/<name>`, what a client inside the container sees); anything else is passed on as it came,
      * so [volume] refuses it with the same words as `-v`. Pure.
      */

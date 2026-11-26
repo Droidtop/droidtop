@@ -9,7 +9,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#827). */
+/** The colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"; mytop-project/tracker#827). */
 class OutsideGamingColorsTest {
     private val themed = GamingThemeColors.DEFAULT.copy(ground = 0xFF2A1A10.toInt(), accent = 0xFFE0A030.toInt(), declared = true)
     private val blue = OutsideGamingColors.ACCENTS.first()

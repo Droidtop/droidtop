@@ -142,7 +142,7 @@ class AppInterfaceTrustTest {
     }
     @Test
     fun `an app whose plugin this droidtop cannot speak says which side needs updating`() {
-        // Enginehost was missing from Plugins altogether (Droidtop/tracker#854).
+        // Enginehost was missing from Plugins altogether (mytop-project/tracker#854).
         fun bytes(json: String) = json.toByteArray(Charsets.UTF_8)
         val newer = AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"app_interface","contractVersion":4}"""), null)
         assertEquals(

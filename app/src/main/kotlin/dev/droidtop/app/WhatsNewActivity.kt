@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * What's new (docs/SPEC.md 7b, "Update onboarding", Droidtop/tracker#727): the changelog of every build since the one
+ * What's new (docs/SPEC.md 7b, "Update onboarding", mytop-project/tracker#727): the changelog of every build since the one
  * the person last saw, drawn in onboarding's scaffold, then the app-wide feature steps as the shell's confirm card over
  * it. Opened by [WhatsNew.onShellResumed] after an update, and from Settings > About droidtop > What's new with the
  * whole history ([EXTRA_ALL]), where it only shows the changelog. Closing it (Done, Back or B) is what counts as seen.
@@ -62,7 +62,7 @@ class WhatsNewActivity : AppCompatActivity() {
 
     /**
      * Over Gaming or Desktop, whose screens hide Android's bars, What's new hides them too: it drew the status bar
-     * over a Gaming screen (UI review, Droidtop/tracker#954 item 9). Mobile keeps them, as its own screens do. The mode
+     * over a Gaming screen (UI review, mytop-project/tracker#954 item 9). Mobile keeps them, as its own screens do. The mode
      * is the one the shell last switched to, already read into memory by the shell that opened this.
      */
     private fun applySystemBars() {

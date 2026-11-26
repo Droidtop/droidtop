@@ -152,7 +152,7 @@ class LibretroCoreIdTest {
     fun `the generated RetroArch launch is ES-DE Android's command`() {
         // ES-DE resources/systems/android/es_systems.xml, Nintendo 64:
         // CONFIGFILE, then LIBRETRO with the downloader's file name, then
-        // ROM. Droidtop/tracker#271: the old <core>_android.so named a
+        // ROM. mytop-project/tracker#271: the old <core>_android.so named a
         // file RetroArch does not have, and there was no CONFIGFILE.
         assertEquals(
             "-n com.retroarch.aarch64/com.retroarch.browser.retroactivity.RetroActivityFuture " +

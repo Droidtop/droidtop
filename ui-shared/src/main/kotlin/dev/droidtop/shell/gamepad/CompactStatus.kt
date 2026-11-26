@@ -25,7 +25,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import dev.droidtop.library.settings.JobIcon
 
 /**
- * The compact status (owner, 2026-11-05, Droidtop/tracker#886; docs/DESIGN-LANGUAGE.md "Status is an icon and a
+ * The compact status (owner, 2026-11-05, mytop-project/tracker#886; docs/DESIGN-LANGUAGE.md "Status is an icon and a
  * value"): what a job does as an icon, its words for a screen reader.
  */
 @Composable

@@ -18,7 +18,7 @@ import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.Result
 import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.SessionCommand
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H7c: the engine's round trip, against a scripted Mozc. */
+/** mytop-project/tracker#903 H7c: the engine's round trip, against a scripted Mozc. */
 class MozcEngineTest {
     /** A Mozc that answers each command from [reply], and records what it was sent. */
     private class Scripted(var reply: (Input) -> Output) : MozcEngine.Runtime {

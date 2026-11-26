@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Chinese typing through RIME (Droidtop/tracker#903 H8b). The strip's lines while it cannot type yet, and its settings row. -->
+<!-- Chinese typing through RIME (mytop-project/tracker#903 H8b). The strip's lines while it cannot type yet, and its settings row. -->
 <resources>
     <!-- One line on the candidate strip, in place of candidates, while Chinese cannot type. -->
     <string name="rime_unavailable_network">Chinese needs its %1$d MB dictionary first, and there is no connection. It tries again in the next text field.</string>

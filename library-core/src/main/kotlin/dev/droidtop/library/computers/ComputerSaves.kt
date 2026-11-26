@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
  * it ends. The computer says where the game keeps its saves (from the person's
  * own entries or the Ludusavi manifest), droidtop resolves those places in the
  * game's Wine prefix and folder here, and the agent core decides: a side that
- * alone changed wins. When both changed, nobody wins (the owner, Droidtop/tracker#814:
+ * alone changed wins. When both changed, nobody wins (the owner, mytop-project/tracker#814:
  * "for saves, nobody 'wins' ... We ask the user"): the agent moves nothing and
  * answers `conflict` with each side's device, files and date, the person picks
  * one through [SaveConflictResolver], and the sync runs again with that
@@ -156,7 +156,7 @@ object ComputerSaves {
     }
 
     /**
-     * A copy of a game's saves kept when a sync overwrote one side (Droidtop/tracker#822): in [computer]'s archive for
+     * A copy of a game's saves kept when a sync overwrote one side (mytop-project/tracker#822): in [computer]'s archive for
      * the game, the set [device] had ([files] files, newest [newestMs]). [device] is the name `restore_saves` takes.
      */
     data class KeptCopy(val computer: Computer, val device: String, val files: Int, val newestMs: Long)
@@ -174,7 +174,7 @@ object ComputerSaves {
     }.sortedByDescending { it.newestMs }
 
     /**
-     * Puts [copy] back as [entryId]'s saves on this device (`restore_saves`, Droidtop/tracker#822). What is here now is
+     * Puts [copy] back as [entryId]'s saves on this device (`restore_saves`, mytop-project/tracker#822). What is here now is
      * kept first as this device's own copy, so a restore is undone the same way. The line to show, and whether it
      * worked. Disk work: never on the main thread.
      */

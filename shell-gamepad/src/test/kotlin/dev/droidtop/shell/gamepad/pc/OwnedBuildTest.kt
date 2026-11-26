@@ -9,7 +9,7 @@ import org.junit.Test
 
 /**
  * A source's newest release that is a store's own build, on a card that holds that store's copy (docs/SPEC.md 7m,
- * "A store's copy and a local copy", Droidtop/tracker#745): F95zone's Bare Witness "Steam Build".
+ * "A store's copy and a local copy", mytop-project/tracker#745): F95zone's Bare Witness "Steam Build".
  */
 class OwnedBuildTest {
     private val steam = LibraryEntry(id = "steam:1", title = "Bare Witness", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = false))

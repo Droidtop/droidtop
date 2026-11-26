@@ -36,7 +36,7 @@ import dev.droidtop.shell.gamepad.ShellDialog
 internal data class SameGameChoice(val title: String, val subtitle: String, val typed: TypedChoice? = null)
 
 /**
- * A choice that is typed in its own row (owner, 2026-11-19, Droidtop/tracker#954 item 12: no editor and no panel):
+ * A choice that is typed in its own row (owner, 2026-11-19, mytop-project/tracker#954 item 12: no editor and no panel):
  * A puts the cursor in it at once, with no second press, since typing changes nothing until it is done. What was
  * typed goes to the picker's onTyped.
  */

@@ -5,7 +5,7 @@ plugins {
 }
 
 // The Compose pieces every droidtop surface draws alike (docs/SPEC.md 7k,
-// "Notices"; Droidtop/tracker#485): the notice card and its palette. Gaming,
+// "Notices"; mytop-project/tracker#485): the notice card and its palette. Gaming,
 // Desktop, the companion and Standard (whose forked Launcher3 settings are
 // Preference rows, through a ComposeView this module builds) all draw these,
 // so none of them depends on another shell for them.
@@ -36,21 +36,21 @@ android {
 dependencies {
     // The Notice model and NoticeColors live there, next to the theme mapping they derive from.
     api(project(":runtime-common"))
-    // The text-entry slab (Slab, SlabView) that TextEntry hosts (docs/SPEC.md 4c, Droidtop/tracker#485 S7).
+    // The text-entry slab (Slab, SlabView) that TextEntry hosts (docs/SPEC.md 4c, mytop-project/tracker#485 S7).
     api(project(":input-keyboard"))
     implementation(libs.androidx.core.ktx)
-    // The design tokens and the theme palette (docs/SPEC.md, Droidtop/tracker#827 F1b): GamingTheme holds the palette
+    // The design tokens and the theme palette (docs/SPEC.md, mytop-project/tracker#827 F1b): GamingTheme holds the palette
     // for its host's lifecycle.
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // The component set (Droidtop/tracker#827 F1b part 3): PadFocusHolder places the focus again on a return to its
+    // The component set (mytop-project/tracker#827 F1b part 3): PadFocusHolder places the focus again on a return to its
     // window, and a catalog row's picture (CatalogGlyph) is drawn by the image loader, as it was in :shell-gamepad.
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
-    // StatusViews hosts the status readout in a window with no activity (Standard's taskbar, Droidtop/tracker#701): it
+    // StatusViews hosts the status readout in a window with no activity (Standard's taskbar, mytop-project/tracker#701): it
     // gives the ComposeView its own lifecycle and saved state, as InGameOverlays does in :app.
     implementation(libs.savedstate)
     implementation(libs.savedstate.ktx)
-    // The settings renderer (Droidtop/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
+    // The settings renderer (mytop-project/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
     // dispatcher and opens Android's folder and document pickers, as it did in :shell-gamepad.
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))

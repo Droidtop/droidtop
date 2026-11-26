@@ -10,7 +10,7 @@ import dev.droidtop.library.settings.Notices
 import kotlinx.coroutines.launch
 
 /**
- * A press on a plugin's part of a droidtop widget (docs/plugin-api.md 3 C10 and C2, Droidtop/tracker#563). The widget
+ * A press on a plugin's part of a droidtop widget (docs/plugin-api.md 3 C10 and C2, mytop-project/tracker#563). The widget
  * renderer's taps are [intent]s to this receiver; it calls the plugin through the broker off the main thread
  * ([PluginWidgets.act]), flashes the reply's message, and asks the renderer to redraw that widget
  * ([PluginWidgets.onActed]). Not exported, and reached only by droidtop's own immutable PendingIntents.

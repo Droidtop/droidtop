@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import android.content.Context
 
 /**
- * A catalog screen as a PAGE (docs/SPEC.md 7k, "Page anatomy"; Droidtop/tracker#485 F2a, final design C.1
+ * A catalog screen as a PAGE (docs/SPEC.md 7k, "Page anatomy"; mytop-project/tracker#485 F2a, final design C.1
  * and C.2): a header that says what the page is about, a bar of at most three buttons that do the page's
  * job (plus a "More" overflow for the rest), then the sections. The header is never a stop; the button bar
  * is the first stop and has the cursor when the page opens; destructive buttons live in the overflow or

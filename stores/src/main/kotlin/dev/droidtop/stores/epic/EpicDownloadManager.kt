@@ -91,7 +91,7 @@ internal class EpicDownloadManager(
 
         /**
          * Whether a chunk's HTTP failure is answered by asking Epic for fresh CDN links and trying the chunk again
-         * (Droidtop/tracker#732, which resolved the old "check error status" TODO): an expired or refused link (401,
+         * (mytop-project/tracker#732, which resolved the old "check error status" TODO): an expired or refused link (401,
          * 403, 404, 410), being told to slow down (429), or the CDN failing (any 5xx, where only 500 was retried before,
          * so a 502 or 503 failed the chunk for good). Any other 4xx is the request's own fault and fails it. Pure.
          */

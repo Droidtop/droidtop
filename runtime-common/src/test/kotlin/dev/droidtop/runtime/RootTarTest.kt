@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The root commands of a droidspaces container's copy and backup (docs/SPEC.md 3d; Droidtop/tracker#758). */
+/** The root commands of a droidspaces container's copy and backup (docs/SPEC.md 3d; mytop-project/tracker#758). */
 class RootTarTest {
     private val rootfs = "/data/user/0/dev.droidtop.app/files/droidspaces/rootfs/droidtop-sibling-1"
 

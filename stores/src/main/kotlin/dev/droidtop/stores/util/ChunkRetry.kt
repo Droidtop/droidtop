@@ -5,7 +5,7 @@ import kotlinx.coroutines.delay
 import timber.log.Timber
 
 /**
- * The one retry around a store's chunk or file fetch (Droidtop/tracker#766). droidtop's download engine already
+ * The one retry around a store's chunk or file fetch (mytop-project/tracker#766). droidtop's download engine already
  * carries a fetch through dropped connections, with its own backoff and failure budget (docs/SPEC.md 12a, "One
  * download engine"), so a store does not retry what the engine retries. Its own attempt is for what the engine cannot
  * do: try another CDN (GOG), fetch fresh links (Epic), or fetch again a chunk that arrived damaged (a hash or size

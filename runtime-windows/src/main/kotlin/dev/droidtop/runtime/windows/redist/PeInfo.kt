@@ -7,7 +7,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 
 /**
- * What a Windows program says about itself (docs/SPEC.md 9, "Redistributable installers"; Droidtop/tracker#916): its
+ * What a Windows program says about itself (docs/SPEC.md 9, "Redistributable installers"; mytop-project/tracker#916): its
  * version resource's strings and the organisation its Authenticode signature names. Read straight from the PE file, no
  * Wine involved, so a redistributable is recognised by what it is and never by its file name.
  *

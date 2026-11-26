@@ -99,7 +99,7 @@ object ImePolicyTool {
 }
 
 /**
- * Typing on the add-on display, in `:app` (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314):
+ * Typing on the add-on display, in `:app` (docs/SPEC.md 4c, "Typing on the add-on display", mytop-project/tracker#314):
  * with elevated access, Android's own keyboard is made to show on each second display ([sync]); without it, or for
  * apps the policy does not help, droidtop's own keyboard is drawn on the editor's screen ([ShowOverEditor]) or on the
  * companion, typing through droidtop's input method or the elevated `input` command.

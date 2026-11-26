@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * A local copy and a store's row of the same game are one card (docs/SPEC.md 7m, "A store's copy and a local
- * copy", Droidtop/tracker#745): Bare Witness owned on Steam and kept as a folder.
+ * copy", mytop-project/tracker#745): Bare Witness owned on Steam and kept as a folder.
  */
 class LinkedCopiesTest {
 

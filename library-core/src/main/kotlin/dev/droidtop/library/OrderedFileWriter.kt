@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * One background thread that appends lines to one file, in the order they were handed over, so a caller (the main
- * thread at start-up, a scan) never waits on the disk (Droidtop/tracker#729). The file is rotated at [maxBytes]: the
+ * thread at start-up, a scan) never waits on the disk (mytop-project/tracker#729). The file is rotated at [maxBytes]: the
  * old one is kept once as `<name>.1`. [flush] waits for everything handed over so far, bounded, for the end of a scan
  * and for a crash handler, which must see the last lines on disk before it reads them.
  *

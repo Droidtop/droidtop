@@ -3,7 +3,7 @@ package dev.droidtop.app
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The companion Home's pure labels (docs/SPEC.md "The companion's tabs", Droidtop/tracker#328). */
+/** The companion Home's pure labels (docs/SPEC.md "The companion's tabs", mytop-project/tracker#328). */
 class CompanionHomeTest {
     private val start = 1_000_000_000L
 

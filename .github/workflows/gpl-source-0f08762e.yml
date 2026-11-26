@@ -1,6 +1,6 @@
 name: GPL source of the last Windows runtime prebuilts
 
-# Builds before Droidtop/tracker#857 packaged GameNative's binaries from
+# Builds before mytop-project/tracker#857 packaged GameNative's binaries from
 # droidtop's fork (Droidtop/gamenative-tux) at 0f08762e, published as the
 # windows-runtime-prebuilt-0f08762e release of this repository. The fork is
 # being deleted, so the corresponding source of those builds goes onto that
@@ -77,7 +77,7 @@ jobs:
             echo "# Source of Droidtop/gamenative-tux at $FORK_REF"
             echo
             echo "The fork's tree at that commit, with every submodule at the commit it pins."
-            echo "Assembled by droidtop's .github/workflows/gpl-source-0f08762e.yml (Droidtop/tracker#857)."
+            echo "Assembled by droidtop's .github/workflows/gpl-source-0f08762e.yml (mytop-project/tracker#857)."
             echo
             echo "| Submodule | Repository | Commit | Taken from |"
             echo "|---|---|---|---|"

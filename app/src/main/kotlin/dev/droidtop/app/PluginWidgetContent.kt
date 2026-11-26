@@ -4,7 +4,7 @@ import dev.droidtop.pluginhost.TileState
 import dev.droidtop.pluginhost.WidgetTemplate
 
 /**
- * What a Plugin widget draws (docs/plugin-api.md 3 C10 and C2, Droidtop/tracker#563): a plugin's `ui.widget` template
+ * What a Plugin widget draws (docs/plugin-api.md 3 C10 and C2, mytop-project/tracker#563): a plugin's `ui.widget` template
  * or tile state turned into the title and rows of droidtop's one widget renderer ([DroidtopWidgets.rows]). Pure, so
  * each template's mapping is tested. A row's [Line.action] is the id a tap on it sends back (`action {id}`); a quick
  * tile's row is a press ([Line.press]); a row with neither does nothing. [Content.action] is a tap on the whole widget.

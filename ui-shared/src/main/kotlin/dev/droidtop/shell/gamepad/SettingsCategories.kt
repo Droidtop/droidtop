@@ -120,7 +120,7 @@ fun settingsCategories(
 }.let(::uniqueKeys)
 
 /**
- * Every category's key unique, as the column's LazyColumn needs (Droidtop/tracker#837: two rows for one game, a linked
+ * Every category's key unique, as the column's LazyColumn needs (mytop-project/tracker#837: two rows for one game, a linked
  * copy, gave two link entries the same key and killed droidtop when they were drawn). The first keeps its key; a later
  * one with the same key gets its place among them, so the keys stay stable as long as the rows do. Pure.
  */
@@ -157,7 +157,7 @@ suspend fun mergeShortScreens(
                     title = section.title ?: if (index == 0) screen.title else null,
                     // A merged screen is a section of the page that linked it, so it is in that page's category,
                     // never one of its own: "Standard mode" (one row) was a whole, icon-less category in the
-                    // column beside the Modes it belongs to (Droidtop/tracker#676).
+                    // column beside the Modes it belongs to (mytop-project/tracker#676).
                     category = section.category ?: group.category,
                     icon = section.icon ?: group.icon,
                 )
@@ -171,7 +171,7 @@ suspend fun mergeShortScreens(
  * [groups] without the links that open a screen the left menu already lists as a place
  * ([placeScreenIds], the registry ids of [GamingSection.placeScreenId]), and without a group that
  * held nothing else: in a mode with a left menu a place has one way in, the menu, not a second
- * row in Settings (docs/SPEC.md "Settings layout", Droidtop/tracker#273).
+ * row in Settings (docs/SPEC.md "Settings layout", mytop-project/tracker#273).
  */
 fun withoutPlaceLinks(groups: List<CatalogGroup>, placeScreenIds: Set<String>): List<CatalogGroup> {
     if (placeScreenIds.isEmpty()) return groups

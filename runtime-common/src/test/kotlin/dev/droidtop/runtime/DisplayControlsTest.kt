@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion screen and displays (DisplayControls.kt, Droidtop/tracker#414 slice C14). */
+/** The companion screen and displays (DisplayControls.kt, mytop-project/tracker#414 slice C14). */
 class DisplayControlsTest {
     @Test fun `companion brightness stops at the floor, only off goes lower`() {
         assertEquals(DisplayControls.FLOOR, DisplayControls.clampCompanion(0f), 0.0001f)

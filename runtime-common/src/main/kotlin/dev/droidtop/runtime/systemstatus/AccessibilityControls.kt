@@ -17,7 +17,7 @@ import dev.droidtop.runtime.tasks.TaskManager
 
 /**
  * Android's own accessibility settings for every app (docs/SPEC.md "The companion's tabs", Accessibility;
- * Droidtop/tracker#414 slice C22): font size, display size, magnification, high-contrast text, colour inversion and
+ * mytop-project/tracker#414 slice C22): font size, display size, magnification, high-contrast text, colour inversion and
  * TalkBack. With the helper app and Settings > Risky actions > "Change accessibility settings" droidtop writes them
  * (`settings put`, `wm density`); otherwise each row opens Android's own screen. Turning TalkBack or magnification off
  * asks first, the safe answer first: someone who relies on them should not lose them by a stray tap. Catalog items,

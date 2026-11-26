@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The one title fold (Droidtop/tracker#870): [TitleKeys.slug] is Lutris's `slugify`. Every expected value below is
+ * The one title fold (mytop-project/tracker#870): [TitleKeys.slug] is Lutris's `slugify`. Every expected value below is
  * what lutris/lutris `lutris/util/strings.py` `slugify` (master 4d9939e468de) returns for the same input.
  */
 class TitleKeysTest {

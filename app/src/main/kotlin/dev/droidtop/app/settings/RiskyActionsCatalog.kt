@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Risky actions (docs/SPEC.md "Risky actions", Droidtop/tracker#248): the one place that says whether
+ * Settings > Risky actions (docs/SPEC.md "Risky actions", mytop-project/tracker#248): the one place that says whether
  * droidtop may change another app or the system through the privileged helper. A master switch, off until the person
  * turns it on, and one switch per class of action, each off until turned on; a class does nothing while the master is
  * off. The gate itself is [dev.droidtop.runtime.tasks.ElevatedShell] (and the RetroArch core placement): this screen

@@ -18,7 +18,7 @@ import java.io.OutputStream
 
 /**
  * The folder the person chose for files sent from another device (docs/SPEC.md, "Type from another device", file
- * transfer, Droidtop/tracker#645): a tree the system folder picker handed back, kept by its persisted permission, or
+ * transfer, mytop-project/tracker#645): a tree the system folder picker handed back, kept by its persisted permission, or
  * none, which means Download/droidtop. Droidtop never picks a folder itself, so a game folder is written into only
  * when the person chose it here.
  */

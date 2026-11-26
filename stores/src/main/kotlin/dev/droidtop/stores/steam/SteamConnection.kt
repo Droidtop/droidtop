@@ -39,7 +39,7 @@ interface SteamConnectionHost {
 
 /**
  * Keeps droidtop connected to Steam while the person is signed in and has not
- * chosen Offline (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313; the owner,
+ * chosen Offline (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313; the owner,
  * 2026-10-08: the connection closing after the last job "leaves us unable to
  * use chat"). One more holder of [SteamSession], so it never closes by itself,
  * and a loop that logs on again whenever the link drops: after a pause that

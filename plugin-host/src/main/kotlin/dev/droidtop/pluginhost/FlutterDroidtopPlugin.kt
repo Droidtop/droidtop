@@ -482,7 +482,7 @@ class FlutterDroidtopPlugin internal constructor(
     /**
      * Touches go to the engine as droidtop packs them ([FlutterPointerPacket]), never through Flutter's
      * AndroidTouchProcessor, which asks the input service about the device and kills a contained process on the first
-     * touch (Droidtop/tracker#511).
+     * touch (mytop-project/tracker#511).
      */
     override fun screenTouch(event: android.view.MotionEvent) {
         val touch = runCatching { ScreenTouches.of(event) }.getOrNull()

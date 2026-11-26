@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.Slab
 
-/** What a slab press does to the entry's text (docs/SPEC.md 4c, "The text-entry slab"; Droidtop/tracker#485 S7). */
+/** What a slab press does to the entry's text (docs/SPEC.md 4c, "The text-entry slab"; mytop-project/tracker#485 S7). */
 class TextEntryEditsTest {
     private fun at(text: String, caret: Int) = TextFieldValue(text, TextRange(caret))
 

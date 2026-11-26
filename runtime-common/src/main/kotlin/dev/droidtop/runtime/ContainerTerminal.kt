@@ -14,7 +14,7 @@ package dev.droidtop.runtime
  * as a window of its own; the primary gets [PACKAGE] with its compositor, and any other container gets it the first
  * time a terminal is asked for ([ENSURE_COMMAND], run from the container manager's Terminal action before [open]).
  *
- * ### On Android: droidtop's own terminal (Droidtop/tracker#909)
+ * ### On Android: droidtop's own terminal (mytop-project/tracker#909)
  *
  * A terminal that lives in the compositor is unreachable when the compositor is not running, which is when a shell
  * would help most. So droidtop also draws a terminal itself, on Android, desktop up or not: Termux's
@@ -83,7 +83,7 @@ object ContainerTerminal {
     )
 
     /**
-     * What droidtop's own terminal runs in a container (Droidtop/tracker#909): the login shell of the user it runs as,
+     * What droidtop's own terminal runs in a container (mytop-project/tracker#909): the login shell of the user it runs as,
      * from the container's /etc/passwd (`/bin/sh` when that names none or nothing executable), started as a login
      * shell (`-l`, which every common shell takes) in that user's home. Read in the container, so a Custom image gets
      * its own shell; nothing here is shell text from outside.

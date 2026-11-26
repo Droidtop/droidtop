@@ -65,7 +65,7 @@ object HomeRolePrefs {
     }
 
     /**
-     * Changes a HOME activity's state only when it really changes (Droidtop/tracker#736). Every write is a package
+     * Changes a HOME activity's state only when it really changes (mytop-project/tracker#736). Every write is a package
      * change Android re-reads the Home candidates on, and onboarding, the "droidtop is your home screen" row and the
      * Alternative forwarder all called this with the state already in place: the trampoline written ENABLED over its
      * manifest default of enabled. Reading first keeps those calls from touching the HOME set at all, so only turning

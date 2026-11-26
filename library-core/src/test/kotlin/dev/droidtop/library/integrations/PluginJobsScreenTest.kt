@@ -67,7 +67,7 @@ class PluginJobsScreenTest {
         val finished = job("f", 100, done = true).copy(finishedAtMs = 5L)
         val groups = PluginJobsScreen.groupsFor(listOf(job("a", 10), held, job("p", 5, paused = true), finished), nowMs = 0L)
         assertEquals(listOf("Current (1)", "Waiting (1)", "Paused (1)", "Finished (1)"), groups.map { it.title })
-        // Show (the kind filter) heads Finished, then Clear finished, the rows, and Older jobs (Droidtop/tracker#940).
+        // Show (the kind filter) heads Finished, then Clear finished, the rows, and Older jobs (mytop-project/tracker#940).
         assertEquals(
             listOf("plugin_jobs_show", "plugin_jobs_clear_finished", "plugin_job_f", "plugin_jobs_older"),
             groups.last().items.map { it.id },
@@ -91,7 +91,7 @@ class PluginJobsScreenTest {
         assertEquals("12 of 40", PluginJobsScreen.amountLine(dev.droidtop.pluginhost.JobNumbers(itemsDone = 12, itemsTotal = 40)))
         assertNull(PluginJobsScreen.amountLine(dev.droidtop.pluginhost.JobNumbers()))
         assertNull(PluginJobsScreen.amountLine(null))
-        // The figures are the detail, asked for; the row's line says only where it stands (Droidtop/tracker#643).
+        // The figures are the detail, asked for; the row's line says only where it stands (mytop-project/tracker#643).
         val running = job("a", 40, status = "Checking files").copy(numbers = bytes)
         assertEquals("Downloading", PluginJobsScreen.progressLine(running, null))
         assertEquals("About 3 min left", PluginJobsScreen.progressLine(running, "About 3 min left"))
@@ -129,7 +129,7 @@ class PluginJobsScreenTest {
     fun `a row leads with the job's own name, and who runs it is the second line`() {
         val running = PluginJobsScreen.jobRow(job("a", 42).copy(title = "Love and Corruption"), nowMs = 0L)
         assertEquals("Love and Corruption", running.title)
-        // Where it stands, then who runs it, under the title: never a value column (Droidtop/tracker#739).
+        // Where it stands, then who runs it, under the title: never a value column (mytop-project/tracker#739).
         assertTrue(running.subtitle!!.endsWith("GOG"))
         assertNull((running as NestedScreenItem).valueLabel)
         assertTrue(running.summaryShown)
@@ -179,7 +179,7 @@ class PluginJobsScreenTest {
 
     @Test
     fun `a download that sends only its bytes draws a filling bar, not a spinner`() {
-        // Droidtop/tracker#877: "Droidtop still shows text, with a spinner for downloads, not a progress bar".
+        // mytop-project/tracker#877: "Droidtop still shows text, with a spinner for downloads, not a progress bar".
         val bytes = job("b").copy(numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 120_000_000, bytesTotal = 300_000_000))
         assertEquals(JobLook.ACTIVE, PluginJobsScreen.lookOf(bytes))
         assertEquals(0.4f, PluginJobsScreen.jobRow(bytes, nowMs = 0L).progress!!, 0.001f)
@@ -192,7 +192,7 @@ class PluginJobsScreenTest {
 
     @Test
     fun `a running row is an icon, its bar and a fraction, and its words stay put while it counts`() {
-        // Droidtop/tracker#886: "a fraction display (downloaded over total)"; "the text constantly changes".
+        // mytop-project/tracker#886: "a fraction display (downloaded over total)"; "the text constantly changes".
         val gb = 1_000_000_000L
         val bytes = job("b", 35).copy(nativeKind = "download", numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 12 * gb / 10, bytesTotal = 34 * gb / 10))
         val row = PluginJobsScreen.jobRow(bytes, nowMs = 0L)

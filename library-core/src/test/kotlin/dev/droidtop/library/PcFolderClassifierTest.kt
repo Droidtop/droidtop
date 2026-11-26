@@ -107,7 +107,7 @@ class PcFolderClassifierTest {
 
     @Test
     fun `a title's leading article does not hide the program named after the rest of it`() {
-        // Droidtop/tracker#308: the folder's shape, with placeholder names.
+        // mytop-project/tracker#308: the folder's shape, with placeholder names.
         val facts = classify("The Samples", "SamplesSE.exe", "Maker.exe")
         assertEquals("SamplesSE.exe", facts.main)
         assertEquals(listOf("Maker.exe"), facts.alternatives)

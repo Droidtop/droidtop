@@ -14,7 +14,7 @@ data class ViewBox(val left: Float, val top: Float, val right: Float, val bottom
         left < other.right && other.left < right && top < other.bottom && other.top < bottom
 }
 
-/** A title-bar button droidtop draws over a sway window (docs/SPEC.md 2b "Window controls", Droidtop/tracker#910). */
+/** A title-bar button droidtop draws over a sway window (docs/SPEC.md 2b "Window controls", mytop-project/tracker#910). */
 enum class WindowButton { MINIMIZE, MAXIMIZE, CLOSE }
 
 /**
@@ -36,7 +36,7 @@ sealed interface ControlHit {
 }
 
 /**
- * The title-bar buttons and resize bands on one surface showing one sway output (Droidtop/tracker#910), in the
+ * The title-bar buttons and resize bands on one surface showing one sway output (mytop-project/tracker#910), in the
  * surface's view pixels, and what a press at a point is ([hit]). Built by [layout] from the layout tree
  * ([SwayFrames]); pure, so it is tested on the JVM (WindowControlsTest).
  *

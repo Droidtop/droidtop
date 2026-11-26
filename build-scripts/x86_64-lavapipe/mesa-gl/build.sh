@@ -40,8 +40,8 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -Dbuild-tests=false
 "
 
-# The source is vendor/mesa-lavapipe (Droidtop/mesa, branch droidtop-lavapipe): Mesa 26.2.4 with Termux's Mesa patches (all but 0001, the llvmpipe single-thread one) as commits, never patched here
-# (Droidtop/tracker#921). The workflow copies that tree into the termux-packages checkout as droidtop-src/mesa-lavapipe, the
+# The source is vendor/mesa-lavapipe (mytop-project/mesa, branch droidtop-lavapipe): Mesa 26.2.4 with Termux's Mesa patches (all but 0001, the llvmpipe single-thread one) as commits, never patched here
+# (mytop-project/tracker#921). The workflow copies that tree into the termux-packages checkout as droidtop-src/mesa-lavapipe, the
 # only place the builder's container can read it.
 termux_step_get_source() {
 	mkdir -p "$TERMUX_PKG_SRCDIR"

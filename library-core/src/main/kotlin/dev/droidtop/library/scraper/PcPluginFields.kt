@@ -11,7 +11,7 @@ import dev.droidtop.pluginhost.MetadataFields
 internal object PcPluginFields {
     /**
      * [row] with the gaps [found] fills, and which source each filled field came from (empty when nothing changed). With
-     * [replace] (a refresh with a plugin as the chosen source, Droidtop/tracker#67) a field already set is replaced too;
+     * [replace] (a refresh with a plugin as the chosen source, mytop-project/tracker#67) a field already set is replaced too;
      * a field the person edited never is.
      */
     fun fill(row: GameMetadataEntity, found: List<MetadataFields>, replace: Boolean = false): Pair<GameMetadataEntity, Map<String, String>> {

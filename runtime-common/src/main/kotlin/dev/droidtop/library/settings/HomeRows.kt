@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The person's say over Home's rows (Droidtop/tracker#611, the adaptive Home: "The person can always pin, hide or
+ * The person's say over Home's rows (mytop-project/tracker#611, the adaptive Home: "The person can always pin, hide or
  * reorder rows"): rows pinned to the top in their order, and rows hidden. Every other row takes the place Home's use
  * gives it. Home notes the rows it has shown ([noteSeen]), by id and title, so a plugin's shelf can be pinned or
  * hidden as droidtop's own can. It also keeps how many games each row has started ([use]), the ranking's sign of use,

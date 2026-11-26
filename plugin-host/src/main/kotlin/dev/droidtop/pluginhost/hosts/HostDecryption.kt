@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost.hosts
 import java.io.File
 
 /**
- * A file a host serves encrypted, such as Mega's (docs/SPEC.md 12a "Host resolvers", Droidtop/tracker#638): the engine
+ * A file a host serves encrypted, such as Mega's (docs/SPEC.md 12a "Host resolvers", mytop-project/tracker#638): the engine
  * fetches the bytes as for any file, and the job decrypts the file where it lies once it is whole, before its digest and
  * its post step, with the key the link gave. The key travels with the download as a header of droidtop's own, which the
  * job takes out before the request goes anywhere ([split]): it is a credential, held in memory by the job as the host

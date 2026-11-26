@@ -35,7 +35,7 @@ object SimilarGames {
      * first. [target] is a game that is folders on this device. Offered are
      * other such games with at least one folder still here (a game that is
      * only missing is the missing-game fold's question, 7g), and games that
-     * are only a store's rows (Droidtop/tracker#745: the same game owned on
+     * are only a store's rows (mytop-project/tracker#745: the same game owned on
      * Steam and kept as a folder), an equal name by [GameNaming.nameKey]
      * counting as fully alike.
      */

@@ -3,7 +3,7 @@
 # app/windowcast-lib/repo/, laid out as a Maven repository that settings.gradle.kts reads, so :app depends on it
 # as dev.windowcast:windowcast-android:<version> like any library. The AAR (client-core for arm64-v8a and
 # x86_64, the session, decoder, input and sign-in types) is built and attached to each windowcast release by
-# Droidtop/windowcast's "Viewer release" workflow; the release tag and the AAR's SHA-256 are app/windowcast.pin.
+# mytop-project/windowcast's "Viewer release" workflow; the release tag and the AAR's SHA-256 are app/windowcast.pin.
 # The release's own SHA256SUMS-android-library must agree with the pin, and a mismatch in either fails the
 # build rather than packaging something else.
 set -eu
@@ -18,7 +18,7 @@ if [ -f "$DEST/.pin" ] && [ "$(cat "$DEST/.pin")" = "$tag $sha" ]; then
     echo "windowcast library $tag already in place"
     exit 0
 fi
-base="https://github.com/Droidtop/windowcast/releases/download/$tag"
+base="https://github.com/mytop-project/windowcast/releases/download/$tag"
 work=$(mktemp -d)
 trap 'rm -rf -- "${work:?}"' EXIT
 aar="windowcast-android-$version.aar"

@@ -12,7 +12,7 @@ import org.pocketworkstation.pckeyboard.MacroStep
 
 /**
  * The companion's Input tab beyond the keyboard grid and the trackpad (docs/SPEC.md "The companion's tabs", Input;
- * Droidtop/tracker#414 slice C12): where the keys go and how the header names it, the trackpad's settings as the
+ * mytop-project/tracker#414 slice C12): where the keys go and how the header names it, the trackpad's settings as the
  * gesture engine takes them, the chord keys, and the controllers' batteries. Pure parts here; the view is
  * [SecondScreenInputView].
  */
@@ -87,7 +87,7 @@ internal object CompanionInputHandle {
 internal object Controllers {
     data class Pad(val name: String, val percent: Int?)
 
-    // The one reader, shared with Settings > Controls (Droidtop/tracker#723).
+    // The one reader, shared with Settings > Controls (mytop-project/tracker#723).
     fun read(context: Context): List<Pad> =
         dev.droidtop.runtime.ConnectedPads.read(context).map { Pad(it.name, it.percent) }
 

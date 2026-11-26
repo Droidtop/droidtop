@@ -94,7 +94,7 @@ object ForegroundShell {
      * display covers the shell, which then is not [current]). When the system's own task list (the elevated helper)
      * shows an app visible on another screen, it is brought back to the front through the task manager's one switch
      * ([dev.droidtop.library.tasks.TaskActions.bringTo], its launcher intent on its own screen), so its screen holds
-     * the system's focus again and its keys and keyboard reach it (Droidtop/tracker#314). Without that list droidtop
+     * the system's focus again and its keys and keyboard reach it (mytop-project/tracker#314). Without that list droidtop
      * cannot tell an app still showing from one the user left, so it moves nothing; a tap on the app does the same.
      */
     private fun returnFocusToApp(fromDisplayId: Int?): Boolean {
@@ -210,7 +210,7 @@ class SecondScreenInputView(
     init {
         orientation = VERTICAL
         setBackgroundColor(dev.droidtop.shell.gamepad.MenuTokens.Ground.toArgb())
-        // Every button here is the shell's secondary button, not Android's grey ALL-CAPS one (Droidtop/tracker#524).
+        // Every button here is the shell's secondary button, not Android's grey ALL-CAPS one (mytop-project/tracker#524).
         listOf(pin, tabs, imePicker, pointerHelp).forEach(::shellButton)
         // Text keeps a 16dp gutter from the screen's edge; the keys and the trackpad run edge to edge (#525).
         val gutter = (GUTTER_DP * resources.displayMetrics.density).toInt()
@@ -235,7 +235,7 @@ class SecondScreenInputView(
         val chordSink = requestAwareSink(keyboardSink())
         val player = org.pocketworkstation.pckeyboard.MacroPlayer({ code, down -> chordSink.key(code, down) }, { chordSink.text(it) })
         val chords = LinearLayout(context).apply { orientation = HORIZONTAL }
-        // Typing from a phone or PC on the same network (Droidtop/tracker#645), opened on this screen.
+        // Typing from a phone or PC on the same network (mytop-project/tracker#645), opened on this screen.
         chords.addView(
             Button(context).apply {
                 text = "Type from another device"
@@ -267,7 +267,7 @@ class SecondScreenInputView(
         )
 
         // The S7 keyboard (Slab) with a whole keyboard's keys: Esc, Tab, Ctrl, Alt, Super, the arrows and F1 to F12
-        // (Droidtop/tracker#567, docs/SPEC.md 4c). It takes a fixed share of the tab and lays its rows out from that
+        // (mytop-project/tracker#567, docs/SPEC.md 4c). It takes a fixed share of the tab and lays its rows out from that
         // share's real height, so it scales with the screen and the font, keeps its keys at least MIN_ROW_DP tall, and
         // never runs past its edge. Only the destination is this surface's own.
         val slabSink = requestAwareSink(keyboardSink())
@@ -327,7 +327,7 @@ class SecondScreenInputView(
      * The keyboard gets its share (KEYBOARD_WEIGHT of what is left under the header and the fact lines), and never less
      * than the height that keeps its keys at least MIN_ROW_DP tall: on a short screen (the RP5's panel turned to
      * landscape) the trackpad gets only what is left, down to nothing, rather than the keys being cut off
-     * (Droidtop/tracker#567).
+     * (mytop-project/tracker#567).
      */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val slab = keys
@@ -422,7 +422,7 @@ class SecondScreenInputView(
     /**
      * While this tab is on screen the input method does not also put its own view up, so there are never two keyboards
      * ([SecondScreenKeyboard.setAttached]). It follows window visibility, not attachment, because a stopped Activity's
-     * views stay attached (Droidtop/tracker#156).
+     * views stay attached (mytop-project/tracker#156).
      */
     private fun syncImeSuppression() {
         val shouldCount = isAttachedToWindow && windowVisibility == View.VISIBLE
@@ -463,8 +463,8 @@ class SecondScreenInputView(
     /**
      * What the trackpad drives outside Desktop right now: droidtop's own selection while the shell is what the target
      * screen shows (pointer and focus are one selection there), else the game's mouse while droidtop's own game screen
-     * is there (Droidtop/tracker#565), else a pointer on that screen when droidtop's accessibility service or the helper
-     * app's shell (Droidtop/tracker#811) can play touches on it, else nothing.
+     * is there (mytop-project/tracker#565), else a pointer on that screen when droidtop's accessibility service or the helper
+     * app's shell (mytop-project/tracker#811) can play touches on it, else nothing.
      */
     private fun currentRoute(): TrackpadRoute {
         val id = targetId()
@@ -534,7 +534,7 @@ class SecondScreenInputView(
                 naturalScroll = settings.naturalScroll,
             )
             // Three fingers swiped sideways switch the desktop's workspace, the content following the fingers: a swipe
-            // to the left brings the next one (Droidtop/tracker#426).
+            // to the left brings the next one (mytop-project/tracker#426).
             return object : TrackpadOutput by seatSink {
                 override fun onSwipe(leftward: Boolean) {
                     dev.droidtop.runtime.util.AppScopes.io.launch {
@@ -621,7 +621,7 @@ class SecondScreenInputView(
     /**
      * The fact lines, and the keys' own look: with nothing able to take what they type the keys are dimmed and the
      * "Use droidtop keyboard" button under them says what to do, rather than a "Keyboard off" line under a keyboard that
-     * looks ready (Droidtop/tracker#525).
+     * looks ready (mytop-project/tracker#525).
      */
     private fun showStatus() {
         status.text = statusText()

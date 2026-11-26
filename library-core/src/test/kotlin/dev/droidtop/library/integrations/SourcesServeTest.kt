@@ -14,7 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which systems a source plugin is listed under and what state Game sources shows for it (Droidtop/tracker#540, #543). */
+/** Which systems a source plugin is listed under and what state Game sources shows for it (mytop-project/tracker#540, #543). */
 class SourcesServeTest {
     private fun record(
         systems: Any? = null,

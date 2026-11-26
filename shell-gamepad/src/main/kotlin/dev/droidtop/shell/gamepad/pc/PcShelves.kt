@@ -56,7 +56,7 @@ internal const val SHELF_WISHLIST = "wishlist"
 /**
  * The shelves Home's games row can be (docs/SPEC.md 7i, "Home"): Continue playing, else Recently added. The
  * rest of [pcShelves] (favourites, what was never played, stores, engine families) is the PC library's own
- * and lives on PC Games' Overview; updates and additions are What's new cards (Droidtop/tracker#485 F7a).
+ * and lives on PC Games' Overview; updates and additions are What's new cards (mytop-project/tracker#485 F7a).
  */
 internal val HOME_SHELF_IDS = setOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED)
 
@@ -199,7 +199,7 @@ internal fun pcShelves(
         val ordered = all.sortedWith(byRecency)
         return PcShelf(id, title, ordered.take(SHELF_LIMIT), ordered.size)
     }
-    // A game whose files are missing cannot be updated, so it is not offered one (Droidtop/tracker#756).
+    // A game whose files are missing cannot be updated, so it is not offered one (mytop-project/tracker#756).
     val updates = shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null && !it.missing })
     return buildList {
         if (updatesFirst) updates?.let(::add)
@@ -255,7 +255,7 @@ internal enum class BadgeKind(val word: String) { PC("PC"), ENGINE("Engine"), RE
 
 /**
  * The kind badge every card and result row of a mixed list carries
- * (docs/SPEC.md 7i, "Kind badges"; Droidtop/tracker#362): [kind] in one word,
+ * (docs/SPEC.md 7i, "Kind badges"; mytop-project/tracker#362): [kind] in one word,
  * then [detail], the store of a PC or engine game or the system of a Retro
  * game. [text] is the same line for a row of words. [showKind] is false where the
  * view's cards are all of one kind ([ViewBadges]).
@@ -270,7 +270,7 @@ internal data class KindBadge(val kind: BadgeKind, val detail: String?, val show
     /**
      * The forms a capsule's badge may take, longest first: the kind and its detail, the detail alone (it says more
      * than the kind: "RPG Maker MV", "Sony PlayStation"), the kind alone. The capsule draws the first that fits its
-     * card, so a badge is never cut in the middle of a word (Droidtop/tracker#434, rig 2026-10-14: "ENGINE · RPG
+     * card, so a badge is never cut in the middle of a word (mytop-project/tracker#434, rig 2026-10-14: "ENGINE · RPG
      * MAK...", "RETRO · SONY PLAY..."). Each is the kind's part and the detail's part, either null.
      */
     val forms: List<Pair<String?, String?>>
@@ -283,7 +283,7 @@ internal data class KindBadge(val kind: BadgeKind, val detail: String?, val show
 
 /**
  * The badges of one view's cards (a page of shelves, or a grid), by the owner's rule (2026-10-14,
- * Droidtop/tracker#496: "We need to show info when useful, not when it's extraneous"): a part of a badge that is the
+ * mytop-project/tracker#496: "We need to show info when useful, not when it's extraneous"): a part of a badge that is the
  * same on every card of the view says nothing, so it is dropped. Every card PC: no "PC"; every Retro card one system:
  * no system. A badge left with nothing is not drawn. A view of one card keeps its badge. Pure.
  */
@@ -336,7 +336,7 @@ private const val BADGE_NAME_MAX = 14
 private val SYSTEM_MAKERS = listOf("Sony", "Nintendo", "Sega", "Microsoft", "Atari", "NEC", "SNK", "Bandai", "Commodore", "Coleco", "Mattel", "Philips", "Panasonic", "Apple")
 
 /**
- * A system's name short enough for a card badge (Droidtop/tracker#942: "RETRO · SONY PL..."): the name when it fits,
+ * A system's name short enough for a card badge (mytop-project/tracker#942: "RETRO · SONY PL..."): the name when it fits,
  * else the name without its maker ("Sony PlayStation 2" -> "PlayStation 2"), else ES-DE's own short name, the system
  * id ("NES"). Pure.
  */
@@ -359,7 +359,7 @@ internal val LibraryEntry.inPcFold: Boolean
     get() = appFacts == null && onPcGamesTab
 
 /**
- * What a hero card shows (docs/SPEC.md 7i, "Home art"; Droidtop/tracker#632): [landscape] art when there is some
+ * What a hero card shows (docs/SPEC.md 7i, "Home art"; mytop-project/tracker#632): [landscape] art when there is some
  * (the SteamGridDB hero, or a wide, banner or hero picture a source gave), else, or when it does not load, the
  * [boxOverBlur]: the box art whole beside the name over a blurred copy of itself, never cropped into a landscape
  * frame. Neither is ever a screenshot; with neither, the plate carries the name.
@@ -367,7 +367,7 @@ internal val LibraryEntry.inPcFold: Boolean
 internal data class HeroArt(val landscape: String?, val boxOverBlur: String?)
 
 /**
- * The one landscape-slot order (owner, 2026-10-24, Droidtop/tracker#632: the big card "needs to not use screenshots
+ * The one landscape-slot order (owner, 2026-10-24, mytop-project/tracker#632: the big card "needs to not use screenshots
  * too"): the game's landscape art ([LibraryEntry.heroUri], the SteamGridDB hero or a source's wide/banner/hero
  * picture), else its box art over a blur of itself. A screenshot or a title screen is never either, so a Retro
  * game whose only "box art" is a screenshot gets the plate. ES-DE fan art of a console game is not used: for those
@@ -381,7 +381,7 @@ internal fun LibraryEntry.heroArt(): HeroArt =
  * art"): the one under the cursor while the cursor is on that shelf, else the
  * one it was last on there ([remembered]), else the first, so the page opens
  * on the game most likely wanted and the card that widens is the one being
- * looked at (Droidtop/tracker#253). Pure.
+ * looked at (mytop-project/tracker#253). Pure.
  */
 internal fun heroItem(cursorOnShelf: Boolean, cursorItem: Int, remembered: Int?): Int =
     if (cursorOnShelf) cursorItem else remembered ?: 0

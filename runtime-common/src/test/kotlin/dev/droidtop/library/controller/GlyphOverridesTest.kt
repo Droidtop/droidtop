@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
-/** The per-pad button labels (Droidtop/tracker#723): glyphs change, the key map does not. */
+/** The per-pad button labels (mytop-project/tracker#723): glyphs change, the key map does not. */
 class GlyphOverridesTest {
     @Test
     fun `stored overrides read back, and nonsense is dropped`() {

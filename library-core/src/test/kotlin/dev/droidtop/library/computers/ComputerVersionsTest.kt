@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A newer version on another device reads as an update (Droidtop/tracker#469 part 2). */
+/** A newer version on another device reads as an update (mytop-project/tracker#469 part 2). */
 class ComputerVersionsTest {
     @Test
     fun `newer is compared the way droidtop compares versions`() {

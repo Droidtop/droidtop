@@ -288,7 +288,7 @@ fun EsDeThemedView(
     // its own -- never overrides a real, theme-declared one (e.g. the
     // "system" view's random game-preview collage).
     focusedGameIndex: Int? = null,
-    // Where the view's list widget starts its cursor (Droidtop/tracker#642):
+    // Where the view's list widget starts its cursor (mytop-project/tracker#642):
     // the entry the person last had focused, so Back lands on it.
     initialFocusIndex: Int = 0,
     // System-level bindings for `systemdata` text elements (see
@@ -1029,7 +1029,7 @@ private fun rememberIntrinsicImageSize(path: String?): kotlin.Pair<Float, Float>
  * Coil's AsyncImage never hands back, so the file is read with BitmapFactory: its bounds first, then the pixels at
  * the largest power-of-two sample that still covers the tile ([esDeTileSampleSize]), then resampled to the tile. A
  * 2000 px cover tiled at 200 px used to be decoded whole for every tile element and resampled in composition, on the
- * main thread (Droidtop/tracker#733). All of it runs on IO, and the result is kept in [TileCache].
+ * main thread (mytop-project/tracker#733). All of it runs on IO, and the result is kept in [TileCache].
  *
  * Null for [path] null (the element isn't tiled), for a size the rules turn tiling off for, and for any file
  * BitmapFactory can't decode -- notably SVG, which is the honest gap here: an SVG tile falls back to the plain
@@ -1194,7 +1194,7 @@ private fun EsDeThemedText(
         // played" for zero. droidtop records launches (last played, count)
         // but not session length, so playtime stays 0 for a game that has
         // been launched: that reads "Played", never "Never played"
-        // (Droidtop/tracker#82 console pass).
+        // (mytop-project/tracker#82 console pass).
         "playtime" -> selectedGame?.let { playtimeLabel(it.playtimeSeconds, it.lastPlayedEpochMs, it.playCount) }
         else -> null
     }
@@ -2377,7 +2377,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
 private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
     // A theme that declares a format owns it; otherwise the clock follows
     // Android's 12/24-hour setting like droidtop's own status pill
-    // (Droidtop/tracker#492).
+    // (mytop-project/tracker#492).
     val declaredFormat = element.valueOrNull<EsDeThemeValue.Str>("format")?.value
     val systemClock = android.text.format.DateFormat.getTimeFormat(LocalContext.current)
     var now by remember { mutableStateOf(Date()) }
@@ -2805,7 +2805,7 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
  * bluetooth/battery, from `SystemStatusComponent.cpp`'s `entries`
  * handling). droidtop is the host device, so the facts are live: they come
  * from the one status source the header, the Quick Menu and the companion
- * read (`SystemStatus.flow`, docs/SPEC.md 7j; Droidtop/tracker#659), so a
+ * read (`SystemStatus.flow`, docs/SPEC.md 7j; mytop-project/tracker#659), so a
  * theme says what the shell says, Wi-Fi without internet and a wired
  * connection included. Bluetooth is a deliberate gap: reading adapter state
  * needs `BLUETOOTH_CONNECT`, a dangerous Android 12+ runtime permission, not
@@ -2829,7 +2829,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
         ?: listOf("wifi", "cellular", "battery")
     val showAll = entries.contains("all")
 
-    // The one status source the header, the Quick Menu and the companion read (docs/SPEC.md 7j, Droidtop/tracker#659),
+    // The one status source the header, the Quick Menu and the companion read (docs/SPEC.md 7j, mytop-project/tracker#659),
     // so a theme's status says what the shell's says: Wi-Fi without internet, wired, mobile, none.
     val status by produceState<SystemStatusSnapshot?>(null, context) {
         SystemStatus.flow(context).flowOn(Dispatchers.IO).collect { value = it }
@@ -2874,7 +2874,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     }
 
     // Each entry is the theme's own icon file, or the shell's own drawn glyph in the element's colour at its height,
-    // never an emoji from the device's font (the glyphs differed by phone, Droidtop/tracker#659). The network entry
+    // never an emoji from the device's font (the glyphs differed by phone, mytop-project/tracker#659). The network entry
     // is the one connection: Wi-Fi or wired under "wifi", mobile under "cellular"; with no connection a theme's icon
     // set shows nothing, as ES-DE does, and the shell's glyph shows it crossed.
     val network = snapshot.network
@@ -2913,7 +2913,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     val textRelativeScale = (element.floatOrNull("textRelativeScale") ?: 1f).coerceIn(0.5f, 1f)
     // The row's width is only known once measured, so its horizontal origin is applied here, and the row is kept
     // inside the view: a theme that right-anchors it (pos near 1, origin 1) ran it off the right edge, leaving half a
-    // wifi glyph and no battery (Droidtop/tracker#658).
+    // wifi glyph and no battery (mytop-project/tracker#658).
     val originX = element.valueOrNull<EsDeThemeValue.Pair>("origin")?.x ?: 0f
     Row(
         modifier = Modifier
@@ -3764,7 +3764,7 @@ private fun backgroundMarginsBoxOf(
 /**
  * The colour of a clock or system status that names none: ES-DE's white, unless the element declares a background white
  * is unreadable on, then black. A light theme's pale pill under a white Wi-Fi icon was invisible (rig, droidtop
- * 0.2.0-dev.1931, Droidtop/tracker#559).
+ * 0.2.0-dev.1931, mytop-project/tracker#559).
  */
 private fun inkOver(element: EsDeThemeElement): Color {
     val plate = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }

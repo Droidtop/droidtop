@@ -29,7 +29,7 @@ import timber.log.Timber
 
 /**
  * One Steam Cloud save sync of one game (docs/SPEC.md 7g, "Stores",
- * Droidtop/tracker#313): the file transfers of GameNative's SteamAutoCloud
+ * mytop-project/tracker#313): the file transfers of GameNative's SteamAutoCloud
  * (GPL-3.0: the list call, the per-file download URL, the upload batch with its
  * block requests), with the decision made by [CloudSavePlan] from the state
  * kept at the last sync, so "this device changed" and "the cloud changed" are

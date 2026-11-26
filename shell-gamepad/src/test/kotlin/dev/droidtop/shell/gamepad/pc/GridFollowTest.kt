@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Droidtop/tracker#884: typing "Stardew" into PC Games' search narrowed the grid behind the panel on every key, and
+ * mytop-project/tracker#884: typing "Stardew" into PC Games' search narrowed the grid behind the panel on every key, and
  * on the rig the UI thread stalled and dropped keys. The grid now follows once the text rests.
  */
 class GridFollowTest {

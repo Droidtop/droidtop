@@ -67,7 +67,7 @@ sealed interface AcquireContentSource {
 /** Where an installed source plugin stands, for the Game sources list and the "not ready" notes. */
 enum class SourceState { READY, WAITING_FOR_APPROVAL, DENIED, DISABLED, TURNED_OFF }
 
-/** One installed source plugin as the Game sources place lists it (Droidtop/tracker#540): ready or not, and why. */
+/** One installed source plugin as the Game sources place lists it (mytop-project/tracker#540): ready or not, and why. */
 data class SourceListing(val record: PluginRecord, val state: SourceState) {
     val label: String get() = record.manifest.label
     val pluginId: String get() = record.manifest.id
@@ -91,7 +91,7 @@ data class SourceListing(val record: PluginRecord, val state: SourceState) {
  * optional [artUrl]. [sizeLabel] is the size as a row shows it.
  * [version], [sizeBytes] and [getValuesJson] serve the one search
  * (docs/plugin-api.md "Fetchers answer in the one search",
- * Droidtop/tracker#218): [getValuesJson] is set
+ * mytop-project/tracker#218): [getValuesJson] is set
  * when the result can be fetched from its row without its detail page
  * ([GameSourceProvider.get]), titled [getTitle] when the source gave one.
  */
@@ -142,7 +142,7 @@ data class UnavailableSource(
     /**
      * True when the one thing missing is the `library.sources` point, set to Ask first or not answered yet: the row then
      * asks right there ([PluginGrants.askPoint]) instead of opening a page that would only show Ask first again
-     * (Droidtop/tracker#270).
+     * (mytop-project/tracker#270).
      */
     val askable: Boolean = false,
 ) {
@@ -151,7 +151,7 @@ data class UnavailableSource(
          * Why an installed source plugin cannot answer, or null when it can (docs/SPEC.md 12a "One search"). The plugin
          * itself must be approved and on, and the person must have allowed it the `library.sources` point ([point]):
          * a plugin approved as a whole but not yet allowed to give games used to be asked anyway and answered with
-         * "has not been allowed to ...", one block per plugin (Droidtop/tracker#485). Pure.
+         * "has not been allowed to ...", one block per plugin (mytop-project/tracker#485). Pure.
          */
         fun of(
             label: String,
@@ -209,7 +209,7 @@ object AcquireContentSources {
 
     /**
      * Every installed plugin that offers downloads, with its state: what Game sources lists so a source can be reached
-     * from the first minute, with an empty library and no folders (Droidtop/tracker#540). Ready ones are those
+     * from the first minute, with an empty library and no folders (mytop-project/tracker#540). Ready ones are those
      * [PluginStore.runnableFor] vouches for (their bundle is re-verified); a bundle that fails that check is left out,
      * as it is from every other list. Reads the plugin store: off the main thread.
      */
@@ -256,7 +256,7 @@ object AcquireContentSources {
 
     /**
      * The Plugins screen's deep link to one plugin's Permissions screen; the plugin's id alone opens its page, where it
-     * is approved (Droidtop/tracker#759).
+     * is approved (mytop-project/tracker#759).
      */
     fun permissionsLink(pluginId: String): String = PERMISSIONS_LINK + pluginId
 
@@ -278,7 +278,7 @@ object AcquireContentSources {
      * What a source that cannot give games yet opens from Game sources: why, in one notice, and the one way on, at
      * the top: Allow it to get games (the point sheet, [askRow]) when only the point waits, else its page in Plugins
      * to review and approve it. It used to open that page straight away, whose approval list is permission rows only,
-     * so the source looked empty, with no systems and no reason (RP5, build 1908, Droidtop/tracker#270). Null for a
+     * so the source looked empty, with no systems and no reason (RP5, build 1908, mytop-project/tracker#270). Null for a
      * source that is ready and allowed.
      */
     fun blockedScreen(context: Context, listing: SourceListing): CatalogScreen? {
@@ -356,7 +356,7 @@ object AcquireContentSources {
      * The systems "Get games" offers to download for: those with a folder already ([existing], by name), then every
      * other system a folder can mean ([all] without the store-owned ones), each with the folder a download would create
      * under [root] (the first games folder) the first time one is placed there. Nothing is refused for lack of a system
-     * folder (Droidtop/tracker#536): "system folder" is ES-DE vocabulary a newcomer does not have. Pure.
+     * folder (mytop-project/tracker#536): "system folder" is ES-DE vocabulary a newcomer does not have. Pure.
      */
     internal fun downloadTargets(
         existing: List<Pair<File, ConsoleSystemDef>>,

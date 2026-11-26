@@ -30,7 +30,7 @@ object FacetGuards {
         Target("quickmenu", setOf("status", "toggle", "action", "progress", "meter", "chart", "choice", "group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.tab", setOf("group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.card", ALL_KINDS - "collection", setOf("plugin", "device", "game"), PointRisk.LOW),
-        // Retired (Droidtop/tracker#880, owner 2026-11-05: settings are declared in the manifest and "should not have to be
+        // Retired (mytop-project/tracker#880, owner 2026-11-05: settings are declared in the manifest and "should not have to be
         // asked or loaded for any of it"): still accepted in a manifest, so a plugin that declares it installs, but droidtop
         // never asks for it or draws it. Its settings page is the manifest's `settings` ([DeclaredSetting]).
         Target("settings.page", INPUTS + setOf("info", "action", "notice", "account", "group", "secret"), setOf("plugin"), PointRisk.LOW),
@@ -39,7 +39,7 @@ object FacetGuards {
         Target("widget", setOf("info", "status", "progress", "meter", "media", "list", "action"), setOf("plugin", "device"), PointRisk.LOW),
         Target("plugin.page", ALL_KINDS, setOf("plugin"), PointRisk.LOW),
         Target("desktop.tray", setOf("status", "badge", "action", "toggle", "meter"), setOf("plugin", "device"), PointRisk.LOW),
-        // A window's bar menu in Desktop (Droidtop/tracker#221): asked only about a window droidtop names, of an app the
+        // A window's bar menu in Desktop (mytop-project/tracker#221): asked only about a window droidtop names, of an app the
         // plugin may see (`windows.read`, narrowed by its `apps`).
         Target("desktop.window", setOf("action", "toggle", "badge"), setOf("window"), PointRisk.MEDIUM),
         // Open with and the file actions: about the file the person picked, by document token, never a path (catalogue E4).
@@ -78,7 +78,7 @@ object FacetGuards {
      * media guards; by priority, then the order the plugin gave. What was turned away is said in [messages].
      *
      * [asked] is the subject droidtop asked about. A facet about a window or a file must be about that very one
-     * (Droidtop/tracker#221): droidtop names windows and files, so a plugin cannot reach one it was not shown.
+     * (mytop-project/tracker#221): droidtop names windows and files, so a plugin cannot reach one it was not shown.
      */
     fun admit(
         facets: List<Facet>,

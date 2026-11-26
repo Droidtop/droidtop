@@ -2,7 +2,7 @@ package org.pocketworkstation.pckeyboard
 
 /**
  * Reads a `.combined` wordlist, the text form AOSP's dictionaries and their open successors are published in
- * (Droidtop/tracker#339): a header line, then ` word=<word>,f=<0..255>,...` lines, each followed by its
+ * (mytop-project/tracker#339): a header line, then ` word=<word>,f=<0..255>,...` lines, each followed by its
  * `  bigram=<next word>,f=<0..255>` lines. Shortcuts, words marked `not_a_word=true` and unknown keys are skipped.
  * Bigram frequencies are halved to the engine's 7 bits. Pure.
  */

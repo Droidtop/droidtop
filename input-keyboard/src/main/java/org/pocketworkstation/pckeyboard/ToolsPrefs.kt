@@ -7,7 +7,7 @@ import android.preference.PreferenceManager
 import android.view.inputmethod.EditorInfo
 
 /**
- * The settings of the keyboard's editing helpers (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340). They
+ * The settings of the keyboard's editing helpers (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340). They
  * live in the same default preference store as every other Hacker's Keyboard setting, so the settings screen, the
  * input method and the panels droidtop draws all read one value.
  */
@@ -21,7 +21,7 @@ object ToolsPrefs {
     /** Whether copied text is recorded into the clipboard history. */
     const val CLIPBOARD = "pref_clipboard_history"
 
-    /** "Keep clips for" ([ClipKeep]); unset is Until cleared, what the history did before it (Droidtop/tracker#903 H12d). */
+    /** "Keep clips for" ([ClipKeep]); unset is Until cleared, what the history did before it (mytop-project/tracker#903 H12d). */
     const val CLIPBOARD_KEEP = "pref_clipboard_keep"
 
     /** Dragging a finger along the space bar moves the cursor. */
@@ -36,7 +36,7 @@ object ToolsPrefs {
     /** The emoji used last, newest first, one per line. */
     const val RECENT_EMOJI = "pref_emoji_recent"
 
-    /** The folders GIFs and stickers are read from, one tree URI per line ([GifFolderList], Droidtop/tracker#903 H5). */
+    /** The folders GIFs and stickers are read from, one tree URI per line ([GifFolderList], mytop-project/tracker#903 H5). */
     const val GIF_FOLDERS = "pref_gif_folders"
 
     /** The GIFs and stickers used last, newest first, one document URI per line. */
@@ -58,7 +58,7 @@ object ToolsPrefs {
 
     /**
      * The key grid's form for [context]'s screen and orientation: the shape setting's ([KeyboardForm.choose],
-     * Droidtop/tracker#903 H1), or the input method's mode's ([KeyboardModes.formFor], H12c).
+     * mytop-project/tracker#903 H1), or the input method's mode's ([KeyboardModes.formFor], H12c).
      */
     fun form(context: Context): KeyboardForm.Form = migrate(context).let { KeyboardModes.formFor(context, KeyboardForm.forScreen(
         prefs(context).getString(KeyboardForm.PREF, null),
@@ -88,7 +88,7 @@ object ToolsPrefs {
     /**
      * Loads what a panel's key grid reads from the shared [GlobalKeyboardSettings] (the form and space-bar drag). The
      * input method loads its own through `initPrefs`; a panel drawn without it (KeyboardPanel) calls this instead,
-     * once, before building its grid, rather than setting fields one by one (Droidtop/tracker#772).
+     * once, before building its grid, rather than setting fields one by one (mytop-project/tracker#772).
      */
     fun loadInto(settings: GlobalKeyboardSettings, context: Context) {
         migrate(context)
@@ -102,7 +102,7 @@ object ToolsPrefs {
     fun macros(context: Context): List<Macro> = MacroParser.parse(macroSource(context))
 }
 
-/** When the keyboard asks for autofill suggestions (Droidtop/tracker#342): Android 11 or later, and not switched off. */
+/** When the keyboard asks for autofill suggestions (mytop-project/tracker#342): Android 11 or later, and not switched off. */
 object InlineRules {
     const val MIN_SDK = 30
 
@@ -110,7 +110,7 @@ object InlineRules {
     fun wanted(sdk: Int, preference: Boolean): Boolean = sdk >= MIN_SDK && preference
 }
 
-/** When the keyboard may learn from what is typed (Droidtop/tracker#340). */
+/** When the keyboard may learn from what is typed (mytop-project/tracker#340). */
 object IncognitoRules {
     /**
      * Learning is off in incognito mode, in a password field and where the editor asked for no personalised
@@ -122,7 +122,7 @@ object IncognitoRules {
 
     /**
      * Whether a field of [inputType] and [imeOptions] holds something the clipboard history must not keep
-     * (Droidtop/tracker#772): any password variation, text, web, visible or numeric, or an editor that asked for no
+     * (mytop-project/tracker#772): any password variation, text, web, visible or numeric, or an editor that asked for no
      * personalised learning. A copy made while such a field has the keyboard is not recorded.
      */
     @JvmStatic

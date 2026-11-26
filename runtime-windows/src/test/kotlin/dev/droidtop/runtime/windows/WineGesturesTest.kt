@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A Windows game's touchscreen gestures as rows (Droidtop/tracker#618 C8). */
+/** A Windows game's touchscreen gestures as rows (mytop-project/tracker#618 C8). */
 class WineGesturesTest {
     private val defaults = TouchGestureConfig()
 

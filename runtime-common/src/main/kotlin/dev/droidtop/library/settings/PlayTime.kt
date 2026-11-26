@@ -7,7 +7,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Play-time limits (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): a limit per day and one per
+ * Play-time limits (docs/SPEC.md 7f "Play-time limits", mytop-project/tracker#421): a limit per day and one per
  * week, on all play together rather than per game, in minutes; 0 is no limit. They belong to Kid mode, the
  * mode that is handed to a child: play counts, and the limits hold, while Kid is on ([PlayTimeLimiter] in
  * `:app` is the one place that watches).
@@ -125,7 +125,7 @@ sealed interface PlayStep {
  * session; [step] is given the clock and the seconds remaining ([PlayTime.remainingSeconds], null for no limit).
  */
 /**
- * The session timers outside Kid mode (docs/SPEC.md 7f "This session", Droidtop/tracker#721): a reminder every
+ * The session timers outside Kid mode (docs/SPEC.md 7f "This session", mytop-project/tracker#721): a reminder every
  * [SessionTimers.remindMinutes] of one game session, and the game closed after [SessionTimers.closeMinutes], the
  * way a Kid limit closes it ([PlayEnforcer], the same warning and grace). 0 is off. Counted from the session's start,
  * not the day's play. Pure.

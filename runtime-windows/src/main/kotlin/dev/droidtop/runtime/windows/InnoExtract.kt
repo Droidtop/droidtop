@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 /**
  * "Unpack an installer" (docs/SPEC.md 7c): innoextract takes the files out of a Windows installer (a
  * GOG offline installer, any Inno Setup program) without running it, so no Wine and no prefix is
- * involved. innoextract is built by Droidtop/droidtop-components from its upstream source
+ * involved. innoextract is built by mytop-project/droidtop-components from its upstream source
  * (tools/innoextract) for arm64-v8a and x86_64 and offered in the catalog by path; it is fetched on
  * first use, checked against the SHA-256 the catalog lists, and kept in app storage.
  *

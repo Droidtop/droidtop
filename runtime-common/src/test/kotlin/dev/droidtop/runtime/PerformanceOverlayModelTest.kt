@@ -177,7 +177,7 @@ class PerformanceOverlayModelTest {
 
     @Test
     fun `the overlay's corner and size step both ways, wrap, and read back from their keys`() {
-        // Droidtop/tracker#812: placed and sized from the Quick Menu, since the overlay is never touchable.
+        // mytop-project/tracker#812: placed and sized from the Quick Menu, since the overlay is never touchable.
         assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_END, dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_START.step(1))
         assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.BOTTOM_END, dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_START.step(-1))
         assertEquals(dev.droidtop.runtime.systemstatus.OverlaySize.SMALL, dev.droidtop.runtime.systemstatus.OverlaySize.LARGE.step(1))

@@ -70,7 +70,7 @@ fun NoticeDialogHost() {
 }
 
 /**
- * Whether a host may add a window now (Droidtop/tracker#410): only while its activity is at least started. A
+ * Whether a host may add a window now (mytop-project/tracker#410): only while its activity is at least started. A
  * notice's Popup or Dialog is driven by global state ([Notices], [NoticeDialogs]), so without this it could be
  * composed while the activity is stopping or gone, and adding its window then throws
  * `WindowManager$BadTokenException` (crash-267, console, v0.2.0-dev.1649).
@@ -165,7 +165,7 @@ internal fun NoticeFlashHost() {
         onStopOrDispose { Notices.detachFlashHost(token) }
     }
     val flashes by Notices.flashes.collectAsState()
-    // A press on a card shows its details in place, over the page (Droidtop/tracker#643: "Details on press, through
+    // A press on a card shows its details in place, over the page (mytop-project/tracker#643: "Details on press, through
     // facets in place (no redirects)"): the job's page, or Downloads for a counted card.
     var details by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     details?.let { screen -> CatalogSheet(root = screen, onExit = { details = null }) }

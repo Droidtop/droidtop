@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- droidtop's own components of the Standard launcher (moved from the Murine launcher's manifest, Droidtop/tracker#921). -->
+    <!-- droidtop's own components of the Standard launcher (moved from the Murine launcher's manifest, mytop-project/tracker#921). -->
     <application>
         <!--
           droidtop's own HOME-role trampoline (built 2026-09-26,

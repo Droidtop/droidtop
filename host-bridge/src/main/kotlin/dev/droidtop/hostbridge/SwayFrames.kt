@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 /**
  * One window sway shows, as its layout tree (GET_TREE) places it, in the layout's logical pixels
- * (docs/SPEC.md 2b "Window controls", Droidtop/tracker#910): what droidtop draws a window's title-bar buttons and
+ * (docs/SPEC.md 2b "Window controls", mytop-project/tracker#910): what droidtop draws a window's title-bar buttons and
  * resize band from.
  *
  * [rect] is the tree's `rect`, the container below its title bar with its border (sway's ipc-json.c moves a
@@ -32,7 +32,7 @@ data class WindowFrame(
 }
 
 /**
- * The windows sway shows on each output, and each output's box in the layout, from one GET_TREE (Droidtop/tracker#910).
+ * The windows sway shows on each output, and each output's box in the layout, from one GET_TREE (mytop-project/tracker#910).
  * [windows] holds every output's, each output's from the bottom up: the tiled windows, then the floating ones in
  * sway's stacking order (a raised floating window is moved to the end of its workspace's list, so the last is on
  * top). Pure, so it is tested on the JVM (SwayFramesTest).

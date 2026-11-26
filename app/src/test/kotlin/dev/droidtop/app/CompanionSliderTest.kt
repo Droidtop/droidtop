@@ -3,7 +3,7 @@ package dev.droidtop.app
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What the companion's one slider row says its value is (Droidtop/tracker#786 S2a). */
+/** What the companion's one slider row says its value is (mytop-project/tracker#786 S2a). */
 class CompanionSliderTest {
     @Test
     fun `a value is a rounded percentage of its range`() {

@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#233: a component counts as in use whenever anything might name it, so Remove never takes one a game needs. */
+/** mytop-project/tracker#233: a component counts as in use whenever anything might name it, so Remove never takes one a game needs. */
 class WineInstalledComponentsTest {
 
     @Test

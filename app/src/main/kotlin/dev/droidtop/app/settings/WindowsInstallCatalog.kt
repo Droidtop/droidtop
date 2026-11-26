@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
  * setup program in a new prefix of its own, then add what it installed to the library. The installer is
  * run where it is (picked, or typed as a path); the game goes inside the new prefix unless a folder of the
  * person's is chosen to install into. [WindowsInstalls] does the work. Registered as [SCREEN_ID] so the
- * general "Add a game" flow (Droidtop/tracker#407) can open it by id.
+ * general "Add a game" flow (mytop-project/tracker#407) can open it by id.
  */
 object WindowsInstallCatalog {
 

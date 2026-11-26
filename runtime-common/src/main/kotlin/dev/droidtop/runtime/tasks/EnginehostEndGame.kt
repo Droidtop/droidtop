@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
  * ([CloseStep.ENGINEHOST_END_GAME]). Enginehost answers droidtop alone, by Android's own record of the caller, which
  * exists only for `startActivityForResult`; so this invisible activity starts the request, takes the answer and
  * finishes, and [request] waits for it on the caller's (background) thread. Before this, Kill on an engine game without
- * Shizuku could only ask Android and said "Not confirmed" even when the game had gone (Droidtop/tracker#289).
+ * Shizuku could only ask Android and said "Not confirmed" even when the game had gone (mytop-project/tracker#289).
  */
 class EnginehostEndGame : Activity() {
     private var answered = false
@@ -80,7 +80,7 @@ class EnginehostEndGame : Activity() {
         private const val EXTRA_ID = "dev.droidtop.runtime.tasks.endgame.id"
         private const val REQUEST = 1
 
-        /** Enginehost's contract (LaunchEntryActivity in Droidtop/enginehost). */
+        /** Enginehost's contract (LaunchEntryActivity in mytop-project/enginehost). */
         const val ACTION_END_GAME = EnginehostIntents.ACTION_END_GAME
         const val EXTRA_ENDED = EnginehostIntents.EXTRA_ENDED
         const val EXTRA_ERROR = EnginehostIntents.EXTRA_ERROR

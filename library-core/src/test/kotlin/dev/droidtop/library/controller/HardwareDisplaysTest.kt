@@ -3,7 +3,7 @@ package dev.droidtop.library.controller
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Where a hardware row says the add-on display sits (hardware/_meta.json `displays[].position`, Droidtop/tracker#258). */
+/** Where a hardware row says the add-on display sits (hardware/_meta.json `displays[].position`, mytop-project/tracker#258). */
 class HardwareDisplaysTest {
     private fun row(displays: String) =
         HardwareDatabase.parse("""{"devices": {"d": {"match": {"model": "M"}, "displays": $displays}}}""").single()

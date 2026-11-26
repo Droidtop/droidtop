@@ -60,7 +60,7 @@ object NoticeDialogs {
 
     /**
      * Waits up to [timeoutMs] for a surface to attach; true once one is. For a question asked during a switch, when
-     * the screen just left has no host and the one arriving attaches only once it composes (Droidtop/tracker#389:
+     * the screen just left has no host and the one arriving attaches only once it composes (mytop-project/tracker#389:
      * the keep-running offer was answered Cancel before Gaming could draw it).
      */
     suspend fun awaitHost(timeoutMs: Long): Boolean =

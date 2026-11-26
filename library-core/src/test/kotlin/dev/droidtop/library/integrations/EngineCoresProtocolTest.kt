@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** docs/plugin-api.md 3 A7b (Droidtop/tracker#752): Enginehost's core list read into what decides a game's runner. */
+/** docs/plugin-api.md 3 A7b (mytop-project/tracker#752): Enginehost's core list read into what decides a game's runner. */
 class EngineCoresProtocolTest {
     private val reply = JSONObject(
         """
@@ -74,7 +74,7 @@ class EngineCoresProtocolTest {
     }
     @Test
     fun `a list is kept while its plugin cannot be asked, and dropped only when it is removed or stops providing`() {
-        // Droidtop/tracker#854: a list dropped while Enginehost could not be asked offered "Get … support" for an installed core.
+        // mytop-project/tracker#854: a list dropped while Enginehost could not be asked offered "Get … support" for an installed core.
         assertTrue(EngineCoresProtocol.keepsUnasked(installed = true, declares = true))
         assertTrue(EngineCoresProtocol.keepsUnasked(installed = true, declares = null))
         assertFalse(EngineCoresProtocol.keepsUnasked(installed = true, declares = false))

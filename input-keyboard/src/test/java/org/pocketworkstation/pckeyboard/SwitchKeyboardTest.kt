@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** "Switch keyboard" (docs/SPEC.md 6a, Droidtop/tracker#717). */
+/** "Switch keyboard" (docs/SPEC.md 6a, mytop-project/tracker#717). */
 class SwitchKeyboardTest {
     @Test
     fun `a long press on space switches keyboard, other keys keep their own`() {

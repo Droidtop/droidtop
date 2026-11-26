@@ -9,7 +9,7 @@ import dev.droidtop.library.settings.words
 import dev.droidtop.runtime.R
 
 /**
- * What Do Not Disturb lets through (Droidtop/tracker#786 S8): Android's priority categories, read and written with
+ * What Do Not Disturb lets through (mytop-project/tracker#786 S8): Android's priority categories, read and written with
  * the notification-policy access the Do Not Disturb row already asks for. Who may call or message (the senders) and
  * the visual effects are kept as they are. Reads and writes go to the system server: off the main thread.
  */

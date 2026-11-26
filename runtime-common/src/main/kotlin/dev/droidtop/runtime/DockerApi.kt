@@ -12,7 +12,7 @@ import kotlinx.serialization.json.putJsonObject
 
 /**
  * The Docker Engine API droidtop serves on `docker.sock` (docs/SPEC.md 3d, "The Docker Engine API";
- * Droidtop/tracker#555 D14), so `docker` clients that talk to a daemon (the real docker CLI with DOCKER_HOST,
+ * mytop-project/tracker#555 D14), so `docker` clients that talk to a daemon (the real docker CLI with DOCKER_HOST,
  * `docker compose`, lazydocker, an IDE) reach droidtop's one engine. A subset of API v1.43, read from the same facts
  * the command fronts answer from; a route droidtop has not built answers 501 with the reason, never a guess. Pure:
  * the request handler gathers the facts and does what a call asks.
@@ -86,7 +86,7 @@ object DockerApi {
         data class PodRemove(val id: String, val force: Boolean) : Call
 
         /**
-         * `rmi` (Droidtop/tracker#715): [names] out of the image store. [batch] is libpod's `images/remove`, which
+         * `rmi` (mytop-project/tracker#715): [names] out of the image store. [batch] is libpod's `images/remove`, which
          * answers one report for them all; [ignoreMissing] its `ignore`.
          */
         data class ImageRemove(
@@ -201,7 +201,7 @@ object DockerApi {
     }
 
     private fun logs(id: String, query: Map<String, String>): Call {
-        // since and until (Droidtop/tracker#715): "0" or none is no bound, as Docker reads them.
+        // since and until (mytop-project/tracker#715): "0" or none is no bound, as Docker reads them.
         val now = System.currentTimeMillis()
         val since = query["since"]?.takeIf { it.isNotEmpty() && it != "0" }
         val until = query["until"]?.takeIf { it.isNotEmpty() && it != "0" }
@@ -253,11 +253,11 @@ object DockerApi {
 
         val image = string(o, "Image") ?: return refuse(400, "a container needs an Image")
         if (!EngineCli.DOCKER.validReference(image)) return refuse(400, "not an image reference: $image")
-        // Entrypoint and WorkingDir are taken (Droidtop/tracker#715); [""] is Docker's "clear the entrypoint".
+        // Entrypoint and WorkingDir are taken (mytop-project/tracker#715); [""] is Docker's "clear the entrypoint".
         val entrypoint = strings(o["Entrypoint"])?.let { list -> if (list == listOf("")) emptyList() else list }
         val workdir = string(o, "WorkingDir")
         if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "WorkingDir must be an absolute folder: $workdir")
-        // User (Droidtop/tracker#715): who the program runs as; whether the image has that user is the start's to say.
+        // User (mytop-project/tracker#715): who the program runs as; whether the image has that user is the start's to say.
         val user = string(o, "User")?.let { ContainerUser.parse(it)?.toString() ?: return refuse(400, "User takes a user or uid, with a group or gid after a colon: $it") }
         string(o, "Hostname")?.let { return refuse(501, EngineOptions.refusal("docker create", "--hostname", features)) }
         (o["Volumes"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { return notYet("Volumes (volumes of droidtop's own)") }
@@ -272,7 +272,7 @@ object DockerApi {
         listOf("CapAdd", "Devices", "SecurityOpt", "Links", "VolumesFrom").forEach { key ->
             strings(host?.get(key))?.takeIf { it.isNotEmpty() }?.let { return notYet(key) }
         }
-        // Mounts, Docker's newer form of Binds (Droidtop/tracker#715): a bind mount of a folder mapped in Containers,
+        // Mounts, Docker's newer form of Binds (mytop-project/tracker#715): a bind mount of a folder mapped in Containers,
         // named or given by where it appears in the container, goes through the same rule as Binds and -v
         // ([EngineCli.volume]); volumes and tmpfs stay not built.
         val mountBinds = (host?.get("Mounts") as? JsonArray).orEmpty().map { el ->

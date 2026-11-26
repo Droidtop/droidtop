@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H8b: librime's context, as rime_jni.cc hands it over (offsets already UTF-16), for the seam. */
+/** mytop-project/tracker#903 H8b: librime's context, as rime_jni.cc hands it over (offsets already UTF-16), for the seam. */
 class RimeContextTest {
     private fun ints(cursor: Int, selStart: Int, selEnd: Int, highlighted: Int = -1, pageSize: Int = 5, ascii: Int = 0) =
         intArrayOf(cursor, selStart, selEnd, highlighted, pageSize, ascii)

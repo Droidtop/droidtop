@@ -33,7 +33,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Legacy Games as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335; the owner, 2026-11-05: "include
+ * Legacy Games as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335; the owner, 2026-11-05: "include
  * Legacy Games, with the password in the encrypted vault"): the account's purchases and giveaways, each installed as
  * one file the way itch.io's and Humble's are ([SingleFileInstall]; Legacy's are Windows installers, kept in the game's
  * folder for Wine to run). Its API asks for the account's e-mail and password with every request, so droidtop keeps

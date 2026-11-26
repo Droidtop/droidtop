@@ -39,7 +39,7 @@ typealias LinkKind = suspend (context: Context, handler: LinkRouter.Handler, lin
 typealias LinkPointHandler = suspend (context: Context, record: PluginRecord, entry: ProvidedPoint, link: String) -> LinkRouter.Result
 
 /**
- * The one link router (docs/SPEC.md 12a "Links", docs/plugin-api.md 3 F3, Droidtop/tracker#459). droidtop owns every
+ * The one link router (docs/SPEC.md 12a "Links", docs/plugin-api.md 3 F3, mytop-project/tracker#459). droidtop owns every
  * Android entry point (`LinkActivity` in `:app`: droidtop's own action links, every https link, shared links and the
  * scheme aliases plugins switch on); every link it receives comes here, and so does a link read inside droidtop (a QR
  * code). droidtop's own links are built-in handlers ([registerBuiltIn]: [ActionLinks]). Every other link goes to the

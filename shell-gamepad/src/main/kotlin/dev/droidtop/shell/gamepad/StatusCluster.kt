@@ -36,13 +36,13 @@ internal fun FloatingStatusCluster(onClick: () -> Unit, onActivity: () -> Unit, 
     )
 }
 
-/** How far the status pill sits from the window's top edge, floating or in Home's band (Droidtop/tracker#675). */
+/** How far the status pill sits from the window's top edge, floating or in Home's band (mytop-project/tracker#675). */
 internal val STATUS_INSET = 8.dp
 
 /**
  * The status cluster on its pill: the one look of the facts wherever they float, the page's corner and Home's band
- * alike (Droidtop/tracker#675). [plate] is the pill's fill: the floating plate over a page, the surface in Home's band.
- * The activity spot ([ActivitySpot]) leads it while something runs, so every page has it (Droidtop/tracker#742);
+ * alike (mytop-project/tracker#675). [plate] is the pill's fill: the floating plate over a page, the surface in Home's band.
+ * The activity spot ([ActivitySpot]) leads it while something runs, so every page has it (mytop-project/tracker#742);
  * [onActivity] is its tap.
  */
 @Composable

@@ -26,7 +26,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Indiegala as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335): the games of the account's
+ * Indiegala as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335): the games of the account's
  * collection, installed as Humble's and itch.io's are ([SingleFileInstall]: one file, unpacked or kept). Signed in on
  * Indiegala's own page; its session is several cookies its client's code never names, so the whole cookie header is
  * what droidtop keeps ([StoreSignIn.WebPage.ALL_COOKIES]). A game Indiegala serves only through its own client is

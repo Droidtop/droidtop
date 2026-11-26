@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#766: a cancelled block is never read as a failed one. */
+/** mytop-project/tracker#766: a cancelled block is never read as a failed one. */
 class CancellableTest {
     @Test
     fun `a failure is kept and a value is returned`() {

@@ -38,7 +38,7 @@ import java.util.Date
 import org.json.JSONObject
 
 /**
- * A source result's page drawn from the item's bundles (docs/SPEC.md 12a, "A source's item page"; Droidtop/tracker#737):
+ * A source result's page drawn from the item's bundles (docs/SPEC.md 12a, "A source's item page"; mytop-project/tracker#737):
  * a `library.sources` `detail` reply of facets, through the item page's guards, as the record droidtop draws for an
  * update (docs/SPEC.md 7g): an Overview, the Downloads (a release in parts is one row, fetched as one set), the
  * Changelog and the Links. What is not a bundle (a switch, a button, a notice) stays the plugin's page, drawn by the one
@@ -125,7 +125,7 @@ object SourceItemPage {
         } else {
             null
         }
-        // Get the update is an update's (Droidtop/tracker#838); a source result's page lists its links as they are. Open
+        // Get the update is an update's (mytop-project/tracker#838); a source result's page lists its links as they are. Open
         // thread is the record page's (#862): here the page's Links open it, with the same capture.
         val rows = downloadRows(found, picked).filterNot {
             it.action == RecordAction.PickSystem || it.action == RecordAction.GetBest || it.action == RecordAction.OpenThread
@@ -140,7 +140,7 @@ object SourceItemPage {
                     confirmTitle = "Download this?",
                     run = { ctx, onStatus -> get.download(ctx, action.download, onStatus) },
                 )
-                // One build's hosts (Droidtop/tracker#859): Try in order first (the next mirror is tried when one starts
+                // One build's hosts (mytop-project/tracker#859): Try in order first (the next mirror is tried when one starts
                 // nothing, #838), then each host on its own, as on the record page.
                 is RecordAction.Group -> NestedScreenItem(
                     id = id,
@@ -177,7 +177,7 @@ object SourceItemPage {
                         },
                     ),
                 )
-                // A section's heading is read, never picked (Droidtop/tracker#859).
+                // A section's heading is read, never picked (mytop-project/tracker#859).
                 else -> if (row.heading) {
                     TextBlockItem(id = id, text = listOfNotNull(row.title, row.subtitle).joinToString(" \u00b7 "))
                 } else {

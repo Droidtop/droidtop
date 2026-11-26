@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * The one rule every store's cloud save sync decides by (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313 and #224):
+ * The one rule every store's cloud save sync decides by (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313 and #224):
  * what a game's save files looked like when they last matched the store's cloud on this device, and the two sides as
  * they are now, turned into what to do.
  *

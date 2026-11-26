@@ -43,7 +43,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Epic cloud saves of one game (docs/SPEC.md 7g, "Stores", Droidtop/tracker#224): the save-sync calls and the chunked
+ * Epic cloud saves of one game (docs/SPEC.md 7g, "Stores", mytop-project/tracker#224): the save-sync calls and the chunked
  * save format of GameNative's EpicCloudSavesManager (GPL-3.0, after Legendary), with the decision made by
  * [dev.droidtop.stores.util.CloudSavePlan] from the state kept at the last sync instead of a newer-timestamp rule.
  *

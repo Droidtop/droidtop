@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Which games folder holds a file, by whole path segments (Droidtop/tracker#763). */
+/** Which games folder holds a file, by whole path segments (mytop-project/tracker#763). */
 class GamesRootsRootOfTest {
     private val games = File("/storage/emulated/0/Games")
     private val games2 = File("/storage/emulated/0/Games2")

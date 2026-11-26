@@ -2,7 +2,7 @@ package dev.droidtop.mapping
 
 /**
  * One entry of a Valve KeyValues ("VDF") text file: a key with either a string [value] or a block of [children], and
- * the platform [condition] (`[$WIN32]`) some files put after it (Droidtop/tracker#618: Steam's controller layouts are
+ * the platform [condition] (`[$WIN32]`) some files put after it (mytop-project/tracker#618: Steam's controller layouts are
  * this format, and droidtop's layouts are stored in it). Keys repeat (a layout has many `group` blocks) and their order
  * is kept, so a file read and written back says the same thing. Keys are matched without regard to case, as Steam
  * does.

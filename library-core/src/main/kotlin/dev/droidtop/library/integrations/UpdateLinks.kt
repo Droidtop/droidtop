@@ -9,7 +9,7 @@ import java.io.File
 import org.json.JSONObject
 
 /**
- * A source's links, kept and opened by droidtop (docs/SPEC.md 7g, "Getting an update"; Droidtop/tracker#599): the
+ * A source's links, kept and opened by droidtop (docs/SPEC.md 7g, "Getting an update"; mytop-project/tracker#599): the
  * owner, "We shouldn't be fetching links again ... we should cache links as well, and then use the webview to open
  * them. The user can start the download, and it'll be kicked over automatically."
  */
@@ -116,7 +116,7 @@ object UpdateLinks {
 
 /**
  * The last page each source gave for a record (`library.updates` `record`), kept so the record page shows at once and
- * its links are the ones the person picks from, never fetched again to download (Droidtop/tracker#599). One small
+ * its links are the ones the person picks from, never fetched again to download (mytop-project/tracker#599). One small
  * file per record under [dir]; a record the source can no longer give is shown from here, with when it was saved.
  */
 class RecordCache(private val dir: File) {

@@ -16,7 +16,7 @@ data class SteamNewsItem(
 )
 
 /**
- * "What's new" for a Steam game (docs/SPEC.md 7i, Droidtop/tracker#229):
+ * "What's new" for a Steam game (docs/SPEC.md 7i, mytop-project/tracker#229):
  * the developer's own announcements from Steam's public news endpoint
  * (`ISteamNews/GetNewsForApp/v2`, no key, no account), the latest post
  * tagged as patch notes first, else the latest announcement. Read-only and

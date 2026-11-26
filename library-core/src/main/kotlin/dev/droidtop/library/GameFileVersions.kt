@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * The version a game's own files declare (docs/SPEC.md 7i, "The game page";
- * Droidtop/tracker#406), for a folder game whose name carries none: Ren'Py's
+ * mytop-project/tracker#406), for a folder game whose name carries none: Ren'Py's
  * `define config.version = "..."` in `game/options.rpy`, and the `version`
  * an RPG Maker MV or MZ developer put in `package.json` (the editor's own
  * template has none, so a value there is the developer's). Read by the engine

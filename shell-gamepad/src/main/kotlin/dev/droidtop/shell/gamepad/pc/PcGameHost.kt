@@ -54,7 +54,7 @@ internal fun foldPcLibrary(context: Context, entries: List<LibraryEntry>): Folde
 
 /**
  * A PC game's primary action, one rule for every surface that has one (docs/SPEC.md 7i "Capsules and the
- * primary action", Droidtop/tracker#349): a store game that is not installed or has an update stops on the
+ * primary action", mytop-project/tracker#349): a store game that is not installed or has an update stops on the
  * free-space offer ([offer], drawn by [PcLaunchOfferSheet]); a store download already running goes to the
  * store's queue; anything else launches through the caller's [onLaunch]. The PC Games tab and the hosts
  * outside Gaming (Standard's Games grid, Desktop's Start menu) all use it, so a game installs the same way
@@ -100,7 +100,7 @@ fun rememberPcLaunch(onLaunch: (LibraryEntry) -> Unit, onOpenDownloads: () -> Un
 
 /**
  * The free-space offer before a store install or update: its own window over whatever opened it, the one
- * place the volume is chosen (Droidtop/tracker#227).
+ * place the volume is chosen (mytop-project/tracker#227).
  */
 @Composable
 fun PcLaunchOfferSheet(launch: PcLaunch) {
@@ -120,7 +120,7 @@ private fun say(context: Context, line: String?) {
 
 /**
  * A PC or engine game's page and its menu, outside the Gaming shell (docs/SPEC.md 7i "The game page",
- * Droidtop/tracker#349): the same [PcGamePage], [PcGameMenu] and install offer the PC Games tab opens,
+ * mytop-project/tracker#349): the same [PcGamePage], [PcGameMenu] and install offer the PC Games tab opens,
  * hosted by Standard's Games grid and Desktop's Start menu so a game can be installed, set up, given a
  * runner or favourited from every mode, not only played. [entryId] is any folder or store row of the
  * game; the page shows the game it belongs to. Nothing is drawn until the library is folded, and

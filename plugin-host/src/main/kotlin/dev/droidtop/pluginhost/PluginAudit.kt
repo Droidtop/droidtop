@@ -112,7 +112,7 @@ class PluginAudit(private val dir: File, private val maxEntries: Int = MAX_ENTRI
 
         fun forContext(context: Context): PluginAudit = forPluginsRoot(PluginStore.root(context))
 
-        /** The per-day counts of everyday calls, kept beside the rings (Droidtop/tracker#61). */
+        /** The per-day counts of everyday calls, kept beside the rings (mytop-project/tracker#61). */
         fun countsForContext(context: Context): PluginCallCounts =
             PluginCallCounts(File(PluginStore.root(context).let { it.parentFile ?: it }, "plugin-audit"))
     }

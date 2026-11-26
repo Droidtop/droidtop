@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * One of the overlays droidtop draws over whatever is on screen without backgrounding it (docs/SPEC.md "In-game
- * overlays", Droidtop/tracker#740), on [displayId], the display in front. [frontPackage] is the app whose window was
+ * overlays", mytop-project/tracker#740), on [displayId], the display in front. [frontPackage] is the app whose window was
  * in front when the chord was pressed (droidtop's own included), for the overlays that depend on it; null when unknown.
  * The input lane raises it; the UI lane draws it, and a second request of the same [kind] while it is open closes it.
  */
@@ -23,7 +23,7 @@ data class OverlayRequest(val kind: Kind, val displayId: Int, val frontPackage: 
         LEFT_MENU,
 
         /**
-         * Android's accessibility button, the touch route to the three above (Droidtop/tracker#839): a small sheet
+         * Android's accessibility button, the touch route to the three above (mytop-project/tracker#839): a small sheet
          * that picks one of them, or the mode switcher.
          */
         PICKER,
@@ -55,7 +55,7 @@ object OverlayRequests {
 }
 
 /**
- * The HOME chords (Droidtop/tracker#740), as a state machine over key codes. Pure: [onKey] says what to do with each
+ * The HOME chords (mytop-project/tracker#740), as a state machine over key codes. Pure: [onKey] says what to do with each
  * key; the accessibility service does it.
  *
  * - HOME down is held. R2, L2 or Start pressed while it is held opens that overlay; droidtop eats HOME and the button,
@@ -66,7 +66,7 @@ object OverlayRequests {
  * - Every other key goes on at once, untouched.
  *
  * A release can be lost (another accessibility service that filters keys ate it, the filter went off mid-press), and
- * nothing may stay stuck for it (Droidtop/tracker#740: "it's possible to bug it so it stops working (maybe inputting
+ * nothing may stay stuck for it (mytop-project/tracker#740: "it's possible to bug it so it stops working (maybe inputting
  * too fast)"). So a key pressed again ends whatever its lost release left behind; a HOME held with no HOME event for
  * [STALE_HOLD_MS] counts as let go; and [reset] forgets everything when the filter goes off. Every sequence of
  * presses and releases leaves it idle once each key's last event was a release ([idle], HomeChordsTest).

@@ -37,7 +37,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // Native jobs register before attach restores any, so a paused scrape found on
         // disk can be resumed (docs/SPEC.md 12a "Jobs").
         dev.droidtop.library.scraper.LibraryScrapeJob.register(appContext)
-        // "Prepare for first launch" (docs/SPEC.md 9; Droidtop/tracker#866), started only from a game's Wine settings.
+        // "Prepare for first launch" (docs/SPEC.md 9; mytop-project/tracker#866), started only from a game's Wine settings.
         dev.droidtop.runtime.windows.PrepareFirstLaunchJob.register(appContext)
         // The games the scrape of PC and engine games works through: the library's own index, walked
         // only when it has none yet (never a second scan of its own).
@@ -52,7 +52,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // A plugin's stores beside them (docs/plugin-api.md 3 A13), once the plugins are read: off this thread.
         dev.droidtop.library.integrations.PluginStores.refreshAsync(appContext)
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)
-        // The desktop's fonts for all languages, a job of its own (Droidtop/tracker#390).
+        // The desktop's fonts for all languages, a job of its own (mytop-project/tracker#390).
         dev.droidtop.app.DesktopFontsJob.register(appContext)
         // A store game's cloud saves, uploaded when the game ends, a job each (7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.register(appContext)
@@ -61,19 +61,19 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // The paired devices plugins see (docs/plugin-api.md D21): they hear of a change, and the paired handhelds
         // are served again while a plugin has announced something to them; a file read and a listener, off this thread.
         dev.droidtop.net.peer.PairedDevices.onChanged = { ctx -> dev.droidtop.library.integrations.notifyDevicesChanged(ctx) }
-        // A synced copy of a plugin's context arrived (docs/plugin-api.md F8): its plugin hears of it (Droidtop/tracker#794).
+        // A synced copy of a plugin's context arrived (docs/plugin-api.md F8): its plugin hears of it (mytop-project/tracker#794).
         dev.droidtop.pluginhost.PluginContexts.onReceived = { plugin, contextId, generation ->
             dev.droidtop.library.integrations.notifyContextReceived(appContext, plugin, contextId, generation)
         }
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.serve(appContext) } }, "devices-serve").start()
-        // The role tokens UI droidtop does not draw follows (docs/SPEC.md 7k, Droidtop/tracker#559): plugins hear when
+        // The role tokens UI droidtop does not draw follows (docs/SPEC.md 7k, mytop-project/tracker#559): plugins hear when
         // they change, looked at again on Light or dark, on Android's night mode, and by the Gaming shell on a theme.
-        // droidtop's home-screen widgets are drawn in the same tokens, so they are drawn again too (Droidtop/tracker#563).
+        // droidtop's home-screen widgets are drawn in the same tokens, so they are drawn again too (mytop-project/tracker#563).
         dev.droidtop.library.theme.RoleTokens.onChanged = { ctx, set ->
             dev.droidtop.library.integrations.notifyThemeChanged(ctx, set.light)
             dev.droidtop.app.DroidtopWidgets.refreshAll(ctx)
         }
-        // The Downloads widget follows the jobs while the process lives (Droidtop/tracker#563).
+        // The Downloads widget follows the jobs while the process lives (mytop-project/tracker#563).
         dev.droidtop.app.DownloadsWidgetProvider.watch(appContext)
         dev.droidtop.app.DesktopWidgetProvider.watch(appContext)
         dev.droidtop.app.CompanionWidgetProvider.watch(appContext)
@@ -85,7 +85,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         }
         dev.droidtop.library.theme.RoleTokens.attach(appContext)
         // The Gaming theme's colours for everything outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming",
-        // Droidtop/tracker#827): read back or worked out now, off the main thread, and again whenever the theme or what
+        // mytop-project/tracker#827): read back or worked out now, off the main thread, and again whenever the theme or what
         // its colours depend on changes, whether or not Gaming ever opens.
         dev.droidtop.library.theme.ThemeColorStore.install(appContext)
         appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -105,12 +105,12 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // The one single-file download runner and the post step of the plugin catalog's bundles; a
         // download that finished while the process was dead is re-attached and finished by these.
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)
-        // A source's Download asks the source inside its own Downloads job (Droidtop/tracker#354).
+        // A source's Download asks the source inside its own Downloads job (mytop-project/tracker#354).
         dev.droidtop.pluginhost.DownloadJobs.registerResolver(
             dev.droidtop.library.integrations.AcquireQueue.RESOLVER,
             dev.droidtop.library.integrations.AcquireQueue.resolver,
         )
-        // A source's whole list, read into its index on the download policy (Droidtop/tracker#937).
+        // A source's whole list, read into its index on the download policy (mytop-project/tracker#937).
         dev.droidtop.library.integrations.SourceIndexRefresh.register(appContext)
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
@@ -143,7 +143,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // it now, off the main thread, so the first cards drawn already have it.
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.EnginesDatabase.defs(appContext) }
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
-        // A download ending is one short flash, grouped while it is up (Droidtop/tracker#643).
+        // A download ending is one short flash, grouped while it is up (mytop-project/tracker#643).
         dev.droidtop.library.integrations.JobNotices.start()
         dev.droidtop.app.LaunchWatchNotification.start(appContext)
         // KDE Connect, when the person left it on, and its notices (docs/SPEC.md "KDE Connect").
@@ -157,7 +157,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
             // What the walks say they are doing ("Looking at PC game
             // folders: 12 of 21"), live, while they run. A walk over a slow
             // card is minutes, and a row that says nothing for minutes
-            // reads as a hang (Droidtop/tracker#275).
+            // reads as a hang (mytop-project/tracker#275).
             val games = kotlinx.coroutines.coroutineScope {
                 val progress = launch {
                     dev.droidtop.library.ScanActivity.state.collect { running ->
@@ -176,7 +176,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
             "Rescan finished in $seconds s: $games game folders and store entries, $apps apps."
         }
-        // "Rescan PC game folders" (docs/SPEC.md 7j "Places", Droidtop/tracker#397 slice E): the PC and engine
+        // "Rescan PC game folders" (docs/SPEC.md 7j "Places", mytop-project/tracker#397 slice E): the PC and engine
         // walks only, never the ROM walk, and the answer says how many games it found that were not listed.
         dev.droidtop.library.settings.LibraryRescan.pcFoldersHandler = { ctx, onStatus ->
             onStatus("Looking at your PC game folders\u2026")
@@ -201,7 +201,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
             "Rescan of PC game folders finished in $seconds s: " + if (added == 0) "nothing new." else "$added new."
         }
-        // Rescans run as a job in the one jobs center (Droidtop/tracker#595), once both walks are registered.
+        // Rescans run as a job in the one jobs center (mytop-project/tracker#595), once both walks are registered.
         dev.droidtop.library.LibraryRescanJob.register(appContext)
         dev.droidtop.app.update.UpdateChecks.register(appContext)
         // "These files changed" (docs/SPEC.md 7g, "Targeted indexing"): a finished download, a store install or
@@ -218,7 +218,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
             )
         }
         // Every kind of update is checked by a job on droidtop's own schedule (Updates > Update settings, Check for
-        // updates; Droidtop/tracker#570). The job is not persisted, so each process start makes sure it is there. Off the
+        // updates; mytop-project/tracker#570). The job is not persisted, so each process start makes sure it is there. Off the
         // main thread: it reads the download rules, and moves a retired update setting into them first (#833).
         dev.droidtop.runtime.util.AppScopes.io.launch {
             dev.droidtop.app.update.AppSelfUpdate.migrateUnmeteredOnly(appContext)

@@ -2,7 +2,7 @@ package dev.droidtop.library
 
 /**
  * Finding the mirror a person picked on a record page again in a fresh copy of the record (docs/SPEC.md 7g, "Getting an
- * update"; Droidtop/tracker#599). A picked mirror with no `url` is a token only the source understands, and a token
+ * update"; mytop-project/tracker#599). A picked mirror with no `url` is a token only the source understands, and a token
  * from a saved record goes stale when the source's page changes (a new version moves the mirrors), so droidtop asks for
  * the record again and opens the same mirror from that. Pure.
  */

@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The plugin API contract gaps droidtop now draws itself (docs/plugin-api.md 1.3, C2, G3; Droidtop/tracker#544). */
+/** The plugin API contract gaps droidtop now draws itself (docs/plugin-api.md 1.3, C2, G3; mytop-project/tracker#544). */
 class PluginContractGapsTest {
     @Test
     fun `an error's detail and BROWSER_CHECK_REQUIRED cross the wire`() {

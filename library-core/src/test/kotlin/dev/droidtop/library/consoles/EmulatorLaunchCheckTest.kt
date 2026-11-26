@@ -3,7 +3,7 @@ package dev.droidtop.library.consoles
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The plain-words launch failures (Droidtop/tracker#248): each names the emulator and says what to do. */
+/** The plain-words launch failures (mytop-project/tracker#248): each names the emulator and says what to do. */
 class EmulatorLaunchCheckTest {
     private val name = "Example Emu"
 

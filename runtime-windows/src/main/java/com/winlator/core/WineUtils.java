@@ -31,7 +31,7 @@ public abstract class WineUtils {
         FileUtils.symlink("../drive_c", dosdevicesPath+"/c:");
         // Z: must point at the resolved imagefs root so the guest sees only opt, home, usr, etc.,
         // not the parent directory (files) which would expose imagefs_shared, etc. The device's own
-        // root only under the "Device system folders" grant (WineStorageGrants, Droidtop/tracker#584).
+        // root only under the "Device system folders" grant (WineStorageGrants, mytop-project/tracker#584).
         String zTarget = dev.droidtop.runtime.windows.WineStorageGrants.zTarget(context, container);
         FileUtils.symlink(zTarget, dosdevicesPath + "/z:");
 

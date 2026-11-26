@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Where a source result in the one search downloads to (docs/SPEC.md 12a
- * "One search", Droidtop/tracker#485). A console list passes its own system
+ * "One search", mytop-project/tracker#485). A console list passes its own system
  * and folder. A list with no system of its own (the PC library, the
  * launcher, the Desktop Start menu) works it out from the result: the
  * platform the source reported names a console system with a games folder, or
@@ -47,7 +47,7 @@ object SourceDestinations {
         folders: List<Pair<File, ConsoleSystemDef>>,
         pcRoots: List<File>,
         // The first games folder: a console system with no folder of its own yet gets one there, made when the first
-        // download is placed (Droidtop/tracker#536: never a dead end for lack of a system folder). A DS game listed
+        // download is placed (mytop-project/tracker#536: never a dead end for lack of a system folder). A DS game listed
         // under Nintendo DS by its own name, sitting in a folder that resolved as another system, left DS with no
         // folder, and Get games said "No games folder for Nintendo DS yet" (rig on 0.2.0-dev.2070).
         firstRoot: File? = null,

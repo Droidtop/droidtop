@@ -165,7 +165,7 @@ import kotlinx.coroutines.withContext
 /**
  * What an app tile promises while it has the focus: A opens, Y searches and
  * Select opens the list's Filter sheet (with Sort by in it), as every list
- * does (proposal 6.A, Droidtop/tracker#644 slice 4), and L2 is the app's own
+ * does (proposal 6.A, mytop-project/tracker#644 slice 4), and L2 is the app's own
  * options. The list around the tile answers Y and Select. The one footer
  * draws these ([declaresHints]).
  */
@@ -255,7 +255,7 @@ internal fun AppsSection(
     var sortOpen by remember { mutableStateOf(false) }
     LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
-    // Where the tile whose menu is open is on the screen, so the menu opens beside it (Droidtop/tracker#827).
+    // Where the tile whose menu is open is on the screen, so the menu opens beside it (mytop-project/tracker#827).
     var optionsAnchor by remember { mutableStateOf<AnchorRect?>(null) }
 
     // Hidden or shown from the options menu: the shell's list follows at once ([onEntryChanged]), and the launcher's
@@ -293,7 +293,7 @@ internal fun AppsSection(
     // empty state when a filter leaves nothing, so X and Y always have a
     // focused element to answer them.
     // On open, and again when L1/R1 changes the view: the items under the focus are replaced, so the focus goes to the
-    // first one (Droidtop/tracker#820).
+    // first one (mytop-project/tracker#820).
     LaunchedEffect(list.isEmpty(), query) {
         if (list.isEmpty()) requestFocusWhenAttached(emptyFocus, "Apps") else requestFocusWhenAttached(firstFocus, "Sections")
     }
@@ -338,7 +338,7 @@ internal fun AppsSection(
         )
         if (list.isEmpty()) {
             // A lit view is not a filter: only what no view stands for is cleared, and an empty view
-            // offers All (Droidtop/tracker#500).
+            // offers All (mytop-project/tracker#500).
             val emptyHints = remember(activeView) {
                 listOf(
                     HintBinding(GamepadAction.A, if (activeView > 0) "Show all apps" else "Clear filters") { activeView > 0 || !query.isEmpty },
@@ -383,7 +383,7 @@ internal fun AppsSection(
             ) {
                 // The first section's first item holds the requester, by position: a flag set while items compose
                 // left it on no item once item 0 composed again on its own, and the grid opened with nothing focused
-                // (Droidtop/tracker#820).
+                // (mytop-project/tracker#820).
                 itemsIndexed(sections, key = { _, section -> section.title }) { sectionIndex, homeSection ->
                     // Native Android apps get their own dense, icon-first grid
                     // (columns configurable via SettingsGamingFragment's
@@ -458,7 +458,7 @@ internal fun AppsSection(
                 usageTick++
             },
             facetActions = if (usageGranted) emptyMap() else mapOf(LibraryFacet.RECENTLY_USED to listOf(usageAction)),
-            // Sort by lives here now that Y is Search (Droidtop/tracker#644 slice 4).
+            // Sort by lives here now that Y is Search (mytop-project/tracker#644 slice 4).
             footerActions = listOf(
                 SheetAction("Sort by", null) {
                     filterOpen = false
@@ -586,7 +586,7 @@ internal fun AppIconTile(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
     onLaunch: () -> Unit,
-    // Given where the tile is on the screen, so its menu opens beside it (Droidtop/tracker#827).
+    // Given where the tile is on the screen, so its menu opens beside it (mytop-project/tracker#827).
     onOptions: (AnchorRect?) -> Unit = {},
     onFocused: () -> Unit = {},
 ) {
@@ -611,7 +611,7 @@ internal fun AppIconTile(
                     // L2 is the focused thing's own menu (docs/SPEC.md 7j):
                     // its details, favourite and Mark as game; a long press
                     // opens the same one (owner, 2026-10-23,
-                    // Droidtop/tracker#621). X and Y are the list's (Filter
+                    // mytop-project/tracker#621). X and Y are the list's (Filter
                     // and Sort By) and bubble to the section around the grid.
                     GamepadAction.L2 -> {
                         openOptions()
@@ -624,7 +624,7 @@ internal fun AppIconTile(
             .focusable()
             // Taps work the same way as on GameCard (see its own comment).
             // A long press opens the app's menu, as a long press does on
-            // every thing (owner, 2026-10-23, Droidtop/tracker#610); Mark as
+            // every thing (owner, 2026-10-23, mytop-project/tracker#610); Mark as
             // game is a row of that menu.
             .padRow(onClick = onLaunch, onLongClick = openOptions)
             // The shell's ONE selection idiom, the same one [GameCard]
@@ -673,7 +673,7 @@ internal fun AppIconTile(
         )
         // An app that declares no category says nothing: "Android app" under every tile said nothing
         // about this one (tracker#500). Its line is still kept, empty, so every tile in a row is one height and the
-        // grid's rows line up (Droidtop/tracker#820: "Calendar" was a line shorter than "Azahar / Games").
+        // grid's rows line up (mytop-project/tracker#820: "Calendar" was a line shorter than "Azahar / Games").
         Text(
             entry.genre?.takeIf { it.isNotBlank() }.orEmpty(),
             color = MenuTokens.OnSurfaceMuted,

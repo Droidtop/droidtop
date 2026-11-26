@@ -63,7 +63,7 @@ import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticeCard
 
 /**
- * One card of the companion's System tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): a titled
+ * One card of the companion's System tab (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): a titled
  * list of catalog items, folded or open. [storage] marks the one card that is not catalog items (free space).
  */
 internal data class SystemCard(
@@ -92,7 +92,7 @@ internal fun companionSystemCards(
     controllers: List<CatalogItem> = emptyList(),
 ): List<SystemCard> = listOf(
     // Without the Android settings row: on the companion its links are Device's "Android's pages", labelled as exits,
-    // and an exit is on one page only (Droidtop/tracker#786 S3, plan 4.1 rule 2).
+    // and an exit is on one page only (mytop-project/tracker#786 S3, plan 4.1 rule 2).
     SystemCard(
         "system",
         "System",
@@ -100,7 +100,7 @@ internal fun companionSystemCards(
         folded = false,
     ),
     // Font and display size have one place on the companion, Accessibility, when that card has them
-    // (Droidtop/tracker#786 S7, plan 4.5); they were drawn on both cards. Brightness is the built-in screen's card,
+    // (mytop-project/tracker#786 S7, plan 4.5); they were drawn on both cards. Brightness is the built-in screen's card,
     // drawn above these rows in every arrangement (`brightnessRows`), so the catalog's copy is not drawn again.
     SystemCard(
         "display",
@@ -111,8 +111,8 @@ internal fun companionSystemCards(
         folded = true,
     ),
     // Media volume is the card's own Media slider, one per stream through VolumeControl (slice C19), so the catalog's
-    // copy is not drawn again (Droidtop/tracker#786 S8).
-    // What Do Not Disturb lets through sits under its row, titled, only with the access (Droidtop/tracker#786 S8).
+    // copy is not drawn again (mytop-project/tracker#786 S8).
+    // What Do Not Disturb lets through sits under its row, titled, only with the access (mytop-project/tracker#786 S8).
     SystemCard(
         "sound",
         "Sound",
@@ -125,7 +125,7 @@ internal fun companionSystemCards(
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
     SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
     // The connected pads, drawn by the card, then Controller buttons and Swap A and B, the Quick Menu's own pad rows
-    // (`ControllerLayoutTiles`), which no companion page had (Droidtop/tracker#786 S9).
+    // (`ControllerLayoutTiles`), which no companion page had (mytop-project/tracker#786 S9).
     SystemCard("controllers", "Controllers", controllers, folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
@@ -164,13 +164,13 @@ internal fun CompanionCatalogItems(
     onChanged: () -> Unit,
     asks: (CatalogItem) -> Boolean = { it.confirmText != null },
     // A group's title, drawn before the row with this id (its first): a screen's sections keep their names
-    // (Droidtop/tracker#786 S2a2).
+    // (mytop-project/tracker#786 S2a2).
     headings: Map<String, String> = emptyMap(),
 ) {
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // The rows the host used to leave out (Droidtop/tracker#786 S2a2): a text field is typed in its own row, a folder
+    // The rows the host used to leave out (mytop-project/tracker#786 S2a2): a text field is typed in its own row, a folder
     // or document the system's picker as Gaming's Settings opens it (CatalogPickers), each line kept by row id.
     val statusById = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     // A picker needs an activity to answer it: the companion's own activity has one, a Presentation on the second
@@ -219,7 +219,7 @@ internal fun CompanionCatalogItems(
                 // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
                 is dev.droidtop.library.settings.PageHeaderItem -> dev.droidtop.ui.shared.PageHeaderView(item.header)
                 is dev.droidtop.library.settings.ButtonBarItem -> CompanionButtonBar(item, onChanged)
-                // Typed in its own row, the list still there (no editor, no panel: Droidtop/tracker#954 item 12).
+                // Typed in its own row, the list still there (no editor, no panel: mytop-project/tracker#954 item 12).
                 is TextInputItem -> if (editing?.id == item.id) {
                     dev.droidtop.shell.gamepad.InPlaceTextField(
                         initial = item.value,
@@ -291,7 +291,7 @@ internal fun CompanionNestedScreen(
             runCatching {
                 val groups = screen.groups(context)
                 // A strip page (Updates' views) is drawn as its top and its first view, All, until the companion
-                // has the strip (Droidtop/tracker#786 S2a2): every view in a row would list each item twice.
+                // has the strip (mytop-project/tracker#786 S2a2): every view in a row would list each item twice.
                 val shown = if (screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP) {
                     val top = groups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }
                     top + groups.filterNot { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }.take(1)
@@ -330,18 +330,18 @@ private fun CatalogRow(
     title: String,
     subtitle: String?,
     value: String?,
-    // The value as a state chip (ChoiceItem.toned), in its tone or neutral (Droidtop/tracker#519).
+    // The value as a state chip (ChoiceItem.toned), in its tone or neutral (mytop-project/tracker#519).
     valueChip: Boolean = false,
     valueTone: NoticeTone? = null,
     // A picture before the title (CatalogItem.iconFile: a plugin's own icon, a store's mark; tracker#513).
     iconFile: String? = null,
-    // A job's bar under the title and how it moves (CatalogItem.progress and progressLook, Droidtop/tracker#643); a
+    // A job's bar under the title and how it moves (CatalogItem.progress and progressLook, mytop-project/tracker#643); a
     // finished job's row has no bar and draws its check or cross. A tap opens the job's page, where its figures are.
     progress: Float? = null,
     look: dev.droidtop.library.settings.JobLook? = null,
     // One status glyph beside the title (CatalogItem.statusMark): a plugin that needs you or cannot run.
     statusMark: dev.droidtop.library.settings.StatusMark? = null,
-    // An on/off state (ActionItem.state), drawn as the switch a toggle row draws, not said (Droidtop/tracker#738).
+    // An on/off state (ActionItem.state), drawn as the switch a toggle row draws, not said (mytop-project/tracker#738).
     switchOn: Boolean? = null,
     onClick: (() -> Unit)?,
 ) {

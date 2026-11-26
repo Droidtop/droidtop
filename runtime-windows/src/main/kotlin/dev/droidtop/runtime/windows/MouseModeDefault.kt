@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.windows
 
 /**
- * Whether a Wine game starts in controller mouse mode before the person has chosen (docs/SPEC.md 5b; Droidtop/tracker#618
+ * Whether a Wine game starts in controller mouse mode before the person has chosen (docs/SPEC.md 5b; mytop-project/tracker#618
  * C2, from the controls review: mouse mode never turned on by default, so a game that wants a pointer looked dead on a
  * pad-only device; the owner, 2026-10-23: "Yep. Go for it"). Pure.
  */

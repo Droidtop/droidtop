@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The power policy's core (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 2). */
+/** The power policy's core (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 2). */
 class PowerPolicyTest {
     private val cool = HeatReading(headroom = 0.3f, status = 0, batteryC = 30f)
     private val switchGame = PowerTarget(game = "zelda", emulator = "org.eden", platform = "switch")

@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The engine seam's round trip with a conversion engine (Droidtop/tracker#903 H6 and H7a): [FakeKanaEngine] driven
+ * The engine seam's round trip with a conversion engine (mytop-project/tracker#903 H6 and H7a): [FakeKanaEngine] driven
  * through [EngineSession], as the input method drives a language's own engine, into a field and the candidate bar's
  * model. Composing clauses with the focused one, paged and annotated candidates, the pad's selection and the pick all
  * arrive; so do what Mozc needs (H7a): the caret inside the composing text, text beyond the BMP, a partial commit,

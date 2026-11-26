@@ -17,7 +17,7 @@ interface RemoteTarget {
 
 /**
  * Keys a paired device sends by name (KDE Connect's mousepad `specialKey`, kdeconnect-kde's SpecialKeysMap, as
- * lib-kdeconnect names them) as Android key codes. Backspace and Enter keep their own path (they act on the text);
+ * mytop-kdeconnect names them) as Android key codes. Backspace and Enter keep their own path (they act on the text);
  * modifiers alone (control, alt, shift, super) and sysreq or scroll lock are not typed.
  */
 object RemoteKeys {
@@ -74,7 +74,7 @@ sealed interface Delivery {
  * The one choice of where text from another device goes (docs/SPEC.md, "Type from another device"), with no Android
  * in it so it is unit-tested: droidtop's own field first, else droidtop's input method's connection, else a notice.
  * [fieldThread] puts a delivery on the thread the fields live on (the main thread); the server's own thread never touches a
- * view or a connection. The keyboard and input module owns it (Droidtop/tracker#903): [RemoteTyping.router] is the
+ * view or a connection. The keyboard and input module owns it (mytop-project/tracker#903): [RemoteTyping.router] is the
  * process's one, used by the phone page's session and by KDE Connect's remote keyboard alike.
  */
 class RemoteInputRouter(

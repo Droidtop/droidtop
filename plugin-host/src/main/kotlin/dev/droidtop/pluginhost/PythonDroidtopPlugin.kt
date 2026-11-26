@@ -107,7 +107,7 @@ class PythonDroidtopPlugin(
         // start_job only registers the job, so the first poll below always finds it. The job itself runs on a Java
         // thread, which ART already knows: a thread Python made is attached to and detached from the JVM around every
         // host call, and a sandboxed plugin process running a job that way died of its own seccomp trap
-        // (Droidtop/tracker#558).
+        // (mytop-project/tracker#558).
         PythonBridge.nativeCallFunction(uniqueName, "start_job", payload)
         val run = JSONObject().put("job_id", jobId).toString()
         val failed = java.util.concurrent.atomic.AtomicReference<String?>(null)
@@ -116,7 +116,7 @@ class PythonDroidtopPlugin(
                 .onFailure { failed.set(it.message ?: it::class.java.simpleName) }
         }, "python-job").apply { isDaemon = true }.start()
         // The job is polled at 50 ms while it reports progress, and less often, up to every 500 ms, while it is quiet
-        // (Droidtop/tracker#765), so a long download does not cost a call into Python twenty times a second.
+        // (mytop-project/tracker#765), so a long download does not cost a call into Python twenty times a second.
         var pollMs = POLL_MIN_MS
         while (true) {
             failed.get()?.let { progress.complete(PluginResult.failure("python plugin job failed: $it")); return }

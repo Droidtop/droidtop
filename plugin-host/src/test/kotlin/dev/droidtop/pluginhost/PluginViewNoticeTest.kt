@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * The plugin `notice` node and the error shape (docs/plugin-api.md 1.3 and 1.6, docs/SPEC.md 7k "Notices";
- * Droidtop/tracker#485, final design tests 3 and 5): read into typed notices with every limit from the limits file,
+ * mytop-project/tracker#485, final design tests 3 and 5): read into typed notices with every limit from the limits file,
  * moved, dropped, cut, demoted and refused as the rules say, each change said once as a plugin message.
  */
 class PluginViewNoticeTest {
@@ -167,7 +167,7 @@ class PluginViewNoticeTest {
 
     @Test
     fun `a failure carrying droidtop's browser-check refusal offers Open the site`() {
-        // Droidtop/tracker#881: the plugin's own FAILED around SiteChecks.refusal, on F95zone's settings page.
+        // mytop-project/tracker#881: the plugin's own FAILED around SiteChecks.refusal, on F95zone's settings page.
         val n = PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, SiteChecks.refusal("f95zone.to")), emptySet(), "Couldn't finish")
         assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, n.subtitle)
         assertEquals(PluginWebAccount.Need.BROWSER_CHECK, n.opensAccount)

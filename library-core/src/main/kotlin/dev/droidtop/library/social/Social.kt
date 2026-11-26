@@ -4,7 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.StateFlow
 
 /*
- * Friends, presence and 1:1 chat from any service (docs/SPEC.md "Social", Droidtop/tracker#327).
+ * Friends, presence and 1:1 chat from any service (docs/SPEC.md "Social", mytop-project/tracker#327).
  * A provider is one account on one service: Steam, which droidtop runs itself, or a plugin that
  * provides `social.provider@1` (docs/plugin-api.md C19). The Social place, the companion's Social
  * tab, the Quick Menu tile and the message notifications draw these types through [SocialHub] and

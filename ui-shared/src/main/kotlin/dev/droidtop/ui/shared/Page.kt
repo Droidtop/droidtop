@@ -53,7 +53,7 @@ import dev.droidtop.library.settings.PageButton
 import dev.droidtop.library.settings.PageHeader
 
 /*
- * The page pieces every surface draws alike (docs/SPEC.md 7k, "Page anatomy"; Droidtop/tracker#485 F2a):
+ * The page pieces every surface draws alike (docs/SPEC.md 7k, "Page anatomy"; mytop-project/tracker#485 F2a):
  * the header, the button bar, the empty/loading/error block and the focus line. Gaming, the companion and
  * Standard (through a ComposeView) draw these; none of them draws its own. Colours come from the
  * surface's MaterialTheme (Gaming's is the active theme's palette), the selection from the caller, because

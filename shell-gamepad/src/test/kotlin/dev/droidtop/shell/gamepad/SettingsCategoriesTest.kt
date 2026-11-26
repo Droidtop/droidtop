@@ -43,7 +43,7 @@ class SettingsCategoriesTest {
 
     @Test
     fun `two rows with one id, a game and its linked copy, still get keys of their own`() {
-        // Droidtop/tracker#837: the same update row twice gave the column one key twice and killed droidtop.
+        // mytop-project/tracker#837: the same update row twice gave the column one key twice and killed droidtop.
         val game = "updates_game_/storage/7EF7-E477/GameSync/renpy/30YearOldVirgin-0.37.dv-pc"
         val groups = listOf(
             CatalogGroup(id = "updates_view_games", title = "Games", items = listOf(link(game, screen("s1")), link(game, screen("s2")), link("other", screen("s3")))),

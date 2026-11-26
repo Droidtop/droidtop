@@ -83,7 +83,7 @@ internal object SteamLibrarySync {
     }
 
     /**
-     * One line per sync for scan.log (Droidtop/tracker#360, #377), to set
+     * One line per sync for scan.log (mytop-project/tracker#360, #377), to set
      * against the counts Steam's own profile shows: the licences by payment
      * method and by flag, how many are another account's (Steam Families),
      * whether the free sub is held and how many apps it names, the own live
@@ -241,7 +241,7 @@ internal object SteamLibrarySync {
         // Steam leaves a large app's product info out of a full answer (a sha, no key-values, no HTTP host), and
         // sends its file's host only to a metadata-only request (SteamKit2's PICSProductInfo: HTTP is available
         // when the response is meta_data_only with an http_min_size). So the apps a full request left empty are
-        // asked again metadata-only, and their files are fetched (SteamPics.keyValuesOf). Droidtop/tracker#956:
+        // asked again metadata-only, and their files are fetched (SteamPics.keyValuesOf). mytop-project/tracker#956:
         // on the console every one of about 3,000 empty answers had a sha and no host.
         val empty = ArrayList<PICSRequest>()
         for (chunk in requests.chunked(PICS_CHUNK)) empty += storeAnswers(db, apps, chunk, metaDataOnly = false, report = false)

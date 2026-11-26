@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * System > Display's cards (docs/SPEC.md "The companion's tabs", Displays; Droidtop/tracker#414 slice C14): one per
+ * System > Display's cards (docs/SPEC.md "The companion's tabs", Displays; mytop-project/tracker#414 slice C14): one per
  * screen, with its name, kind, size and role, then what droidtop can change on it through [DisplayControls], the one
  * write path: the main screen's brightness (Android's setting), the companion's own brightness (its window, never
  * below 10%) and Turn off, and the refresh rate where the screen lists more than one (through the helper app). What a
@@ -82,7 +82,7 @@ internal fun offeredRates(rates: List<Float>): List<Float> =
 
 /**
  * The low safe mode the catalog's Reinitialize row names (`GamingSettingsCatalog.ID_DISPLAY_REINIT`): only a second
- * screen counts, so the card that shows the fault is the one that offers the fix (Droidtop/tracker#786 S7). Pure.
+ * screen counts, so the card that shows the fault is the one that offers the fix (mytop-project/tracker#786 S7). Pure.
  */
 internal fun lowModeOf(isSecondScreen: Boolean, inFallback: Boolean, summary: String): String? =
     summary.takeIf { isSecondScreen && inFallback }
@@ -90,7 +90,7 @@ internal fun lowModeOf(isSecondScreen: Boolean, inFallback: Boolean, summary: St
 internal enum class BrightnessRow { ANDROID, WINDOW }
 
 /**
- * The brightness rows a screen's card draws (Droidtop/tracker#786 S7: one brightness for every arrangement). The
+ * The brightness rows a screen's card draws (mytop-project/tracker#786 S7: one brightness for every arrangement). The
  * built-in screen always gets Android's brightness, whatever its role, so it is never lost when the companion sits
  * there; the companion's own screen gets its window level too, which can dim below Android's lowest. Pure.
  */
@@ -174,7 +174,7 @@ private fun MainBrightness() {
     val level = current ?: return
     val title = stringResource(R.string.companion_displays_brightness)
     if (!allowed) {
-        // Kept in place, read-only, until droidtop may change it (Droidtop/tracker#786 rule 3).
+        // Kept in place, read-only, until droidtop may change it (mytop-project/tracker#786 rule 3).
         CompanionReadOnlyRow(
             title = title,
             value = percentOf(level.toFloat(), 0f..255f),

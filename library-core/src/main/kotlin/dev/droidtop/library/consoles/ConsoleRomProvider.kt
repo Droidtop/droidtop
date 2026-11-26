@@ -297,7 +297,7 @@ internal fun resolveSystem(folderName: String, systemsById: Map<String, ConsoleS
 
 /**
  * The system a FOLDER is, not merely one its name matches
- * (Droidtop/tracker#472, docs/SPEC.md 7h "Detection gaps found by auditing a real library").
+ * (mytop-project/tracker#472, docs/SPEC.md 7h "Detection gaps found by auditing a real library").
  * ES-DE system ids are ordinary words (`ags`, `flash`, `pc`, `android`), so a
  * collection folder `Manual/ags` holding Adventure Game Studio games, or
  * `adult/flash` holding an Adobe AIR game, resolved to a system and both
@@ -650,7 +650,7 @@ class ConsoleRomProvider(
     /** Every ROM of [unit]'s system under [unit]'s folders, each folder budgeted on its own. */
     /**
      * Per system folder, the files its last walk folded into a game folder (RomScanResult.absorbed,
-     * Droidtop/tracker#931), for the index to drop rather than keep as missing.
+     * mytop-project/tracker#931), for the index to drop rather than keep as missing.
      */
     private val absorbedByFolder = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
 
@@ -715,7 +715,7 @@ class ConsoleRomProvider(
         // as droidtop's own asset -- a single fast indexed query, no file
         // content read at all), before falling back to trusting the
         // folder. Lemuroid's strongest signal, a whole-content CRC32, is
-        // Droidtop/tracker#780.
+        // mytop-project/tracker#780.
         //
         // Real bug this fixes, found via actual on-device testing: this
         // per-file cascade used to run as a sequential for-loop, meaning
@@ -915,7 +915,7 @@ class ConsoleRomProvider(
      * pattern as [detectSystemIdFromContent] -- one bad lookup never
      * fails the whole scan).
      */
-    // A cancelled scan stops here (Droidtop/tracker#766): the database lookup suspends, and a catch-all used to keep
+    // A cancelled scan stops here (mytop-project/tracker#766): the database lookup suspends, and a catch-all used to keep
     // going with no answer. Any other failure is "no answer", as before.
     private suspend fun detectSystemIdFromFilename(romFile: File): String? =
         runCatchingCancellable {
@@ -952,7 +952,7 @@ class ConsoleRomProvider(
                 message = noEmulatorInstalledMessage(context, system),
             )
         // RetroArch sits black, with no error, when the core it is handed is missing or incomplete
-        // (Droidtop/tracker#271): when droidtop can see that (a root helper), the launch stops here with the
+        // (mytop-project/tracker#271): when droidtop can see that (a root helper), the launch stops here with the
         // reason and the shell offers Get the core. It used to call ensure() without asking, which only
         // returned a line nobody showed, and the launch went on into the black screen. Without root the
         // state is unknown and the launch watchdog notices the stall instead.
@@ -968,11 +968,11 @@ class ConsoleRomProvider(
         }
         // The launch goes ahead as the preset says (SPEC 7e2, "File access is help in emulator setup, never a launch
         // step"); when it went out with the content link because the emulator lacks All files access, a launch alert
-        // says so and names the setup row (Droidtop/tracker#270: NetherSX2 black, then not responding, on the link).
+        // says so and names the setup row (mytop-project/tracker#270: NetherSX2 black, then not responding, on the link).
         // It also tells the watchdog this is an emulator playing a game, so one that sits idle is reported
-        // (Droidtop/tracker#270, #271).
+        // (mytop-project/tracker#270, #271).
         // The emulator's BIOS comes from droidtop's own copy (a games folder's bios folder), one source as with RetroArch
-        // cores (docs/SPEC.md "Emulator setup helper", Droidtop/tracker#270: NetherSX2 sat black on an empty BIOS folder
+        // cores (docs/SPEC.md "Emulator setup helper", mytop-project/tracker#270: NetherSX2 sat black on an empty BIOS folder
         // while the PS2 BIOS was in the games folder). Copied in where the emulator's folder can be looked in and written
         // (the helper behind Risky actions); what is still missing is named to the watchdog for this launch.
         val biosAdvice = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { biosAdvice(context, system, player) }
@@ -1103,7 +1103,7 @@ class ConsoleRomProvider(
     }
 
     /**
-     * [LibraryProvider.quit] for ROM entries (Droidtop/tracker#82): the
+     * [LibraryProvider.quit] for ROM entries (mytop-project/tracker#82): the
      * exact same system/player resolution [launch] runs, then the task
      * manager's one close path for the player's package
      * ([dev.droidtop.runtime.tasks.TaskManager.close], docs/SPEC.md "The

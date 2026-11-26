@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Home's adaptive order and its time-of-day row (HomeRanking.kt, Droidtop/tracker#611). */
+/** Home's adaptive order and its time-of-day row (HomeRanking.kt, mytop-project/tracker#611). */
 class HomeRankingTest {
     private fun game(id: String, hidden: Boolean = false) = LibraryEntry(id = id, title = id, kind = LibraryEntryKind.RENPY, hidden = hidden)
 

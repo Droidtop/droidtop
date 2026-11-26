@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The bundled themes whose extraction failed in this process (docs/SPEC.md 10c, "Storage full";
- * Droidtop/tracker#849). A failed parse is never cached, on purpose, so before this every load of a theme that could
+ * mytop-project/tracker#849). A failed parse is never cached, on purpose, so before this every load of a theme that could
  * not be extracted (a full disk) deleted the half-written copy and extracted the whole theme again, under the one
  * extraction lock, while the first composition waited on that lock. A theme named here is not tried again until the
  * process restarts or the storage-full screen's Try again finds room and calls [clear]; until then it loads from the

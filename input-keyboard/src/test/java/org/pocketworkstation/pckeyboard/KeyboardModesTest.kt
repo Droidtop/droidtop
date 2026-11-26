@@ -6,7 +6,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The input method's modes as pure rules (Droidtop/tracker#903 H12c). */
+/** The input method's modes as pure rules (mytop-project/tracker#903 H12c). */
 class KeyboardModesTest {
     @Test fun eachOrientationKeepsItsOwnKeys() {
         assertEquals("pref_keyboard_view_mode", KeyboardModes.key(KeyboardModes.PREF_MODE, landscape = false))

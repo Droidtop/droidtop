@@ -162,7 +162,7 @@ internal object HostNetApis {
         val replaced = added.keys.map { it.lowercase() }.toSet()
         val sent = withClearance(env, record, host, headers(args).filterKeys { it.lowercase() !in replaced } + added)
         // A host that has shown this plugin a browser check is read by droidtop's web view, never its HTTP client,
-        // which Cloudflare refuses even with the clearance (Droidtop/tracker#600). The plugin gets an ordinary answer.
+        // which Cloudflare refuses even with the clearance (mytop-project/tracker#600). The plugin gets an ordinary answer.
         if (method == "GET" && host != null && checks(env, record, host)) {
             hopCheck(target)
             reach(env, record, target)
@@ -186,7 +186,7 @@ internal object HostNetApis {
             hopCheck(hop)
             reach(env, record, hop)
         }
-        // A browser check instead of the page (docs/SPEC.md 12a, Droidtop/tracker#600): the plugin gets one plain
+        // A browser check instead of the page (docs/SPEC.md 12a, mytop-project/tracker#600): the plugin gets one plain
         // sentence, never the challenge's HTML, and droidtop remembers where to open the check for the person.
         if (SiteCheck.isChallenge(answer.status, answer.headers, answer.body)) {
             val at = NetScope.hostOf(answer.finalUrl)?.let { answer.finalUrl } ?: target

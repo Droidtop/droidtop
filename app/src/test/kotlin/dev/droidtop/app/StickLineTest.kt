@@ -3,7 +3,7 @@ package dev.droidtop.app
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The stick test's line (Droidtop/tracker#723), at the default dead zone's 0.5 / 0.3 band. */
+/** The stick test's line (mytop-project/tracker#723), at the default dead zone's 0.5 / 0.3 band. */
 class StickLineTest {
     private fun line(x: Float, y: Float) = stickLine(x, y, maxOf(kotlin.math.abs(x), kotlin.math.abs(y)), 0.5f, 0.3f)
 

@@ -22,7 +22,7 @@ class LeftMenuTest {
 
     @Test
     fun `Home is the first row and a section of its own`() {
-        // Owner, 2026-10-23: "Home should NOT be the same section" (Droidtop/tracker#611).
+        // Owner, 2026-10-23: "Home should NOT be the same section" (mytop-project/tracker#611).
         assertEquals(LeftMenuEntry(GamingSection.HOME, "Home"), all.first())
         assertEquals(listOf("Home", "PC Games", "Retro Games", "Apps"), all.take(4).map { it.label })
         assertEquals(all.size, all.map { it.key }.toSet().size)
@@ -42,7 +42,7 @@ class LeftMenuTest {
 
     @Test
     fun `Updates and Get new games are pages of Downloads and Updates, not rows of their own`() {
-        // The owner, 2026-10-30 (Droidtop/tracker#792): "Uh... There's a separate "updates" item in the left menu, now?";
+        // The owner, 2026-10-30 (mytop-project/tracker#792): "Uh... There's a separate "updates" item in the left menu, now?";
         // the way in is Downloads and Updates' "Updates · N available" row.
         assertFalse(GamingSection.NEW_GAMES in menuSectionsFor(UiMode.FULL))
         assertFalse(GamingSection.UPDATES in menuSectionsFor(UiMode.FULL))
@@ -104,7 +104,7 @@ class LeftMenuTest {
         assertEquals(emptyMap<GamingSection, Attention>(), leftMenuAttention(running = emptyList(), needYou = 0))
         assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(0.5f)), leftMenuAttention(listOf(0.25f, 0.75f, -1f), 0))
         assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(-1f)), leftMenuAttention(listOf(-1f), 0))
-        // Needing the person outranks the ring (Droidtop/tracker#643).
+        // Needing the person outranks the ring (mytop-project/tracker#643).
         assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Dot), leftMenuAttention(listOf(0.5f), needYou = 1))
     }
 
@@ -131,8 +131,8 @@ class LeftMenuTest {
 
     @Test
     fun `Plugins, Social and Game sources are not rows of the left menu`() {
-        // Owner, 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu" (Droidtop/tracker#586); "Downloads and
-        // Updates stays too, learning from steam. Game sources go into the qam, as does social" (Droidtop/tracker#644).
+        // Owner, 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu" (mytop-project/tracker#586); "Downloads and
+        // Updates stays too, learning from steam. Game sources go into the qam, as does social" (mytop-project/tracker#644).
         val off = listOf(GamingSection.STORES, GamingSection.SOCIAL, GamingSection.PLUGINS)
         assertEquals(off, GamingSection.entries.filter { it.offLeftMenu })
         off.forEach { section -> assertTrue(section.name, all.none { it.isAt(section) }) }

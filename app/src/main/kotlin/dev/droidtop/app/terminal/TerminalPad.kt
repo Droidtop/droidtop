@@ -3,7 +3,7 @@ package dev.droidtop.app.terminal
 import dev.droidtop.shell.gamepad.input.GamepadAction
 
 /**
- * What the pad does on droidtop's container terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909).
+ * What the pad does on droidtop's container terminal (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909).
  * The pad's meaning comes from the one key table every screen reads ([dev.droidtop.shell.gamepad.input.GamepadKeyMap],
  * the face-button swap applied there); this says what each meaning does here: the D-pad is the arrow keys, A is
  * Enter, X shows or hides the on-screen keyboard, and B (or Back) leaves. A keyboard's own keys never come through

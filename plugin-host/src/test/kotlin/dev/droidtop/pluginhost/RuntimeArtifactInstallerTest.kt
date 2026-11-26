@@ -74,7 +74,7 @@ class RuntimeArtifactInstallerTest {
     }
 
     @Test fun anEntryReachesOnlyInsideTheInstallFolderNeverASiblingSharingItsPrefix() {
-        // Droidtop/tracker#874: `python` and `python-evil` share a prefix; a plain startsWith let the second through.
+        // mytop-project/tracker#874: `python` and `python-evil` share a prefix; a plain startsWith let the second through.
         val dir = temp.newFolder("python")
         temp.newFolder("python-evil")
         assertEquals(File(dir, "lib/libpython3.so").canonicalFile, RuntimeArtifactInstaller.entryTarget(dir, "lib/libpython3.so"))

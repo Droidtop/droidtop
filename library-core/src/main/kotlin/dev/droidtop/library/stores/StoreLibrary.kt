@@ -79,7 +79,7 @@ enum class StoreHolding(
     /** Installed on the device but no longer held by the account (a licence ended, or signed out). */
     NOT_OWNED("No longer in your library"),
 
-    /** On the account's wishlist at the store and not owned (Droidtop/tracker#134): never installed, shown only on its own shelf and under the Ownership facet. */
+    /** On the account's wishlist at the store and not owned (mytop-project/tracker#134): never installed, shown only on its own shelf and under the Ownership facet. */
     WISHLIST("On your wishlist (not owned)"),
     ;
 
@@ -218,7 +218,7 @@ interface StoreAccountSignIn {
 
     /**
      * Whether the store needs the password with every request, so droidtop keeps it, sealed in its encrypted vault
-     * (Legacy Games, the owner's choice, Droidtop/tracker#913); the screen then says so instead of "not kept".
+     * (Legacy Games, the owner's choice, mytop-project/tracker#913); the screen then says so instead of "not kept".
      */
     val keepsPassword: Boolean get() = false
 
@@ -256,7 +256,7 @@ data class StorePlayOption(val id: String, val title: String, val detail: String
 data class StorePlayer(val steamId64: Long, val name: String, val dlc: Set<String>)
 
 /**
- * One of a store game's achievements and the signed-in account's progress in it (Droidtop/tracker#230). [earnedAtMs]
+ * One of a store game's achievements and the signed-in account's progress in it (mytop-project/tracker#230). [earnedAtMs]
  * is when it was earned, null while it is not (0: earned, the store gives no date); [hidden] is a secret one, described
  * only once earned; [progress] and [progressMax] a counted one's way there ("45 of 100"), null for one that is simply
  * earned or not; [rarityPercent] the share of the store's players who earned it, when the store says (GOG, Epic).
@@ -273,7 +273,7 @@ data class StoreAchievement(
     val rarityPercent: Float? = null,
 )
 
-/** A store game's achievements as the store reports them, read-only, for its page (Droidtop/tracker#230). */
+/** A store game's achievements as the store reports them, read-only, for its page (mytop-project/tracker#230). */
 data class StoreAchievements(val achievements: List<StoreAchievement>, val pageUrl: String? = null) {
     val total: Int get() = achievements.size
     val earned: Int get() = achievements.count { it.earnedAtMs != null }
@@ -312,7 +312,7 @@ interface StoreLibrary {
 
     /**
      * The store's own web site. Its declared icon is the store's mark, which droidtop caches once the store is
-     * signed in ([StoreMarks], Droidtop/tracker#503). Null: no mark is fetched and the generic glyph stays.
+     * signed in ([StoreMarks], mytop-project/tracker#503). Null: no mark is fetched and the generic glyph stays.
      */
     val siteUrl: String? get() = null
 
@@ -482,7 +482,7 @@ interface StoreLibrary {
 
     /**
      * [gameId]'s achievements and the signed-in account's progress, read-only, for the game's page
-     * (Droidtop/tracker#230). Null when the store reports none or nobody is signed in (the default); a failure is
+     * (mytop-project/tracker#230). Null when the store reports none or nobody is signed in (the default); a failure is
      * the store's sentence. Network work: never on the main thread.
      */
     suspend fun achievements(context: Context, gameId: String): Result<StoreAchievements>? = null
@@ -558,7 +558,7 @@ object StoreLibraries {
  * Says that a store's rows changed with no file to name (a sign-in, a sync, a
  * sign-out). The library reads the stores' rows again and replaces only the
  * store part of the PC library; no folder is walked (docs/SPEC.md 7g,
- * "Targeted indexing", Droidtop/tracker#354). That is what a path report for
+ * "Targeted indexing", mytop-project/tracker#354). That is what a path report for
  * a store's own install folder already does
  * (`PcGameProvider.indexPath`), so this reports the
  * first store's folder in the first games folder as changed: the folder is

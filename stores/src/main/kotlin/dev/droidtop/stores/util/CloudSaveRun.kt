@@ -10,7 +10,7 @@ import java.util.Locale
 
 /**
  * What GOG's and Epic's cloud save syncs share around [CloudSavePlan] (docs/SPEC.md 7g, "Stores",
- * Droidtop/tracker#224): the decision with the person asked on a conflict, the folders a store names walked into the
+ * mytop-project/tracker#224): the decision with the person asked on a conflict, the folders a store names walked into the
  * cloud's names, a cloud name turned back into a file that stays inside its folder, and the one line each outcome
  * reads as.
  */

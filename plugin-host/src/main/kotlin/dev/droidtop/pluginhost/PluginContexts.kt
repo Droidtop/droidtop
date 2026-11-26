@@ -23,7 +23,7 @@ import java.io.File
  * seen by the next sync.
  *
  * Two protocols (docs/plugin-api.md F8; droidtop-agent docs/DESIGN.md section 8;
- * Droidtop/tracker#794). Protocol 2, syncable data: the plugin publishes a whole
+ * mytop-project/tracker#794). Protocol 2, syncable data: the plugin publishes a whole
  * copy of its records ([publish]), droidtop makes it current in one rename, syncs
  * that copy with each computer by copies, and makes the merged copy current the
  * same way, so neither side ever reads half a copy and a stopped sync changes
@@ -49,7 +49,7 @@ class PluginContexts(
 
     /**
      * A context's published copy (protocol 2): what syncs, never the plugin's live data. [generation] counts its
-     * versions here. A data kind's copy (docs/plugin-api.md 3 H3, Droidtop/tracker#793) also carries [files], the
+     * versions here. A data kind's copy (docs/plugin-api.md 3 H3, mytop-project/tracker#793) also carries [files], the
      * binary part a record cannot hold (Syncthing's key and index database), kept under the folder [fileset] names.
      */
     data class Copy(val generation: Long, val records: JSONObject, val files: List<CopyFile> = emptyList(), val fileset: String? = null)
@@ -203,7 +203,7 @@ class PluginContexts(
 
     /**
      * Gives [toPlugin] [fromPlugin]'s current copy of data kind [kind] as its own next copy (docs/plugin-api.md 3 H3,
-     * Droidtop/tracker#793): the records whole, and each file copied into a fileset of the receiver's and checked
+     * mytop-project/tracker#793): the records whole, and each file copied into a fileset of the receiver's and checked
      * again, then made current in one rename. The source is only read. Returns the receiver's new copy, or null when
      * the source has no copy. Opens the receiver's context with the source's declaration when it has none.
      */

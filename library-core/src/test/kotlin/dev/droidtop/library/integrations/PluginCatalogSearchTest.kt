@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The plugin store search is a filter over the cached index (Droidtop/tracker#485): every word must be somewhere in the plugin. */
+/** The plugin store search is a filter over the cached index (mytop-project/tracker#485): every word must be somewhere in the plugin. */
 class PluginCatalogSearchTest {
     private val plugin = PluginCatalogPlugin(
         id = "dev.droidtop.plugin.nyaa",

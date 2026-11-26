@@ -90,7 +90,7 @@ object CompanionState {
     /**
      * What the last Quit or Kill from the companion came to, shown where it was pressed (the Game tab, the Now
      * card): "Ending <game>…" at once, then nothing when it ended or the reason it did not. Never silent
-     * (Droidtop/tracker#412: Kill and Quit left RetroArch running and said nothing).
+     * (mytop-project/tracker#412: Kill and Quit left RetroArch running and said nothing).
      */
     val stopStatus = MutableStateFlow<String?>(null)
 
@@ -108,7 +108,7 @@ object CompanionState {
         stopStatus.value = "Ending ${entry.title}…"
         launchError.value = null
         scope.launch {
-            // Kill force-stops at once; Quit tries the gentler steps first (Droidtop/tracker#571 row 16).
+            // Kill force-stops at once; Quit tries the gentler steps first (mytop-project/tracker#571 row 16).
             val stop = async(kotlinx.coroutines.Dispatchers.IO) {
                 val library = LibraryCore.library(app)
                 if (kill) library.killRunning(app, entry) else library.quitRunning(app, entry)

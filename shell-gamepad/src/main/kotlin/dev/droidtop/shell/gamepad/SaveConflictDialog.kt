@@ -27,7 +27,7 @@ import dev.droidtop.shell.gamepad.input.menuStep
 /**
  * Hosts the question a store's cloud-save sync asks when a game's saves
  * changed on this device and in the store's cloud since they last matched
- * (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313). While the Gaming shell is
+ * (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313). While the Gaming shell is
  * on screen it is the dialog; a launch from another shell finds nobody
  * registered and keeps both sides as they are.
  */
@@ -43,12 +43,12 @@ internal fun SaveConflictHost() {
 
 /**
  * "Cloud saves differ" (a store's cloud) or "Saves differ" (a paired computer,
- * Droidtop/tracker#814: "for saves, nobody 'wins' ... We ask the user"): this
+ * mytop-project/tracker#814: "for saves, nobody 'wins' ... We ask the user"): this
  * device's saves and the other side's, each with its device when known, when it
  * last changed and how many files, the newer one marked. When the replaced side
  * is kept as a copy ([SaveConflict.kept]), the dialog says so. "Decide later" comes
  * first and has the focus, so a mashed A changes nothing (the design
- * language's modal rule, Droidtop/tracker#663); each side is one labelled
+ * language's modal rule, mytop-project/tracker#663); each side is one labelled
  * action in the danger colour that says what it replaces, chosen with one
  * deliberate move and press, no arming. B decides later too.
  */

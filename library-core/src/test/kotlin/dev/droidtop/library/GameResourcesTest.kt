@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A game page's resources row (Droidtop/tracker#363): searches by the game's name. */
+/** A game page's resources row (mytop-project/tracker#363): searches by the game's name. */
 class GameResourcesTest {
     @Test
     fun `each resource searches for the game by name, encoded`() {

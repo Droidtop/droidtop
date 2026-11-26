@@ -20,7 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * `apps.catalog@1` (docs/plugin-api.md 3 A12, docs/SPEC.md 10b "Installing apps", Droidtop/tracker#261): plugins that
+ * `apps.catalog@1` (docs/plugin-api.md 3 A12, docs/SPEC.md 10b "Installing apps", mytop-project/tracker#261): plugins that
  * list Android apps (an F-Droid repository client, a tracker of release pages), and droidtop, which does everything
  * that touches the device. Core owns installing and update tracking; a plugin supplies a catalog:
  *

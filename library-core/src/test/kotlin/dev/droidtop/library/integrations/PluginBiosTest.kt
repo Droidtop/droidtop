@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** `emulator.bios@1` (docs/plugin-api.md 3 A11, Droidtop/tracker#415): what a provider's list becomes, and where a downloaded file goes. */
+/** `emulator.bios@1` (docs/plugin-api.md 3 A11, mytop-project/tracker#415): what a provider's list becomes, and where a downloaded file goes. */
 class PluginBiosTest {
     private val dir: File = Files.createTempDirectory("bios").toFile()
     private val md5Of = { bytes: ByteArray -> dev.droidtop.library.consoles.EmulatorSetup.md5(bytes) }

@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What Steam answers the plugin API's calls (docs/plugin-api.md 3 G8, Droidtop/tracker#379), read off the network. */
+/** What Steam answers the plugin API's calls (docs/plugin-api.md 3 G8, mytop-project/tracker#379), read off the network. */
 class SteamPluginAccountTest {
     private fun kv(name: String, value: String? = null, vararg children: KeyValue) = KeyValue(name, value).apply { this.children.addAll(children) }
 

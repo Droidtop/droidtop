@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * A Windows game's Drivers tab (docs/SPEC.md 5b, "Kernel drivers"; Droidtop/tracker#607, owner 2026-10-23): every
+ * A Windows game's Drivers tab (docs/SPEC.md 5b, "Kernel drivers"; mytop-project/tracker#607, owner 2026-10-23): every
  * kernel driver the game has been seen to install, each with an Approved switch, and the game's default for the rest,
  * which is deny and asks before it changes. This is the list the prefix layer will enforce (#584 piece 3); until it
  * lands droidtop only reads the prefix, so the tab says plainly that a driver still installs as the game left it.

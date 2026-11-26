@@ -10,7 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** docs/SPEC.md 3d "The docker command" and "The podman command" (Droidtop/tracker#555 D6c, D11): a closed set of requests. */
+/** docs/SPEC.md 3d "The docker command" and "The podman command" (mytop-project/tracker#555 D6c, D11): a closed set of requests. */
 class EngineCliTest {
     @get:Rule val tmp = TemporaryFolder()
 

@@ -2,7 +2,7 @@
 
 Upstream: https://github.com/termux/termux-app, tag `v0.118.3`, commit
 `5b657c6adf4304e5198951ce815fe0205dcac29c` (2025-05-23), pinned as the plain submodule `vendor/termux-app`. droidtop
-patches nothing in it, so it is upstream's own repository, not a fork (Droidtop/tracker#921).
+patches nothing in it, so it is upstream's own repository, not a fork (mytop-project/tracker#921).
 
 ## What is here
 

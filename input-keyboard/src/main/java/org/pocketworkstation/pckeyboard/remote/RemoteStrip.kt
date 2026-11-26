@@ -4,7 +4,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * What the keyboard's own strip says of a live "Type from another device" session (docs/SPEC.md, "Type from another
- * device", "On the keyboard", Droidtop/tracker#903). [live]: a phone is paired and may type, and the strip is shown;
+ * device", "On the keyboard", mytop-project/tracker#903). [live]: a phone is paired and may type, and the strip is shown;
  * otherwise it is hidden and the rest is empty. [sent]: what the phone last typed, null in a password field, where the
  * text is never kept here at all. [notReceived]: why the last thing sent went nowhere (the router's notice); the next
  * thing that lands clears it.

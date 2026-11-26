@@ -14,7 +14,7 @@ private const val MAX_NORMALIZED_DATA_BYTES = 8L * 1024L * 1024L
  * Whether SoundPool would mis-play this file: it treats every sample as
  * 16-bit PCM, so 8-bit, 24-bit and 32-bit integer samples and float samples
  * come out as noise (a chirp, then static like rain, in the owner's words on
- * Droidtop/tracker#160, whose theme's launch sample is 32-bit). Anything else
+ * mytop-project/tracker#160, whose theme's launch sample is 32-bit). Anything else
  * (16-bit PCM, or a compressed format the pool decodes itself) is left alone.
  */
 fun WavInfo.needsSixteenBit(): Boolean = when (encoding) {

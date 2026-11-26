@@ -28,13 +28,13 @@ object DesktopSetupPrefs {
     /**
      * Whether the person chose. Not "droidtop_desktop_keep_running_answered": up to 0.2.0-dev.2398 the offer, asked
      * before any surface could show it, stored an instant Cancel under that key as an answer nobody gave
-     * (Droidtop/tracker#389), so it is ignored and everyone is asked once more.
+     * (mytop-project/tracker#389), so it is ignored and everyone is asked once more.
      */
     private const val KEY_KEEP_RUNNING_ANSWERED = "droidtop_desktop_keep_running_chosen"
 
     /**
      * Whether leaving Desktop for another mode keeps the desktop running in
-     * the background (Droidtop/tracker#389). Off by default: a desktop
+     * the background (mytop-project/tracker#389). Off by default: a desktop
      * nobody sees still holds its memory, its processes and the audio
      * bridge's open output.
      */
@@ -56,7 +56,7 @@ object DesktopSetupPrefs {
     fun keepRunningAnswered(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_RUNNING_ANSWERED, false)
 
-    /** What leaving Desktop for another mode does to the desktop session (Droidtop/tracker#389). */
+    /** What leaving Desktop for another mode does to the desktop session (mytop-project/tracker#389). */
     enum class LeaveAction { STOP, KEEP, OFFER }
 
     /**
@@ -72,7 +72,7 @@ object DesktopSetupPrefs {
         else -> LeaveAction.OFFER
     }
 
-    /** The panel and launcher the sway desktop starts (dev.droidtop.runtime.DesktopPanel, Droidtop/tracker#353). */
+    /** The panel and launcher the sway desktop starts (dev.droidtop.runtime.DesktopPanel, mytop-project/tracker#353). */
     fun panel(context: Context): dev.droidtop.runtime.DesktopPanel =
         dev.droidtop.runtime.DesktopPanel.fromId(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_PANEL, null))
 
@@ -82,7 +82,7 @@ object DesktopSetupPrefs {
 
     /**
      * Whether sway tiles new windows instead of floating them (dev.droidtop.runtime.DesktopPanel.swayConfig,
-     * Droidtop/tracker#686). Off by default: floating is what a finger can move and resize.
+     * mytop-project/tracker#686). Off by default: floating is what a finger can move and resize.
      */
     fun tileWindows(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TILE_WINDOWS, false)
@@ -91,7 +91,7 @@ object DesktopSetupPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_TILE_WINDOWS, on).apply()
     }
 
-    /** The Linux desktop's background (dev.droidtop.runtime.DesktopAppearance, Droidtop/tracker#694). */
+    /** The Linux desktop's background (dev.droidtop.runtime.DesktopAppearance, mytop-project/tracker#694). */
     fun background(context: Context): dev.droidtop.runtime.DesktopAppearance.Background =
         dev.droidtop.runtime.DesktopAppearance.Background.fromId(
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_BACKGROUND, null),
@@ -103,7 +103,7 @@ object DesktopSetupPrefs {
 
     /**
      * Whether the primary's plan installs fonts for every script
-     * (CompositorProvisioning, Droidtop/tracker#390). On by default: a
+     * (CompositorProvisioning, mytop-project/tracker#390). On by default: a
      * library full of Japanese file names is unreadable without them.
      */
     fun allLanguageFonts(context: Context): Boolean =
@@ -131,7 +131,7 @@ object DesktopSetupPrefs {
 
     /**
      * The image cache as Settings > Containers sets it (docs/SPEC.md 3, "Storage is checked before it is spent";
-     * Droidtop/tracker#911): "Keep downloaded images" and "Cache size limit", [dev.droidtop.runtime.ImageCachePolicy.DEFAULT]
+     * mytop-project/tracker#911): "Keep downloaded images" and "Cache size limit", [dev.droidtop.runtime.ImageCachePolicy.DEFAULT]
      * until changed. Both backends read it through ContainerRuntimeFactory at each pull.
      */
     fun imageCachePolicy(context: Context): dev.droidtop.runtime.ImageCachePolicy {
@@ -152,7 +152,7 @@ object DesktopSetupPrefs {
             .putString(KEY_IMAGE_CACHE_LIMIT, dev.droidtop.runtime.ImageCachePolicy.limitId(bytes)).apply()
     }
 
-    /** Whether a desktop image has been chosen: without one no session can start (Droidtop/tracker#370). */
+    /** Whether a desktop image has been chosen: without one no session can start (mytop-project/tracker#370). */
     fun isSetUp(context: Context): Boolean = preferredPrimaryImageId(context) != null
 
     /**

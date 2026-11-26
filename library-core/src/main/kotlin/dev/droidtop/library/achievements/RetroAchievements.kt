@@ -36,7 +36,7 @@ sealed interface RaResult {
 
     /**
      * RetroAchievements has a game of this title, and no file of the game matches its list: shown only once the person
-     * confirms it ([RaChoices]; Droidtop/tracker#318 decision 7a). Nothing of the person's progress is asked for until then.
+     * confirms it ([RaChoices]; mytop-project/tracker#318 decision 7a). Nothing of the person's progress is asked for until then.
      */
     data class Proposed(val game: RaGame) : RaResult
 }

@@ -3,7 +3,7 @@ package dev.droidtop.runtime.tasks
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The device-setup items' pure parts (docs/SPEC.md "Device setup", Droidtop/tracker#816). */
+/** The device-setup items' pure parts (docs/SPEC.md "Device setup", mytop-project/tracker#816). */
 class DeviceSetupTest {
     private val own = "dev.droidtop.app/dev.droidtop.app.TypingAccessibilityService"
     private val vendor = "com.retroid.gameassistant/.Service"

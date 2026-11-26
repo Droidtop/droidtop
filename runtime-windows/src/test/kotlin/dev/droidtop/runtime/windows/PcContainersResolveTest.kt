@@ -24,7 +24,7 @@ class PcContainersResolveTest {
 
     @Test
     fun `a game with no prefix of its own never lands in another game's, whatever is listed first`() {
-        // Droidtop/tracker#928: one game's own prefix sorted first, and every shared-prefix game launched in it.
+        // mytop-project/tracker#928: one game's own prefix sorted first, and every shared-prefix game launched in it.
         val existing = listOf("CUSTOM_GAME_5", "STEAM_1")
         assertEquals("STEAM_1", PcContainers.resolveId(chosen = null, ownId = null, existing = existing, shared = "STEAM_1"))
         assertEquals("STEAM_1", PcContainers.resolveId(chosen = null, ownId = "STEAM_99", existing = existing, shared = "STEAM_1"))

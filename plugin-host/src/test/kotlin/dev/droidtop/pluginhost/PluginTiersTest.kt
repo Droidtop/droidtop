@@ -154,7 +154,7 @@ class PluginTiersTest {
 
     @Test
     fun `each granted hole permission opens only its own hole`() {
-        // Owner's decision (Droidtop/tracker#553): one open process type, each grant opening only its own hole.
+        // Owner's decision (mytop-project/tracker#553): one open process type, each grant opening only its own hole.
         val r = record(manifest { it.put("permissions", arr(gpu, net)) })
         assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants()))
         assertTrue(PluginTiers.holes(r, grants()).isEmpty())

@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The links a plugin may register and how they match (docs/plugin-api.md 3 F3, Droidtop/tracker#459). */
+/** The links a plugin may register and how they match (docs/plugin-api.md 3 F3, mytop-project/tracker#459). */
 class PluginLinksTest {
     private fun entry(vararg links: JSONObject) =
         ProvidedPoint(point = "apps.catalog", extra = JSONObject().put("links", JSONArray(links.toList())).toString())

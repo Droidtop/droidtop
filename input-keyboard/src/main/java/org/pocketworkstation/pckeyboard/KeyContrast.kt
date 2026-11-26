@@ -5,7 +5,7 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Text on a key is readable in every look Hacker Keyboard Reborn draws itself (Droidtop/tracker#903 H12b; docs/SPEC.md
+ * Text on a key is readable in every look Hacker Keyboard Reborn draws itself (mytop-project/tracker#903 H12b; docs/SPEC.md
  * 6a, "Themes, light and dark"): a key's label reaches at least [TEXT] (WCAG 2's 4.5:1 for normal text) against each
  * plate it can sit on, a letter's, a function key's, a latched modifier's and a pressed key's ([KeyPlates.plateColor]),
  * and an alt-key hint at least [HINT] (3:1, WCAG's floor for what is not body text) against the letter and function

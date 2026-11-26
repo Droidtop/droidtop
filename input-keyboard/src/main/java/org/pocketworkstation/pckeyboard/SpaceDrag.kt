@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import kotlin.math.abs
 
 /**
- * Space-bar drag moves the cursor (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340). A touch that starts
+ * Space-bar drag moves the cursor (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340). A touch that starts
  * on the space key stays an ordinary space press until it has moved [activatePx] sideways; from then on it is a
  * cursor drag and every [stepPx] further moves the cursor one place, left or right. The thresholds are in pixels
  * here and in dp at the caller, so a handheld's dense panel and a tablet feel alike.

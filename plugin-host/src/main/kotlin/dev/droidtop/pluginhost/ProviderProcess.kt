@@ -15,7 +15,7 @@ import org.json.JSONObject
 /**
  * A long-running privileged command through a `priv.shell` provider plugin (docs/plugin-api.md 2.7, "Stream
  * sessions"), as a [Process]: droidtop's `PrivilegedShell.spawn` shape, for a command that outlives one call or takes
- * input (the rooted desktop stack, Droidtop/tracker#394), with no `su` anywhere. The provider runs it (Shizuku's
+ * input (the rooted desktop stack, mytop-project/tracker#394), with no `su` anywhere. The provider runs it (Shizuku's
  * server, as the shell user or as root); this object turns the session ops into streams:
  *
  * - stdout and stderr: a pump thread long-polls `stream_read` and feeds two pipes until the provider says it exited;

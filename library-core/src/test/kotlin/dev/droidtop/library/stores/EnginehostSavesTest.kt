@@ -9,7 +9,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * Droidtop/tracker#580: droidtop names the game's own save folder to Enginehost, and Enginehost reports exactly that
+ * mytop-project/tracker#580: droidtop names the game's own save folder to Enginehost, and Enginehost reports exactly that
  * folder when it took it, so the upload after the game ends is decided by equality.
  */
 class EnginehostSavesTest {
@@ -108,7 +108,7 @@ class EnginehostSavesTest {
 
     @Test
     fun aBroadcastOnlyAsksForTheUploadOfTheFolderDroidtopPassed() {
-        // Droidtop/tracker#550: any app can send GAME_ENDED. Naming the passed folder only asks for its upload; naming any
+        // mytop-project/tracker#550: any app can send GAME_ENDED. Naming the passed folder only asks for its upload; naming any
         // other folder copies from it only when the report is Enginehost's own, through its plugin's broker.
         val other = "/storage/emulated/0/Documents"
         assertEquals(EnginehostSaves.ReportTrust.UPLOAD_PASSED, EnginehostSaves.reportTrust(passed, passed, fromEnginehost = false))

@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         deliver = { event -> deliverKey(event) },
         enabled = { mode != Mode.DESKTOP },
         // Made-up keys (a held stick's repeats) stop the moment another app on
-        // either screen has the pad (Droidtop/tracker#265).
+        // either screen has the pad (mytop-project/tracker#265).
         focused = { topResumed },
         // The overlays composed in this window own the keys from the moment they are pushed (SPEC 6e).
         overlays = OverlayKeys(),
@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     private var gamingDeepLinkToken by mutableStateOf(0)
     private var gamingStartSection by mutableStateOf<String?>(null)
     private var gamingQuickMenu by mutableStateOf(false)
-    // Whether the last arrival was a HOME press (Droidtop/tracker#936): with no game running, the shell goes Home.
+    // Whether the last arrival was a HOME press (mytop-project/tracker#936): with no game running, the shell goes Home.
     private var gamingHomePress by mutableStateOf(false)
     private var gamingTriggerRescan by mutableStateOf(false)
     private var gamingTriggerBrowseThemes by mutableStateOf(false)
@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     /**
      * Whether Desktop setup has chosen a desktop image. Without one there is nothing for the session to
      * start, so the desktop shows its setup page instead of starting a session that can only fail, and
-     * the notification question waits for a session that will run (Droidtop/tracker#370).
+     * the notification question waits for a session that will run (mytop-project/tracker#370).
      */
     private var desktopSetUp by mutableStateOf(true)
 
@@ -225,7 +225,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false) ||
             (homePress && running != null)
         gamingDeepLinkToken++
-        // One line per arrival, so a HOME that did not bring the menu says which half was missing (Droidtop/tracker#86).
+        // One line per arrival, so a HOME that did not bring the menu says which half was missing (mytop-project/tracker#86).
         android.util.Log.i(
             "droidtop.ReturnToGame",
             "arrival: homePress=$homePress running=${running?.gameId} quickMenu=$gamingQuickMenu token=$gamingDeepLinkToken",
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     /**
      * Whether this instance is the storage-full screen and nothing else (docs/SPEC.md 10c, "Storage full";
-     * Droidtop/tracker#849). Every lifecycle step below that starts, reads or writes anything returns early while it
+     * mytop-project/tracker#849). Every lifecycle step below that starts, reads or writes anything returns early while it
      * is, and the shell's fields it would touch (the library, the display orchestrator) were never made.
      */
     internal var storageFull = false
@@ -243,7 +243,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Too little space to start: one plain screen that says so, before any preference is read or any shell is
-        // built (Droidtop/tracker#849, about 12 MB free ended in "Application does not have a focused window").
+        // built (mytop-project/tracker#849, about 12 MB free ended in "Application does not have a focused window").
         if (StorageFullScreen.showIfFull(this)) {
             storageFull = true
             return
@@ -253,7 +253,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // that saved this state, and re-applying them would drag the user
         // back to the section those extras named -- away from the place
         // the restored shell state (GamepadShell's saveable back stack,
-        // Droidtop/tracker#87) actually holds. The Text size setting
+        // mytop-project/tracker#87) actually holds. The Text size setting
         // triggers exactly such a recreate (AccessibilityPrefs). Real
         // re-deliveries still arrive, and are applied, through
         // onNewIntent below.
@@ -378,7 +378,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // in Gaming mode droidtop goes immersive and the theme's clock
             // is the only one. Desktop is immersive too: its sheets hid the
             // bars and closing one showed them again, so the desktop resized
-            // under the person (Droidtop/tracker#555 D4); its own bar carries
+            // under the person (mytop-project/tracker#555 D4); its own bar carries
             // what the status bar did. Standard keeps the system bars.
             LaunchedEffect(mode) { applySystemBars(mode) }
             // Signed-in stores last read longer ago than the person's interval are read again as
@@ -445,7 +445,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                             }
                         },
                         loadLinuxApps = connected?.let { session ->
-                            // With each app's icon from the container's theme, resolved once and cached (Droidtop/tracker#689).
+                            // With each app's icon from the container's theme, resolved once and cached (mytop-project/tracker#689).
                             suspend {
                                 val apps = ContainerApplications.list(session.runtime, session.container)
                                 dev.droidtop.runtime.ContainerIcons.attach(session.runtime, session.container, filesDir, apps)
@@ -467,7 +467,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         onRestartSession = { DesktopSessionService.restart(this@MainActivity) },
                         onStopSession = { DesktopSessionService.stop(this@MainActivity) },
                         onLockScreen = { lockScreen(this@MainActivity) },
-                        // With a second output (DesktopSecondScreen, Droidtop/tracker#908 step D3) the primary's touch
+                        // With a second output (DesktopSecondScreen, mytop-project/tracker#908 step D3) the primary's touch
                         // names its own output, and a new primary size places the others again; the bar lists the
                         // primary's windows and a window can be moved to another screen (step D4).
                         outputs = connected?.outputs.orEmpty(),
@@ -585,7 +585,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     }
 
     /**
-     * Asks, in the mode just switched to, whether the desktop left behind keeps running (Droidtop/tracker#389,
+     * Asks, in the mode just switched to, whether the desktop left behind keeps running (mytop-project/tracker#389,
      * docs/SPEC.md 3 "Stopping is a stop"). It runs until the answer; either answer is kept as the Settings
      * switch, so this is asked once. Stop, a dismissal, or no surface to ask on stops it, as leaving always did,
      * unless the person is back in Desktop by then.
@@ -595,7 +595,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         keepRunningOffer = lifecycleScope.launch {
             // The mode just switched to attaches its dialog host once it composes, and Desktop has none, so asking
             // at once came back Cancel unseen, stopped the desktop and was stored as the person's answer (rig 2398,
-            // Droidtop/tracker#389). Wait for the host; with none, stop as before and keep the question for next time.
+            // mytop-project/tracker#389). Wait for the host; with none, stop as before and keep the question for next time.
             if (!dev.droidtop.library.settings.NoticeDialogs.awaitHost(KEEP_RUNNING_HOST_WAIT_MS)) {
                 if (mode != Mode.DESKTOP) DesktopSessionService.stop(this@MainActivity)
                 return@launch
@@ -630,7 +630,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Desktop mode's, and a compositor nobody can see must not keep
         // running behind Gaming (rig, dq-coordinator-23 F9), unless the
         // person chose to keep it running, or has not chosen yet and is
-        // asked now (Droidtop/tracker#389).
+        // asked now (mytop-project/tracker#389).
         if (previous == Mode.DESKTOP && mode != Mode.DESKTOP) {
             val action = DesktopSetupPrefs.leaveAction(
                 sessionLive = DesktopSessionService.state.value is DesktopSessionState.Connected,
@@ -663,7 +663,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             reinitializeDisplays()
         } else {
             // Switch mode > Gaming or Desktop after Android: the companion's screen was taken by the launcher, and
-            // the person asked for droidtop back (Droidtop/tracker#522).
+            // the person asked for droidtop back (mytop-project/tracker#522).
             if (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAYS_BACK, false)) displayOrchestrator.companionBack()
             displayOrchestrator.refresh()
         }
@@ -720,7 +720,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         val shellDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY
         dev.droidtop.runtime.HomeDisplays.shellShown(shellDisplay)
         dev.droidtop.runtime.HomeDisplays.used(shellDisplay)
-        // Kept for the next process's Home press, which starts the shell here rather than moving it (Droidtop/tracker#824).
+        // Kept for the next process's Home press, which starts the shell here rather than moving it (mytop-project/tracker#824).
         if (shellDisplay != null) {
             val app = applicationContext
             dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.ShellPlacement.remember(app, shellDisplay) }
@@ -1076,7 +1076,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
         private var live: java.lang.ref.WeakReference<MainActivity>? = null
 
-        /** The live shell instance, neither finishing nor destroyed, or null: a companion with none starts one (Droidtop/tracker#788). */
+        /** The live shell instance, neither finishing nor destroyed, or null: a companion with none starts one (mytop-project/tracker#788). */
         fun current(): MainActivity? = live?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
     }
 }

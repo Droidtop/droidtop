@@ -10,7 +10,7 @@ import android.media.session.PlaybackState
 /**
  * What is playing now, read from the newest active media session through droidtop's notification access
  * (`MediaSessionManager.getActiveSessions`): no account and no credentials. One reader for the companion's Now
- * playing card and Gaming's Quick Menu (Droidtop/tracker#716). Without access, or with no session, there is nothing.
+ * playing card and Gaming's Quick Menu (mytop-project/tracker#716). Without access, or with no session, there is nothing.
  */
 object MediaNow {
     /** droidtop's notification listener, the component the session list is asked for. */

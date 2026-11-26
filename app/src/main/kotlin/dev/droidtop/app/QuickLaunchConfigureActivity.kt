@@ -33,7 +33,7 @@ import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.scraper.isPcOrEngineGame
 
 /**
- * The Quick launch widget's configure activity (Droidtop/tracker#563): picks the one game the widget plays. Opened by
+ * The Quick launch widget's configure activity (mytop-project/tracker#563): picks the one game the widget plays. Opened by
  * the launcher when the widget is placed (and again where the launcher can reconfigure a widget), and by a tap on a
  * widget whose game is unset or gone. Lists the library's playable games under the names Gaming gives them, one card
  * per game as the Games grid groups them, filtered by what is typed; a pick saves it ([WidgetConfigs]) and draws the

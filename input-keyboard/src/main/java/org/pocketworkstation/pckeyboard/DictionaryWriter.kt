@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * Writes the keyboard engine's binary dictionary (Droidtop/tracker#339; docs/SPEC.md 6a "Dictionaries"): the format
+ * Writes the keyboard engine's binary dictionary (mytop-project/tracker#339; docs/SPEC.md 6a "Dictionaries"): the format
  * AOSP's 2011 LatinIME reads, as the native reader in src/main/cpp/dictionary.cpp does, version 200 with bigrams.
  * Pure: words and bigrams in, bytes out.
  *

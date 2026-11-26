@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * What Get new games opens on (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, Droidtop/tracker#612): "The
+ * What Get new games opens on (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, mytop-project/tracker#612): "The
  * 'get new games' page should NOT open to a blank search bar. It should open to a recommendations list, with the
  * ability to search at the top." Everything here comes from the person's library and their sources; nothing is
  * invented: what each source features ([GameSourceProvider.featured], docs/plugin-api.md 1.8), what the library

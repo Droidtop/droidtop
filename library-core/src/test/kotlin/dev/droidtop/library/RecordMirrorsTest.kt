@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Droidtop/tracker#599, Bare Witness on the console: a mirror picked from a saved record had no address, its token was
+ * mytop-project/tracker#599, Bare Witness on the console: a mirror picked from a saved record had no address, its token was
  * stale after the thread changed, and the source's job said "the thread no longer lists that link". The same mirror is
  * found in the record asked again, and opened from there.
  */

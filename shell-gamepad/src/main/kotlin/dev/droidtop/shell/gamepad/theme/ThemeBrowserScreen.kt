@@ -197,7 +197,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         ) {
             Text(stringResource(R.string.browse_themes), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
-            // Every network page's one offline notice, before a download is pressed only to fail (Droidtop/tracker#594).
+            // Every network page's one offline notice, before a download is pressed only to fail (mytop-project/tracker#594).
             if (offline) {
                 dev.droidtop.ui.shared.NoticeCard(
                     dev.droidtop.ui.shared.Offline.notice(),

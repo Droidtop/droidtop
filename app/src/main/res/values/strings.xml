@@ -40,7 +40,7 @@
     <!-- TypingAccessibilityService (docs/SPEC.md 4c, "Typing on the add-on display"): its name and what it does,
          shown in Android's accessibility settings. -->
     <string name="typing_accessibility_label">droidtop: HOME button combos, keyboard and pointer over other apps</string>
-    <!-- The companion Game page's heading over Quit, Restart and Kill (Droidtop/tracker#835). -->
+    <!-- The companion Game page's heading over Quit, Restart and Kill (mytop-project/tracker#835). -->
     <string name="companion_game_stop">Stop</string>
     <string name="typing_accessibility_description">Lets HOME held with R2, L2 or Start open droidtop\'s menus over the game or app you are using, while droidtop is your home screen. Every other key goes on to the app untouched. Its accessibility button opens the same menus by touch. Also shows droidtop\'s keyboard when you tap a text field in another app on a screen Android shows no keyboard on, and types what you press into that field. When you use the companion screen\'s trackpad on another app, it draws a pointer on the main screen and plays the taps, long presses, drags and swipes you make there. It reads only the text of the field you are typing in, to edit it, and stores nothing.</string>
     <string name="companion_performance_collecting_readings">Collecting readings...</string>
@@ -144,23 +144,23 @@
     <string name="shelf_configure_done">Done</string>
     <string name="companion_app_picker_game">Game</string>
     <string name="companion_power_battery">Battery: %1$s</string>
-    <!-- Onboarding's Android settings step (docs/SPEC.md "Device setup", Droidtop/tracker#816) -->
+    <!-- Onboarding's Android settings step (docs/SPEC.md "Device setup", mytop-project/tracker#816) -->
     <string name="device_setup_change">Change it</string>
     <string name="device_setup_undo">Undo</string>
     <string name="device_setup_not_now">Not now</string>
-    <!-- The storage-full screen, shown instead of droidtop when too little space is free to start (docs/SPEC.md 10c, "Storage full", Droidtop/tracker#849) -->
+    <!-- The storage-full screen, shown instead of droidtop when too little space is free to start (docs/SPEC.md 10c, "Storage full", mytop-project/tracker#849) -->
     <string name="storage_full_title">Storage is full</string>
     <string name="storage_full_body">droidtop needs about %1$s free to start.</string>
     <string name="storage_full_open_settings">Open storage settings</string>
     <string name="storage_full_try_again">Try again</string>
     <string name="storage_full_still">Still only %1$s free.</string>
-    <!-- The desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
+    <!-- The desktop's background picture (DesktopBackgroundPicture, mytop-project/tracker#694). -->
     <string name="desktop_background_picture_saved">Set. Shows on the desktop\'s next start.</string>
     <string name="desktop_background_picture_failed">Couldn\'t use that picture.</string>
     <!-- KDE Connect's touchpad (docs/SPEC.md 7p). -->
     <string name="kdeconnect_touchpad_title">Controlling %1$s</string>
     <string name="kdeconnect_touchpad_help">Drag to move, tap to click, two fingers to scroll. B leaves</string>
-    <!-- The terminal into a container on Android (ContainerTerminalActivity, docs/SPEC.md 3d "A terminal on Android", Droidtop/tracker#909). -->
+    <!-- The terminal into a container on Android (ContainerTerminalActivity, docs/SPEC.md 3d "A terminal on Android", mytop-project/tracker#909). -->
     <string name="terminal_title">Terminal in %1$s</string>
     <string name="terminal_opening">Opening a shell…</string>
     <string name="terminal_failed">Couldn\'t open a shell: %1$s</string>

@@ -88,7 +88,7 @@ internal class GridPad(val state: LazyGridState, private val scope: CoroutineSco
      * pure, no mutation, so a caller can ask "would this move" on both
      * the DOWN edge of a press (to decide whether to actually [move]) and
      * the matching UP edge (to decide whether to consume the release
-     * too, Droidtop/tracker#1) without moving twice for one press.
+     * too, mytop-project/tracker#1) without moving twice for one press.
      */
     private fun targetFor(direction: FocusDirection): Int? =
         gridPadTarget(at = focused, count = state.layoutInfo.totalItemsCount, cols = columns(), direction = direction)
@@ -129,7 +129,7 @@ internal class GridPad(val state: LazyGridState, private val scope: CoroutineSco
             // attaching -- a one-shot requestFocus() here raced that gap
             // often enough to be the real cause of Up/Down at a page
             // boundary sometimes just not moving anything (owner, console,
-            // Droidtop/tracker#1: "Up is now swallowed, not moved").
+            // mytop-project/tracker#1: "Up is now swallowed, not moved").
             // requestFocusWhenAttached already exists for exactly this
             // (GamepadShell.kt's own doc comment, the identical race for a
             // themed list's first row) -- reused here instead of a second,

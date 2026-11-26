@@ -30,7 +30,7 @@ object RestrictedSettingsRules {
 }
 
 /**
- * Android 13+ "restricted settings" (docs/SPEC.md 4c, "Typing on the add-on display"; Droidtop/tracker#314,
+ * Android 13+ "restricted settings" (docs/SPEC.md 4c, "Typing on the add-on display"; mytop-project/tracker#314,
  * #329): a sideloaded droidtop cannot be given notification access or turn its accessibility service on until
  * "Allow restricted settings" is chosen in its App info screen. Every place that offers one of those grants also
  * offers this one step when it is needed, as one row: [TITLE] with the value [VALUE], opening App info.

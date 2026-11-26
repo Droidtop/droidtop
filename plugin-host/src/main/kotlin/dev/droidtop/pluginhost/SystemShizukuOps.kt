@@ -269,7 +269,7 @@ class SystemShizukuOps : ElevatedBackend {
 /**
  * How the system Shizuku's binder reaches droidtop's processes. Shizuku's server pushes it to the one provider named
  * `<applicationId>.shizuku`, which lives in droidtop's main process (plugin-host's manifest, docs/plugin-api.md 2.7),
- * so a cold start never waits on another process to publish it (Droidtop/tracker#775). Shizuku's built-in
+ * so a cold start never waits on another process to publish it (mytop-project/tracker#775). Shizuku's built-in
  * multi-process support then shares it: the main process rebroadcasts the binder, and the full-trust slots ask the
  * provider for it. Sui needs no provider: it hands the binder to any process that asks, so
  * each process asks once. Everything here is idempotent and safe to call from any process.

@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The in-place hints (docs/DESIGN-LANGUAGE.md, "Guidance"; Droidtop/tracker#829): one short line, shown where the thing
+ * The in-place hints (docs/DESIGN-LANGUAGE.md, "Guidance"; mytop-project/tracker#829): one short line, shown where the thing
  * is done, until the person has done it or dismissed it. The owner, 2026-10-30: "minimally intrusive guidance telling
  * users how to do certain things". Whether a hint is done is kept in the one "seen" store that update onboarding's
  * steps use ([FeatureSteps]), under the hint's own id, so there is one record of what droidtop has already taught.

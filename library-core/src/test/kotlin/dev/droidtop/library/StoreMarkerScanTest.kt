@@ -8,7 +8,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * Store markers (docs/SPEC.md 7g, Droidtop/tracker#397 slice E): the PC
+ * Store markers (docs/SPEC.md 7g, mytop-project/tracker#397 slice E): the PC
  * folder scan reads GOG's `goggame-<id>.info` and Epic's `.egstore` off the
  * listing it already has, and the folder game's row says which store's game
  * it is.

@@ -64,7 +64,7 @@ object ContextActionFilter {
 }
 
 /**
- * The systems a `library.sources` entry serves (docs/plugin-api.md 1.6, Droidtop/tracker#543): the entry's static
+ * The systems a `library.sources` entry serves (docs/plugin-api.md 1.6, mytop-project/tracker#543): the entry's static
  * `systems`, a list of droidtop system ids or `"*"` for every system. Decided from the manifest alone, so a Get games
  * page never loads a plugin to learn whether to list it. An entry without a usable `systems` is [UNDECLARED]: it keeps
  * the behaviour every source had before the field existed (listed under every system, asked by every search).
@@ -217,7 +217,7 @@ object PluginMetadataProtocol {
 
     /**
      * Whether [title] is only one of [ids]' values, alone or after one word ("214581", "Thread 214581"): a stand-in for a
-     * name the source did not give, which docs/plugin-api.md 1.11 forbids (Droidtop/tracker#784). droidtop then asks the
+     * name the source did not give, which docs/plugin-api.md 1.11 forbids (mytop-project/tracker#784). droidtop then asks the
      * source's `fetch` for the name instead of showing the id as one.
      */
     fun isIdOnly(title: String?, ids: JSONObject): Boolean {
@@ -287,7 +287,7 @@ object PluginTileProtocol {
     }
 
     /**
-     * A tile's game filter (docs/plugin-api.md 3 C2, Droidtop/tracker#544 item 6): `"whileGame": true` shows it only
+     * A tile's game filter (docs/plugin-api.md 3 C2, mytop-project/tracker#544 item 6): `"whileGame": true` shows it only
      * while a game is running, and `"gamePackages": [...]` (the `ui.panel` entry's field) only while one of those apps
      * runs the game. A tile with neither shows whatever runs. Pure: [gameRunning] and [runningPackage] are the host's.
      */
@@ -302,7 +302,7 @@ object PluginTileProtocol {
     /**
      * `state` answers `{label, value, on?, severity?}`. A missing label falls back to the tile's own. The label and the
      * value are cut to the view limits' `tileLabel` and `tileValue` (32 and 16): a tile is a host row of fixed height,
-     * so a long answer ellipsizes instead of growing it (Droidtop/tracker#644, "Plugins inherit it").
+     * so a long answer ellipsizes instead of growing it (mytop-project/tracker#644, "Plugins inherit it").
      */
     fun state(data: JSONObject, fallbackLabel: String): TileState = TileState(
         label = cut(data.optString("label").takeIf { it.isNotBlank() && !data.isNull("label") } ?: fallbackLabel, PluginViewLimits.length("tileLabel")),

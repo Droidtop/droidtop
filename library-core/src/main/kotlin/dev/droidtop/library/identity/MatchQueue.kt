@@ -14,7 +14,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The games waiting for the person's pick, with what the source answered (Droidtop/tracker#318 §4.1, §5): a scrape that
+ * The games waiting for the person's pick, with what the source answered (mytop-project/tracker#318 §4.1, §5): a scrape that
  * does not take a match queues the game with its best five candidates, so Review Matches opens at once and works
  * offline, and a match (automatic or picked) takes it off. Today's matcher still decides what is taken (the new score
  * is not live until its calibration set passes, §3.3); the score only sorts the queue into Likely, Unsure and Not

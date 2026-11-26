@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** System > Power's probe (PowerProbe.kt, Droidtop/tracker#414 slice C16). Setting names here are made-up examples. */
+/** System > Power's probe (PowerProbe.kt, mytop-project/tracker#414 slice C16). Setting names here are made-up examples. */
 class PowerProbeTest {
     private val system = """
         screen_brightness=120

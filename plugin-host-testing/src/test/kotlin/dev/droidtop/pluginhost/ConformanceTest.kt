@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The `native_bundle` kind's fixture through the conformance script (docs/plugin-api.md 3 I2, Droidtop/tracker#71).
+ * The `native_bundle` kind's fixture through the conformance script (docs/plugin-api.md 3 I2, mytop-project/tracker#71).
  * The python fixture runs the same cases in droidtop_fake_host.py.
  */
 class ConformanceTest {

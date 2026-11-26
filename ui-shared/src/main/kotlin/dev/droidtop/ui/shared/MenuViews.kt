@@ -15,7 +15,7 @@ import dev.droidtop.shell.gamepad.AnchoredMenu
 import dev.droidtop.shell.gamepad.GamingTheme
 
 /**
- * The item menu for a View surface (docs/DESIGN-LANGUAGE.md, "The anchored menu"; Droidtop/tracker#827): Mobile is
+ * The item menu for a View surface (docs/DESIGN-LANGUAGE.md, "The anchored menu"; mytop-project/tracker#827): Mobile is
  * the forked Launcher3, so droidtop's own menus there (a folder's options, a drawer tab's, an app's Drawer tabs) open
  * the one [AnchoredMenu] through here, beside the view they belong to, in the colours outside Gaming
  * ([GamingTheme] with `outsideGaming`, docs/SPEC.md 7k "Colours outside Gaming"). Launcher3's own popups are not

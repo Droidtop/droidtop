@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#786 S9: the Network pin names the network and does something when tapped. */
+/** mytop-project/tracker#786 S9: the Network pin names the network and does something when tapped. */
 class NetworkPinTest {
     @Test fun `the pin names the Wi-Fi network where it can`() {
         assertEquals("Home 5G", networkPinValue(NetworkKind.WIFI, "Home 5G", wifiOn = true))

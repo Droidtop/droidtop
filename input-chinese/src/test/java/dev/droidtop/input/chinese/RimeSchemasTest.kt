@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H8b: which schema and forms each Chinese input language gets, and how keys reach librime. */
+/** mytop-project/tracker#903 H8b: which schema and forms each Chinese input language gets, and how keys reach librime. */
 class RimeSchemasTest {
     private val simp = RimeSchemas.Choice("luna_pinyin_simp", "zh_hant", simplifiedFirst = true)
     private val tw = RimeSchemas.Choice("luna_pinyin_tw", "zh_hant_tw", simplifiedFirst = false)

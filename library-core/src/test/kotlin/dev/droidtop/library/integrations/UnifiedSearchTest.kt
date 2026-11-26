@@ -139,7 +139,7 @@ class UnifiedSearchTest {
         assertTrue(last.sources.first { it.source.id == "hung" }.failure != null)
     }
 
-    /** Droidtop/tracker#848: a source is started first, on its own bound, so a slow start is not spent out of its search. */
+    /** mytop-project/tracker#848: a source is started first, on its own bound, so a slow start is not spent out of its search. */
     private fun runWarm(source: GameSourceProvider, warm: suspend (GameSourceProvider) -> String?, timeoutMs: Long, loadTimeoutMs: Long) =
         UnifiedSearch.stream(
             query = "sonic",
@@ -254,7 +254,7 @@ class UnifiedSearchTest {
 
     @Test
     fun `a game found only on a source is new, one the library has too is not`() {
-        // Owner, 2026-10-23: "Get new games should be presented under the search results" (Droidtop/tracker#612).
+        // Owner, 2026-10-23: "Get new games should be presented under the search results" (mytop-project/tracker#612).
         val rows = UnifiedSearch.rank(
             "love",
             listOf(LocalSearchRow("lib", SearchRowKind.GAME, "Love and Sex: Second Base", "Game") {}),

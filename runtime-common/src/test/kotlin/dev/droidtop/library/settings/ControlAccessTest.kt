@@ -15,7 +15,7 @@ class ControlAccessTest {
      * Every mode's sets, written out. A mode added to [UiMode] is missing here and fails this test until its
      * sets are decided and written down.
      */
-    /** Every panel but the companion's own Device and droidtop (Droidtop/tracker#786): the Quick Menu's whole set. */
+    /** Every panel but the companion's own Device and droidtop (mytop-project/tracker#786): the Quick Menu's whole set. */
     private val quickMenuPanels = ControlPanel.entries.toSet() - ControlPanel.DEVICE - ControlPanel.DROIDTOP
 
     private val expected: Map<UiMode, Triple<Set<ControlPanel>, Set<ControlPanel>, Set<ControlRow>>> = mapOf(
@@ -121,7 +121,7 @@ class ControlAccessTest {
         // Play time is Kid's alone: the line on Home is not Guest's or Kiosk's.
         assertTrue(ControlAccess.shows(UiMode.KID, ControlRow.PLAY_TIME))
         assertFalse(ControlAccess.shows(UiMode.GUEST, ControlRow.PLAY_TIME) || ControlAccess.shows(UiMode.KIOSK, ControlRow.PLAY_TIME))
-        // Kid and Kiosk keep every Quick Menu section but the owner's Profile (Droidtop/tracker#586).
+        // Kid and Kiosk keep every Quick Menu section but the owner's Profile (mytop-project/tracker#586).
         assertEquals(quickMenuPanels - ControlPanel.PROFILE, ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
     }
 

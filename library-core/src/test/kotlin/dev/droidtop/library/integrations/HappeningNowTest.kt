@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The status area's one contextual spot: what is happening now, read from the jobs (Droidtop/tracker#742). */
+/** The status area's one contextual spot: what is happening now, read from the jobs (mytop-project/tracker#742). */
 class HappeningNowTest {
 
     private fun job(id: String, native: String?, percent: Int = -1, done: Boolean = false, paused: Boolean = false) = PluginJobsCenter.Entry(

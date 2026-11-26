@@ -90,7 +90,7 @@ object WinePrefixTools {
      * [file] in [container]: the one place a program the person picked starts ([launchOf]). It starts in its
      * own folder, and that folder is put on a drive of the prefix first when no drive holds it yet
      * ([PrefixDrives.withFolder]), so what it writes beside itself (a translation updater rewriting the game's
-     * files, Droidtop/tracker#636) lands in that folder. Nothing is copied.
+     * files, mytop-project/tracker#636) lands in that folder. Nothing is copied.
      */
     internal suspend fun runIn(context: Context, container: Container, file: File): PcLaunchResult {
         val folder = file.parentFile ?: file
@@ -137,7 +137,7 @@ object WinePrefixTools {
     /**
      * Every component [entryId]'s prefix lists, with whether it carries Windows' own files. These are
      * the components of droidtop's component catalog (the `wincomponents` files of
-     * Droidtop/droidtop-components): this runtime's counterpart of a winetricks verb.
+     * mytop-project/droidtop-components): this runtime's counterpart of a winetricks verb.
      */
     suspend fun components(context: Context, entryId: String?): List<Component>? = withContext(Dispatchers.IO) {
         val container = PcContainers.forGame(context, entryId) ?: return@withContext null

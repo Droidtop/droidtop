@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * A scanned PC folder game (id `folder:CUSTOM_GAME_n`, install folder in
  * [PcInfo]) groups into games the way an engine game's path does
- * (docs/SPEC.md 7n; Droidtop/tracker#264). Names are placeholders.
+ * (docs/SPEC.md 7n; mytop-project/tracker#264). Names are placeholders.
  */
 class FolderGameGroupingTest {
 

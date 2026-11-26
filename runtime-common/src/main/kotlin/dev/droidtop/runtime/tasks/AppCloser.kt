@@ -11,7 +11,7 @@ package dev.droidtop.runtime.tasks
  * could not be asked or refused. [onClosed] runs after a close that ended the session. [sendToBackground] is told
  * just before the background kill and moves the app off the screen it is on: Android's background kill leaves a
  * visible app alone, so without a helper a game in front was never ended (console, build 1773, RetroArch still
- * running after Kill, Droidtop/tracker#412).
+ * running after Kill, mytop-project/tracker#412).
  *
  * Before choosing, the helper is given [CONNECT_MS] to arrive ([PrivilegedShell.connect]), and a close that could
  * only ask Android says why no helper ended it ([PrivilegedShell.unavailableReason]): "Not confirmed" alone left the
@@ -31,7 +31,7 @@ class AppCloser(
 
     /**
      * Kill: force-stop at once, with none of [close]'s gentler steps first (Enginehost's own end, the move to the
-     * background). The owner, 2026-10-16: "kill should immediately force-stop it" (Droidtop/tracker#571 row 16).
+     * background). The owner, 2026-10-16: "kill should immediately force-stop it" (mytop-project/tracker#571 row 16).
      * Without a helper that can force-stop there is no such stop on Android, and it says so instead of trying less.
      */
     fun kill(packageName: String): CloseOutcome {

@@ -12,7 +12,7 @@ import java.nio.ByteOrder
 /**
  * A client of sway's IPC (`man sway-ipc`), for what wlr-foreign-toplevel-management cannot ask sway to do:
  * sway ignores the protocol's set_minimized, so the taskbar's Minimize moves the window to the scratchpad
- * over IPC instead ([DesktopWindows], Droidtop/tracker#391). The socket is the one sway creates in the shared
+ * over IPC instead ([DesktopWindows], mytop-project/tracker#391). The socket is the one sway creates in the shared
  * `XDG_RUNTIME_DIR` (ContainerLayout.findSwayIpcSocket), which host-bridge already reaches from the Android
  * side for the Wayland socket; nothing runs in the container for it.
  *
@@ -30,7 +30,7 @@ class SwayIpc(private val socketPath: String) {
 
     /**
      * A connection subscribed to sway's [events] (`window`, `workspace`, `output`, ...; sway-ipc's SUBSCRIBE), for
-     * following the tree without asking for it all the time (Droidtop/tracker#910). Its [SwayEvents.next] blocks until
+     * following the tree without asking for it all the time (mytop-project/tracker#910). Its [SwayEvents.next] blocks until
      * the next event; closing it from another thread ends a wait. Null when sway refused the subscription.
      */
     fun subscribe(events: List<String>): SwayEvents? {
@@ -121,7 +121,7 @@ class SwayIpc(private val socketPath: String) {
          * foreign-toplevel protocol tells droidtop about a window (sway sets both from the same view, see
          * sway/tree/view.c and ipc-json.c ipc_json_describe_view). A missing app id (an Xwayland window) is "".
          * The scratchpad's hidden windows are included, as sway lists them under its `__i3_scratch` workspace.
-         * With [output] given, only the windows under the output node of that name (Droidtop/tracker#908, step D4):
+         * With [output] given, only the windows under the output node of that name (mytop-project/tracker#908, step D4):
          * the window's output from the same protocol, which tells two windows alike apart when they are on different
          * screens. The scratchpad's are under sway's own `__i3` output.
          */

@@ -20,7 +20,7 @@ enum class QuickGlyph {
     APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
     // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
     HOME, KEYBOARD, PEOPLE, MORE,
-    // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
+    // Tiles that drew GENERIC, the placeholder ring, until each had its own (mytop-project/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
     PROFILE,
     SEARCH,
@@ -32,7 +32,7 @@ enum class QuickGlyph {
  * to read at tile size, and one hand-drawn style across every tile and the
  * rail. A quick-settings grid without icons is a wall of text, so a tile
  * this file has no glyph for draws [QuickGlyph.GENERIC], a placeholder that
- * a known tile should never show (Droidtop/tracker#534).
+ * a known tile should never show (mytop-project/tracker#534).
  */
 @Composable
 fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier) {

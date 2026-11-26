@@ -7,7 +7,7 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /*
- * The one jobs and progress model (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577): what a job is
+ * The one jobs and progress model (docs/SPEC.md "Jobs and their results", mytop-project/tracker#577): what a job is
  * doing, its numbers, what can be done to it, and what it did. Every job in [PluginJobsCenter] carries it, downloads
  * and the work that is not a download alike (a library scrape, a save sync, a rescan), so the Downloads place, the
  * rows on game pages and the widgets read one thing. The screens write every line from these values; a job sends
@@ -17,7 +17,7 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Where a job stands. Derived from [PluginJobsCenter.Entry] by [PluginJobsCenter.Entry.state]. A job that lost its
  * connection waits for it ([WAITING_FOR_NETWORK]) and carries on by itself when it is back; a lost connection is
- * never [FAILED] (Droidtop/tracker#577).
+ * never [FAILED] (mytop-project/tracker#577).
  */
 enum class JobState { RUNNING, WAITING_FOR_NETWORK, WAITING_TO_RETRY, HELD, PAUSED, DONE, FAILED }
 
@@ -67,7 +67,7 @@ sealed interface OpenTarget {
     /** A download site's sign-in, by its domain: a job its expired session stopped (docs/SPEC.md 12a "Download sites"). */
     data class SiteSignIn(val domain: String) : OpenTarget
 
-    /** One plugin's page, by its id: where it is approved, turned on and allowed (Droidtop/tracker#759). */
+    /** One plugin's page, by its id: where it is approved, turned on and allowed (mytop-project/tracker#759). */
     data class Plugin(val pluginId: String) : OpenTarget
 
     companion object {
@@ -154,7 +154,7 @@ class JobHandle internal constructor(val jobId: String) : AbstractCoroutineConte
 
     fun numbers(numbers: JobNumbers) = PluginJobsCenter.setNumbers(jobId, numbers)
 
-    /** The job's bar and line from inside a step its runner does not report from itself (an unpack, Droidtop/tracker#842). */
+    /** The job's bar and line from inside a step its runner does not report from itself (an unpack, mytop-project/tracker#842). */
     fun progress(percent: Int, line: String) = PluginJobsCenter.setProgress(jobId, percent, line)
 
     fun item(item: ReportItem) = PluginJobsCenter.addReportItem(jobId, item)

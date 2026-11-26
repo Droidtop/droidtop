@@ -7,7 +7,7 @@ import dev.droidtop.library.stores.StoreGame
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The Storage page lists installed games biggest first (docs/SPEC.md 7j "Places", Droidtop/tracker#227). */
+/** The Storage page lists installed games biggest first (docs/SPEC.md 7j "Places", mytop-project/tracker#227). */
 class StorageCatalogTest {
     private fun game(id: String, title: String, bytes: Long, installed: Boolean = true) =
         StoreGame("gog", id, title, installed, if (installed) "/storage/emulated/0/Games/GOG/$title" else null, bytes, null)

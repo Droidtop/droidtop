@@ -20,7 +20,7 @@ import java.io.File
 
 /**
  * A game's version copied between this device and a computer (docs/SPEC.md
- * 7o, "Game updates"; Droidtop/tracker#469 part 3; owner, 2026-10-10: "If I
+ * 7o, "Game updates"; mytop-project/tracker#469 part 3; owner, 2026-10-10: "If I
  * install an update to a game on my desktop, I should be able to sync it to
  * the handheld and version-manage it automatically").
  *

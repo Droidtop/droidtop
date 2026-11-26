@@ -8,7 +8,7 @@ import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.library.OwnGameScreens
 
 /**
- * The companion's trackpad as the mouse of droidtop's own game screen (Droidtop/tracker#565): finger travel scaled to
+ * The companion's trackpad as the mouse of droidtop's own game screen (mytop-project/tracker#565): finger travel scaled to
  * the game's own width (the same hand movement crosses its screen once, as on every other route), with libinput's
  * acceleration and the person's pointer speed, into the [pointer] controller mouse mode drives. Fractions of a pixel and
  * of a wheel step carry over, so slow movement is not lost. Main thread.

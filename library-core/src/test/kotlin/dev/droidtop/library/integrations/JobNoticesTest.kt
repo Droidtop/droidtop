@@ -5,7 +5,7 @@ import dev.droidtop.pluginhost.PluginResult
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What a download ending says, and which endings are news (docs/SPEC.md "Motion and visual status", Droidtop/tracker#643). */
+/** What a download ending says, and which endings are news (docs/SPEC.md "Motion and visual status", mytop-project/tracker#643). */
 class JobNoticesTest {
 
     private fun ended(id: String, atMs: Long, failed: Boolean = false) = PluginJobsCenter.Entry(

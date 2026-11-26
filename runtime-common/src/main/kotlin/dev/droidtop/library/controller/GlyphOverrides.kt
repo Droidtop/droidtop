@@ -4,7 +4,7 @@ import android.content.Context
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
- * The button labels a person chose for one pad (Settings > Controls, Droidtop/tracker#723): Xbox, PlayStation or
+ * The button labels a person chose for one pad (Settings > Controls, mytop-project/tracker#723): Xbox, PlayStation or
  * Nintendo glyphs in place of what droidtop worked out, by the pad's input-device descriptor. Only the printed glyphs
  * change ([FaceLayout.copy] of the family): which key confirms and which cancels stays the resolver's. No entry is
  * Automatic.

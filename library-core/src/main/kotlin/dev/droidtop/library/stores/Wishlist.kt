@@ -12,7 +12,7 @@ import java.io.File
 data class WishlistGame(val gameId: String, val title: String, val artUrl: String? = null)
 
 /**
- * droidtop's own copy of each store's wishlist (docs/SPEC.md 7g, "Wishlist", Droidtop/tracker#134): written by the
+ * droidtop's own copy of each store's wishlist (docs/SPEC.md 7g, "Wishlist", mytop-project/tracker#134): written by the
  * store's sync, read by [StoreLibrary.wishlist] with no network. One small file per store in the app's private
  * storage, a line per game ("id TAB title TAB cover"), so a rebuild of the library reads files that are already
  * there. Pure parsing and formatting, plus the file work, which the callers do off the main thread.

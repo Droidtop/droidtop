@@ -84,7 +84,7 @@ data class GameMediaLocator(
 object EsDeArtwork {
     /**
      * droidtop's own order for a game's picture on a card (tiles, Home's rows, grids, the companion): box art first,
-     * a screenshot only when nothing else exists (owner, 2026-10-23, Droidtop/tracker#632: "we never want
+     * a screenshot only when nothing else exists (owner, 2026-10-23, mytop-project/tracker#632: "we never want
      * screenshots to be what's displayed first, and that seems to be preferred for emulator games. We want boxart
      * or posters to be there"). It used to lead with ES-DE's miximage, a composite that is mostly a screenshot.
      * A miximage still beats a bare screenshot (it carries the box), and the art that is not a screenshot (the
@@ -130,13 +130,13 @@ object EsDeArtwork {
 
     /**
      * Whether [path] is a screenshot or a title screen, by the ES-DE media folder it is in: what a hero card and a
-     * card's first picture never show (docs/SPEC.md 7i, "Home art"; Droidtop/tracker#632). Pure.
+     * card's first picture never show (docs/SPEC.md 7i, "Home art"; mytop-project/tracker#632). Pure.
      */
     fun isScreenshot(path: String): Boolean =
         File(path).parentFile?.name?.lowercase() in SCREEN_FOLDERS
 
     /**
-     * The folders a theme's [imageTypes] are looked up in, in order (owner, 2026-10-23, Droidtop/tracker#632: "we
+     * The folders a theme's [imageTypes] are looked up in, in order (owner, 2026-10-23, mytop-project/tracker#632: "we
      * never want screenshots to be what's displayed first"; 2026-10-24, the same for every slot). The theme's own
      * order is kept, except that screenshots and title screens go after every other kind of art the slot also
      * accepts: DEcaffe's `screenshot,cover,titlescreen` shows the cover first. A slot that asks only for screenshots
@@ -171,7 +171,7 @@ object EsDeArtwork {
     /**
      * ES-DE's media folder name (its default MediaDirectory), the one droidtop's scrapers write
      * under a games root and this object reads. It holds media, never games: [ScanPrune] keeps
-     * every library walk out of it (Droidtop/tracker#297).
+     * every library walk out of it (mytop-project/tracker#297).
      */
     const val MEDIA_DIR = "downloaded_media"
 
@@ -250,7 +250,7 @@ object EsDeArtwork {
      */
     /**
      * Whether the game has box art (a cover or a 3D box), the art a card leads with. A screenshot or a title screen
-     * is not: the scraper fetches a cover for a game that has only those (Droidtop/tracker#632), where "any art at
+     * is not: the scraper fetches a cover for a game that has only those (mytop-project/tracker#632), where "any art at
      * all" left the screenshot on the card for good.
      */
     fun hasCover(gamesRoot: File, system: String, romBaseName: String): Boolean =

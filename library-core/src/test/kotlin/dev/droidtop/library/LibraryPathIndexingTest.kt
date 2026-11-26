@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Targeted indexing (docs/SPEC.md 7g, Droidtop/tracker#354): a file or folder droidtop or a plugin changed is
+ * Targeted indexing (docs/SPEC.md 7g, mytop-project/tracker#354): a file or folder droidtop or a plugin changed is
  * brought into the index by looking at that path, with no walk. The providers here are fakes whose only job
  * is to answer `indexPath`; what is under test is the library's side: which providers are asked about which
  * path, what of the slice is replaced, what is kept, and what a removal leaves behind.

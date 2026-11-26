@@ -33,7 +33,7 @@ import android.view.View;
  * characters. This includes corrections and completions.
  * @hide pending API Council Approval
  *
- * droidtop (Droidtop/tracker#903 H6): the Latin engine's dictionaries ({@link LatinEngine.Lexicon}), with no change.
+ * droidtop (mytop-project/tracker#903 H6): the Latin engine's dictionaries ({@link LatinEngine.Lexicon}), with no change.
  */
 public class Suggest implements Dictionary.WordCallback, LatinEngine.Lexicon {
 	private static String TAG = "PCKeyboard";
@@ -146,7 +146,7 @@ public class Suggest implements Dictionary.WordCallback, LatinEngine.Lexicon {
 
     /**
      * droidtop: a main dictionary that arrived after this was made (a converted wordlist, loaded off the main thread,
-     * Droidtop/tracker#339). Main thread only.
+     * mytop-project/tracker#339). Main thread only.
      */
     public void setMainDictionary(BinaryDictionary dictionary) {
         if (mMainDict != null) mMainDict.close();

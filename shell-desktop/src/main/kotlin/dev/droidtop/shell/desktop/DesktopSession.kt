@@ -112,7 +112,7 @@ import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 
-// Desktop mode's live session (Droidtop/tracker#764, split out of DesktopShell.kt): the surface the
+// Desktop mode's live session (mytop-project/tracker#764, split out of DesktopShell.kt): the surface the
 // compositor's output is drawn on and its input seat, the windows and Android tasks the bar lists, and the
 // on-screen keyboard that follows the container's text fields.
 
@@ -131,8 +131,8 @@ sealed interface DesktopSessionMessage {
 }
 
 /**
- * One live session's input (Droidtop/tracker#764): the seat, the router that drives it, and the router's pad chords
- * (docs/SPEC.md 6b "Pad chords", Droidtop/tracker#383), the bundled layout read off the main thread here rather than
+ * One live session's input (mytop-project/tracker#764): the seat, the router that drives it, and the router's pad chords
+ * (docs/SPEC.md 6b "Pad chords", mytop-project/tracker#383), the bundled layout read off the main thread here rather than
  * by the surface's composition. Until the layout is in, the pad behaves as it always has.
  *
  * The seat comes from [InputSeats] rather than being made here: the second-screen trackpad and keyboard (docs/SPEC.md
@@ -175,7 +175,7 @@ internal fun BoxScope.DesktopViewport(
     prefs: DesktopPrefs.Values,
     outputNames: List<String> = emptyList(),
     onPrimarySized: (width: Int, height: Int, scale: Double) -> Unit = { _, _, _ -> },
-    /** The session's window actions, for the title-bar buttons over the surface (Droidtop/tracker#910); null with none. */
+    /** The session's window actions, for the title-bar buttons over the surface (mytop-project/tracker#910); null with none. */
     windows: DesktopWindows? = null,
 ) {
     if (hostBridge != null && primaryOutput != null) {
@@ -190,7 +190,7 @@ internal fun BoxScope.DesktopViewport(
         }
         val router = input.router
         // The primary's touch takes the unnamed call while it is the only output, and its own output's name once
-        // the desktop has another (PointerTarget.choose, Droidtop/tracker#908 step D3): the unnamed call would spread
+        // the desktop has another (PointerTarget.choose, mytop-project/tracker#908 step D3): the unnamed call would spread
         // it over both.
         androidx.compose.runtime.SideEffect {
             router.pointerTarget = dev.droidtop.input.PointerTarget.choose(
@@ -201,7 +201,7 @@ internal fun BoxScope.DesktopViewport(
         }
         val primarySized by rememberUpdatedState(onPrimarySized)
         // The keys Android keeps (Super, Alt+Tab, Ctrl+Space) come to this session through droidtop's accessibility
-        // service while it is in front, and to nothing at any other time (Droidtop/tracker#697, docs/SPEC.md 6b).
+        // service while it is in front, and to nothing at any other time (mytop-project/tracker#697, docs/SPEC.md 6b).
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         DisposableEffect(router, lifecycle) {
             val give: (android.view.KeyEvent) -> Boolean = { event -> router.onKeyEvent(event) }
@@ -223,7 +223,7 @@ internal fun BoxScope.DesktopViewport(
         // here, so a change made while the desktop shows applies at once, not at the next surface change.
         val currentPrefs by rememberUpdatedState(prefs)
         var surfaceSize by remember(hostBridge) { mutableStateOf<Pair<Int, Int>?>(null) }
-        // The density of the screen the desktop's surface is on (Droidtop/tracker#386): the one source the scale is
+        // The density of the screen the desktop's surface is on (mytop-project/tracker#386): the one source the scale is
         // worked out from, here and in Settings, rather than whichever screen the activity or Settings is on.
         var surfaceDpi by remember(hostBridge) { mutableStateOf<Int?>(null) }
         val scope = rememberCoroutineScope()
@@ -231,7 +231,7 @@ internal fun BoxScope.DesktopViewport(
             val dpi = surfaceDpi ?: context.resources.displayMetrics.densityDpi
             val scale = DesktopScale.resolve(currentPrefs.scale, dpi)
             // Below full resolution the output is asked for fewer pixels than the view
-            // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
+            // has and SurfaceFlinger scales the buffer up (mytop-project/tracker#426); the
             // scale shrinks with it so the layout keeps its size.
             val factor = DesktopScale.resolutionFactor(currentPrefs.resolution)
             val (outW, outH) = DesktopScale.outputSize(width, height, factor)
@@ -258,7 +258,7 @@ internal fun BoxScope.DesktopViewport(
                     DesktopKeyboardTarget.surface = java.lang.ref.WeakReference(this)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
-                            // Paced to the display this view is on (Droidtop/tracker#950).
+                            // Paced to the display this view is on (mytop-project/tracker#950).
                             presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface, this@apply.display?.refreshRate ?: 0f)
                         }
 
@@ -317,10 +317,10 @@ internal fun BoxScope.DesktopViewport(
             when (sessionMessage) {
                 is DesktopSessionMessage.Connecting -> {
                     Text(stringResource(R.string.desktop_starting), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-                    // What is going on and how long it takes, nothing about root or the machinery (Droidtop/tracker#693):
+                    // What is going on and how long it takes, nothing about root or the machinery (mytop-project/tracker#693):
                     // droidtop never asks for root itself, and the line under it is the boot's own progress. The
                     // minutes-long download is said only on the start that makes the Linux system: a restart or a
-                    // later start reuses it and is back in seconds (rig 2026-11-04, Droidtop/tracker#687).
+                    // later start reuses it and is back in seconds (rig 2026-11-04, mytop-project/tracker#687).
                     if (sessionMessage.firstStart) {
                         Text(
                             stringResource(R.string.desktop_starting_detail),
@@ -350,7 +350,7 @@ internal fun BoxScope.DesktopViewport(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     // The failure may be the setup itself (an image the catalog no longer has), so the
-                    // way to fix it sits beside the retry rather than in the sentence (Droidtop/tracker#370).
+                    // way to fix it sits beside the retry rather than in the sentence (mytop-project/tracker#370).
                     Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(onClick = onStartSession) { Text(stringResource(R.string.desktop_try_again)) }
                         androidx.compose.material3.OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.desktop_setup)) }
@@ -358,7 +358,7 @@ internal fun BoxScope.DesktopViewport(
                 }
                 is DesktopSessionMessage.NeedsSetup -> {
                     // Nothing to start yet: the one next step is choosing the Linux system the
-                    // desktop runs, so the page offers exactly that (Droidtop/tracker#370).
+                    // desktop runs, so the page offers exactly that (mytop-project/tracker#370).
                     Text(stringResource(R.string.desktop_set_up), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "Choose the Linux system it runs.",
@@ -390,7 +390,7 @@ internal fun BoxScope.DesktopViewport(
 
 /**
  * The on-screen keyboard comes up when a text field in the container takes the focus, and goes when it loses it
- * (Droidtop/tracker#685); the bar's Keyboard button still shows and hides it by hand.
+ * (mytop-project/tracker#685); the bar's Keyboard button still shows and hides it by hand.
  */
 @Composable
 internal fun FollowTextFields(hostBridge: HostBridge?) {
@@ -422,7 +422,7 @@ internal fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
  * task list the Quick Menu, the companion and Standard's home read too), kept current while Desktop is
  * showing and only then. A game launched from the Start menu is a fullscreen Activity over the desktop,
  * which the compositor's window list cannot show, so without this the bar listed neither it nor any
- * Android app (Droidtop/tracker#352). Without Shizuku the list holds just the apps droidtop opened itself.
+ * Android app (mytop-project/tracker#352). Without Shizuku the list holds just the apps droidtop opened itself.
  */
 @Composable
 internal fun rememberAndroidApps(): List<RunningApp> {
@@ -451,12 +451,12 @@ internal suspend fun closeAndroidApp(context: Context, app: RunningApp) {
     if (outcome !is CloseOutcome.Closed) dev.droidtop.library.settings.Notices.flash(outcome.text, context = context)
 }
 
-/** The desktop's surface, for the bar's Keyboard button (Droidtop/tracker#685). Main thread. */
+/** The desktop's surface, for the bar's Keyboard button (mytop-project/tracker#685). Main thread. */
 internal object DesktopKeyboardTarget {
     var surface: java.lang.ref.WeakReference<dev.droidtop.input.DesktopSurfaceView>? = null
 }
 
-/** Android's density for the screen [view] is on, or null before it is attached to one (Droidtop/tracker#386). */
+/** Android's density for the screen [view] is on, or null before it is attached to one (mytop-project/tracker#386). */
 @Suppress("DEPRECATION")
 internal fun screenDpi(view: android.view.View): Int? {
     val display = view.display ?: return null

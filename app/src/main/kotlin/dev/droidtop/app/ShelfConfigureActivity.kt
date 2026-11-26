@@ -32,7 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
- * The widget maker for a Shelf widget (Droidtop/tracker#563): what the shelf shows (recently played, recently added,
+ * The widget maker for a Shelf widget (mytop-project/tracker#563): what the shelf shows (recently played, recently added,
  * favourites, one of the person's collections, a system that has games) and how (a grid of art or a list of names).
  * Opened by the launcher when the widget is placed, again where it can reconfigure one, and by a tap on a shelf never
  * set up. Done saves it ([WidgetConfigs]) and draws the widget; leaving without Done cancels a new placement, as the

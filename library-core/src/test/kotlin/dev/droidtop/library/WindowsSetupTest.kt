@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The states Settings' row, the game page and launch all read ([WindowsSetup], Droidtop/tracker#299). */
+/** The states Settings' row, the game page and launch all read ([WindowsSetup], mytop-project/tracker#299). */
 class WindowsSetupTest {
 
     @Test

@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The "Fetch box art and details for your games?" question is asked once
- * (Droidtop/tracker#174): once answered, either way, a finished walk never
+ * (mytop-project/tracker#174): once answered, either way, a finished walk never
  * raises it again, and Settings can change the stored answer.
  */
 @RunWith(RobolectricTestRunner::class)

@@ -3,7 +3,7 @@ package dev.droidtop.runtime.windows
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
 
 /**
- * A Windows game's touchscreen gestures as settings rows (Droidtop/tracker#618 C8: "`TouchGestureConfig` has twelve
+ * A Windows game's touchscreen gestures as settings rows (mytop-project/tracker#618 C8: "`TouchGestureConfig` has twelve
  * slots stored per container and no screen edits it"). One row per gesture: Off, or what it does. Pure: the rows are
  * read from a [TouchGestureConfig] and a choice gives the next one ([apply]); [WineOptions] keeps it per game and lays
  * it over the prefix at launch.

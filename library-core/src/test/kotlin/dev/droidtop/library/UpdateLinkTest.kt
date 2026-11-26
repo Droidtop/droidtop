@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Which linked source an update row shows the downloads of (docs/SPEC.md 7g, "Facets in place"; Droidtop/tracker#639). */
+/** Which linked source an update row shows the downloads of (docs/SPEC.md 7g, "Facets in place"; mytop-project/tracker#639). */
 class UpdateLinkTest {
     private fun link(source: String, id: String, version: String?, gone: Boolean = false) =
         SourceLink(source, id, version?.let { SourceAnswer(version = it, checkedAtEpochMs = 0L, gone = gone) })

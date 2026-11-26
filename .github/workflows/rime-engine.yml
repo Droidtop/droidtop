@@ -1,7 +1,7 @@
 name: RIME engine
 
 # Builds librime (RIME, BSD-3), the Chinese input engine, for the keyboard's
-# Chinese input (Droidtop/tracker#903 H8; docs/SPEC.md 6a, "The engine seam,
+# Chinese input (mytop-project/tracker#903 H8; docs/SPEC.md 6a, "The engine seam,
 # the candidate bar and the gesture seam"), with its pinyin data, and publishes
 # both as a prerelease of this repository, the mozc-engine.yml and
 # lsfg-vk-layer.yml precedent:

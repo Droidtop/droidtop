@@ -1,7 +1,7 @@
 package dev.droidtop.runtime.power
 
 /**
- * The automatic power policy's core (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 2): what level to ask
+ * The automatic power policy's core (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 2): what level to ask
  * for, from the person's rules, the device's heat and the battery. Pure: nothing here applies anything; the adapters
  * of slice 3 on do, with what [PowerResolver] and [PowerGovernor] decide.
  */

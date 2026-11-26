@@ -4,7 +4,7 @@ import dev.droidtop.app.DesktopSetupPrefs.LeaveAction
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Leaving Desktop: stop, keep, or ask once (Droidtop/tracker#389, docs/SPEC.md 3 "Stopping is a stop"). */
+/** Leaving Desktop: stop, keep, or ask once (mytop-project/tracker#389, docs/SPEC.md 3 "Stopping is a stop"). */
 class DesktopLeaveActionTest {
 
     @Test

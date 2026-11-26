@@ -15,7 +15,7 @@ import dev.droidtop.pluginhost.PluginStore
 import java.io.File
 
 /**
- * Plugins in droidtop's Open with (docs/plugin-api.md 1.12, catalogue E4, Droidtop/tracker#221): each running plugin
+ * Plugins in droidtop's Open with (docs/plugin-api.md 1.12, catalogue E4, mytop-project/tracker#221): each running plugin
  * whose `files.handler` entry has an association for the file, in Desktop, with the point's consent granted. Picking
  * one hands it the file as a read-only token and calls its `open`; every hand-over is in its activity log.
  */
@@ -47,7 +47,7 @@ object PluginOpenWith {
                 .add(id, PickedDocument(Uri.fromFile(file).toString(), file.name, file.length(), writable = false))
         }.getOrElse { return "${record.manifest.label} couldn't be given the file: ${it.message}" }
         val reply = PluginViews.call(context, record, FileHandlers.POINT, FileHandlers.OP_OPEN, FileHandlers.openArgs(token, file.name, mime))
-        // Every file a plugin is handed is listed in its activity (docs/plugin-api.md 4.6, Droidtop/tracker#61).
+        // Every file a plugin is handed is listed in its activity (docs/plugin-api.md 4.6, mytop-project/tracker#61).
         runCatching {
             PluginAudit.forContext(context).append(
                 id,

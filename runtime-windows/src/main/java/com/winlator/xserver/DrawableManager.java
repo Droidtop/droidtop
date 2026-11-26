@@ -44,7 +44,7 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 //            Objects.requireNonNull(texture);
 //            xServerView.queueEvent(() -> VortekRendererComponent.destroyTexture(texture));
 //        }
-        // A session with no renderer (the hidden one a redistributable installs in, Droidtop/tracker#899) never
+        // A session with no renderer (the hidden one a redistributable installs in, mytop-project/tracker#899) never
         // uploaded a texture, so there is nothing on a GL thread to free; queueing on it crashed droidtop.
         XServerRenderer renderer = xServer.getRenderer();
         if (texture != null && renderer != null) renderer.getRendererView().queueEvent(texture::destroy);

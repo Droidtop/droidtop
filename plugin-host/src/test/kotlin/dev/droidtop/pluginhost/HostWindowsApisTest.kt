@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** E5, Desktop windows for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): list, focus, close and the events. */
+/** E5, Desktop windows for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221): list, focus, close and the events. */
 class HostWindowsApisTest {
     private val firefox = DesktopWindow(1L, "org.mozilla.firefox", "Bank - Mozilla Firefox", "HEADLESS-1", focused = true)
     private val terminal = DesktopWindow(2L, "foot", "~", "HEADLESS-1", focused = false)

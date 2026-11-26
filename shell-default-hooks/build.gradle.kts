@@ -1,5 +1,5 @@
-// droidtop's side of the Murine launcher's hooks (Droidtop/tracker#921 item 2): Murine (the shell-default submodule,
-// Droidtop/murine-launcher) calls app.murinelauncher.hooks.MurineHooks wherever droidtop changes what it does, and this
+// droidtop's side of the Murine launcher's hooks (mytop-project/tracker#921 item 2): Murine (the shell-default submodule,
+// mytop-project/murine-launcher) calls app.murinelauncher.hooks.MurineHooks wherever droidtop changes what it does, and this
 // module installs droidtop's implementations of them at start (ShellDefaultHooks.install, from DroidtopApplication).
 // It grows one area per slice on #921; the droidtop code still inside the submodule moves here in the last one.
 plugins {
@@ -31,7 +31,7 @@ dependencies {
     implementation(project(":IconLoader"))
     implementation(project(":systemUIPluginCore"))
     implementation(project(":SettingsLib-SliderPreference"))
-    // The droidtop screens and services of the Standard launcher that live here (Droidtop/tracker#921 slice 9):
+    // The droidtop screens and services of the Standard launcher that live here (mytop-project/tracker#921 slice 9):
     // catalog settings drawn as preferences, the taskbar, Clear all apps, the Nova and Apex import.
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)

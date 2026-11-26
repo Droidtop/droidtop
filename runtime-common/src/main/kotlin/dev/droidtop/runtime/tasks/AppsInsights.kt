@@ -11,7 +11,7 @@ import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 
 /**
  * What the companion's Apps tab shows beside each running app (docs/SPEC.md "The companion's tabs", Apps;
- * Droidtop/tracker#414 slice C20): its processor share or memory with the helper app (`dumpsys cpuinfo`,
+ * mytop-project/tracker#414 slice C20): its processor share or memory with the helper app (`dumpsys cpuinfo`,
  * `dumpsys meminfo -c`), its data use over the last hours with Usage access (`NetworkStatsManager`, in buckets of
  * several hours, so "used data lately" is a marker, never a rate), and the sensitive permissions it holds. Reads are
  * binder and shell work: off the main thread.

@@ -5,7 +5,7 @@ import dev.droidtop.library.LibraryEntryKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What Get new games opens on (docs/SPEC.md 13; Droidtop/tracker#612): only what the library and the sources say. */
+/** What Get new games opens on (docs/SPEC.md 13; mytop-project/tracker#612): only what the library and the sources say. */
 class NewGamesTest {
     private fun game(title: String, plays: Int = 0, developer: String? = null, series: String? = null, update: String? = null, hidden: Boolean = false) =
         LibraryEntry(

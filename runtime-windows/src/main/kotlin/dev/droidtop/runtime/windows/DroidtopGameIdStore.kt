@@ -25,7 +25,7 @@ object DroidtopGameIdStore {
 
     /**
      * The store, made on first use: its file is found under droidtop's files folder, a disk lookup that must not run
-     * on the main thread at droidtop's start (Droidtop/tracker#775). Null before [install].
+     * on the main thread at droidtop's start (mytop-project/tracker#775). Null before [install].
      */
     private val ids: GameFolderIds?
         get() = made ?: synchronized(this) {

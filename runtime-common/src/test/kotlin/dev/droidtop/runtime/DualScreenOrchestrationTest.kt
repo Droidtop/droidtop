@@ -140,7 +140,7 @@ class DualScreenOrchestrationTest {
 
     @Test
     fun `the main screen is the first chooser row, then the companion's, whichever screen the shell is on`() {
-        // No screen is first for being an add-on (Droidtop/tracker#776): the order is the person's roles.
+        // No screen is first for being an add-on (mytop-project/tracker#776): the order is the person's roles.
         val names = mapOf(0 to "Bottom screen", 9 to "Top screen")
         val mainOnAddon = DualScreenOrchestration.chooserCandidates(
             listOf(0, 9), names, shellDisplayId = 9, secondDisplayId = 9, mainDisplayId = 9, companionDisplayId = 0,
@@ -366,7 +366,7 @@ class DualScreenOrchestrationTest {
 
     @Test
     fun `a companion with no shell closes and starts it, in a mode with a shell`() {
-        // Droidtop/tracker#788: after a crash only the companion came back, on display 0, while 4 was the main screen.
+        // mytop-project/tracker#788: after a crash only the companion came back, on display 0, while 4 was the main screen.
         assertEquals(DualScreenOrchestration.CompanionCheck.START_SHELL, DualScreenOrchestration.companionCheck(0, 4, shellMode = true, shellDisplayId = null))
         assertEquals(DualScreenOrchestration.CompanionCheck.KEEP, DualScreenOrchestration.companionCheck(0, 4, shellMode = false, shellDisplayId = null))
     }

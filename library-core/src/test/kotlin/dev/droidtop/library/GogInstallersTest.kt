@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** GOG's offline installer names (Droidtop/tracker#405), as GOG's own downloads name them. */
+/** GOG's offline installer names (mytop-project/tracker#405), as GOG's own downloads name them. */
 class GogInstallersTest {
 
     @Test

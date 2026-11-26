@@ -89,7 +89,7 @@ enum class AppsKeyboard(val label: String) {
 
 /**
  * The rules for typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display",
- * Droidtop/tracker#314), with no Android in them so they are unit-tested.
+ * mytop-project/tracker#314), with no Android in them so they are unit-tested.
  */
 object AddonKeyboardRules {
     const val DEFAULT_DISPLAY = 0
@@ -101,7 +101,7 @@ object AddonKeyboardRules {
     /**
      * Whether droidtop's keyboard, not Android's, serves a droidtop text field on [displayId]: Android draws none
      * there, or [placement] (the field's resolved "Keyboard displays on") sends its keys to the companion. The owner,
-     * 2026-10-23 (Droidtop/tracker#612): typing "should always land on the lowest screen, ideally just opening the keys
+     * 2026-10-23 (mytop-project/tracker#612): typing "should always land on the lowest screen, ideally just opening the keys
      * option on the companion. Its current behavior, of always being on the screen that's focused, is wrong". With
      * one screen the placement is the field's own screen, and on the built-in display that is Android's keyboard.
      */
@@ -110,7 +110,7 @@ object AddonKeyboardRules {
 
     /**
      * Whether a keyboard comes up when droidtop itself puts the cursor in a field, before the person chose to type
-     * (owner, 2026-10-23, Droidtop/tracker#612): only on one screen with no controller or keyboard attached, a
+     * (owner, 2026-10-23, mytop-project/tracker#612): only on one screen with no controller or keyboard attached, a
      * touch-only phone or tablet, as any touch app does. With [twoScreens], or with [padOrKeyboard], it waits for the
      * person: A or a tap on the field, or a key typed.
      */
@@ -170,7 +170,7 @@ object AddonKeyboardRules {
      * single-display device is not. The internal screen hosts it when droidtop can draw there ([internalAvailable])
      * and the field is not already on it. Anything that cannot be honoured falls back to the field's own screen.
      * With an assistive service on ([assistive]: TalkBack, Switch Access, Select to Speak), the system keyboard types
-     * instead, the one those services are built to drive (Droidtop/tracker#485 S7 5.6; a rig check with TalkBack on
+     * instead, the one those services are built to drive (mytop-project/tracker#485 S7 5.6; a rig check with TalkBack on
      * the RP5 decides whether droidtop's slab with its key semantics replaces it).
      */
     fun keyboardPlacement(
@@ -203,7 +203,7 @@ object AddonKeyboardRules {
     /**
      * Why "Companion" could not be honoured for a field on [fieldDisplay], or null when it was (or was not asked for):
      * the same two conditions [keyboardPlacement] reads, named, so the Displays row and the log can say which one held
-     * (Droidtop/tracker#523: on the console the keyboard rose on the field's screen while the row read "Companion").
+     * (mytop-project/tracker#523: on the console the keyboard rose on the field's screen while the row read "Companion").
      */
     fun companionFallback(
         setting: KeyboardPlacement,
@@ -350,7 +350,7 @@ object AddonKeyboard {
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
 
-/** Why "Keyboard displays on: Companion" fell back to the field's own screen (Droidtop/tracker#523). */
+/** Why "Keyboard displays on: Companion" fell back to the field's own screen (mytop-project/tracker#523). */
 enum class CompanionFallback {
     /** The companion's own "Keyboard for the other screen" is off. */
     COMPANION_KEYBOARD_OFF,

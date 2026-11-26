@@ -158,11 +158,11 @@ public class LatinIME extends InputMethodService implements
     private AlertDialog mOptionsDialog;
 
     /* package */KeyboardSwitcher mKeyboardSwitcher;
-    // droidtop: the pad on the keyboard (Droidtop/tracker#338).
+    // droidtop: the pad on the keyboard (mytop-project/tracker#338).
     private final PadKeys mPadKeys = new PadKeys(this);
-    // droidtop: the dictionaries the keyboard last loaded (Droidtop/tracker#339).
+    // droidtop: the dictionaries the keyboard last loaded (mytop-project/tracker#339).
     private int mDictionaryGeneration;
-    // droidtop: glide typing (Droidtop/tracker#341): the guesser for the shown keyboard, and the word a glide last
+    // droidtop: glide typing (mytop-project/tracker#341): the guesser for the shown keyboard, and the word a glide last
     // typed with the others it offered, so picking one of those replaces it.
     private final GlideTyping mGlide = new GlideTyping(words -> {
         onGlideWords(words);
@@ -170,7 +170,7 @@ public class LatinIME extends InputMethodService implements
     });
     private String mGlideWord;
     static final String PREF_GLIDE = "pref_glide";
-    // droidtop: the strip says offline voice typing is listening, and a tap on it stops (Droidtop/tracker#343).
+    // droidtop: the strip says offline voice typing is listening, and a tap on it stops (mytop-project/tracker#343).
     private boolean mShowingVoiceHint;
 
     private UserDictionary mUserDictionary;
@@ -184,7 +184,7 @@ public class LatinIME extends InputMethodService implements
     private String mSystemLocale;
     private LanguageSwitcher mLanguageSwitcher;
 
-    // droidtop (Droidtop/tracker#903 H6): the word being composed (Hacker's mComposing, mWord and mPredicting) lives in
+    // droidtop (mytop-project/tracker#903 H6): the word being composed (Hacker's mComposing, mWord and mPredicting) lives in
     // the Latin engine, which LatinIME reads and writes where it read its own fields; the engine seam is mEngine.
     private final LatinEngine mLatin = new LatinEngine(new LatinEngine.Host() {
         public boolean predictionOnForMode() { return mPredictionOnForMode; }
@@ -221,7 +221,7 @@ public class LatinIME extends InputMethodService implements
     // Saved shift state when leaving alphabet mode, or when applying multitouch shift
     private int mSavedShiftState;
     private boolean mPasswordText;
-    // droidtop patch (Droidtop/tracker#903 H12a): a haptic per key class at the "Vibration strength" chosen.
+    // droidtop patch (mytop-project/tracker#903 H12a): a haptic per key class at the "Vibration strength" chosen.
     private KeyHapticsPlayer mHaptics;
     private boolean mSoundOn;
     private boolean mPopupOn;
@@ -382,7 +382,7 @@ public class LatinIME extends InputMethodService implements
         super.onCreate();
         sInstance = this;
         mHaptics = new KeyHapticsPlayer(this);
-        // droidtop: whether offline voice typing's download is in place, read off the main thread (Droidtop/tracker#343).
+        // droidtop: whether offline voice typing's download is in place, read off the main thread (mytop-project/tracker#343).
         OfflineVoice.refresh(this);
         // setStatusIcon(R.drawable.ime_qwerty);
         mResources = getResources();
@@ -424,8 +424,8 @@ public class LatinIME extends InputMethodService implements
         mSwipeRightAction = prefs.getString(PREF_SWIPE_RIGHT, res.getString(R.string.default_swipe_right));
         mVolUpAction = prefs.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         mVolDownAction = prefs.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
-        KeyboardForm.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H1): shapes per orientation
-        KeyboardModes.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H12c): one store for shapes and modes
+        KeyboardForm.migrate(prefs); // droidtop patch (mytop-project/tracker#903 H1): shapes per orientation
+        KeyboardModes.migrate(prefs); // droidtop patch (mytop-project/tracker#903 H12c): one store for shapes and modes
         KeyHapticsPlayer.migrate(prefs); // droidtop patch (#903 H12a): Vibrate on keypress becomes Vibration strength
         sKeyboardSettings.initPrefs(prefs, res);
 
@@ -572,7 +572,7 @@ public class LatinIME extends InputMethodService implements
         return (mOrientation == Configuration.ORIENTATION_PORTRAIT);
     }
 
-    // droidtop (Droidtop/tracker#903 H6): where Hacker's composes, and so where it does not (suggestions off, the
+    // droidtop (mytop-project/tracker#903 H6): where Hacker's composes, and so where it does not (suggestions off, the
     // terminal preset, a password), is the Latin engine's capability; the rules moved there unchanged.
     private boolean suggestionsDisabled() {
         return mLatin.suggestionsDisabled();
@@ -639,11 +639,11 @@ public class LatinIME extends InputMethodService implements
         int[] dictionaries = getDictionary(orig);
         mSuggest = new Suggest(this, dictionaries);
         mLatin.setLexicon(mSuggest);
-        // droidtop: a dictionary the person added for this language, loaded off the main thread (Droidtop/tracker#339).
+        // droidtop: a dictionary the person added for this language, loaded off the main thread (mytop-project/tracker#339).
         final Suggest created = mSuggest;
         mDictionaryGeneration = KeyboardDictionaries.getGeneration();
         KeyboardDictionaries.loadInto(this, created, locale, () -> mSuggest == created, this::updateCorrectionMode);
-        // droidtop: glide guesses from the same language's words (Droidtop/tracker#341), read when a keyboard shows.
+        // droidtop: glide guesses from the same language's words (mytop-project/tracker#341), read when a keyboard shows.
         final String glideLocale = locale;
         mGlide.setWords(() -> KeyboardDictionaries.INSTANCE.glideWords(this, glideLocale));
         updateAutoTextEnabled(saveLocale);
@@ -673,14 +673,14 @@ public class LatinIME extends InputMethodService implements
         mSentenceSeparators = mResources
                 .getString(R.string.sentence_separators);
         initSuggestPuncList();
-        // droidtop (Droidtop/tracker#903 H6): a language with an engine of its own (none yet; H7 to H9) types through it.
+        // droidtop (mytop-project/tracker#903 H6): a language with an engine of its own (none yet; H7 to H9) types through it.
         useEngine(InputEngines.forLanguage(this, locale));
 
         conf.locale = saveLocale;
         orig.updateConfiguration(conf, orig.getDisplayMetrics());
     }
 
-    /** droidtop (Droidtop/tracker#903 H6): the engine keys go to; Hacker's Latin path when [engine] is null. */
+    /** droidtop (mytop-project/tracker#903 H6): the engine keys go to; Hacker's Latin path when [engine] is null. */
     private void useEngine(InputEngine engine) {
         if (mSession != null) mSession.close();
         mEngine = engine != null ? engine : mLatin;
@@ -813,7 +813,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * droidtop (Droidtop/tracker#903 H7a): an arrow or Escape, from the keys ([code] is the keyboard's own negative code)
+     * droidtop (mytop-project/tracker#903 H7a): an arrow or Escape, from the keys ([code] is the keyboard's own negative code)
      * or a hardware keyboard (the negated KeyEvent code), to a language's own engine while it composes. False leaves it
      * to do what it always did.
      */
@@ -906,7 +906,7 @@ public class LatinIME extends InputMethodService implements
         mConfigurationChanging = true;
         super.onConfigurationChanged(conf);
         mConfigurationChanging = false;
-        // droidtop patch (Droidtop/tracker#903 H12b): night mode and a new wallpaper's palette arrive as a
+        // droidtop patch (mytop-project/tracker#903 H12b): night mode and a new wallpaper's palette arrive as a
         // configuration change; a modern theme follows them at once, not only at the next field.
         if (mKeyboardSwitcher != null && mKeyboardSwitcher.getInputView() != null) {
             mKeyboardSwitcher.refreshAppearance();
@@ -983,7 +983,7 @@ public class LatinIME extends InputMethodService implements
         // showing its soft-input window. The second-screen keyboard uses
         // this connection even when Android declines to draw that window.
         SecondScreenKeyboard.onStartInput(getCurrentInputConnection(), attribute.inputType);
-        // droidtop patch (Droidtop/tracker#772, #903 H12d): the clipboard history keeps nothing copied while a password
+        // droidtop patch (mytop-project/tracker#772, #903 H12d): the clipboard history keeps nothing copied while a password
         // field, or an editor that asked for no personalised learning, has the keyboard. Noted here, as every field
         // starts, and not in onStartInputView: with a hardware keyboard, or the keys on the add-on screen, Android
         // starts the field without showing the input view, and a copy from a password field was then kept.
@@ -997,11 +997,11 @@ public class LatinIME extends InputMethodService implements
         // policy, docs/SPEC.md 4c), so droidtop is told and can draw the
         // same keyboard on the editor's own screen itself.
         SecondScreenKeyboard.onShowRequested(attribute.packageName);
-        // droidtop patch (Droidtop/tracker#903 H12a): the animation settings, read once each time the keyboard shows.
+        // droidtop patch (mytop-project/tracker#903 H12a): the animation settings, read once each time the keyboard shows.
         KeyboardMotion.refresh(this);
-        // droidtop: the voice key asks again which keyboard dictates for this field (Droidtop/tracker#772).
+        // droidtop: the voice key asks again which keyboard dictates for this field (mytop-project/tracker#772).
         VoiceInput.fieldStarted();
-        // droidtop: a dictionary added or removed since the last field is loaded now (Droidtop/tracker#339).
+        // droidtop: a dictionary added or removed since the last field is loaded now (mytop-project/tracker#339).
         if (mDictionaryGeneration != KeyboardDictionaries.getGeneration() && mLanguageSwitcher != null) {
             initSuggest(mLanguageSwitcher.getInputLanguage());
         }
@@ -1012,7 +1012,7 @@ public class LatinIME extends InputMethodService implements
         sKeyboardSettings.editorImeOptions = attribute.imeOptions;
 
         //Log.i("PCKeyboard", "onStartInputView " + attribute + ", inputType= " + Integer.toHexString(attribute.inputType) + ", restarting=" + restarting);
-        // droidtop patch: a modern theme follows a change made while the keyboard was away (Droidtop/tracker#562, #903 H12b).
+        // droidtop patch: a modern theme follows a change made while the keyboard was away (mytop-project/tracker#562, #903 H12b).
         mKeyboardSwitcher.refreshAppearance();
         LatinKeyboardView inputView = mKeyboardSwitcher.getInputView();
         // In landscape mode, this method gets called without the input view
@@ -1020,7 +1020,7 @@ public class LatinIME extends InputMethodService implements
         if (inputView == null) {
             return;
         }
-        // droidtop: glide typing while its setting is on (Droidtop/tracker#341); a new field starts with no glided word.
+        // droidtop: glide typing while its setting is on (mytop-project/tracker#341); a new field starts with no glided word.
         mGlideWord = null;
         inputView.setGlide(PreferenceManager.getDefaultSharedPreferences(this).getBoolean(PREF_GLIDE, true) ? mGlide : null);
 
@@ -1139,7 +1139,7 @@ public class LatinIME extends InputMethodService implements
         }
         inputView.closing();
         resetPrediction();
-        // droidtop (Droidtop/tracker#903 H6): a new field for the engine; a language's own one forgets the last, and
+        // droidtop (mytop-project/tracker#903 H6): a new field for the engine; a language's own one forgets the last, and
         // is given the text before the caret (H7a).
         if (mSession != null) {
             mSession.leave();
@@ -1221,7 +1221,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * droidtop patch (Droidtop/tracker#340): the input view with the tool strip above the keys (clipboard history,
+     * droidtop patch (mytop-project/tracker#340): the input view with the tool strip above the keys (clipboard history,
      * macros, incognito, the emoji panel with its GIFs and Stickers tabs), or the keys alone when the strip is switched off.
      */
     View wrapInputView(LatinKeyboardView keyboard) {
@@ -1235,12 +1235,12 @@ public class LatinIME extends InputMethodService implements
             }
         }, null, new Runnable() {
             public void run() {
-                // The strip's Switch keyboard (Droidtop/tracker#717): the same move as the space bar's long press.
+                // The strip's Switch keyboard (mytop-project/tracker#717): the same move as the space bar's long press.
                 switchToNextKeyboard();
             }
-        }, new ImeMediaTarget(this)); // GIFs and stickers go in through this editor's content channel (Droidtop/tracker#903 H5).
+        }, new ImeMediaTarget(this)); // GIFs and stickers go in through this editor's content channel (mytop-project/tracker#903 H5).
         mToolsDeck = view instanceof ToolsDeck ? (ToolsDeck) view : null;
-        // droidtop patch (Droidtop/tracker#903 H12c): the floating mode puts the keyboard in a frame over the app.
+        // droidtop patch (mytop-project/tracker#903 H12c): the floating mode puts the keyboard in a frame over the app.
         mFloatingFrame = null;
         if (KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING) {
             mFloatingFrame = new FloatingKeyboardFrame(this, view, keyboard, KeyboardAppearance.colors(this));
@@ -1250,7 +1250,7 @@ public class LatinIME extends InputMethodService implements
         return view;
     }
 
-    /** The floating mode's frame around the input view, or null in every other mode (Droidtop/tracker#903 H12c). */
+    /** The floating mode's frame around the input view, or null in every other mode (mytop-project/tracker#903 H12c). */
     private FloatingKeyboardFrame mFloatingFrame;
 
     /** The tool strip around the input view, for the pad (PadKeys); null with the strip off. */
@@ -1258,13 +1258,13 @@ public class LatinIME extends InputMethodService implements
         return mToolsDeck;
     }
 
-    /** Whether the keyboard floats over the app now (Droidtop/tracker#903 H12c). */
+    /** Whether the keyboard floats over the app now (mytop-project/tracker#903 H12c). */
     private boolean isFloating() {
         return mFloatingFrame != null && KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING;
     }
 
     /**
-     * droidtop patch (Droidtop/tracker#903 H12c): the number pad's "=" types the answer to the sum before the cursor,
+     * droidtop patch (mytop-project/tracker#903 H12c): the number pad's "=" types the answer to the sum before the cursor,
      * or a plain "=" when there is none (a division by zero, no sum).
      */
     private void typeCalculation() {
@@ -1279,7 +1279,7 @@ public class LatinIME extends InputMethodService implements
     private static final int CALCULATION_LOOKBACK = 64;
 
     /**
-     * droidtop patch (Droidtop/tracker#903 H4): emoji for the word just typed, on the tool strip. Only with a plain cursor
+     * droidtop patch (mytop-project/tracker#903 H4): emoji for the word just typed, on the tool strip. Only with a plain cursor
      * (no selection), and never in a password or no-learning field (IncognitoRules.sensitiveField).
      */
     private void offerEmojiForWord(int selStart, int selEnd) {
@@ -1297,7 +1297,7 @@ public class LatinIME extends InputMethodService implements
     /** The tool strip around the current input view, if there is one; shows the autofill suggestions. */
     private ToolsDeck mToolsDeck;
 
-    /** droidtop patch (Droidtop/tracker#342): autofill suggestions in the keyboard, Android 11 and later. */
+    /** droidtop patch (mytop-project/tracker#342): autofill suggestions in the keyboard, Android 11 and later. */
     @Override
     @RequiresApi(Build.VERSION_CODES.R)
     public android.view.inputmethod.InlineSuggestionsRequest onCreateInlineSuggestionsRequest(Bundle uiExtras) {
@@ -1317,7 +1317,7 @@ public class LatinIME extends InputMethodService implements
         return true;
     }
 
-    /** droidtop patch (Droidtop/tracker#340): a space-bar drag moves the cursor like the arrow keys do. */
+    /** droidtop patch (mytop-project/tracker#340): a space-bar drag moves the cursor like the arrow keys do. */
     @Override
     public void onCursorDrag(int steps) {
         final int key = steps < 0 ? LatinKeyboardView.KEYCODE_DPAD_LEFT : LatinKeyboardView.KEYCODE_DPAD_RIGHT;
@@ -1339,7 +1339,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
-        // droidtop: dictation belongs to the field it started in (Droidtop/tracker#343).
+        // droidtop: dictation belongs to the field it started in (mytop-project/tracker#343).
         OfflineVoiceTyping.finishInput();
         mShowingVoiceHint = false;
         mPadKeys.clear();
@@ -1365,7 +1365,7 @@ public class LatinIME extends InputMethodService implements
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 candidatesStart, candidatesEnd);
         offerEmojiForWord(newSelStart, newSelEnd);
-        // droidtop (Droidtop/tracker#903 H6): the cursor left what a language's own engine composes; it stays as typed.
+        // droidtop (mytop-project/tracker#903 H6): the cursor left what a language's own engine composes; it stays as typed.
         // The engine may put the caret inside its text (H7a), so only a selection or a caret outside it counts.
         if (mSession != null && mSession.getComposing()
                 && (newSelStart != newSelEnd || newSelStart < candidatesStart || newSelEnd > candidatesEnd)
@@ -1513,7 +1513,7 @@ public class LatinIME extends InputMethodService implements
 //                " mPredicting=" + mLatin.predicting
 //                );
         // TODO: Remove this if we support candidates with hard keyboard
-        // droidtop patch (Droidtop/tracker#903 H12c): the strip would sit at the top of the screen, away from a
+        // droidtop patch (mytop-project/tracker#903 H12c): the strip would sit at the top of the screen, away from a
         // floating keyboard and outside the part of the window that takes touches, so it is not shown while floating.
         boolean visible = shown
         && !isFloating()
@@ -1576,7 +1576,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onComputeInsets(InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
-        // droidtop patch (Droidtop/tracker#903 H12c): a floating keyboard leaves the app its whole screen and takes
+        // droidtop patch (mytop-project/tracker#903 H12c): a floating keyboard leaves the app its whole screen and takes
         // touches only inside its frame.
         if (isFloating() && mFloatingFrame.isShown()) {
             mFloatingFrame.computeInsets(outInsets);
@@ -1595,7 +1595,7 @@ public class LatinIME extends InputMethodService implements
         // mode
         float dimen = getResources().getDimension(
                 R.dimen.max_height_for_fullscreen);
-        // droidtop patch (Droidtop/tracker#903 H12c): a floating keyboard never takes the screen for an extract view.
+        // droidtop patch (mytop-project/tracker#903 H12c): a floating keyboard never takes the screen for an extract view.
         if (displayHeight > dimen || mFullscreenOverride || isConnectbot()
                 || KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING) {
             return false;
@@ -1612,9 +1612,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // droidtop: a pad drives the keyboard while it shows (Droidtop/tracker#338).
+        // droidtop: a pad drives the keyboard while it shows (mytop-project/tracker#338).
         if (mPadKeys.onKeyDown(keyCode, event)) return true;
-        // droidtop (Droidtop/tracker#903 H7a): a hardware keyboard's arrows and Esc reach a language's own engine
+        // droidtop (mytop-project/tracker#903 H7a): a hardware keyboard's arrows and Esc reach a language's own engine
         // while it composes.
         if (mSession != null && sessionNavigates(-keyCode, event.isShiftPressed())) {
             mSessionKeysDown.add(keyCode);
@@ -1693,7 +1693,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     private void commitTyped(InputConnection inputConnection, boolean manual) {
-        // droidtop (Droidtop/tracker#903 H6): a language's own engine puts what it composed in the field first.
+        // droidtop (mytop-project/tracker#903 H6): a language's own engine puts what it composed in the field first.
         if (mSession != null) mSession.commit();
         if (mLatin.predicting) {
             // The engine ends composing and gives the word as typed (Hacker's mComposing, kept for a revert).
@@ -1903,7 +1903,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * Moves to the next keyboard enabled on the device (Droidtop/tracker#717). With droidtop's keyboard the only one
+     * Moves to the next keyboard enabled on the device (mytop-project/tracker#717). With droidtop's keyboard the only one
      * there is to move to, the system's picker opens instead, which also offers enabling another.
      */
     private void switchToNextKeyboard() {
@@ -2379,9 +2379,9 @@ public class LatinIME extends InputMethodService implements
     // Implementation of KeyboardViewListener
 
     public void onKey(int primaryCode, int[] keyCodes, int x, int y) {
-        // droidtop: a key typed after a glide keeps the glided word (Droidtop/tracker#341).
+        // droidtop: a key typed after a glide keeps the glided word (mytop-project/tracker#341).
         mGlideWord = null;
-        // droidtop patch (Droidtop/tracker#342): an open emoji search takes the keys.
+        // droidtop patch (mytop-project/tracker#342): an open emoji search takes the keys.
         if (KeyboardCapture.offerKey(primaryCode)) {
             return;
         }
@@ -2398,7 +2398,7 @@ public class LatinIME extends InputMethodService implements
             if (processMultiKey(primaryCode)) {
                 break;
             }
-            // droidtop (Droidtop/tracker#903 H6): a language's own engine takes Backspace while it composes.
+            // droidtop (mytop-project/tracker#903 H6): a language's own engine takes Backspace while it composes.
             if (mSession != null && mSession.onDelete()) {
                 mDeleteCount++;
                 break;
@@ -2455,11 +2455,11 @@ public class LatinIME extends InputMethodService implements
             switchToNextKeyboard();
             break;
         case PadCalculator.EQUALS_CODE:
-            // droidtop (Droidtop/tracker#903 H12c): the number pad's "=".
+            // droidtop (mytop-project/tracker#903 H12c): the number pad's "=".
             typeCalculation();
             break;
         case PadCalculator.LETTERS_CODE:
-            // droidtop (Droidtop/tracker#903 H12c): the number pad's ABC, back to Normal; the keyboard builds itself again,
+            // droidtop (mytop-project/tracker#903 H12c): the number pad's ABC, back to Normal; the keyboard builds itself again,
             // once this key's own press is over.
             mHandler.post(new Runnable() {
                 public void run() {
@@ -2478,7 +2478,7 @@ public class LatinIME extends InputMethodService implements
             toggleLanguage(false, false);
             break;
         case LatinKeyboardView.KEYCODE_VOICE:
-            // droidtop (Droidtop/tracker#343): dictation from the first voice provider that can.
+            // droidtop (mytop-project/tracker#343): dictation from the first voice provider that can.
             VoiceInput.start(this);
             break;
         case 9 /* Tab */:
@@ -2488,7 +2488,7 @@ public class LatinIME extends InputMethodService implements
             sendTab();
             break;
         case LatinKeyboardView.KEYCODE_ESCAPE:
-            // droidtop (Droidtop/tracker#903 H7a): a language's own engine cancels what it composes.
+            // droidtop (mytop-project/tracker#903 H7a): a language's own engine cancels what it composes.
             if (mSession != null && sessionNavigates(primaryCode, false)) {
                 break;
             }
@@ -2524,7 +2524,7 @@ public class LatinIME extends InputMethodService implements
         case LatinKeyboardView.KEYCODE_BREAK:
         case LatinKeyboardView.KEYCODE_NUM_LOCK:
         case LatinKeyboardView.KEYCODE_SCROLL_LOCK:
-            // droidtop (Droidtop/tracker#903 H7a): the arrows move about what a language's own engine composes.
+            // droidtop (mytop-project/tracker#903 H7a): the arrows move about what a language's own engine composes.
             if (mSession != null && sessionNavigates(primaryCode, isShiftMod())) {
                 break;
             }
@@ -2551,7 +2551,7 @@ public class LatinIME extends InputMethodService implements
                 mJustAddedAutoSpace = false;
             }
             RingCharBuffer.getInstance().push((char) primaryCode, x, y);
-            // droidtop (Droidtop/tracker#903 H6): a language's own engine first; what it leaves types as before.
+            // droidtop (mytop-project/tracker#903 H6): a language's own engine first; what it leaves types as before.
             if (mSession != null && sessionTakes(primaryCode, keyCodes)) {
                 mJustRevertedSeparator = null;
                 break;
@@ -3014,7 +3014,7 @@ public class LatinIME extends InputMethodService implements
                 false);
     }
 
-    /** The word being typed: its suggestions from the Latin engine (Droidtop/tracker#903 H6), shown as Hacker's showed them. */
+    /** The word being typed: its suggestions from the Latin engine (mytop-project/tracker#903 H6), shown as Hacker's showed them. */
     private void showWordSuggestions() {
         // TODO Maybe need better way of retrieving previous word
         CharSequence prevWord = EditingUtil.getPreviousWord(
@@ -3055,7 +3055,7 @@ public class LatinIME extends InputMethodService implements
         return false;
     }
 
-    /** droidtop: offline voice typing's line in the suggestion strip (Droidtop/tracker#343). */
+    /** droidtop: offline voice typing's line in the suggestion strip (mytop-project/tracker#343). */
     void showVoiceHint(CharSequence text) {
         if (mCandidateView == null) return;
         setCandidatesViewShown(true);
@@ -3072,14 +3072,14 @@ public class LatinIME extends InputMethodService implements
     }
 
     public void pickSuggestionManually(int index, CharSequence suggestion) {
-        // droidtop: a tap on "Listening" stops offline voice typing (Droidtop/tracker#343).
+        // droidtop: a tap on "Listening" stops offline voice typing (mytop-project/tracker#343).
         if (mShowingVoiceHint) {
             OfflineVoiceTyping.stop();
             return;
         }
-        // droidtop: one of a glide's other words replaces the word it typed (Droidtop/tracker#341).
+        // droidtop: one of a glide's other words replaces the word it typed (mytop-project/tracker#341).
         if (replaceGlideWord(suggestion)) return;
-        // droidtop (Droidtop/tracker#903 H6): a candidate of a language's own engine.
+        // droidtop (mytop-project/tracker#903 H6): a candidate of a language's own engine.
         if (mSession != null && mCandidateView != null && mCandidateView.isShowingEngineCandidates()) {
             mSession.pick(index);
             updateShiftKeyState(getCurrentInputEditorInfo());
@@ -3165,7 +3165,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     /**
-     * droidtop: a glide's words (Droidtop/tracker#341), best first. The best is typed, after a space when it follows a
+     * droidtop: a glide's words (mytop-project/tracker#341), best first. The best is typed, after a space when it follows a
      * word, with the shift state's capitals; the strip offers the rest, and picking one replaces it.
      */
     private void onGlideWords(java.util.List<String> words) {
@@ -3191,7 +3191,7 @@ public class LatinIME extends InputMethodService implements
     /** A glided word in the shift state's case: all capitals when locked, a capital first letter when shifted. */
     private String glideCase(String word) {
         // The keyboard's language decides the capitals, not the device's: a Turkish layout's "i" capitalises to
-        // the dotted capital, an English one's to "I" even on a Turkish device (Droidtop/tracker#772).
+        // the dotted capital, an English one's to "I" even on a Turkish device (mytop-project/tracker#772).
         Locale locale = sKeyboardSettings.inputLocale;
         int shift = getShiftState();
         if (shift == Keyboard.SHIFT_LOCKED || shift == Keyboard.SHIFT_CAPS_LOCKED) return word.toUpperCase(locale);
@@ -3347,7 +3347,7 @@ public class LatinIME extends InputMethodService implements
             int frequencyDelta, boolean addToBigramDictionary) {
         if (suggestion == null || suggestion.length() < 1)
             return;
-        // droidtop patch (Droidtop/tracker#340): incognito mode, a password field and an editor that asked for no
+        // droidtop patch (mytop-project/tracker#340): incognito mode, a password field and an editor that asked for no
         // personalised learning learn nothing.
         if (!IncognitoRules.learningAllowed(ToolsPrefs.INSTANCE.incognito(this),
                 sKeyboardSettings.editorImeOptions, mPasswordText)) {

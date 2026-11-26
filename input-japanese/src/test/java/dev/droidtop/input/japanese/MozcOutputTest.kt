@@ -16,7 +16,7 @@ import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.Result
 import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.Status
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H7c: Mozc's Output read as the seam's composing text and candidates, in UTF-16. */
+/** mytop-project/tracker#903 H7c: Mozc's Output read as the seam's composing text and candidates, in UTF-16. */
 class MozcOutputTest {
     private fun segment(value: String, highlight: Boolean = false) = Preedit.Segment.newBuilder()
         .setValue(value)

@@ -59,7 +59,7 @@ interface PlayHistoryDao {
     suspend fun recordPlay(id: String, epochMs: Long) {
         ensureRow(id, epochMs)
         bumpPlay(id, epochMs)
-        // The launch log beside the count (Droidtop/tracker#611): when in the day each game is started, kept
+        // The launch log beside the count (mytop-project/tracker#611): when in the day each game is started, kept
         // PlayStarts.KEEP_MS, so Home can put the games of this hour first. On the device only.
         addStart(PlayStartEntity(gameId = id, startedAt = epochMs))
         pruneStarts(epochMs - PlayStarts.KEEP_MS)
@@ -107,7 +107,7 @@ interface PlayHistoryDao {
     suspend fun moveStarts(fromId: String, toId: String)
 }
 
-/** One start of a game, for the launch log (Droidtop/tracker#611): which game and when. */
+/** One start of a game, for the launch log (mytop-project/tracker#611): which game and when. */
 @Entity(tableName = "play_starts", indices = [androidx.room.Index("started_at")])
 data class PlayStartEntity(
     @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
@@ -353,7 +353,7 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
-        // The launch log (Droidtop/tracker#611): one new table, nothing existing touched, for the same reason as
+        // The launch log (mytop-project/tracker#611): one new table, nothing existing touched, for the same reason as
         // MIGRATION_1_2. It starts empty; Home's time-of-day row waits until it has something to say.
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -365,7 +365,7 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
-        // A folder linked to a store's row of its game (Droidtop/tracker#745): one nullable column, nothing existing
+        // A folder linked to a store's row of its game (mytop-project/tracker#745): one nullable column, nothing existing
         // touched, for the same reason as MIGRATION_1_2.
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {

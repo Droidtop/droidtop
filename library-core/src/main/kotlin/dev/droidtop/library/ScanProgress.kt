@@ -242,7 +242,7 @@ object ScanLog {
 
     /**
      * The file is written by one background thread, in order ([OrderedFileWriter]), because a line written on the main
-     * thread at start-up was a disk write there (the StrictMode watch of Droidtop/tracker#729 reported it).
+     * thread at start-up was a disk write there (the StrictMode watch of mytop-project/tracker#729 reported it).
      */
     private val writer = OrderedFileWriter(MAX_LOG_BYTES)
 
@@ -361,7 +361,7 @@ object ScanLog {
  * "Looking at PC game folders: 12 of 21". A walk is silent to the person
  * otherwise, and the rig's five-minute PC rescan sat on "Looking for new
  * or changed games and apps..." the whole time with nothing to say whether
- * it was working (Droidtop/tracker#275).
+ * it was working (mytop-project/tracker#275).
  *
  * A source [set]s its line as it goes and [finish]es it when it is done
  * (always, including when it was cancelled); [state] is what a screen

@@ -14,7 +14,7 @@ enum class BackendState {
     NEEDS_PERMISSION,
 
     /**
-     * Running, but nothing privileged answers behind it (Droidtop/tracker#851): the Shizuku provider plugin with no
+     * Running, but nothing privileged answers behind it (mytop-project/tracker#851): the Shizuku provider plugin with no
      * Shizuku app running, so every command it is asked for fails. Never offered as the active backend.
      */
     UNBACKED,
@@ -32,7 +32,7 @@ enum class ElevatedBackendId(val id: String, val label: String) {
 
     /**
      * Android's own wireless debugging, which droidtop pairs with once and then talks to as `adb` does, as the shell user
-     * (docs/SPEC.md "Wireless debugging", Droidtop/tracker#816). Android 11 and later.
+     * (docs/SPEC.md "Wireless debugging", mytop-project/tracker#816). Android 11 and later.
      */
     WIRELESS_DEBUGGING("wireless_debugging", "Wireless debugging"),
 }
@@ -76,7 +76,7 @@ object ElevatedAccess {
     ): ElevatedBackendId? = when (choice) {
         ElevatedChoice.OFF -> null
         ElevatedChoice.SHIZUKU_APP -> ElevatedBackendId.SHIZUKU_APP.takeIf { app != BackendState.ABSENT }
-        // A plugin with nothing behind it is never claimed: its reason says so instead (Droidtop/tracker#851).
+        // A plugin with nothing behind it is never claimed: its reason says so instead (mytop-project/tracker#851).
         ElevatedChoice.SHIZUKU_PLUGIN -> ElevatedBackendId.SHIZUKU_PLUGIN.takeIf { plugin != BackendState.ABSENT && plugin != BackendState.UNBACKED }
         ElevatedChoice.WIRELESS_DEBUGGING -> ElevatedBackendId.WIRELESS_DEBUGGING.takeIf { wireless != BackendState.ABSENT }
         // Wireless debugging last: it is there only while its switch is on, and Shizuku, when running, needs nothing.
@@ -98,7 +98,7 @@ object ElevatedAccess {
 
     private const val PLUGIN_NOT_APPROVED = "The Shizuku plugin is installed but not approved and turned on yet: open it in $SETTINGS_PLACE"
 
-    /** The plugin runs, but the Shizuku app it bridges to does not (Droidtop/tracker#851): the person's one step. */
+    /** The plugin runs, but the Shizuku app it bridges to does not (mytop-project/tracker#851): the person's one step. */
     const val PLUGIN_UNBACKED =
         "The Shizuku plugin is on, but nothing is behind it: the Shizuku app isn't running. Install and start Shizuku, or pair wireless debugging in $SETTINGS_PLACE"
 

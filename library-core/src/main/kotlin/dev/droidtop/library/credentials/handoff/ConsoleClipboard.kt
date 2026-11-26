@@ -20,7 +20,7 @@ sealed interface ClipRead {
 
 /**
  * The console's clipboard as the session's shared clipboard uses it (docs/SPEC.md, "Type from another device", the
- * shared clipboard, Droidtop/tracker#645). The Android implementation runs both calls on the main thread; the
+ * shared clipboard, mytop-project/tracker#645). The Android implementation runs both calls on the main thread; the
  * session calls them from the server's thread, outside its own lock, so a fake stands in for it in tests.
  */
 interface ConsoleClipboard {

@@ -15,7 +15,7 @@ import org.junit.rules.TemporaryFolder
  * `<media root>/<system>/<subdir>/<name>.<ext>` layout and the
  * extension walk (FileData.h:161: png, jpg, webp)) and FileData.cpp:381-431
  * (the one-to-one type -> subdirectory names). Two rules are droidtop's
- * own (owner, Droidtop/tracker#632, "we never want screenshots to be
+ * own (owner, mytop-project/tracker#632, "we never want screenshots to be
  * what's displayed first"): screenshots and title screens come after any
  * other art a slot accepts, and the `image` pseudo-type is droidtop's own
  * order rather than ES-DE's miximage-then-screenshot chain.

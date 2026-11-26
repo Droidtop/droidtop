@@ -3,7 +3,7 @@ package dev.droidtop.input.chinese
 import org.pocketworkstation.pckeyboard.InputEngine
 
 /**
- * The seam's keys as librime takes them (Droidtop/tracker#903 H8b): X11 keysyms and modifier masks, which
+ * The seam's keys as librime takes them (mytop-project/tracker#903 H8b): X11 keysyms and modifier masks, which
  * process_key reads (librime's key_table.h, X11's keysymdef.h). Pure.
  */
 object RimeKeys {

@@ -12,10 +12,10 @@ import kotlinx.coroutines.flow.filterNotNull
 /**
  * The colours everything outside Gaming draws in (docs/SPEC.md 7k, "Colours outside Gaming"): Mobile's screens and
  * taskbar, Desktop, the shared menus, and the role tokens plugins read there. The owner, 2026-10-30,
- * Droidtop/tracker#827: "Maybe we set the default coloration to the retro theme, and let users pick between that (the
+ * mytop-project/tracker#827: "Maybe we set the default coloration to the retro theme, and let users pick between that (the
  * "droidtop recommendation: consistent coloration across all themes" option), and a custom droidtop-only theme".
  *
- * One setting, the colour source ([AppearancePrefs.KEY_OUTSIDE_GAMING]), with three choices (Droidtop/tracker#844,
+ * One setting, the colour source ([AppearancePrefs.KEY_OUTSIDE_GAMING]), with three choices (mytop-project/tracker#844,
  * owner: "That feels like a good coloring implementation"): Device colours, Android's system palette
  * ([GamingThemeMapping.fromDevicePalette]), the default where there is one; Gaming theme, [ThemeColorStore]'s resolved
  * colours, the default elsewhere; Custom droidtop theme, droidtop's own palette for Light or dark in one of [ACCENTS].

@@ -1,6 +1,6 @@
 /*
  * A plugin's SQLite, droidtop's own (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's",
- * Droidtop/tracker#741): the pinned SQLite amalgamation built into this library, reached from
+ * mytop-project/tracker#741): the pinned SQLite amalgamation built into this library, reached from
  * dev.droidtop.pluginhost.SqliteNative. Android's own SQLite is never used for a plugin: opening one in an isolated
  * process first reads a global setting through a content provider, which such a process may not call.
  *

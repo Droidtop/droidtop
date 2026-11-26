@@ -78,7 +78,7 @@ class AppCategoryRules(
             "com.nvidia.geforcenow",
             "com.limelight",
             "com.winlator",
-            // Google's own games launcher: on BlueStacks the Apps grid had it under Tools (Droidtop/tracker#944).
+            // Google's own games launcher: on BlueStacks the Apps grid had it under Tools (mytop-project/tracker#944).
             "com.google.android.play.games",
         )
 

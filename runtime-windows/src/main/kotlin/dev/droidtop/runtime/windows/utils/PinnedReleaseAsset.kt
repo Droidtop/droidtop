@@ -32,7 +32,7 @@ class PinnedReleaseAsset(
     /** How the archive is compressed. */
     private val type: TarCompressorUtils.Type = TarCompressorUtils.Type.ZSTD,
 ) {
-    private val urls = urls ?: listOf("https://github.com/Droidtop/droidtop/releases/download/$tag/$asset")
+    private val urls = urls ?: listOf("https://github.com/mytop-project/droidtop/releases/download/$tag/$asset")
 
     fun root(context: Context): File = File(context.filesDir, dirName)
 

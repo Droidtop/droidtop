@@ -40,7 +40,7 @@ public class InputLanguageSelection extends PreferenceActivity {
     private static final String TAG = "PCKeyboardILS";
     private ArrayList<Loc> mAvailableLanguages = new ArrayList<Loc>();
     // droidtop: a language listed here is offered once an engine registered in InputEngines types it
-    // (Droidtop/tracker#903 H7c: Japanese, through Mozc, which :app registers; H8b: Chinese, through RIME; Korean comes in H9).
+    // (mytop-project/tracker#903 H7c: Japanese, through Mozc, which :app registers; H8b: Chinese, through RIME; Korean comes in H9).
     private static final String[] BLACKLIST_LANGUAGES = {
         "ko", "ja", "zh"
     };
@@ -51,9 +51,9 @@ public class InputLanguageSelection extends PreferenceActivity {
         NOCAPS_LANGUAGES.add("ar");
         NOCAPS_LANGUAGES.add("iw");
         NOCAPS_LANGUAGES.add("th");
-        // droidtop (Droidtop/tracker#903 H7c): romaji for Mozc; a capital would type a full-width letter.
+        // droidtop (mytop-project/tracker#903 H7c): romaji for Mozc; a capital would type a full-width letter.
         NOCAPS_LANGUAGES.add("ja");
-        // droidtop (Droidtop/tracker#903 H8b): pinyin for RIME; luna_pinyin types a capital as a Latin letter.
+        // droidtop (mytop-project/tracker#903 H8b): pinyin for RIME; luna_pinyin types a capital as a Latin letter.
         NOCAPS_LANGUAGES.add("zh");
     }
 
@@ -80,7 +80,7 @@ public class InputLanguageSelection extends PreferenceActivity {
         "it", "iw", "ja", "ka", "ko", "lo", "lt", "lv", "nb", "nl", "pl",
         "pt", "pt_PT", "rm", "ro", "ru", "ru_PH", "si", "sk", "sk_QY", "sl",
         "sr", "sv", "ta", "th", "tl", "tr", "uk", "vi", "zh_CN", "zh_TW",
-        // droidtop: 4-row layouts made from HeliBoard's (Droidtop/tracker#342, input-keyboard/layouts-src)
+        // droidtop: 4-row layouts made from HeliBoard's (mytop-project/tracker#342, input-keyboard/layouts-src)
         "be", "mk", "mn"
     };
 
@@ -99,7 +99,7 @@ public class InputLanguageSelection extends PreferenceActivity {
         "en", "en_CX", "en_DV", "es", "es_LA", "es_US", "fa", "fr", "fr_CA",
         "he", "hr", "hu", "hu_QY", "iw", "nb", "ru", "ru_PH", "sk", "sk_QY",
         "sl", "sr", "sv", "tr", "uk",
-        // droidtop: made from HeliBoard's layouts (Droidtop/tracker#342)
+        // droidtop: made from HeliBoard's layouts (mytop-project/tracker#342)
         "be", "mk", "mn"
     };
 

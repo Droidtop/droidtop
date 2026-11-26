@@ -59,7 +59,7 @@ dependencies {
     implementation(libs.javasteam.depotdownloader)
     // JavaSteam's crypto (CryptoHelper, which DepotManifest.decryptFilenames uses) names
     // org.bouncycastle.jce.provider.BouncyCastleProvider but leaves the library to the app. Without it every Steam
-    // download died decrypting the manifest's file names (console, build 1767; Droidtop/tracker#313).
+    // download died decrypting the manifest's file names (console, build 1767; mytop-project/tracker#313).
     implementation(libs.bouncycastle.bcprov)
     implementation(libs.protobuf.java)
     implementation(libs.androidx.room.runtime)

@@ -14,7 +14,7 @@ import org.pocketworkstation.pckeyboard.CodePoints
 import org.pocketworkstation.pckeyboard.InputEngine
 
 /**
- * The engine seam in Mozc's words (Droidtop/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam", whose H7a list maps
+ * The engine seam in Mozc's words (mytop-project/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam", whose H7a list maps
  * each part of the seam to protocol/commands.proto): what [MozcEngine] sends ([MozcCommands]) and how it reads the
  * answer ([MozcOutput]). Pure: the generated protobuf lite classes and the seam's types only.
  */
@@ -151,7 +151,7 @@ object MozcCommands {
 }
 
 /**
- * Mozc's answer as the seam's types (Droidtop/tracker#903 H7c). Mozc counts code points (Preedit.cursor,
+ * Mozc's answer as the seam's types (mytop-project/tracker#903 H7c). Mozc counts code points (Preedit.cursor,
  * Segment.value_length, highlighted_position, DeletionRange); the seam counts UTF-16 chars, so every position goes
  * through [CodePoints]. Pure.
  */

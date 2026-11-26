@@ -7,7 +7,7 @@ import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
 
 /**
- * Start > System > Lock screen in Desktop (Droidtop/tracker#687): the same accessibility-service lock Standard's
+ * Start > System > Lock screen in Desktop (mytop-project/tracker#687): the same accessibility-service lock Standard's
  * double tap uses (GestureAction.lockScreen), the one public way an app locks the screen on Android 9 and later.
  * Without the service turned on there is nothing to call, so it says where to turn it on, rather than opening
  * Android's accessibility settings past the disclosure Standard shows first.

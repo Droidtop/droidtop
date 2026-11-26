@@ -5,7 +5,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 
 /**
- * Reads Android's Material You palette (Droidtop/tracker#903 H12b): the `android.R.color.system_*` tones, which exist
+ * Reads Android's Material You palette (mytop-project/tracker#903 H12b): the `android.R.color.system_*` tones, which exist
  * from Android 12 (API 31). A class of its own so nothing below Android 12 loads it: its only caller is
  * [DynamicKeyColors.palette], under SDK_INT >= 31. Its shape names only [Context] and Kotlin types, so
  * build-scripts/check_class_load_api.py needs no allowlist line; the tone ids are constants the compiler inlines.

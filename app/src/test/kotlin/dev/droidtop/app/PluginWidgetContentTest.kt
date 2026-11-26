@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What a Plugin widget draws for each C10 template and for a tile (docs/plugin-api.md 3 C10, Droidtop/tracker#563). */
+/** What a Plugin widget draws for each C10 template and for a tile (docs/plugin-api.md 3 C10, mytop-project/tracker#563). */
 class PluginWidgetContentTest {
     @Test
     fun aValueIsItsTitleAndOneRow() {

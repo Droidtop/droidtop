@@ -6,7 +6,7 @@ import dev.droidtop.runtime.systemstatus.GameModeControl
 import dev.droidtop.runtime.tasks.PrivilegedShell
 
 /**
- * The power policy's standard layer (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 3a): Android's Game Mode
+ * The power policy's standard layer (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 3a): Android's Game Mode
  * for the package in front, the one layer every device with the elevated shell has. Saver is Android's battery mode,
  * Standard its standard, Performance and Max its performance.
  *

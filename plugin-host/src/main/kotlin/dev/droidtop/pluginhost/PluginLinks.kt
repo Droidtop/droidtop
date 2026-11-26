@@ -4,7 +4,7 @@ import java.net.URI
 import org.json.JSONObject
 
 /**
- * One link pattern a plugin handles (docs/plugin-api.md 3 F3, Droidtop/tracker#459): a `provides` entry may carry
+ * One link pattern a plugin handles (docs/plugin-api.md 3 F3, mytop-project/tracker#459): a `provides` entry may carry
  * `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]`, and droidtop's one link router hands a matching
  * link to that entry's point (op `open_link`) through the broker. A plugin never gets an Android entry point of
  * its own; droidtop receives every link and routes it ([PluginLinks]).
@@ -58,7 +58,7 @@ data class LinkPattern(
 }
 
 /**
- * The patterns plugins declare (docs/plugin-api.md 3 F3, docs/SPEC.md 12a "Links", Droidtop/tracker#459). Pure.
+ * The patterns plugins declare (docs/plugin-api.md 3 F3, docs/SPEC.md 12a "Links", mytop-project/tracker#459). Pure.
  *
  * Owner's decisions (2026-10-10): droidtop answers its own `droidtop://` links, every https link as a general
  * web-link handler (browser-style, no host named) and shared links; a plugin registers the patterns it handles in

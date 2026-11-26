@@ -22,7 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The DLC and branch picker's rules and the choice file (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313). */
+/** The DLC and branch picker's rules and the choice file (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313). */
 class SteamContentTest {
     private fun manifests(vararg branches: String, gid: Long = 1L, size: Long = 100L) =
         branches.associateWith { ManifestInfo(it, gid, size, size / 2) }

@@ -20,7 +20,7 @@ import org.junit.Test
 
 /**
  * An Android app's page in the one frame every page shares (EntryDetailScreen.kt, AppPageFacts.kt; docs/SPEC.md 7i,
- * "Apps on the page"; Droidtop/tracker#845 slice U3): the frame's words name an app, and the app's facts land on
+ * "Apps on the page"; mytop-project/tracker#845 slice U3): the frame's words name an app, and the app's facts land on
  * their tabs.
  */
 class AppPageTest {
@@ -64,7 +64,7 @@ class AppPageTest {
         assertEquals(PageKind.GAME, PageKind.of(rom))
         PageTab.values().forEach { tab ->
             val line = tab.emptyLine(PageKind.APP)
-            // Short lines (Droidtop/tracker#153): an app's never says "game", and every tab has one.
+            // Short lines (mytop-project/tracker#153): an app's never says "game", and every tab has one.
             assertTrue(line, line.isNotBlank())
             assertFalse(line, line.contains("game"))
             assertTrue(tab.emptyLine(PageKind.GAME).isNotBlank())
@@ -75,7 +75,7 @@ class AppPageTest {
         assertEquals("Game options", PageKind.GAME.optionsHint)
         // Options' shared rows take the same word.
         assertEquals("3 images and videos scraped for this app", PageOptionRows.viewMedia(PageKind.APP, 3) {}.detail)
-        // The Collections row's title says it all, so it has no line (Droidtop/tracker#153).
+        // The Collections row's title says it all, so it has no line (mytop-project/tracker#153).
         assertEquals(null, PageOptionRows.collections(PageKind.GAME) {}.detail)
 
         val play = consolePlayState(kind = PageKind.APP, emulatorsKnown = false, emulator = null, systemName = null)

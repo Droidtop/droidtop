@@ -6,7 +6,7 @@ import java.net.URL
 
 /**
  * Keeps a request's credentials on the site they were made for when the download engine follows redirects
- * (docs/SPEC.md 12a "One download engine", Droidtop/tracker#417).
+ * (docs/SPEC.md 12a "One download engine", mytop-project/tracker#417).
  *
  * aria2 sends every `header` option it was given to every address it is redirected to, so a download that carries
  * an `Authorization` or `Cookie` header (a sign-in site's session, a private release asset) would hand it to

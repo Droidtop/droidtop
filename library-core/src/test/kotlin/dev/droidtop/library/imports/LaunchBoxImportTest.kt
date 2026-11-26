@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Reading LaunchBox's platform files for an import (Droidtop/tracker#724). */
+/** Reading LaunchBox's platform files for an import (mytop-project/tracker#724). */
 class LaunchBoxImportTest {
     private val xml = """
         <?xml version="1.0" standalone="yes"?>

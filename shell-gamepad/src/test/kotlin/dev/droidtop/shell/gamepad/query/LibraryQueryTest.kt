@@ -556,7 +556,7 @@ class LibraryQueryTest {
         assertNull(dev.droidtop.library.PcLaunchers.viaOf("Chosen by you"))
     }
 
-    // Droidtop/tracker#722: the person's own marks, apart from the scraped rating.
+    // mytop-project/tracker#722: the person's own marks, apart from the scraped rating.
     @Test
     fun `my status filters and my rating sorts, from the person's own marks`() {
         val marks = mapOf(

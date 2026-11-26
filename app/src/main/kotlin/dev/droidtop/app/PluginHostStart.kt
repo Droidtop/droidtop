@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.launch
 
 /**
- * The plugin host's start, after droidtop's and by droidtop (docs/SPEC.md 12a "Start order", Droidtop/tracker#775). The
+ * The plugin host's start, after droidtop's and by droidtop (docs/SPEC.md 12a "Start order", mytop-project/tracker#775). The
  * owner: "droidtop initializes. Then, it initializes the plugin host. which initializes the plugins." droidtop's own start
  * ([DroidtopApplication.onCreate]) needs nothing here and starts none of it: no plugin, no plugin process and no plugin
  * file is touched on the way to droidtop's first screen, so a plugin that is missing, slow or broken never stops it.
@@ -68,7 +68,7 @@ object PluginHostStart {
             step("standard hooks") { dev.droidtop.library.integrations.PluginStandardHooks.install(app) }
             // The plugin services and schedules the person switched on (E8, E9).
             step("background") { PluginBackgroundHost.install(app) }
-            // Apps that carry a droidtop plugin (Droidtop/tracker#547): told to the person once per app version when the
+            // Apps that carry a droidtop plugin (mytop-project/tracker#547): told to the person once per app version when the
             // app is installed or updated while droidtop runs, or when it changed while droidtop did not run.
             step("app interfaces") {
                 dev.droidtop.pluginhost.AppInterfaceAnnouncements.watch(app)
@@ -77,7 +77,7 @@ object PluginHostStart {
             // With Shizuku, the grants the system controls need are taken now, so they switch in place rather than
             // opening Android's screens (docs/SPEC.md "Privileged actions", tracker#581). Here, not in droidtop's start:
             // the backend may be the Shizuku plugin.
-            // The enhancement provider host (Droidtop/tracker#852): a newer one goes in over droidtop's own, without asking,
+            // The enhancement provider host (mytop-project/tracker#852): a newer one goes in over droidtop's own, without asking,
             // where Android allows that. Nothing is installed for the first time here.
             step("provider host") { ProviderHostSetup.updateQuietly(app) }
             step("elevated grants") { dev.droidtop.runtime.tasks.ElevatedGrants.takeAll(app, dev.droidtop.runtime.tasks.TaskManager.shell) }

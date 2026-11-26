@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The search a link sheet and the match picker start from, and what the person types over it (Droidtop/tracker#861). */
+/** The search a link sheet and the match picker start from, and what the person types over it (mytop-project/tracker#861). */
 class SearchTextTest {
     @Test
     fun typedWordsAreSearchedAndBlankKeepsTheSuggestion() {

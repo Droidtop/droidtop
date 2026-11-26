@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 /**
  * Whether an app is in front on the screen the companion lives on, so the
  * orchestration must not start the companion (or re-front the shell) over it
- * (Droidtop/tracker#265).
+ * (mytop-project/tracker#265).
  *
  * The companion is an Activity on the screen the shell is NOT on. When the
  * shell is on the add-on and the user launches an emulator onto the other,

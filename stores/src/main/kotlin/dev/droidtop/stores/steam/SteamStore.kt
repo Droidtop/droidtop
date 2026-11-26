@@ -87,7 +87,7 @@ class SteamStore : StoreLibrary {
 
     override fun accountName(context: Context): String? = SteamCredentials.load(context)?.accountName
 
-    /** [gameId]'s achievements and this account's progress, read-only (Droidtop/tracker#230). */
+    /** [gameId]'s achievements and this account's progress, read-only (mytop-project/tracker#230). */
     override suspend fun achievements(context: Context, gameId: String): Result<dev.droidtop.library.stores.StoreAchievements>? =
         gameId.toIntOrNull()?.let { SteamAchievements.read(context, it) }
 
@@ -136,13 +136,13 @@ class SteamStore : StoreLibrary {
                 runCatchingCancellable {
                     SteamCollections.fetch(steam)?.let { parsed ->
                         SteamCollections.save(context, parsed)
-                        // Dynamic collections are not shown yet (Droidtop/tracker#403); their filters go to the scan log
+                        // Dynamic collections are not shown yet (mytop-project/tracker#403); their filters go to the scan log
                         // so the mapping onto droidtop's filters can be checked against real ones.
                         parsed.dynamic.forEach { dev.droidtop.library.ScanLog.write("steam: dynamic collection \"${it.name}\" not shown yet, filters ${it.filterSpec.take(2000)}") }
                     }
                 }
                     .onFailure { Timber.tag("SteamStore").w(it, "Steam collections could not be read") }
-                // The wishlist is a second read as well (Droidtop/tracker#134): its failure leaves the library read and the old copy in place.
+                // The wishlist is a second read as well (mytop-project/tracker#134): its failure leaves the library read and the old copy in place.
                 runCatchingCancellable {
                     val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@runCatchingCancellable
                     val token = steam.authentication.generateAccessTokenForApp(SteamID(credentials.steamId64), credentials.refreshToken).await().accessToken
@@ -160,7 +160,7 @@ class SteamStore : StoreLibrary {
             ?.map { StoreCollection(it.id, it.name, it.appIds.mapTo(HashSet()) { app -> app.toString() }, favourites = it.id == SteamCollections.ID_FAVOURITES) }
     }
 
-    /** Steam's hidden-games list as the last sync read it (Droidtop/tracker#402); null before Steam has answered. */
+    /** Steam's hidden-games list as the last sync read it (mytop-project/tracker#402); null before Steam has answered. */
     override suspend fun hiddenGames(context: Context): Set<String>? = withContext(Dispatchers.IO) {
         val parsed = SteamCollections.load(context) ?: return@withContext null
         parsed.collections.firstOrNull { it.id == SteamCollections.ID_HIDDEN }?.appIds?.mapTo(HashSet()) { it.toString() } ?: emptySet()

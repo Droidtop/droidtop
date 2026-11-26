@@ -8,7 +8,7 @@ import android.widget.RemoteViews
 import dev.droidtop.shell.standard.LauncherSearch
 
 /**
- * The Library search widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): a bar on any launcher's
+ * The Library search widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): a bar on any launcher's
  * page that opens droidtop's one search (`LauncherSearchActivity`): installed apps, the library's games, the download
  * sources and the web in one ranked list. Not gated by a mode: the library is never mode-gated (docs/SPEC.md 2c).
  */

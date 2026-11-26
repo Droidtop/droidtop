@@ -13,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#595: a rescan is a job in the one jobs center, and the row that started it still hears it. */
+/** mytop-project/tracker#595: a rescan is a job in the one jobs center, and the row that started it still hears it. */
 class LibraryRescanJobTest {
     /** The walk never touches the Context here; it only has to be its own application. */
     private class TestContext : android.content.ContextWrapper(null) {

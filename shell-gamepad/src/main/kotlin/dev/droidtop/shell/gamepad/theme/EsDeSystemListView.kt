@@ -272,7 +272,7 @@ fun EsDeSystemListView(
     onCamOffsetChanged: ((Float) -> Unit)? = null,
     // Where the cursor starts: the entry the person last had focused in this
     // list, so a view rebuilt on Back lands where they left it rather than
-    // on the first entry (Droidtop/tracker#642). Clamped to the entries.
+    // on the first entry (mytop-project/tracker#642). Clamped to the entries.
     initialFocusIndex: Int = 0,
 ) {
     // Real ES-DE `fontSize`/`itemSize`/`itemSpacing` etc. are fractions of
@@ -588,7 +588,7 @@ private fun EsDeCarousel(
     var stoppedTick by remember { mutableIntStateOf(0) }
 
     // CarouselComponent::onCursorChanged: each cursor move, and the release after a held run, restarts the camera
-    // from where it is towards the cursor, eased out, for as long as esDeCarouselAnimMs says (Droidtop/tracker#782).
+    // from where it is towards the cursor, eased out, for as long as esDeCarouselAnimMs says (mytop-project/tracker#782).
     // A move made while the camera is still sliding (a quick tap, a held run) retargets it in a short slide, so the
     // camera keeps pace with the cursor; that is droidtop's one deviation from ES-DE, see esDeCarouselAnimMs.
     // Whether the camera is sliding is kept here rather than read from the Animatable: a new move cancels the old
@@ -747,7 +747,7 @@ private fun EsDeCarousel(
                 val item = items.getOrNull(placement.index) ?: return@forEach
                 if (item.logoPath == null) return@forEach
                 // Keyed by the entry, so an item keeps its place in the composition as the carousel moves
-                // (Droidtop/tracker#941).
+                // (mytop-project/tracker#941).
                 key(item.key) {
                     EsDeCarouselItem(
                         item = item,
@@ -794,7 +794,7 @@ private fun EsDeCarousel(
         placements.forEach { placement ->
             val item = items.getOrNull(placement.index) ?: return@forEach
             // Keyed by the entry, so an item keeps its place in the composition as the carousel moves
-            // (Droidtop/tracker#941).
+            // (mytop-project/tracker#941).
             key(item.key) {
                 EsDeCarouselItem(
                     item = item,
@@ -1272,7 +1272,7 @@ private fun EsDeTextList(
     onFocusedIndexChanged: (Int) -> Unit,
     screenWidth: Dp,
     screenHeight: Dp,
-    // Real ES-DE quicksysselect (Droidtop/tracker#43): Left/Right in a
+    // Real ES-DE quicksysselect (mytop-project/tracker#43): Left/Right in a
     // GAMELIST textlist means "jump to the sibling system's gamelist",
     // the same convention the main system carousel and EsDeGrid's own
     // edge already have -- never "move within this list" (a vertical
@@ -1381,7 +1381,7 @@ private fun EsDeTextList(
             val item = items.getOrNull(index) ?: continue
             // Keyed by the entry, not the slot: a scroll by one row used to hand every slot the next entry's name, so
             // every row's text was laid out again; now a row moves with its entry and only its offset and the two
-            // selection colors change (Droidtop/tracker#941, cause 4).
+            // selection colors change (mytop-project/tracker#941, cause 4).
             key(item.key) {
                 val selected = index == cursor
                 // Real color selection (TextListComponent.h:373-384): the
@@ -1550,7 +1550,7 @@ private fun EsDeGrid(
     screenWidth: Dp,
     screenHeight: Dp,
     // Same real quicksysselect convention as EsDeTextList's own
-    // (Droidtop/tracker#43): a GAMELIST grid steps within its own row on
+    // (mytop-project/tracker#43): a GAMELIST grid steps within its own row on
     // Left/Right same as always, but AT the row's edge, bubbles to the
     // sibling-system switch instead of doing nothing -- matching
     // GridPad's already-correct edge behaviour for droidtop's own
@@ -1660,7 +1660,7 @@ private fun EsDeGrid(
             for (index in drawOrder) {
                 val item = items.getOrNull(index) ?: continue
                 // Keyed by the entry: the selected entry is drawn last, so slots by position changed entry on
-                // every move (Droidtop/tracker#941).
+                // every move (mytop-project/tracker#941).
                 key(item.key) {
                     EsDeGridEntry(
                         item = item,

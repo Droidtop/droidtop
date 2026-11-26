@@ -6,7 +6,7 @@ import java.io.File
 enum class GuideFormat { TEXT, PDF, WEB }
 
 /**
- * One guide for a game (Droidtop/tracker#817): what it is called, who it is from ([from], the guide facet's own name),
+ * One guide for a game (mytop-project/tracker#817): what it is called, who it is from ([from], the guide facet's own name),
  * how it is read, and where it is, a file ([path]) or an address ([url]). [id] is stable for the game, so the reader's
  * place is kept under it.
  */

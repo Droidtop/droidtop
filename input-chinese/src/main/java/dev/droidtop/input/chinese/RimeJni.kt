@@ -1,7 +1,7 @@
 package dev.droidtop.input.chinese
 
 /**
- * droidtop's JNI over librime's C API (Droidtop/tracker#903 H8b; src/main/cpp/rime_jni.cc, libdroidtop_rime.so). The
+ * droidtop's JNI over librime's C API (mytop-project/tracker#903 H8b; src/main/cpp/rime_jni.cc, libdroidtop_rime.so). The
  * natives are registered by this object's class name and theirs (JNI_OnLoad), which a consumer R8 rule keeps. librime
  * counts in UTF-8 bytes; every string and offset here is already UTF-16, as Kotlin's are.
  *

@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
  * ([JobPace]); its figures ([detailLine]) are on its page. A opens the job's
  * own page: Pause or Resume and Cancel while it runs; once it has finished,
  * what it did, line by line ([JobReport]), with Open, Retry and Clear
- * (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577). The screen is
+ * (docs/SPEC.md "Jobs and their results", mytop-project/tracker#577). The screen is
  * live ([CatalogScreen.live]): it is read again whenever a job moves, so
  * nothing on it polls.
  *
@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
  * the "Downloads and Updates" entry of Settings and, in the Gaming
  * shell, from the left menu's place of the same name (docs/SPEC.md 7j
  * "Places"): the Steam-style downloads view, where nothing starts an
- * update (owner, 2026-10-29, Droidtop/tracker#749; updates are checked
+ * update (owner, 2026-10-29, mytop-project/tracker#749; updates are checked
  * for and started in the Quick Menu's Downloads tab, [QUICK_MENU_ID])
  * -- same shared-catalog registry every other cross-module
  * management screen uses, so every renderer gets it for free. A store's
@@ -58,7 +58,7 @@ object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
     /**
-     * The Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): Check now, Update all, every update,
+     * The Quick Menu's Downloads tab (owner, 2026-10-29, mytop-project/tracker#749): Check now, Update all, every update,
      * then the jobs. Registered by `:app` (`UpdatesPage`), which owns the updates.
      */
     const val QUICK_MENU_ID = "quick_menu_downloads"
@@ -75,12 +75,12 @@ object PluginJobsScreen {
     /**
      * The one place the list of "what is running" is reached; every store's installs are jobs in
      * it. [headed] false is for a host that already names the screen in its own header (the Quick
-     * Menu's panel), so the heading is not said twice. In order (Droidtop/tracker#749): the jobs, then [lead] and
+     * Menu's panel), so the heading is not said twice. In order (mytop-project/tracker#749): the jobs, then [lead] and
      * [trail] (the place registered by `:app` puts Get games and the Sources status list there,
-     * Droidtop/tracker#644 slice 3), then Download rules. The page is read again on every job report, so the two are
+     * mytop-project/tracker#644 slice 3), then Download rules. The page is read again on every job report, so the two are
      * kept for [EXTRA_KEEP_MS] rather than read each time (they read plugins and stat game folders); they are read in
      * the background, so the jobs show at once and the two fill in under a loading row of their own
-     * (Droidtop/tracker#748: the page took about 10 s to show anything).
+     * (mytop-project/tracker#748: the page took about 10 s to show anything).
      */
     fun screen(
         headed: Boolean = true,
@@ -101,14 +101,14 @@ object PluginJobsScreen {
             },
             onLeave = { kept.clear() },
             // All StateFlows, combined: one value on subscription, which the navigator skips, where merge gave five and the
-            // page loaded four extra times on opening (Droidtop/tracker#941).
+            // page loaded four extra times on opening (mytop-project/tracker#941).
             live = kotlinx.coroutines.flow.combine(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind, JobHistory.count) { _, _, _, _, _ -> },
         )
     }
 
     /**
      * The way to Updates from Downloads and Updates and the Quick Menu's Downloads tab: one row, "Updates · N
-     * available", opening the page (the owner, 2026-10-30, Droidtop/tracker#792: "An updates link should be in the
+     * available", opening the page (the owner, 2026-10-30, mytop-project/tracker#792: "An updates link should be in the
      * Downloads and Updates tab. Not there directly, but a shortcut"). The updates are only on their own page.
      */
     fun updatesGroup() = CatalogGroup(
@@ -179,7 +179,7 @@ object PluginJobsScreen {
     }
 
     /**
-     * Which kind of finished job the Finished section and Older jobs show (owner, 2026-11-15, Droidtop/tracker#940: "can
+     * Which kind of finished job the Finished section and Older jobs show (owner, 2026-11-15, mytop-project/tracker#940: "can
      * we provide filters for that download history, to sort by scrapes and stuff"); null shows every kind.
      */
     val shownKind = kotlinx.coroutines.flow.MutableStateFlow<JobHistory.Kind?>(null)
@@ -298,7 +298,7 @@ object PluginJobsScreen {
         nowMs: Long,
         kind: JobHistory.Kind? = shownKind.value,
         // Whether history holds jobs ([JobHistory.count], in memory): then Older jobs stays reachable with no finished job
-        // in the live list, after Clear finished too (review of Droidtop/tracker#940).
+        // in the live list, after Clear finished too (review of mytop-project/tracker#940).
         older: Boolean = JobHistory.count.value > 0,
     ): List<CatalogGroup> {
         JobPace.forget(snapshot.mapTo(HashSet()) { it.jobId })
@@ -325,7 +325,7 @@ object PluginJobsScreen {
             // of events or tasks that are completed? I want to remove all the syncthing spam from the downloads list"):
             // at its foot it was under as many as FINISHED_KEPT rows, where nobody found it.
             // Show filters it by kind, and Older jobs follows the last row: what the live list no longer holds is kept there
-            // (Droidtop/tracker#940).
+            // (mytop-project/tracker#940).
             if (!anyFinished && !older) {
                 null
             } else {
@@ -379,7 +379,7 @@ object PluginJobsScreen {
     /**
      * Who runs a job, for a row's second line: the plugin and the launcher it came through. A row's title is the job's
      * own name, so a list of jobs from one plugin is not ten rows that all read "Downloads: ..." once cut to the
-     * row's width (Droidtop/tracker#85, rig 2026-10-14).
+     * row's width (mytop-project/tracker#85, rig 2026-10-14).
      */
     private fun jobSource(entry: PluginJobsCenter.Entry): String? =
         // Not when it is the row's own title: a service named after its plugin read "Syncthing" over "Syncthing · 1
@@ -435,7 +435,7 @@ object PluginJobsScreen {
     /**
      * What a running job's row says in its value column: where it stands ("Paused", "Waiting for the connection") or,
      * while it moves, roughly how long is left ([timeLeft], from [JobPace]), never a number that changes with every
-     * report (owner, 2026-10-24, Droidtop/tracker#643: "The current 'flickery numbers for download progress', for
+     * report (owner, 2026-10-24, mytop-project/tracker#643: "The current 'flickery numbers for download progress', for
      * instance, is bad"). The bar beside it shows how far; the percent, amounts and speed are [detailLine], on demand.
      * A job that sends only a percent and a line keeps its line under it. Pure.
      */
@@ -469,10 +469,10 @@ object PluginJobsScreen {
     }
 
     /**
-     * How [entry]'s bar moves (Droidtop/tracker#643): waiting its turn or for a connection is queued, stopped by the
+     * How [entry]'s bar moves (mytop-project/tracker#643): waiting its turn or for a connection is queued, stopped by the
      * person is paused, under way with no fraction is checking, and a finished job is done or failed. A job that ran
      * to its end with every item of its report failed is failed: the done check over "Library · 3 failed" read as
-     * success (rig, AVD dev.3347, Droidtop/tracker#940). Pure.
+     * success (rig, AVD dev.3347, mytop-project/tracker#940). Pure.
      */
     fun lookOf(entry: PluginJobsCenter.Entry): JobLook = when (entry.state) {
         JobState.FAILED -> JobLook.FAILED
@@ -483,7 +483,7 @@ object PluginJobsScreen {
     }
 
     /**
-     * What [entry] is doing, as the icon its status starts with (owner, 2026-11-05, Droidtop/tracker#886): ↓ a
+     * What [entry] is doing, as the icon its status starts with (owner, 2026-11-05, mytop-project/tracker#886): ↓ a
      * download, the install icon for a store's install, ↑ a sync's push, a check, a scan, else work. Pure.
      */
     fun iconOf(entry: PluginJobsCenter.Entry): JobIcon = when {
@@ -498,7 +498,7 @@ object PluginJobsScreen {
     }
 
     /**
-     * How much of [entry] is done, compact (Droidtop/tracker#886: "a fraction display (downloaded over total)"):
+     * How much of [entry] is done, compact (mytop-project/tracker#886: "a fraction display (downloaded over total)"):
      * "1.2/3.4 GB" for bytes ("640 MB" while the total is unknown), "12/40" for items, "42%" for a job that sends only
      * a percent; null for one that sends nothing to count. Pure.
      */
@@ -514,7 +514,7 @@ object PluginJobsScreen {
     }
 
     /**
-     * The words under a running job's title, which do not change while it counts (Droidtop/tracker#886: "the text
+     * The words under a running job's title, which do not change while it counts (mytop-project/tracker#886: "the text
      * constantly changes as progress updates"): where it stands only when it is not moving (Paused, Waiting for Wi-Fi,
      * Waiting for the connection), then who runs it. How far, how much and how long are the bar, the value and the
      * job's page. Pure.
@@ -539,7 +539,7 @@ object PluginJobsScreen {
      */
     fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String = when {
         entry.done -> outcome(entry).lineSequence().first()
-        // Moving: the icon's sign and the amount, the compact status (Droidtop/tracker#886), where text is all there is.
+        // Moving: the icon's sign and the amount, the compact status (mytop-project/tracker#886), where text is all there is.
         // Only an amount: a job that sends just a percent keeps its words, as the bar says how far and a bare
         // percent in a line that has no fixed width is the flicker #643 removed.
         standingLine(entry) == null && entry.numbers != null -> compactValue(entry)?.let { "${iconSign(iconOf(entry))} $it" }
@@ -559,10 +559,10 @@ object PluginJobsScreen {
      * or paused job is its name, its progress bar and [progressLine] under it, and A opens its page; a
      * finished one is its name, its mark (a check or a cross) and how it ended under it.
      *
-     * Show, then say (owner, 2026-10-29, Droidtop/tracker#738: "we need to use visual indicators instead of words
+     * Show, then say (owner, 2026-10-29, mytop-project/tracker#738: "we need to use visual indicators instead of words
      * whenever possible. Numbers and words can be in ADDITION to them"): the bar and the mark are the state; the words
      * are the line under the title, never a value column, which took the title's width in a narrow pane and broke it
-     * mid-word ("Synct / hing", Droidtop/tracker#739).
+     * mid-word ("Synct / hing", mytop-project/tracker#739).
      */
     fun jobRow(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): CatalogItem {
         if (entry.done) {
@@ -577,7 +577,7 @@ object PluginJobsScreen {
                 summaryShown = true,
             )
         }
-        // ↓ ▬▬▬▭ 1.2/3.4 GB under the title, and words that stay put while it counts (Droidtop/tracker#886).
+        // ↓ ▬▬▬▭ 1.2/3.4 GB under the title, and words that stay put while it counts (mytop-project/tracker#886).
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
             title = entry.title,
@@ -664,7 +664,7 @@ object PluginJobsScreen {
                     ),
                 )
             }
-            // A store download that stopped (a crash left it Paused with an empty bar, Droidtop/tracker#313) can be started
+            // A store download that stopped (a crash left it Paused with an empty bar, mytop-project/tracker#313) can be started
             // over: Resume continues from the files on disk, Start over deletes them first, and asks.
             if (entry.nativeKind == dev.droidtop.library.stores.StoreInstallJob.KIND && entry.paused) {
                 add(

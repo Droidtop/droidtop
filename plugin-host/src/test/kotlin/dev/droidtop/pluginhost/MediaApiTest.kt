@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** The media library for plugins (docs/plugin-api.md 3 A9, Droidtop/tracker#714): ids, kinds, paging and the answer's shape. */
+/** The media library for plugins (docs/plugin-api.md 3 A9, mytop-project/tracker#714): ids, kinds, paging and the answer's shape. */
 class MediaApiTest {
     @Test
     fun `an item's id is its kind and Android's row, and nothing else reads as one`() {

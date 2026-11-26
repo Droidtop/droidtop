@@ -80,7 +80,7 @@ class StoresCatalogTest {
 
     @Test
     fun `a folder of ROMs counts them, by system, and says them apart only beside other games`() {
-        // The console's "Roms" folder read 0 games while Retro Games listed its 12 Switch games (Droidtop/tracker#846).
+        // The console's "Roms" folder read 0 games while Retro Games listed its 12 Switch games (mytop-project/tracker#846).
         val roots = listOf("/sd/Games", "/sd/Roms")
         val roms = listOf(
             "/sd/Roms/nsw/a.nsp" to "switch",

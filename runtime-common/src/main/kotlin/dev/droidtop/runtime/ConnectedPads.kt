@@ -6,7 +6,7 @@ import android.view.InputDevice
 
 /**
  * The controllers connected now and their batteries (`InputDevice.getBatteryState`, Android 12 and later; before that no
- * battery is reported): the companion's Input and Home lines, and Settings > Controls (Droidtop/tracker#723). Read
+ * battery is reported): the companion's Input and Home lines, and Settings > Controls (mytop-project/tracker#723). Read
  * when a surface shows, never polled; an input-manager query, so off the main thread where it can be.
  */
 object ConnectedPads {

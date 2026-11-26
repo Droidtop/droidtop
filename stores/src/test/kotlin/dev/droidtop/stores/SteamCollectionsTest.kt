@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Reading Steam's collections out of its cloud config store (docs/SPEC.md 7g, "Collections"; Droidtop/tracker#232). */
+/** Reading Steam's collections out of its cloud config store (docs/SPEC.md 7g, "Collections"; mytop-project/tracker#232). */
 class SteamCollectionsTest {
     private fun entry(key: String, value: String, deleted: Boolean = false) = Raw(key, value, deleted)
 
@@ -32,7 +32,7 @@ class SteamCollectionsTest {
         )
         assertEquals(listOf("Backlog"), parsed.collections.map { it.name })
         assertEquals(1, parsed.skippedDynamic)
-        // Its filters are kept as Steam wrote them (Droidtop/tracker#403).
+        // Its filters are kept as Steam wrote them (mytop-project/tracker#403).
         assertEquals(listOf("Cheap"), parsed.dynamic.map { it.name })
         assertEquals(2, org.json.JSONObject(parsed.dynamic.single().filterSpec).getInt("nFormatVersion"))
     }

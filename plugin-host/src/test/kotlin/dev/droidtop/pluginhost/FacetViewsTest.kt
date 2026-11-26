@@ -25,7 +25,7 @@ class FacetViewsTest {
         val view = FacetViews.toView(Facets.read(JSONObject(romgi)).facets)
         assertEquals(listOf("facets", "storage"), view.sections.map { it.id })
         val main = view.sections[0].nodes
-        // A status keeps its state, for the host's glyph (Droidtop/tracker#644).
+        // A status keeps its state, for the host's glyph (mytop-project/tracker#644).
         assertEquals(ViewNode.Info("index", "Index", "Updated 2 days ago", "OK", state = "ok"), main[0])
         val update = main[1] as ViewNode.Button
         assertEquals(ViewAction.Kind.JOB, update.action.kind)

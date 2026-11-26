@@ -265,14 +265,14 @@ public class Container {
     public static final java.util.List<String> LAUNCH_OVERRIDE_KEYS = java.util.Arrays.asList(
         "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion",
         "lsfgEnabled", "lsfgMultiplier", LAUNCH_ENV,
-        // droidtop: a game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8).
+        // droidtop: a game's own touchscreen gestures over the prefix's (mytop-project/tracker#618 C8).
         "gestureConfig",
-        // droidtop: a game's own wide storage grants (WineStorageGrants, Droidtop/tracker#584).
+        // droidtop: a game's own wide storage grants (WineStorageGrants, mytop-project/tracker#584).
         dev.droidtop.runtime.windows.WineStorageGrants.DEVICE_SYSTEM, dev.droidtop.runtime.windows.WineStorageGrants.ALL_STORAGE,
         dev.droidtop.runtime.windows.WineStorageGrants.GAME_FOLDER,
-        // droidtop: a game's own allocator (WineAllocator, Droidtop/tracker#894).
+        // droidtop: a game's own allocator (WineAllocator, mytop-project/tracker#894).
         dev.droidtop.runtime.windows.WineAllocator.KEY,
-        // droidtop: the redistributables this launch installs before the game (Droidtop/tracker#916).
+        // droidtop: the redistributables this launch installs before the game (mytop-project/tracker#916).
         "droidtopRedists");
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 

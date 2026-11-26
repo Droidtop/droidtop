@@ -5,7 +5,7 @@ import dev.droidtop.pluginhost.MetadataFields
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A metadata plugin's fields: gaps only, except a refresh with the plugin as the chosen source (Droidtop/tracker#67). */
+/** A metadata plugin's fields: gaps only, except a refresh with the plugin as the chosen source (mytop-project/tracker#67). */
 class PcPluginFieldsTest {
     private val f95 = MetadataFields("F95zone", "New text", "New dev", null, "Visual novel", null, null, null)
 

@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** D22, peer addresses (docs/plugin-api.md 3, Droidtop/tracker#645): what a VPN plugin may give droidtop. */
+/** D22, peer addresses (docs/plugin-api.md 3, mytop-project/tracker#645): what a VPN plugin may give droidtop. */
 class HostPeersApisTest {
     private fun args(vararg a: String) = JSONObject().put("addresses", JSONArray(a.toList()))
 

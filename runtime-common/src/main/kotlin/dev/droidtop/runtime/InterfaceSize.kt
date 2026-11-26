@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 enum class DisplayRole { MAIN, COMPANION }
 
 /**
- * Settings > Displays > Interface size, one for each screen role (owner, 2026-10-29, Droidtop/tracker#656 point 3):
+ * Settings > Displays > Interface size, one for each screen role (owner, 2026-10-29, mytop-project/tracker#656 point 3):
  * Auto, then 75 to 150 percent. It multiplies the canvas density the shell already works out from what that display
  * reports (`canvasDensity`, docs/SPEC.md 7k), so layout and text scale together, and the main screen and the companion
  * screen are set separately. Auto is the canvas as reported, never a size picked from the device model.

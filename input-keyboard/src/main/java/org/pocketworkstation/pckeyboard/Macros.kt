@@ -18,7 +18,7 @@ sealed interface MacroStep {
 data class Macro(val name: String, val steps: List<MacroStep>)
 
 /**
- * Macro keys (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): a name and a sequence of keys, such as a
+ * Macro keys (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340): a name and a sequence of keys, such as a
  * tmux prefix then c. One macro per line of the `pref_macros` setting, `name = steps`; blank lines and lines
  * starting with `#` are ignored, and a line with a step that is not understood is skipped whole so a typo never
  * sends half a sequence. Steps are separated by spaces:

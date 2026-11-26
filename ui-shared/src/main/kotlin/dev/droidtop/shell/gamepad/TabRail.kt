@@ -71,7 +71,7 @@ data class RailColors(val selected: Color, val ink: Color, val muted: Color, val
  *   scrolls and no label is cut off.
  * Every entry has the tab role, its selected state and a spoken name with its count. It is never a focus target:
  * a tap selects. [onPreview], given, hears which entry a finger is down on (null once it lifts or slides off), so an
- * unlabelled rail's caller can name it in its own header before the tap lands (Droidtop/tracker#674): no tooltip.
+ * unlabelled rail's caller can name it in its own header before the tap lands (mytop-project/tracker#674): no tooltip.
  */
 @Composable
 fun TabRail(

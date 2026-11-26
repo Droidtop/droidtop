@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The person's own choices kept when a page is read again after a failed action (Droidtop/tracker#846). */
+/** The person's own choices kept when a page is read again after a failed action (mytop-project/tracker#846). */
 class ViewKeptValuesTest {
     private val mirrors = listOf("www" to "Win/Linux · WWW", "pixeldrain" to "Win/Linux · PIXELDRAIN", "mega" to "Mac · MEGA")
 

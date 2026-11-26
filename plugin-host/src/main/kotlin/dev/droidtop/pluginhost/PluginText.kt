@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 /**
- * A plugin's words, made safe to show before droidtop shows any of them (Droidtop/tracker#784, slice 4; the owner:
+ * A plugin's words, made safe to show before droidtop shows any of them (mytop-project/tracker#784, slice 4; the owner:
  * "Parse and sanitize it against any injection attacks and stuff first"). A plugin is third-party code, and what it says
  * in an error or a job's summary reaches droidtop's screens, its job lines, its notices and TalkBack. So every such
  * text is cleaned once, where it enters droidtop ([PluginReply.parse], [PluginResult]), and no screen gets it raw:

@@ -11,7 +11,7 @@ import dev.droidtop.runtime.HomeDisplays
 import dev.droidtop.runtime.ShellPlacement
 
 /**
- * The one Home decision (docs/SPEC.md 2c, Droidtop/tracker#771), for both of droidtop's HOME activities: Standard's
+ * The one Home decision (docs/SPEC.md 2c, mytop-project/tracker#771), for both of droidtop's HOME activities: Standard's
  * trampoline ([HomeTrampolineActivity]) and the forwarder to another launcher ([AlternativeLauncherActivity]). In
  * order:
  *
@@ -72,7 +72,7 @@ internal object HomeEntry {
             .putExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, true)
         if (doubleTap) redirect.putExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true)
         // Started where it belongs, once: on the default display and then moved by the screen placement, it was started
-        // twice, and the second start covered what the first opened (Droidtop/tracker#824).
+        // twice, and the second start covered what the first opened (mytop-project/tracker#824).
         val present = activity.getSystemService(android.hardware.display.DisplayManager::class.java)
             ?.displays?.map { it.displayId }?.toSet().orEmpty()
         val shellOn = ShellPlacement.launchDisplay(HomeDisplays.shellDisplayId, ShellPlacement.remembered(activity), present, here)

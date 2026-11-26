@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The systems a download is for (docs/plugin-api.md 1.10, Droidtop/tracker#617). */
+/** The systems a download is for (docs/plugin-api.md 1.10, mytop-project/tracker#617). */
 class DownloadSystemsTest {
     @Test
     fun `a forum heading names its systems`() {

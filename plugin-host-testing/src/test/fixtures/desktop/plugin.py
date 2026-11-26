@@ -1,4 +1,4 @@
-"""The Desktop-mode fixture (docs/plugin-api.md 1.12, Droidtop/tracker#221), written as a plugin author writes one.
+"""The Desktop-mode fixture (docs/plugin-api.md 1.12, mytop-project/tracker#221), written as a plugin author writes one.
 It exercises each Desktop hook: tray and window-menu facets, window list, focus and events, the clipboard bridge,
 notifications and Open with. Never packaged: droidtop ships no sample plugins. Its facets are replies.json, which the
 JVM test (DesktopFixtureTest) reads too, and desktop_fixture_check.py drives this module with a fake host."""

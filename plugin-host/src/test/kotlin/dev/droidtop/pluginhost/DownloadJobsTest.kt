@@ -20,7 +20,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * The download runner's rules (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181): placing, unpacking and moving what a
+ * The download runner's rules (docs/SPEC.md 12a "Downloads", mytop-project/tracker#181): placing, unpacking and moving what a
  * job fetched, its arguments, and what a restart does with a job whose bytes had all arrived. The transfer itself is
  * the download engine's, tested with the engine (net-core's EngineFetchTest, and aria2-engine's on-device tests).
  */
@@ -461,7 +461,7 @@ class DownloadJobsTest {
 
     @Test
     fun aMoveTheVolumeRefusesIsACopyThatLandsWholeAndOnlyThenDropsTheDownload() {
-        // The downloads area and an SD card game folder are two volumes, where a rename fails (Droidtop/tracker#558).
+        // The downloads area and an SD card game folder are two volumes, where a rename fails (mytop-project/tracker#558).
         val downloaded = File(dir, "downloads/acquire_1_bios.bin").also { it.parentFile.mkdirs(); it.writeBytes(data) }
         val target = File(dir, "sd/bios/ps2-0230a-20080220.bin").also { it.parentFile.mkdirs() }
         var renames = 0
@@ -641,7 +641,7 @@ class DownloadJobsTest {
 
     @Test
     fun `an unpack cut short by the process dying is done again from the archive, its leftover folder cleared`(): Unit = kotlinx.coroutines.runBlocking {
-        // Droidtop/tracker#842: ".Bare Witness vSteam Build.unpacking" was left behind in the game folder.
+        // mytop-project/tracker#842: ".Bare Witness vSteam Build.unpacking" was left behind in the game folder.
         val games = java.nio.file.Files.createTempDirectory("unpack842").toFile()
         val archive = zipOf(File(games.parentFile, "bw_${System.nanoTime()}.zip"), "Game/game.exe" to "exe", "Game/data.rpa" to "data")
         val stale = File(games, ".Game v0.5.unpacking").apply { mkdirs() }

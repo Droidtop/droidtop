@@ -72,7 +72,7 @@ fun ConfirmDialogCard(
     val notice = request.notice
     val tone = if (request.danger) NoticeTone.Danger else notice.tone
     val ink = palette.ink(tone)
-    // Motion's switch: Android's Remove animations makes it a snap (Droidtop/tracker#643). Compose scales the tween itself.
+    // Motion's switch: Android's Remove animations makes it a snap (mytop-project/tracker#643). Compose scales the tween itself.
     val appear = remember { Animatable(if (Motion.enabled) 0f else 1f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, Motion.tw(OPEN_MS)) }
     BoxWithConstraints(contentAlignment = Alignment.Center) {
@@ -163,7 +163,7 @@ private fun DialogButton(label: String, fill: Color, text: Color, outline: Color
  * A flash's card (docs/SPEC.md 7k, "Notices"): at most 320 dp wide, the tone's glyph and up to [maxLines] lines
  * of 14 sp text, the plugin's name leading a plugin's flash. A job's flash shows the job's own mark instead of the
  * glyph ([mark], [JobMark]: a check that draws in, drawn again each time the card counts up by [count]; a cross that
- * shakes) (Droidtop/tracker#643). With [onPress] the card is one target that shows its details in place; without, nothing
+ * shakes) (mytop-project/tracker#643). With [onPress] the card is one target that shows its details in place; without, nothing
  * in it can be pressed.
  */
 @Composable

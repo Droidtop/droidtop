@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import org.json.JSONObject
 
 /**
- * Plugins in every mode (docs/plugin-api.md 1.9, Droidtop/tracker#53). A droidtop device has three modes, Gaming,
+ * Plugins in every mode (docs/plugin-api.md 1.9, mytop-project/tracker#53). A droidtop device has three modes, Gaming,
  * Standard (the Android launcher) and Desktop, and one plugin may add to any of them through the same declared
  * extension points. Two things decide whether one `provides` entry shows in a mode:
  *
@@ -38,7 +38,7 @@ object PluginModes {
         // Home shelves: Gaming's Home and Desktop's Start menu. Standard has no shelf of games.
         "gaming.rows" to setOf(GAMING, DESKTOP),
         // A game's page exists in Gaming only. Its actions are also on Standard's long-press app menu and Desktop's
-        // Start menu row menu (Droidtop/tracker#67).
+        // Start menu row menu (mytop-project/tracker#67).
         "ui.game_section" to setOf(GAMING),
         "ui.context_action" to setOf(GAMING, STANDARD, DESKTOP),
         "social.provider" to setOf(GAMING, STANDARD, DESKTOP),

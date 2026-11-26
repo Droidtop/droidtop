@@ -10,7 +10,7 @@ import dev.droidtop.pluginhost.PluginRecord
 import org.json.JSONObject
 
 /**
- * Plugin facets on Desktop's bar (docs/plugin-api.md 1.12, Droidtop/tracker#221): the tray (`desktop.tray`, about the
+ * Plugin facets on Desktop's bar (docs/plugin-api.md 1.12, mytop-project/tracker#221): the tray (`desktop.tray`, about the
  * device) and a window's menu (`desktop.window`, about that window). Each is drawn by the one renderer, as a page opened
  * from the bar, so nothing on the bar waits on a plugin to draw: the bar shows the plugin's name from its manifest, and
  * the plugin is asked only when the person opens it. Reads manifests and grants only; call off the main thread.

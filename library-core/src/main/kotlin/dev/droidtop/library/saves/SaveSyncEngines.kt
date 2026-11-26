@@ -46,8 +46,8 @@ data class SaveHandoff(val engine: String, val line: String, val started: Boolea
 
 /**
  * One way droidtop syncs a game's saves somewhere else (docs/SPEC.md 7o "Saves"): a store's cloud today; paired
- * computers and handhelds once they sync from a folder outside a Wine prefix (Droidtop/tracker#546); a cloud or network
- * share (Droidtop/tracker#573); a `saves.sync` plugin (Droidtop/tracker#284). Each says for itself whether it covers a game.
+ * computers and handhelds once they sync from a folder outside a Wine prefix (mytop-project/tracker#546); a cloud or network
+ * share (mytop-project/tracker#573); a `saves.sync` plugin (mytop-project/tracker#284). Each says for itself whether it covers a game.
  */
 interface SaveSyncEngine {
     val id: String

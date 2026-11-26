@@ -116,13 +116,13 @@ object PluginViews {
 
     /** The fallback title of a failed action's notice. */
     /**
-     * A failed call's notice title in droidtop's words, by its code, naming the feature (Droidtop/tracker#883 §3.7):
+     * A failed call's notice title in droidtop's words, by its code, naming the feature (mytop-project/tracker#883 §3.7):
      * "F95zone wants you to sign in", "F95zone stopped". It replaced one "Couldn't finish" for every failure.
      */
     internal fun failedTitle(record: PluginRecord, code: PluginErrorCode?): String =
         dev.droidtop.pluginhost.PluginFailureWords.of(code, record.manifest.label).title
 
-    /** The title of droidtop's notice for a job that finished and sent no notice of its own (Droidtop/tracker#521 item 9). */
+    /** The title of droidtop's notice for a job that finished and sent no notice of its own (mytop-project/tracker#521 item 9). */
     internal const val FINISHED_TITLE = "Finished"
 
     /** droidtop's notice for a finished job: [FINISHED_TITLE], and the plugin's `message` as its body unless it only says "Done". */
@@ -136,7 +136,7 @@ object PluginViews {
         return if (text.length <= max) text else text.take(max - 1).trimEnd() + "\u2026"
     }
 
-    /** The title of droidtop's notice on a plugin page with nothing in it (Droidtop/tracker#521 item 6). */
+    /** The title of droidtop's notice on a plugin page with nothing in it (mytop-project/tracker#521 item 6). */
     internal const val EMPTY_TITLE = "Nothing here yet"
 
     /**
@@ -260,7 +260,7 @@ object PluginViews {
      * A source's `acquire` as a job, then what it fetched to the library (docs/plugin-api.md 1.6, `acquire`): the
      * files the job placed itself are indexed, and a `download` or `downloads` reply is fetched and placed by
      * droidtop. The one path for the detail page's job action and a search row's Get ("Fetchers answer in the one
-     * search", Droidtop/tracker#218). [callArgs] already carries `ref`, `values` and the host's `context`.
+     * search", mytop-project/tracker#218). [callArgs] already carries `ref`, `values` and the host's `context`.
      */
     suspend fun acquire(
         context: Context,
@@ -270,7 +270,7 @@ object PluginViews {
         callArgs: JSONObject,
         onStatus: (String) -> Unit,
     ): PluginResult = dev.droidtop.pluginhost.DownloadJobs.runResolved(
-        // The press only asks the download queue (Droidtop/tracker#354; the owner: "the button should send the download
+        // The press only asks the download queue (mytop-project/tracker#354; the owner: "the button should send the download
         // call over the downloader API, so the actual task sits on the other side of it"). The source is asked, the file
         // fetched and placed, all in one Downloads job from this moment; the page only watches it, and leaving the page
         // leaves the job running.
@@ -323,7 +323,7 @@ object PluginViews {
     ): PluginResult {
         val capability = LegacyManifest.jobCapabilityFor(point)
         val call = newCall(point, op, SURFACE, args, 0L)
-        // Inside a download job that asks its source first (Droidtop/tracker#354): the plugin's job is that job's first
+        // Inside a download job that asks its source first (mytop-project/tracker#354): the plugin's job is that job's first
         // step, said on its row, with no row of its own.
         dev.droidtop.pluginhost.DownloadStage.current()?.let { stage ->
             return PluginJobsCenter.runInside(
@@ -394,7 +394,7 @@ private class PluginPage(
     /**
      * The next read of this page keeps the person's own choices ([chosen]): set when it is read again after an action
      * that failed, Open the site, Sign in or Refresh, where nothing the person did changed the plugin's state, so a
-     * mirror picked before a browser check is still the one picked after it (Droidtop/tracker#846). A page read again
+     * mirror picked before a browser check is still the one picked after it (mytop-project/tracker#846). A page read again
      * after an action that worked shows the plugin's values: the plugin's state is what changed.
      */
     @Volatile private var keepChosen: Boolean = false
@@ -477,7 +477,7 @@ private class PluginPage(
                 ?: PluginView.parse(reply.data, messages)
             PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {
-                // A page droidtop cannot draw is skipped and logged for the developer (Droidtop/tracker#883 §3.7): the
+                // A page droidtop cannot draw is skipped and logged for the developer (mytop-project/tracker#883 §3.7): the
                 // person sees an empty page, never "<plugin> sent a page droidtop cannot draw".
                 runCatching { android.util.Log.w("droidtop.plugin", "${record.manifest.id}: $point/$op returned a page droidtop cannot draw: ${messages.joinToString("; ")}") }
                 show(PluginView(title = null, subtitle = null, sections = emptyList()))
@@ -609,10 +609,10 @@ private class PluginPage(
         val itemId = "pv_${screenId}_${node.id}"
         return when (node) {
             is ViewNode.Notice -> noticeItem(screenId, itemId, node)
-            // A status facet's state is the host's glyph (Droidtop/tracker#644): busy turns a ring, warning asks for the
+            // A status facet's state is the host's glyph (mytop-project/tracker#644): busy turns a ring, warning asks for the
             // person, error is the danger octagon; ok, on and off are quiet.
             is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, statusMark = PluginViews.markOf(node.state))
-            // A plugin's progress is the host's job bar (Droidtop/tracker#643, #644), not a percent in text: the bar glides,
+            // A plugin's progress is the host's job bar (mytop-project/tracker#643, #644), not a percent in text: the bar glides,
             // and one with no percent is the checking shimmer.
             is ViewNode.Progress -> ActionItem(
                 id = itemId,
@@ -700,7 +700,7 @@ private class PluginPage(
     }
 
     /**
-     * A SIGN_IN_REQUIRED or BROWSER_CHECK_REQUIRED notice as droidtop's own action (docs/plugin-api.md 1.3, Droidtop/tracker#544):
+     * A SIGN_IN_REQUIRED or BROWSER_CHECK_REQUIRED notice as droidtop's own action (docs/plugin-api.md 1.3, mytop-project/tracker#544):
      * Sign in or Open the site in the plugin's session, then the page is read again. Null when the plugin declares no
      * `web.session` site, and its own action (if any) is offered as before.
      */

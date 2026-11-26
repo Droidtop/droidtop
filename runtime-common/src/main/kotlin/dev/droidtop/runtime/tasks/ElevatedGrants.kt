@@ -8,7 +8,7 @@ import android.provider.Settings
 import android.util.Log
 
 /**
- * The grants droidtop's system controls need, taken through the elevated shell when it can (Droidtop/tracker#581;
+ * The grants droidtop's system controls need, taken through the elevated shell when it can (mytop-project/tracker#581;
  * docs/SPEC.md "Privileged actions"): modify system settings (brightness, auto-rotate, screen timeout), Bluetooth
  * access (its state and paired devices, Android 12 and later) and Do Not Disturb access. Each is asked for only
  * while droidtop does not hold it, and checked again after, so a start with Shizuku running leaves the controls

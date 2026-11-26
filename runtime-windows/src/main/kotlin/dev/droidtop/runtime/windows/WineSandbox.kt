@@ -11,7 +11,7 @@ import timber.log.Timber
 
 /**
  * Wine's process tree under the sandbox broker (docs/SPEC.md 5b "Containment and copy-on-write layers for Wine",
- * piece 0; Droidtop/tracker#584). Piece 0 is learning only: behind a Developer menu switch, off by default, a launch
+ * piece 0; mytop-project/tracker#584). Piece 0 is learning only: behind a Developer menu switch, off by default, a launch
  * starts a learning listener ([SandboxHost.startLearning]) and every process of the game's tree attaches to it, so
  * what Wine really reaches is written to a learn log before any rule is tightened (SPEC 5b: "What Wine really uses is
  * found with the library's learning mode, not by tightening first"). A learning run gives NO protection, and the

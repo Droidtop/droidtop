@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
- * The Desktop session's windows for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): the one place a session
+ * The Desktop session's windows for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221): the one place a session
  * hands its windows to the plugin API ([DesktopPluginBridge]) and turns changes of its window list into the window
  * events. Everything comes from host-bridge's window list (wlr-foreign-toplevel-management) and the bar's own window
  * actions ([DesktopWindows]); nothing is started in the container, and nothing needs root.
@@ -62,7 +62,7 @@ class DesktopPluginWindows(
 }
 
 /**
- * The clipboard bridge's text for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): the one place a running
+ * The clipboard bridge's text for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221): the one place a running
  * [dev.droidtop.hostbridge.ClipboardBridge] is handed to the plugin API, and its changes become `clipboard.changed`.
  * A plugin reads and sets the clipboard through the bridge's own sync, so it can never loop with the container.
  */

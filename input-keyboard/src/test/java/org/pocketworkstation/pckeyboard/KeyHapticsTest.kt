@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Haptics per key class and the Vibration strength setting (Droidtop/tracker#903 H12a). */
+/** Haptics per key class and the Vibration strength setting (mytop-project/tracker#903 H12a). */
 class KeyHapticsTest {
     @Test fun eachKeyCodeHasItsClass() {
         // Letters, digits, punctuation and the other keys.

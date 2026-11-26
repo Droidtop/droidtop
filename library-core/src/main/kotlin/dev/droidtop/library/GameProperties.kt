@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * One Windows game's own properties as a settings screen (docs/SPEC.md 7i,
- * "Game properties", Droidtop/tracker#228): the launch options the person
+ * "Game properties", mytop-project/tracker#228): the launch options the person
  * types after the program, the environment variables they set for it, the
  * game's language and its pad layout, and the rows that say exactly what
  * will run. The page every guide ends with
@@ -159,7 +159,7 @@ object GameProperties {
         }
         return listOf(
             // Titled: the Gaming column names an untitled group after the screen, so its entry read "Game
-            // properties" inside Game properties and looked like the heading (Droidtop/tracker#228 rig check,
+            // properties" inside Game properties and looked like the heading (mytop-project/tracker#228 rig check,
             // 2026-11-05: Language and Controls "not on these pages").
             CatalogGroup("properties_edit", "Language, controls and launch", edit),
             CatalogGroup("properties_drivers", null, drivers),

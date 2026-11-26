@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import dev.droidtop.shared.trust.Sha256
 
 /**
- * The id a container goes by in the engine's fronts and APIs (docs/SPEC.md 3d, "Container ids"; Droidtop/tracker#555):
+ * The id a container goes by in the engine's fronts and APIs (docs/SPEC.md 3d, "Container ids"; mytop-project/tracker#555):
  * 64 hex digits, as Docker's and Podman's are. droidtop's own container ids (`droidtop-sibling-1a2b3c4d`) share their
  * first twelve characters, which is all both tools' `ps` show, so every container read `droidtop-sib` there. The
  * engine id is a digest of droidtop's id: the same on every boot, never stored, and every place a container is named

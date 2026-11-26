@@ -84,7 +84,7 @@ object PcScraperSourcePrefs {
         prefs(context).putString(KEY_SOURCE, source.key)
     }
 
-    /** What the source choice stores for a metadata plugin chosen as the source (Droidtop/tracker#67). */
+    /** What the source choice stores for a metadata plugin chosen as the source (mytop-project/tracker#67). */
     const val PLUGIN_PREFIX = "plugin:"
 
     /** The metadata plugin chosen as the PC source, by its id, or null when a built-in source is chosen. */
@@ -367,7 +367,7 @@ object PcScraper {
     const val NEEDS_PICK = "needs_pick"
 
     /** The PC Games options row that lists [needingPick], named here so the pass's summary can point at it. */
-    /** The review queue's name, on the options row that opens it and in a pass's summary (Droidtop/tracker#318 §5). */
+    /** The review queue's name, on the options row that opens it and in a pass's summary (mytop-project/tracker#318 §5). */
     const val REVIEW_MATCHES = "Review matches"
 
     /**
@@ -471,7 +471,7 @@ object PcScraper {
     suspend fun candidates(context: Context, entry: LibraryEntry, query: String? = null): Candidates = withContext(Dispatchers.IO) {
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext Candidates.Unavailable(it) }
         val source = source(context) ?: return@withContext Candidates.Unavailable("No PC scraper source is configured.")
-        // The person's own search text when they gave one (Droidtop/tracker#861), else the name droidtop reads.
+        // The person's own search text when they gave one (mytop-project/tracker#861), else the name droidtop reads.
         val title = query?.trim()?.takeIf { it.isNotEmpty() } ?: searchTitleFor(entry)
         val lookup = runCatching { source.search(title) }.getOrElse { error ->
             return@withContext Candidates.Unavailable("${source.label} search failed: ${error.message}")
@@ -508,7 +508,7 @@ object PcScraper {
         val record = flavour.complete(entry, match)
         write(context, entry, record, confidence = "manual", replaceExisting = true)
         dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
-        // The pick teaches its name (Droidtop/tracker#318 §6.4): the next folder that searches it is matched without asking.
+        // The pick teaches its name (mytop-project/tracker#318 §6.4): the next folder that searches it is matched without asking.
         dev.droidtop.library.identity.MatchAliases.learn(context, searchTitleFor(entry), match)
         "Matched ${entry.title} to ${match.name} (${match.sourceLabel})." + flavour.notes().let { if (it.isEmpty()) "" else " $it" }
     }
@@ -537,9 +537,9 @@ object PcScraper {
         // A game the person asked to scrape by name (its page or menu) is scraped whatever the library filter says;
         // the filter is for passes over the library (docs/SPEC.md 7h).
         filter: ScrapeFilter? = null,
-        // The automatic pass (PcAutoScrape) only fills gaps (Droidtop/tracker#318 §7.2).
+        // The automatic pass (PcAutoScrape) only fills gaps (mytop-project/tracker#318 §7.2).
         auto: Boolean = false,
-        // "Rescrape with…" (Droidtop/tracker#67): the source this pass asks instead of the chosen one, as
+        // "Rescrape with…" (mytop-project/tracker#67): the source this pass asks instead of the chosen one, as
         // [PcScraperSourcePrefs.key] stores a choice. The setting is left as it is.
         using: String? = null,
     ): String = withContext(Dispatchers.IO) {
@@ -548,7 +548,7 @@ object PcScraper {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         val key = using ?: PcScraperSourcePrefs.key(context)
         ScraperReadiness.pcSourceProblem(context, key)?.let { return@withContext it }
-        // A metadata plugin chosen as the source is the one source the pass asks (Droidtop/tracker#67): no built-in
+        // A metadata plugin chosen as the source is the one source the pass asks (mytop-project/tracker#67): no built-in
         // search, as with any other choice.
         val chosen = chosenPlugin(context, key)
         val source = if (chosen != null) PluginChosenSource(chosen.label) else source(context, key) ?: return@withContext "No PC scraper source is configured."
@@ -561,17 +561,17 @@ object PcScraper {
         val dao = RomDatabase.get(context).romDao()
         // A library is thousands of entries, and one IN list that long can pass SQLite's limit on
         // variables; the rows are read in slices. A game is in a pass once, however many times the list names it
-        // (Droidtop/tracker#834: one game scraped twice in a pass).
+        // (mytop-project/tracker#834: one game scraped twice in a pass).
         val ordered = entries.distinctBy { it.id }.sortedBy(::orderKey)
         val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = filter ?: ScrapeOptionsPrefs.filter(context)
         // Only a pass the person started over everything (a game's own Scrape, or "Everything") replaces what a game
-        // already has; any other pass fills what is missing (Droidtop/tracker#318 §7.2).
+        // already has; any other pass fills what is missing (mytop-project/tracker#318 §7.2).
         val refresh = !auto && filter == ScrapeFilter.ALL
         val afterCheckpoint = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
         // An automatic pass does not ask again about a game the last answer for was "no match" or "needs a pick" under
-        // the same name (Droidtop/tracker#834): that is asked again when the name changes, or when the person asks (a
+        // the same name (mytop-project/tracker#834): that is asked again when the name changes, or when the person asks (a
         // pass they start, the game's own Scrape, Review matches).
         val remembered = if (auto) rememberedMisses(context, existing) else emptyMap()
         val (candidates, unchanged) = afterCheckpoint.partition { entry -> remembered[entry.id] != searchTitleFor(entry) }
@@ -655,7 +655,7 @@ object PcScraper {
                     refusedInARow = 0
                     if (outcome == PcOutcome.ByStoreId) steamInARow = 0
                 }
-                // Review Matches (Droidtop/tracker#318 §5): a game not taken waits with what the source answered; a match takes it off.
+                // Review Matches (mytop-project/tracker#318 §5): a game not taken waits with what the source answered; a match takes it off.
                 when (outcome) {
                     PcOutcome.ByStoreId, PcOutcome.ByName -> dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
                     is PcOutcome.NeedsPicking -> dev.droidtop.library.identity.MatchQueue.put(context, entry, source.label, outcome.searched, outcome.matches)
@@ -707,7 +707,7 @@ object PcScraper {
 
     /**
      * The games whose last answer was "no match" or "needs a pick", with the name that was searched for
-     * (Droidtop/tracker#834): Review matches' queue keeps both. A game marked [NEEDS_PICK] before the queue kept answers
+     * (mytop-project/tracker#834): Review matches' queue keeps both. A game marked [NEEDS_PICK] before the queue kept answers
      * has no searched name, so it is left to be asked. Database work.
      */
     private suspend fun rememberedMisses(context: Context, rows: Map<String, GameMetadataEntity>): Map<String, String> =
@@ -806,7 +806,7 @@ object PcScraper {
         context: Context,
         entry: LibraryEntry,
         plugins: dev.droidtop.library.integrations.PluginMetadataSources.Session,
-        // A refresh with the plugin as the chosen source replaces what is there (Droidtop/tracker#67).
+        // A refresh with the plugin as the chosen source replaces what is there (mytop-project/tracker#67).
         replace: Boolean = false,
         // The plugin is the chosen source: asked even when the built-in fields are all filled.
         always: Boolean = false,
@@ -835,14 +835,14 @@ object PcScraper {
     /** One source "Rescrape with…" offers: the [scrape] `using` value, its name, and why it cannot run now (null when it can). */
     data class SourceChoice(val key: String, val label: String, val problem: String?)
 
-    /** Every source one game can be scraped with (Droidtop/tracker#67): the built-in ones, then the running metadata plugins. */
+    /** Every source one game can be scraped with (mytop-project/tracker#67): the built-in ones, then the running metadata plugins. */
     fun sourceChoices(context: Context): List<SourceChoice> =
         PcScraperSource.entries.map { SourceChoice(it.key, it.label, ScraperReadiness.pcSourceProblem(context, it.key)) } +
             dev.droidtop.library.integrations.PluginMetadataSources.sources(context).map {
                 SourceChoice(PcScraperSourcePrefs.PLUGIN_PREFIX + it.record.manifest.id, "${it.label} (plugin)", null)
             }
 
-    /** The metadata plugin chosen as the PC source, when it is installed and running (Droidtop/tracker#67). */
+    /** The metadata plugin chosen as the PC source, when it is installed and running (mytop-project/tracker#67). */
     internal fun chosenPlugin(context: Context, key: String = PcScraperSourcePrefs.key(context)): dev.droidtop.library.integrations.PluginMetadataSources.Source? {
         val id = PcScraperSourcePrefs.pluginOf(key) ?: return null
         return dev.droidtop.library.integrations.PluginMetadataSources.sources(context).firstOrNull { it.record.manifest.id == id }
@@ -887,7 +887,7 @@ object PcScraper {
                 .isSuccess
         } ?: return
         val base = row ?: GameMetadataEntity(id = entry.id)
-        // A picture is filed by its real shape (docs/SPEC.md 7h, "Artwork roles", Droidtop/tracker#585): a forum
+        // A picture is filed by its real shape (docs/SPEC.md 7h, "Artwork roles", mytop-project/tracker#585): a forum
         // thread's banner offered as the cover is landscape art, and squashed into a box it is no cover at all.
         val role = imageSize(destination)?.let { (width, height) -> ArtworkRoles.ofShape(width, height) } ?: ArtworkRole.CAPSULE
         if (role != ArtworkRole.CAPSULE) {
@@ -943,7 +943,7 @@ object PcScraper {
     ) {
         /**
          * The candidate's title, or, when the source gave none, its record said plainly as one with no name
-         * ("f95zone thread 214581 (name not given)", Droidtop/tracker#784): never the id as if it were the name.
+         * ("f95zone thread 214581 (name not given)", mytop-project/tracker#784): never the id as if it were the name.
          */
         val name: String get() = candidate.title ?: "${source.label} ${entryIdText()} (name not given)"
         private fun entryIdText(): String = candidate.ids.keys().asSequence().joinToString(", ") { "$it ${candidate.ids.opt(it)}" }
@@ -953,7 +953,7 @@ object PcScraper {
     suspend fun pluginCandidates(context: Context, entry: LibraryEntry, query: String? = null): List<PluginPick> = withContext(Dispatchers.IO) {
         val session = dev.droidtop.library.integrations.PluginMetadataSources.open(context) ?: return@withContext emptyList()
         try {
-            // One rematch path, droidtop's (docs/plugin-api.md 1.11, Droidtop/tracker#784; the owner: "We need to be able
+            // One rematch path, droidtop's (docs/plugin-api.md 1.11, mytop-project/tracker#784; the owner: "We need to be able
             // to rematch it on f95 if it's matched incorrectly"). A source the game is linked to is asked by the link, as
             // the automatic scrape asks it: that is the current record, listed first and marked. Every source is then
             // asked as for a game it has never seen, with no link and `asked: "person"`, so it searches; its candidates
@@ -969,7 +969,7 @@ object PcScraper {
             val search = org.json.JSONObject(facts.toString()).apply {
                 remove("sourceLinks")
                 put("asked", "person")
-                // The person's own search text (Droidtop/tracker#861) is the one name searched: the folder's goes, so a
+                // The person's own search text (mytop-project/tracker#861) is the one name searched: the folder's goes, so a
                 // source that also searches by the folder's name does not bring back what the person typed past.
                 query?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
                     put("title", text)
@@ -1013,7 +1013,7 @@ object PcScraper {
     private sealed interface PcOutcome {
         data object ByStoreId : PcOutcome
         data object ByName : PcOutcome
-        /** [matches] are what the source answered, kept for Review Matches (Droidtop/tracker#318 §5). */
+        /** [matches] are what the source answered, kept for Review Matches (mytop-project/tracker#318 §5). */
         data class NeedsPicking(val searched: String, val candidates: Int, val matches: List<PcMatch> = emptyList()) : PcOutcome
         data class NoMatch(val searched: String) : PcOutcome
         /** [asked] false: the source had already refused [REFUSAL_ABORT_THRESHOLD] in a row and this game was not sent to it. */
@@ -1064,7 +1064,7 @@ object PcScraper {
         }
         val title = searchTitleFor(entry)
         if (!searchByName) return PcOutcome.NoMatch(title)
-        // A name the person matched by hand before is that match, with no search (Droidtop/tracker#318 §6.4, tier A-).
+        // A name the person matched by hand before is that match, with no search (mytop-project/tracker#318 §6.4, tier A-).
         dev.droidtop.library.identity.MatchAliases.find(context, title)?.let { taught ->
             write(context, entry, flavour.complete(entry, taught), confidence = "alias", replaceExisting = refresh)
             return PcOutcome.ByName
@@ -1111,7 +1111,7 @@ object PcScraper {
         val names = listOfNotNull(PcMediaLayout.fileSafe(baseNameFor(entry)), alsoUnder).distinct()
         val found = names.flatMap { dev.droidtop.library.EsDeArtwork.allMedia(root, systemFolder, it) }
         val icon = entry.iconUri?.let { listOf("Icon" to it) }.orEmpty()
-        // The person's own shots of it come first (Droidtop/tracker#596).
+        // The person's own shots of it come first (mytop-project/tracker#596).
         return (dev.droidtop.library.GameScreenshots.of(context, entry.id) + found + icon).distinctBy { it.second }
     }
 
@@ -1131,7 +1131,7 @@ object PcScraper {
      * already there may be of the game the person just rejected. It replaces
      * only when [confidence] ranks at least as high as the row's match
      * ([FieldSources.replaces]); any other write keeps what is there and
-     * fills what is missing (Droidtop/tracker#318 §7.2).
+     * fills what is missing (mytop-project/tracker#318 §7.2).
      *
      * Every field written records its source (docs/SPEC.md 7h); a field the
      * person edited is never written over ([FieldSources.keep]).
@@ -1148,7 +1148,7 @@ object PcScraper {
         val had = row?.fieldSources
         val sources = mutableMapOf<String, String>()
         // A field or picture already there is replaced only by a refresh at least as strong as the row's match
-        // (Droidtop/tracker#318 §7.1, §7.2); otherwise only what is missing is filled, so a name match never overwrites
+        // (mytop-project/tracker#318 §7.1, §7.2); otherwise only what is missing is filled, so a name match never overwrites
         // what a store id or the person's pick put there.
         val replaces = FieldSources.replaces(confidence, row?.scrapeConfidence, replaceExisting)
         val systemFolder = PcMediaLayout.systemFolderFor(entry)
@@ -1160,7 +1160,7 @@ object PcScraper {
 
         /** Downloads the first of [candidates] that arrives into [folder]; its path, or null. */
         fun fetch(field: String, enabled: Boolean, folder: String, candidates: List<Sourced<String>>): String? {
-            // Only an address is fetched: a source that gave none (or the text "null") is no picture (Droidtop/tracker#834).
+            // Only an address is fetched: a source that gave none (or the text "null") is no picture (mytop-project/tracker#834).
             val addresses = candidates.filter { isAddress(it.value) }
             if (!enabled || addresses.isEmpty() || systemFolder == null || gamesRoot == null) return null
             val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, folder, baseName)
@@ -1246,7 +1246,7 @@ object PcScraper {
      * else the title the entry carries. Disk (one `isDirectory`): IO only.
      */
     /**
-     * What [source] answered for [entry], for the calibration set when recording is on (Droidtop/tracker#318). A game the
+     * What [source] answered for [entry], for the calibration set when recording is on (mytop-project/tracker#318). A game the
      * person named is left out: its search is their name, not one droidtop read from the disk.
      */
     private fun recordAnswers(context: Context, entry: LibraryEntry, source: String, by: String, searched: String, today: String, matches: List<PcMatch>) {
@@ -1255,7 +1255,7 @@ object PcScraper {
     }
 
     /**
-     * What a search for [entry] starts from in a picker, for the person to change (Droidtop/tracker#861): the name droidtop
+     * What a search for [entry] starts from in a picker, for the person to change (mytop-project/tracker#861): the name droidtop
      * reads from the game, as an automatic scrape searches it; a ROM's file name. Pure.
      */
     fun suggestedSearch(entry: LibraryEntry): String =

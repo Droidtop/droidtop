@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Performance > Logs (LogReader.kt, Droidtop/tracker#414 slice C18). */
+/** Performance > Logs (LogReader.kt, mytop-project/tracker#414 slice C18). */
 class LogReaderTest {
     private val crash = "10-09 23:01:02.345  4321  4321 E AndroidRuntime: FATAL EXCEPTION: main"
     private val info = "10-09 23:01:03.000  1234  1250 I ActivityManager   : Start proc 4321:com.example.game/u0a99"

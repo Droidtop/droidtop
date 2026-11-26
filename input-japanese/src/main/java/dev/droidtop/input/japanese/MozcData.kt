@@ -12,7 +12,7 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * Mozc's dictionary on the device (Droidtop/tracker#903 H7c): `mozc.data` in the engine's profile directory
+ * Mozc's dictionary on the device (mytop-project/tracker#903 H7c): `mozc.data` in the engine's profile directory
  * (noBackupFilesDir/engine-mozc). The first time Japanese is used it is downloaded from the release the pin names
  * ([MozcPin.dataUrl]), never at app start and never in the APK. The coordinator's rulings for the owner: host it on a
  * droidtop prerelease, keep the zip-code data, and the open Mozc dictionary is the default.

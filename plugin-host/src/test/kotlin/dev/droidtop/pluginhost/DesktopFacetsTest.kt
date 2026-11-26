@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Desktop-mode facets (Droidtop/tracker#221): the window and file subjects, `desktop.window`, and icons on more kinds. */
+/** Desktop-mode facets (mytop-project/tracker#221): the window and file subjects, `desktop.window`, and icons on more kinds. */
 class DesktopFacetsTest {
     private val window = FacetSubject.Window(42L, "org.mozilla.firefox")
 

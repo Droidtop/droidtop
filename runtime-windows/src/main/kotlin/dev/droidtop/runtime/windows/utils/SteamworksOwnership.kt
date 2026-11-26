@@ -6,7 +6,7 @@ import dev.droidtop.library.stores.StoreLibraries
 
 /**
  * Whether a game that starts through the Steamworks shim is known to be the person's (docs/SPEC.md 5b, "DRM: platform
- * enablement, never piracy enablement"; Droidtop/tracker#718).
+ * enablement, never piracy enablement"; mytop-project/tracker#718).
  *
  * Owner, 2026-11-05: "We don't add a check that explicitly checks an account and refuses to run. We DO add a check
  * that checks against an account, and warns the user if it can't find the game on it, with the general checkbox for

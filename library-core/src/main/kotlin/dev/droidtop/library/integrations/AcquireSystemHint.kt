@@ -36,7 +36,7 @@ object AcquireSystemHint {
      * system by its folder, one is made, named by the system's id as ES-DE names them
      * ([dev.droidtop.library.consoles.EsDeFolderStructure]), beside
      * the person's other system folders ([placeFor]): a DOS zip from Abandonware was refused with "there is no games
-     * folder for dos" (Droidtop/tracker#846). Null for a system droidtop does not know or a folder that cannot be made.
+     * folder for dos" (mytop-project/tracker#846). Null for a system droidtop does not know or a folder that cannot be made.
      * [onMade] hears the folder made. Off the main thread.
      */
     suspend fun folderFor(context: Context, id: String, onMade: (File) -> Unit = {}): File? = withContext(Dispatchers.IO) {

@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-// The sandbox library's program-tree binding (docs/SPEC.md 5b, Droidtop/tracker#584): the broker listener a tree of
+// The sandbox library's program-tree binding (docs/SPEC.md 5b, mytop-project/tracker#584): the broker listener a tree of
 // processes such as Wine's attaches to, with libsbx_child.so and sbx-exec packaged beside it.
 android {
     namespace = "dev.droidtop.sandboxhost"

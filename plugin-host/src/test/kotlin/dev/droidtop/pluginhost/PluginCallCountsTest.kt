@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Everyday plugin calls, counted per day (Droidtop/tracker#61). */
+/** Everyday plugin calls, counted per day (mytop-project/tracker#61). */
 class PluginCallCountsTest {
     private val dir: File = Files.createTempDirectory("counts").toFile()
     private val utc = ZoneOffset.UTC

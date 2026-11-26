@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.SharedFlow
  * free to rename this class or drop the "unused" constructor.
  *
  * [output] is the compositor's name for the output the window is listed on ("HEADLESS-2"), from the protocol's
- * output_enter and output_leave (Droidtop/tracker#908, step D4): the one it entered last among those it is on, or
+ * output_enter and output_leave (mytop-project/tracker#908, step D4): the one it entered last among those it is on, or
  * the one it was on last while it is on none (a window sway hid in its scratchpad); "" when there is none. Which
  * bar lists it follows from that ([WindowOutputs]).
  */
@@ -47,7 +47,7 @@ data class Toplevel(
  *  1. Connects to the primary container's Wayland socket as a client.
  *  2. Pulls frames from its headless output(s) via wlr-screencopy and
  *     presents them on Android [Surface]s, one capture per compositor
- *     output ([outputNames], Droidtop/tracker#908).
+ *     output ([outputNames], mytop-project/tracker#908).
  *  3. Forwards normalized input from :input-seat in as virtual
  *     pointer/keyboard events.
  *  4. Bridges the seat's clipboard selection both ways over
@@ -94,7 +94,7 @@ class HostBridge : HostBridgeInput {
     }
 
     /**
-     * Whether the compositor ended the connection: it exited, or closed the socket (Droidtop/tracker#688). Nothing
+     * Whether the compositor ended the connection: it exited, or closed the socket (mytop-project/tracker#688). Nothing
      * reaches the desktop after that, so the session is over. False when droidtop disconnected itself. Cheap and
      * safe from any thread; the session service asks it every second.
      */
@@ -102,7 +102,7 @@ class HostBridge : HostBridgeInput {
 
     /**
      * The compositor's outputs by name ("HEADLESS-1" under sway), the primary first, in the order the compositor
-     * advertised them (Droidtop/tracker#908). The primary is the first output it advertised: the one the calls without
+     * advertised them (mytop-project/tracker#908). The primary is the first output it advertised: the one the calls without
      * a name ([presentOutput] with a [DisplayOutput], [stopPresenting], [setOutputSize]) mean. An output is listed
      * only once the compositor has named it (wl_output version 4); one that offers less is still reachable as the
      * primary. Empty when not connected. Safe from any thread.
@@ -147,7 +147,7 @@ class HostBridge : HostBridgeInput {
      *
      * [scale] is the output's scale in the same request: how many of those
      * pixels one logical pixel is (2.0 draws everything twice as large), so
-     * a dense handheld screen is readable (Droidtop/tracker#386). 0 leaves
+     * a dense handheld screen is readable (mytop-project/tracker#386). 0 leaves
      * the compositor's own.
      */
     fun setOutputSize(width: Int, height: Int, scale: Double = 0.0): Boolean =
@@ -179,7 +179,7 @@ class HostBridge : HostBridgeInput {
     /**
      * Puts the pointer at ([x], [y]) of a [extentWidth] x [extentHeight] surface showing the output named
      * [outputName] (one of [outputNames]): the same place on that output, wherever it sits in the compositor's layout
-     * (Droidtop/tracker#908). A point off the surface stays on the output's edge. False, and nothing sent, when the
+     * (mytop-project/tracker#908). A point off the surface stays on the output's edge. False, and nothing sent, when the
      * compositor has no output of that name in its layout, or offers no wlr-output-management to say where it is.
      *
      * Each call reads the layout as the compositor last reported it (no wait on the Wayland thread), and
@@ -258,7 +258,7 @@ class HostBridge : HostBridgeInput {
 
     /**
      * A tick whenever the window list changes, for any number of readers (the taskbar and the companion's Apps tab,
-     * Droidtop/tracker#425): each re-reads [toplevels]. Emitted from a native worker thread.
+     * mytop-project/tracker#425): each re-reads [toplevels]. Emitted from a native worker thread.
      */
     val toplevelChanges: SharedFlow<Unit> = toplevelChangesFlow
 
@@ -285,7 +285,7 @@ class HostBridge : HostBridgeInput {
         toplevelChangesFlow.tryEmit(Unit)
     }
 
-    // ---- Text fields (Droidtop/tracker#685) ----
+    // ---- Text fields (mytop-project/tracker#685) ----
 
     /**
      * Called from a native worker thread when a text field in the container takes (true) or loses (false) the
@@ -300,7 +300,7 @@ class HostBridge : HostBridgeInput {
     private var inputMethodTaken = true
 
     /**
-     * Whether droidtop holds the seat's one input method (Droidtop/tracker#809, docs/SPEC.md "The on-screen keyboard").
+     * Whether droidtop holds the seat's one input method (mytop-project/tracker#809, docs/SPEC.md "The on-screen keyboard").
      * sway allows one per seat, so with droidtop's released a container's own (fcitx5 or ibus, for CJK input) can take
      * it, and text fields no longer bring up the on-screen keyboard. Applies at once, and on every later connection.
      */

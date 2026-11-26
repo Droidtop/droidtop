@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The pure parts of getting a RetroArch core in (Droidtop/tracker#271). */
+/** The pure parts of getting a RetroArch core in (mytop-project/tracker#271). */
 class RetroArchCoresTest {
     private fun elf(is64: Boolean, machine: Int): ByteArray = ByteArray(64).also {
         it[0] = 0x7F.toByte(); it[1] = 'E'.code.toByte(); it[2] = 'L'.code.toByte(); it[3] = 'F'.code.toByte()

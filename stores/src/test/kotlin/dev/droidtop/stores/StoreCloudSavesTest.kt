@@ -21,7 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** GOG's and Epic's cloud saves: where the saves are, what the clouds list, and Epic's snapshot format (Droidtop/tracker#224). */
+/** GOG's and Epic's cloud saves: where the saves are, what the clouds list, and Epic's snapshot format (mytop-project/tracker#224). */
 class StoreCloudSavesTest {
     @get:Rule
     val temp = TemporaryFolder()

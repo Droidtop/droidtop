@@ -3,7 +3,7 @@ package dev.droidtop.library
 import dev.droidtop.pluginhost.DownloadSystems
 
 /**
- * A source record's downloads as one page shows them (docs/SPEC.md 7g, Droidtop/tracker#845): which System choices
+ * A source record's downloads as one page shows them (docs/SPEC.md 7g, mytop-project/tracker#845): which System choices
  * there are, which one is picked, the picked one's builds, and what is apart from them. The record rows read it, and
  * so will droidtop's pick, Updates (#833) and the game page's Versions tab, so they cannot disagree. Pure.
  *

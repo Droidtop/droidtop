@@ -6,7 +6,7 @@ import java.io.File
 /**
  * Finds the logs a Windows game wrote itself, so a run's record carries the real reason it failed: Wine's own
  * output rarely does (console, 2026-10-22: a Unity game stayed black while Wine printed nothing, and the cause was
- * in Unity's Player.log in the prefix, Droidtop/tracker#601). Reads only; the caller attaches what is found
+ * in Unity's Player.log in the prefix, mytop-project/tracker#601). Reads only; the caller attaches what is found
  * ([RunRecords.attach]) off the main thread. Only the logs of known engines and a few common file names next to
  * the executable: not a search of the game's folder.
  */

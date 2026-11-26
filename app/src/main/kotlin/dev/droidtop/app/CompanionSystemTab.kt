@@ -36,7 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The companion's System tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): the Quick Menu's own
+ * The companion's System tab (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): the Quick Menu's own
  * System section at the top, then Display, Sound, Power, Storage and Privacy, folded. Every row is a catalog item
  * drawn for touch ([CompanionCatalogItems]); the catalog is built off the main thread while the tab shows and again
  * after each change or a return from another screen (a grant), and nothing reads while the tab is not composed.
@@ -69,7 +69,7 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
             return@Column
         }
         // A Device page draws only its own cards, open, without the card's header: the page names it
-        // (Droidtop/tracker#786); the System page draws the cards no page of their own holds.
+        // (mytop-project/tracker#786); the System page draws the cards no page of their own holds.
         list.filter { only == null || it.id in only }.forEach { card ->
             val isFolded = if (only != null) false else folded[card.id] ?: card.folded
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -94,7 +94,7 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
                             // A slider per stream through the one volume path, and the network and Bluetooth (C19).
                             if (card.id == "sound") CompanionStreamVolumes()
                             if (card.id == "connections") CompanionConnections()
-                            // Each connected pad with its battery (Droidtop/tracker#786 S9).
+                            // Each connected pad with its battery (mytop-project/tracker#786 S9).
                             if (card.id == "controllers") CompanionControllerList()
                             CompanionCatalogItems(card.items, onChanged = { version++ }, headings = card.headings)
                         }

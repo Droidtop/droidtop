@@ -8,7 +8,7 @@ import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 
 /**
- * Where the voice key's dictation comes from (Droidtop/tracker#343). One provider answers at a time: the first in
+ * Where the voice key's dictation comes from (mytop-project/tracker#343). One provider answers at a time: the first in
  * [providers] that is available when the key is pressed: [OfflineVoiceTyping] once its download is in place and the
  * microphone is allowed, else [SystemVoiceKeyboard].
  */

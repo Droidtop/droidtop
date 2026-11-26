@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** Text on a key reads at 4.5:1 or better, hints at 3:1, in every look (Droidtop/tracker#903 H12b). */
+/** Text on a key reads at 4.5:1 or better, hints at 3:1, in every look (mytop-project/tracker#903 H12b). */
 class KeyContrastTest {
     private val white = 0xFFFFFFFF.toInt()
     private val black = 0xFF000000.toInt()

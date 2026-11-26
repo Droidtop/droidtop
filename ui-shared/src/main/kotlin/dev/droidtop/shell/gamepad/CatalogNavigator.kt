@@ -202,7 +202,7 @@ fun CatalogNavigator(
     var version by remember { mutableStateOf(0) }
     // A live screen's changes (screen.live) re-read that screen only: the root's while it shows, the pane's while a
     // pushed or linked screen shows. One shared counter rebuilt the whole root, every short screen merged into it
-    // included, on each progress report of the Downloads page (Droidtop/tracker#941).
+    // included, on each progress report of the Downloads page (mytop-project/tracker#941).
     var rootLive by remember { mutableStateOf(0) }
     // A row marked popup (NestedScreenItem.popup) opens its screen over this one; closing it reads this screen again.
     var popupScreen by remember { mutableStateOf<CatalogScreen?>(null) }
@@ -215,7 +215,7 @@ fun CatalogNavigator(
     var paneLive by remember { mutableStateOf(0) }
     // Both place-holding states below are saveable because the Activity
     // recreate the Text size setting triggers (AccessibilityPrefs,
-    // Droidtop/tracker#87) used to rebuild them from nothing: the user
+    // mytop-project/tracker#87) used to rebuild them from nothing: the user
     // changing their text size inside a pushed settings screen landed
     // back on this root with row 0 selected, their place gone.
     val stack = rememberSaveable(saver = catalogStackSaver(root)) { mutableStateListOf(root) }
@@ -243,9 +243,9 @@ fun CatalogNavigator(
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
-    // A short choice tapped: its options in a small pop-up over the page (Droidtop/tracker#673).
+    // A short choice tapped: its options in a small pop-up over the page (mytop-project/tracker#673).
     var poppingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
-    // A row that asks first (its confirmTitle), waiting in the one confirmation, Cancel first (Droidtop/tracker#835): it
+    // A row that asks first (its confirmTitle), waiting in the one confirmation, Cancel first (mytop-project/tracker#835): it
     // replaced the second A on the row, where only pressing again or leaving the page ended the question.
     var confirming by remember { mutableStateOf<CatalogItem?>(null) }
     // Y's Info sheet: the selected row's whole text. Rows show their
@@ -296,7 +296,7 @@ fun CatalogNavigator(
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val fillsPage = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION
-    // A page drawn as a strip of views (Updates) is never cut into a column: its views are its groups (Droidtop/tracker#837,
+    // A page drawn as a strip of views (Updates) is never cut into a column: its views are its groups (mytop-project/tracker#837,
     // where Updates as a place drew each source row as a column entry of its own).
     val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES && root.layout != dev.droidtop.library.settings.CatalogLayout.STRIP
     // Side by side only on a landscape window: held upright the two take turns, however wide the
@@ -315,7 +315,7 @@ fun CatalogNavigator(
     val screen: CatalogScreen = if (depth > 0) stack.last() else category?.let { linkScreen(it) } ?: root
     // A page drawn as a strip of views (CatalogLayout.STRIP, docs/SPEC.md 7k "Page anatomy"): its header and bar, then
     // one of its groups at a time, each group a view named by its title on the shell's view strip, L1 and R1 stepping
-    // them (Updates' kinds with their counts, Droidtop/tracker#792).
+    // them (Updates' kinds with their counts, mytop-project/tracker#792).
     val strip = screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP
     var stripIndex by remember(screen.id) { mutableStateOf(0) }
     // Tagged with the screen they belong to: right after a push or a pop
@@ -337,7 +337,7 @@ fun CatalogNavigator(
     }
     // A screen still building (the stores' list, a plugin's panel, which asks the plugin when it opens)
     // shows a loading row from the first frame instead of its title on black, after a moment so a fast one
-    // does not flash it (Droidtop/tracker#502).
+    // does not flash it (mytop-project/tracker#502).
     val loadingPending = if (screen === root) rootGroups == null else paneLoaded?.first !== screen
     val loadingShown by produceState(false, screen, loadingPending) {
         value = false
@@ -508,7 +508,7 @@ fun CatalogNavigator(
     }
 
     // L1/R1 step the categories from anywhere on the page, never wrapping, as they step a strip elsewhere (proposal
-    // 6.H, Droidtop/tracker#644 slice 4).
+    // 6.H, mytop-project/tracker#644 slice 4).
     if (categoryMode) {
         OwnShoulders { step ->
             val next = menuStep(categoryIndex, categories.size, step)
@@ -580,7 +580,7 @@ fun CatalogNavigator(
             is ToggleItem -> adjust(item, +1)
             // A tap never changes a value by itself (rig, build 1649: a tap on a selector cycled it, so looking at a
             // setting changed it): it opens the choices, a short one as a small pop-up over the row, a long one as the
-            // picker (owner, 2026-11-05, Droidtop/tracker#673, option 1). A on a pad steps a short choice in place
+            // picker (owner, 2026-11-05, mytop-project/tracker#673, option 1). A on a pad steps a short choice in place
             // before it gets here (onPanePad); Left/Right step either way.
             is ChoiceItem -> when {
                 item.options.isEmpty() -> {}
@@ -617,7 +617,7 @@ fun CatalogNavigator(
                 NoticePress.NONE -> {}
             }
             is ActionItem -> {
-                // A fact or a state: A promises nothing on it, and does nothing (Droidtop/tracker#587).
+                // A fact or a state: A promises nothing on it, and does nothing (mytop-project/tracker#587).
                 if (item.inert) return
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirming = item
@@ -671,7 +671,7 @@ fun CatalogNavigator(
     fun openSearchResult(result: SettingsSearchResult) {
         // A row on a screen below the root: the category its first step belongs to, then each screen down to it, so
         // the column marks where it lives. Pushed onto the category on show instead, a plugin's page found by search
-        // sat under Modes (BlueStacks dev.3374, Droidtop/tracker#954 item 15).
+        // sat under Modes (BlueStacks dev.3374, mytop-project/tracker#954 item 15).
         if (categoryMode && result.trail.isNotEmpty()) {
             val (firstRow, firstScreen) = result.trail.first()
             val linked = categories.indexOfFirst { linkScreen(it)?.id == firstScreen.id }
@@ -947,7 +947,7 @@ fun CatalogNavigator(
             GamepadAction.A -> row?.let {
                 val item = it.item
                 // A on a short choice steps it to its next option in place: pressing A is deliberate (owner,
-                // 2026-11-05, Droidtop/tracker#673, option 1). A long choice still opens its picker.
+                // 2026-11-05, mytop-project/tracker#673, option 1). A long choice still opens its picker.
                 if (item is ChoiceItem && item.stepsInPlace()) {
                     adjust(item, +1)
                     return@let
@@ -1002,9 +1002,9 @@ fun CatalogNavigator(
     val rowHints = remember(selectedRowItem) {
         selectedRowItem?.let { item ->
             listOfNotNull(
-                // A short choice steps on A (Droidtop/tracker#673): the hint says so.
+                // A short choice steps on A (mytop-project/tracker#673): the hint says so.
                 HintBinding(GamepadAction.A, if (item is ChoiceItem && item.stepsInPlace()) "Next" else "Select").takeIf { !item.isInert },
-                // A row that steps in place says so: "◄ ► Change" (Droidtop/tracker#519). Left's label is empty so
+                // A row that steps in place says so: "◄ ► Change" (mytop-project/tracker#519). Left's label is empty so
                 // the pair reads as one hint, keycaps then the word.
                 HintBinding(GamepadAction.LEFT, "").takeIf { item.stepsInPlace() },
                 HintBinding(GamepadAction.RIGHT, "Change").takeIf { item.stepsInPlace() },
@@ -1100,7 +1100,7 @@ fun CatalogNavigator(
         }
         val edge = LocalShellWindow.current.edgePadding
         // The text row being typed in (A or a tap on it): it edits in its own place, never in a panel or a page of
-        // its own (owner, 2026-11-19, Droidtop/tracker#954 item 12). Done hands the pad back to the list.
+        // its own (owner, 2026-11-19, mytop-project/tracker#954 item 12). Done hands the pad back to the list.
         val textEdit = editingText?.let { item ->
             CatalogTextEdit(item.id) { newValue ->
                 editingText = null
@@ -1143,7 +1143,7 @@ fun CatalogNavigator(
 /** The pane: an optional title, then the rows, grouped under small section labels. */
 /**
  * True where a catalog screen is as tall as its rows rather than the whole space it is given: a popup over another
- * screen (CatalogPopup), which stood at its full allowed height for one row (rig, AVD dev.3333, Droidtop/tracker#939).
+ * screen (CatalogPopup), which stood at its full allowed height for one row (rig, AVD dev.3333, mytop-project/tracker#939).
  */
 val LocalWrapHeight = staticCompositionLocalOf { false }
 
@@ -1170,11 +1170,11 @@ private fun CatalogPane(
     modifier: Modifier = Modifier,
 ) {
     // The selected row's explanation goes in a strip of its own under the list, never in a bubble over
-    // the next row (Droidtop/tracker#495); armed, the row says what pressing again will do (the app and
+    // the next row (mytop-project/tracker#495); armed, the row says what pressing again will do (the app and
     // the exact permission or file) in place of its hint, at once.
     // An armed row says what pressing again does under touch too: tapped, it used to arm with only "press A again" in
     // its title, so a person never saw the key fingerprint they were trusting, and the next tap on the row confirmed
-    // (rig, build 1908, Droidtop/tracker#270).
+    // (rig, build 1908, mytop-project/tracker#270).
     val tipRow = rows.getOrNull(selected)?.takeIf {
         active && (PadModality.showsFocus || (confirmArmedId == it.item.id && it.item.confirmText != null)) && it.item !is TextBlockItem
     }
@@ -1184,7 +1184,7 @@ private fun CatalogPane(
     val context = LocalContext.current
     val underRows = remember(rows) { dev.droidtop.library.settings.ReadingPrefs.infoUnderRows(context) }
     // In a narrow pane (the Quick Menu) the focused row's sentence opens under that row, and the strip at the foot
-    // keeps only what changes, so the footer is the pane's hints, not a paragraph (Droidtop/tracker#739).
+    // keeps only what changes, so the footer is the pane's hints, not a paragraph (mytop-project/tracker#739).
     val narrow = LocalNarrowPane.current
     val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows && !narrow) }
         ?: hint?.takeIf { active }
@@ -1396,7 +1396,7 @@ private fun SettingsCategoryColumn(
     ) {
         if (showSearch) {
             item(key = SEARCH_ROW_ID) {
-                // It searches settings only, so it says so: "Search" alone read as the global search (Droidtop/tracker#680).
+                // It searches settings only, so it says so: "Search" alone read as the global search (mytop-project/tracker#680).
                 CategoryEntry(label = "Search settings", icon = CatalogIcon.SEARCH, current = false, cursor = cursor == 0, onClick = onSearch)
             }
         }
@@ -1418,7 +1418,7 @@ private fun SettingsCategoryColumn(
 
 /**
  * One entry of the category column (docs/SPEC.md "Settings layout", [SettingsLayout]): under the cursor it is the one
- * row focus every menu has ([rowFocus], Droidtop/tracker#644: the accent at 22 percent and a 4 dp accent bar at the
+ * row focus every menu has ([rowFocus], mytop-project/tracker#644: the accent at 22 percent and a 4 dp accent bar at the
  * leading edge, nothing growing, no ring); the category being shown keeps a short accent pill on that edge, whether or
  * not the pad is in the column, and its name in the full text colour.
  */
@@ -1430,7 +1430,7 @@ private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, c
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MenuTokens.CategoryRowMinHeight)
-            // The one row focus (Droidtop/tracker#644): the accent fill and bar under the cursor, the short pill on the
+            // The one row focus (mytop-project/tracker#644): the accent fill and bar under the cursor, the short pill on the
             // category on show.
             .rowFocus(shown, current = current)
             .padRow(onClick = onClick)
@@ -1646,7 +1646,7 @@ private fun CatalogRowView(
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
     // A text or search field is an input box, never a settings row reading "not set" (owner, 2026-10-30,
-    // Droidtop/tracker#825: "why "not set"? It's not a freeform search bar?"). A sends it to the same edit as before.
+    // mytop-project/tracker#825: "why "not set"? It's not a freeform search bar?"). A sends it to the same edit as before.
     if (item is TextInputItem && !locked && !confirmArmed) {
         CatalogInputBox(
             title = item.title,
@@ -1661,7 +1661,7 @@ private fun CatalogRowView(
     }
     val placeholder = status == null && value == null && item is TextInputItem
     // A text size under the cursor shows itself: a sample line under its row, at the size in force (A steps it,
-    // Droidtop/tracker#673).
+    // mytop-project/tracker#673).
     val sample = (item as? ChoiceItem)?.sampleScale?.takeIf { isSelected }
     if (sample != null) {
         Column(Modifier.fillMaxWidth()) {
@@ -1907,7 +1907,7 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
             },
         ) {
             Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            // Show, then say (Droidtop/tracker#738): a switch's state is the switch, as on its row.
+            // Show, then say (mytop-project/tracker#738): a switch's state is the switch, as on its row.
             if (item is ToggleItem) ShellSwitch(item.current, Modifier.padding(top = 4.dp).semantics { stateDescription = if (item.current) "On" else "Off" })
             val value = when (item) {
                 is ChoiceItem -> item.currentLabel()
@@ -2003,7 +2003,7 @@ fun CatalogChoicePicker(
         LazyColumn(
             state = listState,
             // The height under the header, not the page's: the full height ran the last options off the screen,
-            // where the cursor reached them without the list scrolling (Droidtop/tracker#616).
+            // where the cursor reached them without the list scrolling (mytop-project/tracker#616).
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -2051,7 +2051,7 @@ fun CatalogChoicePicker(
  * is still running on IO: the overlay shows "Indexing settings..." rather
  * than a false "No settings match", and the query re-runs when the index
  * lands (the first search right after opening "Search settings" raced the
- * build and answered over an empty index, Droidtop/tracker#101).
+ * build and answered over an empty index, mytop-project/tracker#101).
  */
 @Composable
 private fun SettingsSearchOverlay(
@@ -2088,7 +2088,7 @@ private fun SettingsSearchOverlay(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(MenuTokens.Accent),
-                // Android's keyboard only where droidtop raises one with focus (Droidtop/tracker#832).
+                // Android's keyboard only where droidtop raises one with focus (mytop-project/tracker#832).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = androidx.compose.ui.text.input.ImeAction.Search,
                     showKeyboardOnFocus = raisesKeyboardWithFocus,
@@ -2189,7 +2189,7 @@ private fun SettingsSearchOverlay(
 
 /**
  * [groups] headed by one "You're offline" notice when [screen] needs the network and the device has none
- * (Droidtop/tracker#594): a page whose actions would only fail says so before one is pressed. Read on the IO
+ * (mytop-project/tracker#594): a page whose actions would only fail says so before one is pressed. Read on the IO
  * dispatcher with the screen's own rows; the page is read again on its next refresh, so the notice goes once a
  * connection is back and something on the page changes.
  */

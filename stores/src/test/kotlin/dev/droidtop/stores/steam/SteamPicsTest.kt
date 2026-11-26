@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A large app's product info arrives as a file on Steam's content servers (Droidtop/tracker#956): the console held
+ * A large app's product info arrives as a file on Steam's content servers (mytop-project/tracker#956): the console held
  * 1,150 owned games as rows with no name and no type, read from answers whose inline key-values were empty.
  */
 class SteamPicsTest {

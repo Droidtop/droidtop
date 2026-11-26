@@ -23,7 +23,7 @@ import dev.droidtop.library.LibraryEntry
  * -- the same launch-screen-memory-and-play-history path as a pinned
  * game icon -- never a second launch mechanism.
  *
- * Drawn by [DroidtopWidgets.rows], the renderer every droidtop widget shares (Droidtop/tracker#563): a title and up to
+ * Drawn by [DroidtopWidgets.rows], the renderer every droidtop widget shares (mytop-project/tracker#563): a title and up to
  * four rows, in the role tokens' colours.
  */
 class ContinuePlayingWidgetProvider : AppWidgetProvider() {

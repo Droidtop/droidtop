@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** "Update its software" for a container (docs/SPEC.md 3d; Droidtop/tracker#757 slice 4). */
+/** "Update its software" for a container (docs/SPEC.md 3d; mytop-project/tracker#757 slice 4). */
 class PackageUpgradeTest {
     private fun manager(id: String) = PackageUpgrade.byId(id)!!
 

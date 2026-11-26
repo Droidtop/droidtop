@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.onStart
  * could be fetched (docs/SPEC.md 12a "One search"), and a web search, where a
  * surface offers one, last.
  */
-/** What a row is; on an equal match, rows sort in this order. CALC is the calculator's answer (Droidtop/tracker#704). */
+/** What a row is; on an equal match, rows sort in this order. CALC is the calculator's answer (mytop-project/tracker#704). */
 enum class SearchRowKind { CALC, APP, GAME, SOURCE, WEB }
 
 /**
@@ -69,7 +69,7 @@ class SearchRow(
 
     /**
      * A game the person does not have yet: no place it is found is on the device, or it is a site to search on. Such
-     * rows go under "Get new games", after what is here (owner, 2026-10-23, Droidtop/tracker#612: "Get new games should
+     * rows go under "Get new games", after what is here (owner, 2026-10-23, mytop-project/tracker#612: "Get new games should
      * be presented under the search results, presenting matches that are relevant").
      */
     val isNew: Boolean get() = kind == SearchRowKind.WEB || choices.none { it.open != null }
@@ -80,7 +80,7 @@ class SourceStatus(
     val source: GameSourceProvider,
     /** Null while the source has not answered. */
     val outcome: SourceOutcome?,
-    /** The source is still starting, not yet asked (Droidtop/tracker#848): its row says so rather than waiting silently. */
+    /** The source is still starting, not yet asked (mytop-project/tracker#848): its row says so rather than waiting silently. */
     val starting: Boolean = false,
 ) {
     val pending: Boolean get() = outcome == null
@@ -91,7 +91,7 @@ class SourceStatus(
 }
 
 /**
- * The one action that fixes a failed source's search (docs/SPEC.md 12a, "One search", Droidtop/tracker#746): what A on
+ * The one action that fixes a failed source's search (docs/SPEC.md 12a, "One search", mytop-project/tracker#746): what A on
  * the source's row runs, read from what the failure already says. Pure.
  */
 enum class SourceFix(val label: String) {
@@ -141,10 +141,10 @@ class UnifiedState(
     val settled: Boolean,
     /**
      * The sources the person turned off in Get games' source filter ([SourceSelection]): not asked, still listed so the
-     * filter can draw them, off (owner, 2026-10-30, Droidtop/tracker#825: "a filter to choose where it searches").
+     * filter can draw them, off (owner, 2026-10-30, mytop-project/tracker#825: "a filter to choose where it searches").
      */
     val off: List<GameSourceProvider> = emptyList(),
-    /** With no query: [rows] are what the sources feature now, not matches (Droidtop/tracker#825). */
+    /** With no query: [rows] are what the sources feature now, not matches (mytop-project/tracker#825). */
     val featured: Boolean = false,
 ) {
     /** Every source hit in [rows]: what the next query carries over while its sources answer. */
@@ -184,7 +184,7 @@ object SearchRank {
 }
 
 /**
- * The ONE search (docs/SPEC.md 12a "One search", Droidtop/tracker#315): a
+ * The ONE search (docs/SPEC.md 12a "One search", mytop-project/tracker#315): a
  * single query over the device's own rows (installed apps, library games,
  * from the caller) and every [GameSourceProvider] (built-in and plugin),
  * answered as ONE ranked list. There is no separate plugin mode and no
@@ -205,7 +205,7 @@ object UnifiedSearch {
     const val SOURCE_DEBOUNCE_MS = 350L
 
     /**
-     * How long a source may take to start before it is asked (Droidtop/tracker#848): apart from the search's own budget
+     * How long a source may take to start before it is asked (mytop-project/tracker#848): apart from the search's own budget
      * ([PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS]), so a cold start is not taken out of it.
      */
     const val LOAD_TIMEOUT_MS = 30_000L
@@ -220,14 +220,14 @@ object UnifiedSearch {
      * The search for [query]. [local] answers for the device (called off the
      * main thread, must not touch the disk); [platform] scopes the sources
      * to one system when the surface has one: only the sources whose manifest declares that system (or
-     * none) are asked, "pc" being the PC library (Droidtop/tracker#543). [carry] is the previous
+     * none) are asked, "pc" being the PC library (mytop-project/tracker#543). [carry] is the previous
      * query's source rows: they stay in the list (while they still show the
      * query) until their source answers again, so the list does not blink
      * with every keystroke. [keep] drops a source result the surface has no
      * use for before it is ranked (the PC library drops the console systems'
      * results), so what a source answers for other platforms never reaches the list.
      *
-     * Get games is this one search (owner, 2026-10-30, Droidtop/tracker#825: "We want a single get games section, and
+     * Get games is this one search (owner, 2026-10-30, mytop-project/tracker#825: "We want a single get games section, and
      * a filter to choose where it searches"): the sources the person turned off ([SourceSelection]) are not asked, and
      * with [featuredWhenEmpty] an empty query asks every source for what it features now, merged the same way.
      */
@@ -240,7 +240,7 @@ object UnifiedSearch {
         keep: (AcquireContentResult) -> Boolean = { true },
         featuredWhenEmpty: Boolean = false,
         /**
-         * Ask the live sources (the person pressed "Search the sources", Droidtop/tracker#937). Without it, each source
+         * Ask the live sources (the person pressed "Search the sources", mytop-project/tracker#937). Without it, each source
          * that is on answers from its own index ([SourceIndex]): no plugin is called and nothing goes over the network.
          */
         live: Boolean = false,
@@ -275,14 +275,14 @@ object UnifiedSearch {
             isOff = { it.id in off },
             featured = if (featuredWhenEmpty) { source -> source.featured(context, platform, MAX_ROWS_PER_SOURCE) } else null,
         )
-            // The sources stay started while this search runs and a little after (Droidtop/tracker#848).
+            // The sources stay started while this search runs and a little after (mytop-project/tracker#848).
             .onStart { SourceWarmth.hold(context) }
             .onCompletion { SourceWarmth.release() }
     }
 
     /**
      * At most one value every [everyMs], always the newest, and the last one always delivered: what a list drawn on the
-     * main thread applies from [search] (Droidtop/tracker#915). Each source sends several states (starting, ready,
+     * main thread applies from [search] (mytop-project/tracker#915). Each source sends several states (starting, ready,
      * answered), and four sources answering together rebuilt the whole result list on the main thread many times a
      * second; on a device short of memory that turned typing into "droidtop isn't responding". The first value goes
      * out at once, so the device's own rows still follow every key.
@@ -315,7 +315,7 @@ object UnifiedSearch {
         loadTimeoutMs: Long = LOAD_TIMEOUT_MS,
     ): Flow<UnifiedState> = channelFlow {
         val q = query.trim()
-        // No query: nothing, or what the sources feature now when the surface asks for it (Droidtop/tracker#825).
+        // No query: nothing, or what the sources feature now when the surface asks for it (mytop-project/tracker#825).
         if (q.isEmpty() && featured == null) {
             send(UnifiedState.empty(q))
             return@channelFlow
@@ -353,7 +353,7 @@ object UnifiedSearch {
         coroutineScope {
             for (source in sources) {
                 launch {
-                    // Started first, on its own bound (Droidtop/tracker#848): a slow start is not spent out of the
+                    // Started first, on its own bound (mytop-project/tracker#848): a slow start is not spent out of the
                     // search's budget, and the row says the source is starting meanwhile.
                     gate.withLock {
                         statuses = statuses.map { if (it.source.id == source.id) SourceStatus(source, null, starting = true) else it }

@@ -9,7 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** The kernel drivers read from a Wine prefix (docs/SPEC.md 5b, "Kernel drivers"; Droidtop/tracker#607). Read only. */
+/** The kernel drivers read from a Wine prefix (docs/SPEC.md 5b, "Kernel drivers"; mytop-project/tracker#607). Read only. */
 class KernelDriversTest {
     @get:Rule val tmp = TemporaryFolder()
 

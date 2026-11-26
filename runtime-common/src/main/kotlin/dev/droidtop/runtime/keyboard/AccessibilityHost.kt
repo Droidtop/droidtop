@@ -4,7 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 
 /**
- * droidtop's one accessibility service, as the parts that use it see it (Droidtop/tracker#740: one mechanism per
+ * droidtop's one accessibility service, as the parts that use it see it (mytop-project/tracker#740: one mechanism per
  * job, where there were two services). The service (`TypingAccessibilityService` in `:app`) sets [service] while it
  * is bound. Each part that needs Android's key filter says so by name ([wantKeyFilter]): Standard's taskbar while
  * it is on, the HOME chords while droidtop is the default home. The filter is on while any part wants it, so no

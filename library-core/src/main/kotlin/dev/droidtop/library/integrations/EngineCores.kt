@@ -20,7 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * One engine core an app can run games with (docs/plugin-api.md 3 A7b, `engines.cores@1`, Droidtop/tracker#752):
+ * One engine core an app can run games with (docs/plugin-api.md 3 A7b, `engines.cores@1`, mytop-project/tracker#752):
  * installed, or one its catalog can install. [rows] are the ids of the engines-database rows whose `enginehost`
  * mapping it serves, so droidtop matches its own detection to a core without a second copy of the rules.
  */
@@ -100,7 +100,7 @@ object EngineCoresProtocol {
      * ones the first listed.
      */
     /**
-     * Whether a plugin's last list is kept when it cannot be asked now (Droidtop/tracker#854). [installed]: its record
+     * Whether a plugin's last list is kept when it cannot be asked now (mytop-project/tracker#854). [installed]: its record
      * is still in droidtop's plugins; [declares]: whether that record still provides [POINT], null when droidtop cannot
      * read the record (an app plugin made for another droidtop). Only a plugin removed, or one that no longer
      * provides the point, loses its list: Enginehost waiting for approval, turned off or needing an update keeps the

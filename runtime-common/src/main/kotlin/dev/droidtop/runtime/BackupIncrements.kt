@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * Incremental container backups (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808 slice B2), with
+ * Incremental container backups (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808 slice B2), with
  * Android's own toybox `find` and `tar` as argv, on both backends. An increment is two files: an archive of the files
  * changed since the backup before it, and a manifest of every path present, so a restore puts back what changed and
  * removes what was deleted. Directories are listed in the manifest, not archived, so a changed directory does not

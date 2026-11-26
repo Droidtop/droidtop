@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The number pad's "=" (Droidtop/tracker#903 H12c). */
+/** The number pad's "=" (mytop-project/tracker#903 H12c). */
 class PadCalculatorTest {
     private fun eval(sum: String): String? = PadCalculator.evaluate(sum)?.let(PadCalculator::format)
 

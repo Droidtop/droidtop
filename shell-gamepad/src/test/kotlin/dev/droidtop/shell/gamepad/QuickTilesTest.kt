@@ -19,7 +19,7 @@ import dev.droidtop.library.settings.WordsForTests
 /** The Quick Menu's tile model (see QuickTiles.kt). */
 class QuickTilesTest {
 
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 
@@ -119,7 +119,7 @@ class QuickTilesTest {
 
     @Test
     fun `no rail entry and none of the tiles the review named draws the placeholder`() {
-        // Droidtop/tracker#534: Screenshot, Stop the app in front, Companion screen, Location, Flashlight, Plugins.
+        // mytop-project/tracker#534: Screenshot, Stop the app in front, Companion screen, Location, Flashlight, Plugins.
         assertTrue(QuickSection.entries.none { it.glyph == QuickGlyph.GENERIC })
         listOf(
             GamingSettingsCatalog.ID_SCREENSHOT to QuickGlyph.CAMERA,
@@ -256,7 +256,7 @@ class QuickTilesTest {
     @Test
     fun `the rail has no Game section and shows Plugins only with tiles`() {
         val bare = QuickTiles.visibleSections(hasPlugins = false)
-        // What can be done with the running game is L2's (Droidtop/tracker#740).
+        // What can be done with the running game is L2's (mytop-project/tracker#740).
         assertTrue(QuickSection.entries.none { it.panel == dev.droidtop.library.settings.ControlPanel.GAME })
         assertFalse(QuickSection.PLUGINS in bare)
         val full = QuickTiles.visibleSections(hasPlugins = true)
@@ -267,7 +267,7 @@ class QuickTilesTest {
 
     @Test
     fun `Social is a section of the rail, gone where its place does not open`() {
-        // Owner, 2026-10-24: "Game sources go into the qam, as does social" (Droidtop/tracker#644).
+        // Owner, 2026-10-24: "Game sources go into the qam, as does social" (mytop-project/tracker#644).
         assertTrue(QuickSection.SOCIAL in QuickTiles.visibleSections(hasPlugins = false))
         assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(hasPlugins = false, hasSocial = false))
         assertEquals("Social", QuickSection.SOCIAL.label)
@@ -277,7 +277,7 @@ class QuickTilesTest {
 
     @Test
     fun `Kid and Kiosk sections come from ControlAccess and match Full's, without the restriction's own items`() {
-        // Full's sections less the owner's Profile (Droidtop/tracker#586).
+        // Full's sections less the owner's Profile (mytop-project/tracker#586).
         for (mode in listOf(dev.droidtop.library.settings.UiMode.KID, dev.droidtop.library.settings.UiMode.KIOSK)) {
             assertEquals(
                 QuickTiles.visibleSections(hasPlugins = true) - QuickSection.PROFILE,
@@ -337,7 +337,7 @@ class QuickTilesTest {
                 ids.map { ActionItem(id = it, title = it, run = {}) },
             ),
             // Gaming's own Screen orientation row (Settings) is not the Display tab's: that one follows the mode
-            // droidtop is in (ID_ORIENTATION_HERE, a System row; Droidtop/tracker#571 row 34).
+            // droidtop is in (ID_ORIENTATION_HERE, a System row; mytop-project/tracker#571 row 34).
             CatalogGroup(
                 GamingSettingsCatalog.GROUP_SCREENS, "Screens",
                 listOf(ActionItem(id = GamingSettingsCatalog.ID_ORIENTATION, title = "Screen orientation", run = {})),

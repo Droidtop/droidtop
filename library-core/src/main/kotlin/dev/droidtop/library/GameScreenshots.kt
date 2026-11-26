@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Screenshots filed under the game they were taken in (docs/SPEC.md "The companion's tabs", Screenshots,
- * Droidtop/tracker#596), as Steam's screenshot manager files them: while droidtop knows the running game
+ * mytop-project/tracker#596), as Steam's screenshot manager files them: while droidtop knows the running game
  * ([LaunchDisplay.runningGame]), a shot is also kept in droidtop's own folder for that game, and the game page's
  * media viewer lists them first, newest first. The copy in Pictures/Screenshots stays. Nothing is written into the
  * person's games folders, and the scraper's own screenshot (ES-DE's `screenshots`) is never replaced.

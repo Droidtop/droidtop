@@ -55,7 +55,7 @@ import org.pocketworkstation.pckeyboard.KeyboardSink
 import java.util.Locale
 
 /**
- * The companion's app picker (docs/SPEC.md "The companion's tabs", Apps; Droidtop/tracker#488 item 3): every launchable
+ * The companion's app picker (docs/SPEC.md "The companion's tabs", Apps; mytop-project/tracker#488 item 3): every launchable
  * app, games included, to open on the companion's own screen or on the main one. This is its pure part, tested without a
  * device: what the list shows for a search, with the pinned apps first and then the recent ones.
  */

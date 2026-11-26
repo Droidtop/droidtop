@@ -153,7 +153,7 @@ data class LibraryEntry(
     val sortName: String? = null,
     // Real ES-DE MD_STRING field: what this game sorts by in a list showing a
     // custom collection, before [sortName] (shell-gamepad `sortTitle`,
-    // Droidtop/tracker#766).
+    // mytop-project/tracker#766).
     val collectionSortName: String? = null,
     // Real ES-DE badge "collection" slot data (confirmed against
     // BadgeComponent.cpp's own real SLOT_COLLECTION) -- true when this
@@ -192,7 +192,7 @@ data class LibraryEntry(
     val gameName: String? = null,
     /**
      * The store row this folder is the same game as, or [GameLinks.NOT_THE_SAME] ([GameLinks.sameAs],
-     * Droidtop/tracker#745). A library fact, like [gameName]: no walk writes it.
+     * mytop-project/tracker#745). A library fact, like [gameName]: no walk writes it.
      */
     val sameAs: String? = null,
     /** The store ids a scrape learned for this game, as store keys ([GameLinks.storeIds]). A library fact, like [gameName]. */
@@ -207,7 +207,7 @@ data class LibraryEntry(
      * The version the game's own files declare ([GameFileVersions]: Ren'Py's
      * options.rpy, RPG Maker MV/MZ's package.json), read by the walk that
      * found the folder, and only when the folder's name names no version
-     * (Droidtop/tracker#406). Grouping and update checks compare it where the
+     * (mytop-project/tracker#406). Grouping and update checks compare it where the
      * name is silent ([GameGrouping.Found.filesVersion]); null otherwise.
      */
     val filesVersion: String? = null,
@@ -380,7 +380,7 @@ data class PcInfo(
     val marker: StoreMarker? = null,
     /**
      * The GOG offline installer a folder row is (docs/SPEC.md 7g, "Installers
-     * in a games folder", Droidtop/tracker#405): the row is not installed and
+     * in a games folder", mytop-project/tracker#405): the row is not installed and
      * its primary action takes the game out of the installer. Null for every
      * other row.
      */
@@ -496,7 +496,7 @@ internal fun Map<String, StoreInstall>.forFolder(folder: File): StoreInstall? =
 /**
  * The [StoreInstall] for a detected game [folder]: the stores' own, else, only while the stores have not answered yet
  * ([installsKnown] false, just after start), the store facts the folder's own last record carried ([recorded], by
- * entry id). Droidtop/tracker#891: a walk that ran before the stores answered gave a Steam game's engine entry its
+ * entry id). mytop-project/tracker#891: a walk that ran before the stores answered gave a Steam game's engine entry its
  * install folder's name ("Love  Sex Second Base" for "Love & Sex: Second Base"); it was scraped by that name and
  * stopped being the store's card until a later walk put it back. Only a record that came from a store (it has a store
  * id) carries any. Once the stores have answered their list decides, so a game no store has any more keeps none.
@@ -650,7 +650,7 @@ object LibraryKinds {
 
     /**
      * What "Rescan PC game folders" walks (docs/SPEC.md 7j "Places",
-     * Droidtop/tracker#397 slice E): every game that is not a console ROM,
+     * mytop-project/tracker#397 slice E): every game that is not a console ROM,
      * so the PC and engine walks run and the ROM walk does not.
      */
     val PC_GAMES: Set<LibraryEntryKind> = GAMES - LibraryEntryKind.CONSOLE_ROM
@@ -674,7 +674,7 @@ fun LibraryEntry.kindLine(): String = genre?.let(GenreWords::withoutDescriptors)
 /**
  * What a genre line may hold. Steam lists its content descriptors among a game's genres, and a game scraped before
  * they were dropped ([dev.droidtop.library.scraper.SteamStoreClient.genres]) still has them stored, so the line under
- * a card leaves them out too (Droidtop/tracker#756). Pure.
+ * a card leaves them out too (mytop-project/tracker#756). Pure.
  */
 object GenreWords {
     /** Steam's genre ids for its content descriptors: sexual content, nudity, violence, gore. */
@@ -896,7 +896,7 @@ sealed interface LaunchResult {
 
     /**
      * A store's game that is not installed: nothing to start. A surface that has the game's page opens it, where
-     * Install is (Droidtop/tracker#563, rig, build 2011: a Quick launch widget did nothing visible).
+     * Install is (mytop-project/tracker#563, rig, build 2011: a Quick launch widget did nothing visible).
      */
     data class NeedsInstall(val entryId: String, val title: String) : LaunchResult
 }
@@ -907,7 +907,7 @@ fun LibraryEntry.needsInstall(): Boolean =
 
 /**
  * What [LibraryProvider.quit] did to the running game, for the Quick
- * Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82). A sealed
+ * Menu's Game tab (docs/SPEC.md, mytop-project/tracker#82). A sealed
  * outcome, not a boolean: a quit that "succeeded" but left the emulator
  * alive (the Android 13 case -- the process and its Recents task were
  * still there after Quit, while droidtop had already dropped its own
@@ -1189,7 +1189,7 @@ class Library(
         val normalized = { files: Collection<File> -> files.map { File(it.absolutePath.trimEnd('/')) }.distinct() }
         val reported = (normalized(added) + normalized(changed)).distinct()
         val removedPaths = normalized(removed)
-        // Each path is looked at once (Droidtop/tracker#766: it was three times), in the same order as before.
+        // Each path is looked at once (mytop-project/tracker#766: it was three times), in the same order as before.
         val present = (reported + removedPaths).distinct().associateWith { it.exists() }
         val gone = (removedPaths + reported).distinct().filter { present[it] == false }
         val stillThere = present.filterValues { it }.keys.toList()
@@ -1470,7 +1470,7 @@ class Library(
 
     /**
      * The mirror [picked] (one of [pickedFrom]) in a copy of [source]'s record [externalId] asked of the source now, for
-     * a pick with no address: a saved record's token goes stale when the source's page changes (Droidtop/tracker#599).
+     * a pick with no address: a saved record's token goes stale when the source's page changes (mytop-project/tracker#599).
      * Null when the source cannot answer (droidtop's saved copy never stands in here) or no longer lists the mirror.
      */
     suspend fun freshDownload(
@@ -1495,7 +1495,7 @@ class Library(
         runCatching { updateSources.signedOut(source) }.getOrDefault(false)
     }
 
-    /** Whether [source]'s site waits for the person to pass its browser check (docs/SPEC.md 12a, Droidtop/tracker#600). */
+    /** Whether [source]'s site waits for the person to pass its browser check (docs/SPEC.md 12a, mytop-project/tracker#600). */
     suspend fun sourceNeedsCheck(source: String): Boolean = withContext(Dispatchers.IO) {
         runCatching { updateSources.needsCheck(source) }.getOrDefault(false)
     }
@@ -1521,7 +1521,7 @@ class Library(
 
     /**
      * Opens the download link [url] of [source]'s record in droidtop's web view; what the person downloads there is
-     * placed as a new version folder beside [newest] (docs/SPEC.md 7g, "Getting an update"; Droidtop/tracker#599).
+     * placed as a new version folder beside [newest] (docs/SPEC.md 7g, "Getting an update"; mytop-project/tracker#599).
      */
     suspend fun openUpdateLink(
         source: String,
@@ -1537,7 +1537,7 @@ class Library(
             .getOrElse { it.message ?: "The download failed" }
     }
 
-    /** Open thread (Droidtop/tracker#862): [source]'s page for [externalId], where what the person starts is placed. */
+    /** Open thread (mytop-project/tracker#862): [source]'s page for [externalId], where what the person starts is placed. */
     suspend fun openUpdateThread(
         source: String,
         externalId: String,
@@ -2080,7 +2080,7 @@ class Library(
 
     /**
      * [folders] (a game that is folders on this device) is the same game as the store row [store]
-     * (docs/SPEC.md 7m, "A store's copy and a local copy", Droidtop/tracker#745): one card from now on, with both
+     * (docs/SPEC.md 7m, "A store's copy and a local copy", mytop-project/tracker#745): one card from now on, with both
      * copies, each keeping its own install, version and update source. Undone by [unlinkFromStore]. What belongs to
      * the game follows the link as [mergeGames] carries it: play history and the favourite move to the entry the
      * card draws, and scraped metadata is copied into an empty place. Each copy keeps its own save rule.
@@ -2141,7 +2141,7 @@ class Library(
      * [PlayHistoryRecord]'s own doc comment): the launch was at least
      * successfully dispatched.
      */
-    /** The launch log's starts within its window (Droidtop/tracker#611): Home's time-of-day row reads it. Disk: IO only. */
+    /** The launch log's starts within its window (mytop-project/tracker#611): Home's time-of-day row reads it. Disk: IO only. */
     suspend fun recentStarts(nowMs: Long = System.currentTimeMillis()): List<PlayStart> =
         withContext(Dispatchers.IO) { playHistory.startsSince(nowMs - PlayStarts.KEEP_MS) }
 
@@ -2174,7 +2174,7 @@ class Library(
             changedFactIds += entry.id
             // The play just recorded is a fact the lists the shell is
             // already showing read -- the detail's "Played" label
-            // (Droidtop/tracker#82). Publish it now, or the label keeps
+            // (mytop-project/tracker#82). Publish it now, or the label keeps
             // its pre-launch "Never played" until some unrelated walk
             // republishes.
             republish()
@@ -2185,7 +2185,7 @@ class Library(
      * Dispatches [LibraryProvider.quit] for whichever provider owns
      * [entry]'s kind -- the Quick Menu Game tab's one route to "end this
      * game," never a second per-kind switch here (docs/SPEC.md,
-     * Droidtop/tracker#82). Returns the real outcome, not a boolean, so
+     * mytop-project/tracker#82). Returns the real outcome, not a boolean, so
      * a quit that left the emulator running surfaces honestly in the
      * row's subtitle instead of being reported as a success.
      */
@@ -2197,8 +2197,8 @@ class Library(
      * Quit for the running game, the one path every Quit control takes (the Quick Menu's Game section, the
      * companion's Now card): the app in front is the one droidtop last started (LaunchLedger, noted at the
      * one dispatch point), whatever kind of entry it was, and the task manager's one close path ends it
-     * (Droidtop/tracker#245); with nothing in the ledger the entry's own provider tries ([quit]). Only a
-     * confirmed end clears droidtop's running-game state (Droidtop/tracker#82): a quit that left the
+     * (mytop-project/tracker#245); with nothing in the ledger the entry's own provider tries ([quit]). Only a
+     * confirmed end clears droidtop's running-game state (mytop-project/tracker#82): a quit that left the
      * emulator alive must not make anything read "the game ended".
      */
     suspend fun quitRunning(context: android.content.Context, entry: LibraryEntry): QuitResult =
@@ -2227,7 +2227,7 @@ class Library(
 
     /**
      * Kill for the running game (the Quick Menu's Kill pill, the companion's Kill row): force-stopped at once, never
-     * the gentler steps Quit tries first (Droidtop/tracker#571 row 16; the owner: "kill should immediately force-stop
+     * the gentler steps Quit tries first (mytop-project/tracker#571 row 16; the owner: "kill should immediately force-stop
      * it"). droidtop's own Windows screen ends its guest immediately either way. With nothing in the ledger droidtop
      * does not know which app to stop, and says to use Quit.
      */
@@ -2252,7 +2252,7 @@ class Library(
 
     /**
      * [quitRunning] for the game droidtop believes is running, for a caller that holds no entry (the play-time
-     * limit, Droidtop/tracker#421): the entry is looked up by the running session's game id. Null when nothing is running.
+     * limit, mytop-project/tracker#421): the entry is looked up by the running session's game id. Null when nothing is running.
      */
     suspend fun quitRunningGame(context: android.content.Context): QuitResult? {
         val id = LaunchDisplay.running.value?.context?.gameId ?: return null
@@ -2369,7 +2369,7 @@ class Library(
      */
     /**
      * Saves [entry]'s edited [metadata] and returns the entry as the list reads it now, for the screen holding the list
-     * to put in place at once (Droidtop/tracker#766: a Sort name was saved, and the list kept the entry it had loaded
+     * to put in place at once (mytop-project/tracker#766: a Sort name was saved, and the list kept the entry it had loaded
      * until a rescan). Null when [entry]'s kind keeps no metadata.
      */
     suspend fun saveMetadata(

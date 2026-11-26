@@ -1,12 +1,12 @@
 name: Emulator tests
 
-# The on-device tests, run (Droidtop/tracker#735): the x86_64 debug build and its test APK from one android-build run
+# The on-device tests, run (mytop-project/tracker#735): the x86_64 debug build and its test APK from one android-build run
 # on an Android emulator, with the rig tests that make sense on a stock emulator and a start-up check
 # (scripts/emulator-tests.sh). Nightly, by hand (optionally for a given android-build run), and when this workflow,
 # its script or the tests change. It tests the APKs android-build already made, so it does not build droidtop a
 # second time. Which build: a push tests the build of the SAME commit (waiting for it, or starting it: ci/ branches are not
 # built on push), main's nightly and by-hand runs test main's latest successful build, and another commit's build is
-# never the fallback (scripts/emulator-build.py; a batch that tested main's build never tested its own change). The emulator is started the way Droidtop/enginehost's conformance-emulator.yml starts its own.
+# never the fallback (scripts/emulator-build.py; a batch that tested main's build never tested its own change). The emulator is started the way mytop-project/enginehost's conformance-emulator.yml starts its own.
 on:
   schedule:
     - cron: "17 4 * * *"
@@ -129,7 +129,7 @@ jobs:
           api-level: ${{ matrix.api-level }}
           # The plain AOSP image: Google Play services' processes come and go on an emulator and Android kills every
           # app process using one of their providers when they do (the same finding as conformance-emulator.yml in
-          # Droidtop/enginehost, run 40834905579).
+          # mytop-project/enginehost, run 40834905579).
           target: default
           arch: x86_64
           disable-animations: true

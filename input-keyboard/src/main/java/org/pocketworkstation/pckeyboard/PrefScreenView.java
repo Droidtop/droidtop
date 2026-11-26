@@ -47,7 +47,7 @@ public class PrefScreenView extends PreferenceActivity
     }
 
     /**
-     * droidtop (Droidtop/tracker#903 H12b): "Light and dark" applies to Modern, Dynamic and High contrast. A classic
+     * droidtop (mytop-project/tracker#903 H12b): "Light and dark" applies to Modern, Dynamic and High contrast. A classic
      * theme keeps its fixed look and Match droidtop follows droidtop, so the row is off for them, and says so.
      */
     private void updateLightDark() {

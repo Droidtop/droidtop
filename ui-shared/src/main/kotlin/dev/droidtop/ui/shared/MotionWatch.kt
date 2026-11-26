@@ -9,7 +9,7 @@ import android.provider.Settings
 /**
  * Keeps [Motion] told of Android's animator duration scale for the whole process, so every host that draws droidtop's
  * motion (Gaming, the companion, Standard's settings, the screen host) degrades to instant when the person turns on
- * "Remove animations" (Droidtop/tracker#643: "Respect Android's 'remove animations' setting: everything degrades to
+ * "Remove animations" (mytop-project/tracker#643: "Respect Android's 'remove animations' setting: everything degrades to
  * instant"). One settings observer on a thread of its own, installed once by the application; the read never runs on
  * the main thread.
  */

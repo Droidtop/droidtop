@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The stored Gaming theme colours (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#827). */
+/** The stored Gaming theme colours (docs/SPEC.md 7k, "Colours outside Gaming"; mytop-project/tracker#827). */
 class ThemeColorStoreTest {
     private val key = ThemeColorStore.Key(
         theme = "es-de-decaffe", colorScheme = null, variant = "grid", aspectRatio = null, light = false, highContrast = false,

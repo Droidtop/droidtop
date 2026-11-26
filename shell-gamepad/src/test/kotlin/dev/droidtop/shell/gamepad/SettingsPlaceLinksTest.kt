@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which Settings rows a place keeps (docs/SPEC.md 7j "Places", Droidtop/tracker#759). */
+/** Which Settings rows a place keeps (docs/SPEC.md 7j "Places", mytop-project/tracker#759). */
 class SettingsPlaceLinksTest {
     @Test
     fun `a place off the left menu keeps its Settings row, a place the menu leads to does not`() {
@@ -17,7 +17,7 @@ class SettingsPlaceLinksTest {
         assertFalse("Plugins is in the Quick Menu, not the left menu: Settings is a way in", Place.ID_PLUGINS in hidden)
         assertFalse(Place.ID_SOCIAL in hidden)
         assertFalse(Place.ID_STORES in hidden)
-        assertTrue("Updates is a row of the left menu (Droidtop/tracker#792)", Place.ID_UPDATES in hidden)
+        assertTrue("Updates is a row of the left menu (mytop-project/tracker#792)", Place.ID_UPDATES in hidden)
     }
 
     @Test

@@ -15,7 +15,7 @@ import dev.droidtop.runtime.CompanionSheet
 import dev.droidtop.shell.standard.BackButtonMenu
 
 /**
- * The Companion widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): the Quick Menu's companion and
+ * The Companion widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): the Quick Menu's companion and
  * screen actions on any launcher's page. With one screen it opens the companion as a pull-down sheet
  * ([CompanionSheet]); with a second screen holding the companion it turns that screen back on
  * ([CompanionPrefs.requestWake], through [WAKE], a broadcast to this provider, as no screen of droidtop's is needed for

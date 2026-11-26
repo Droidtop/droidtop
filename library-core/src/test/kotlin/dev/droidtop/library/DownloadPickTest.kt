@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** droidtop's own pick among a record's downloads (Droidtop/tracker#838). */
+/** droidtop's own pick among a record's downloads (mytop-project/tracker#838). */
 class DownloadPickTest {
     private fun d(section: String, host: String, systems: List<String>, role: String = "build", official: Boolean = true) =
         UpdateSources.Download(section, host, host, "", "https://$host.example/$section/${systems.joinToString()}", systems, role = role, official = official)

@@ -20,7 +20,7 @@ import android.view.MotionEvent
  *
  * The layout a physical keyboard types in is the keymap host-bridge gives
  * its layout keyboard, compiled in the container from the person's
- * "Keyboard layout" setting (docs/SPEC.md 6b, Droidtop/tracker#387), not a
+ * "Keyboard layout" setting (docs/SPEC.md 6b, mytop-project/tracker#387), not a
  * bigger table here: a compensating table would be the second mapping
  * mechanism this design exists to avoid.
  */

@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 /**
- * Waiting for a process another app runs for droidtop, Shizuku's `ShizukuRemoteProcess` (Droidtop/tracker#412).
+ * Waiting for a process another app runs for droidtop, Shizuku's `ShizukuRemoteProcess` (mytop-project/tracker#412).
  *
  * `Process.waitFor(timeout, unit)` is not overridden there, so Java's default runs: it polls `exitValue()` and takes
  * only an `IllegalThreadStateException` as "still running". The remote process's `exitValue()` throws that in

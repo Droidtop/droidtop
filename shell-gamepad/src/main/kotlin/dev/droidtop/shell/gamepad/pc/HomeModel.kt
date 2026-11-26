@@ -6,7 +6,7 @@ import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.shell.gamepad.query.addedEpochMs
 
 /*
- * Home's strip (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a, final design B.2): What's new, Friends and
+ * Home's strip (docs/SPEC.md 7i, "Home"; mytop-project/tracker#485 F7a, final design B.2): What's new, Friends and
  * Downloads under Recent games, stepped with L1/R1, each a row of cards. Everything here is pure and works on
  * what the shell already holds in memory (the library flow, the jobs, the friends), so the model is built off
  * the main thread in time linear in the library, and a JVM test holds it to its rules.
@@ -69,7 +69,7 @@ internal sealed interface HomeCard {
     /**
      * A download that is running or paused: its bar ([percent], moving as [look] says) over the Downloads place's own
      * line for it ([said]: "About 8 min left", "Paused"), never a percent that changes with each report
-     * (Droidtop/tracker#643). Opens the job.
+     * (mytop-project/tracker#643). Opens the job.
      */
     data class Download(
         val jobId: String,
@@ -117,7 +117,7 @@ internal sealed interface AttentionTarget {
 
 internal object HomeModel {
     /**
-     * Home's Random game (Droidtop/tracker#507): one of [entries] picked at random, hidden ones and repeats of one
+     * Home's Random game (mytop-project/tracker#507): one of [entries] picked at random, hidden ones and repeats of one
      * id left out, so a game listed twice is not twice as likely. Null when there is none.
      */
     fun randomGame(entries: List<LibraryEntry>, random: kotlin.random.Random = kotlin.random.Random.Default): LibraryEntry? =

@@ -22,7 +22,7 @@ const val PLUGIN_MANIFEST_CONTRACT_VERSION = 3
 
 /**
  * The oldest manifest contract this build installs or runs. Contract 1 (capabilities only, no permissions, run with
- * full access) is no longer served (Droidtop/tracker#766): a contract 1 manifest is refused at install, and one already
+ * full access) is no longer served (mytop-project/tracker#766): a contract 1 manifest is refused at install, and one already
  * installed is never called and shows that it needs an update ([PluginTiers.refusal]).
  */
 const val PLUGIN_MANIFEST_MIN_CONTRACT_VERSION = 2
@@ -124,7 +124,7 @@ data class PluginManifest(
      * them and is refused ([PLUGIN_MANIFEST_MIN_CONTRACT_VERSION]).
      */
     val v2: V2Declarations = V2Declarations.EMPTY,
-    /** Summary, publisher, home page, category, icon and screenshots ([PluginPresentation], Droidtop/tracker#521 item 2). */
+    /** Summary, publisher, home page, category, icon and screenshots ([PluginPresentation], mytop-project/tracker#521 item 2). */
     val presentation: PluginPresentation = PluginPresentation(),
     /** For [PluginKind.APP_INTERFACE] only: the app that is the plugin, and the service droidtop binds (docs/plugin-api.md 1.3). */
     val app: AppTarget? = null,
@@ -266,7 +266,7 @@ data class PluginManifest(
             add("native bundle ships a .so but declares abis=$abis, not both $REQUIRED_ABIS")
         }
         // An app interface is an Android app: its id follows Android's package-name rules ("dev.enginehost.app"), and its
-        // app's package and signature are what droidtop checks (Droidtop/tracker#547). A bundle's stays "<origin>.<name>".
+        // app's package and signature are what droidtop checks (mytop-project/tracker#547). A bundle's stays "<origin>.<name>".
         if (kind == PluginKind.APP_INTERFACE) {
             if (!AppTarget.isPackageName(id)) {
                 add("id \"$id\" must be an Android package-style name: segments of letters, digits and underscores, each starting with a letter")

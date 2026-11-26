@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The rules for names and sizes of transferred files (docs/SPEC.md, "Type from another device", file transfer, Droidtop/tracker#645). */
+/** The rules for names and sizes of transferred files (docs/SPEC.md, "Type from another device", file transfer, mytop-project/tracker#645). */
 class FileNamesTest {
     @Test
     fun `a name keeps only its last part, whatever separator the phone used`() {

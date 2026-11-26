@@ -15,7 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The device-setup items as Settings rows (docs/SPEC.md "Device setup", Droidtop/tracker#816): each asks first and
+ * The device-setup items as Settings rows (docs/SPEC.md "Device setup", mytop-project/tracker#816): each asks first and
  * runs on the one privileged shell, and one droidtop made offers its undo, asked the same way. Reads the device
  * through the shell: build off the main thread.
  */

@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Accounts and sources > Keys and accounts (docs/SPEC.md "Accounts and sources", Droidtop/tracker#12; the
+ * Settings > Accounts and sources > Keys and accounts (docs/SPEC.md "Accounts and sources", mytop-project/tracker#12; the
  * owner, 2026-10-28: "Add one 'Keys and accounts' page under Settings > Accounts and sources. It lists every key and
  * token droidtop holds, where each is used, and a Remove. Each service's own page keeps its row."). One row per key or
  * sign-in droidtop holds, saying where it is used; pressing it removes it after a question, through the same code its

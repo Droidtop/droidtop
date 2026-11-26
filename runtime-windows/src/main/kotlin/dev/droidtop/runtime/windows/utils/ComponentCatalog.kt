@@ -15,7 +15,7 @@ import timber.log.Timber
  * DXVK, VKD3D, FEXCore, Box64/WowBox64 and Adreno driver build the Windows
  * runtime can offer, and every base-system file it fetches, each with the
  * SHA-256 its download is checked against. Published daily by
- * Droidtop/droidtop-components (its sources/feeds.json and mirror.json say
+ * mytop-project/droidtop-components (its sources/feeds.json and mirror.json say
  * where each one comes from), replacing GameNative's component list and
  * download host. Read in the shape GameNative's manifest had
  * ([ManifestData]), so [ComponentRequests] and the option lists use it as
@@ -37,7 +37,7 @@ object ComponentCatalog {
     const val SOURCE_MIRROR = "mirror"
     const val ENGINE_BIONIC = "bionic"
 
-    private const val RELEASES = "https://github.com/Droidtop/droidtop-components/releases/download/"
+    private const val RELEASES = "https://github.com/mytop-project/droidtop-components/releases/download/"
     const val CATALOG_URL = RELEASES + "catalog/catalog.json"
     private const val SIGNATURE_URL = RELEASES + "catalog/" + CatalogSignature.SIGNATURE_FILE
 

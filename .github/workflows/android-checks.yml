@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
 
 # Nothing here publishes or pushes; Gradle and the vendor builds get a
-# read-only token (Droidtop/enginehost docs/security/2026-09-24-ci-supply-chain.md).
+# read-only token (mytop-project/enginehost docs/security/2026-09-24-ci-supply-chain.md).
 permissions:
   contents: read
 
@@ -38,7 +38,7 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     env:
-      # Compose compiler reports for every Gradle run in this job (Droidtop/tracker#941). Lint compiles the main sources
+      # Compose compiler reports for every Gradle run in this job (mytop-project/tracker#941). Lint compiles the main sources
       # first; with the flag only on the test step those compiles were up to date and wrote no report.
       ORG_GRADLE_PROJECT_composeReports: "true"
     steps:
@@ -97,14 +97,14 @@ jobs:
         run: ./gradlew :app:lintDebug --stacktrace
 
       - name: Lint summary
-        # The lint report is an artifact; this is what it holds, as lines a log can show (Droidtop/tracker#734):
+        # The lint report is an artifact; this is what it holds, as lines a log can show (mytop-project/tracker#734):
         # the findings per id and source tree, and where the ones in code droidtop writes are.
         if: ${{ !cancelled() }}
         run: python3 -I scripts/lint-summary.py app/build/reports/lint-results-debug.xml
 
       - name: One Compose version across modules
         # A module compiled against another Compose than the app ships dies at runtime with NoSuchMethodError
-        # (Droidtop/tracker#566: the plugin page's FlowRow). The root build's checkComposeVersions compares every
+        # (mytop-project/tracker#566: the plugin page's FlowRow). The root build's checkComposeVersions compares every
         # module's compile classpath with the app's release runtime.
         if: ${{ !cancelled() }}
         run: ./gradlew checkComposeVersions --stacktrace
@@ -124,7 +124,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Every module with tests is run below
-        # Droidtop/tracker#730: :net-core, the one download engine, had ten test files and was not in the list
+        # mytop-project/tracker#730: :net-core, the one download engine, had ten test files and was not in the list
         # below, so a regression in it would have shipped green. A module with a src/test tree that the
         # next step does not run fails here, naming it.
         if: always()
@@ -161,7 +161,7 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest :shell-default:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :input-japanese:testDebugUnitTest :input-chinese:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :sandbox-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest :shell-desktop:testDebugUnitTest :runtime-linux-root:testDebugUnitTest --stacktrace
 
       - name: Compose stability
-        # Droidtop/tracker#941: how many composables can skip when their inputs are unchanged, and how many classes
+        # mytop-project/tracker#941: how many composables can skip when their inputs are unchanged, and how many classes
         # Compose counts as unstable, per module, from the reports the test build above wrote (-PcomposeReports). A
         # composable that can't skip redraws with its parent, so the totals are the redraw cost as a number per build.
         if: always()
@@ -196,7 +196,7 @@ jobs:
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
       - name: host-bridge pixel swizzle
-        # The desktop frame's B/R swap (host-bridge/native/src/pixel_swizzle.h, Droidtop/tracker#950): the SSSE3 and the
+        # The desktop frame's B/R swap (host-bridge/native/src/pixel_swizzle.h, mytop-project/tracker#950): the SSSE3 and the
         # plain path against the reference, on the runner.
         if: always()
         run: |
@@ -206,12 +206,12 @@ jobs:
           done
 
       - name: Plugin conformance (python fixture)
-        # docs/plugin-api.md 3 I2 (Droidtop/tracker#71): the python kind's fixture through the same
+        # docs/plugin-api.md 3 I2 (mytop-project/tracker#71): the python kind's fixture through the same
         # conformance cases the native fixture passes in :plugin-host-testing's ConformanceTest.
         if: always()
         run: python3 -I plugin-host-testing/python/droidtop_fake_host.py plugin-host-testing/src/test/fixtures/python
       - name: Desktop-mode plugin fixture (python)
-        # docs/plugin-api.md 1.12 (Droidtop/tracker#221): the Desktop fixture's plugin.py against each Desktop hook;
+        # docs/plugin-api.md 1.12 (mytop-project/tracker#221): the Desktop fixture's plugin.py against each Desktop hook;
         # DesktopFixtureTest checks droidtop's side of the same hooks.
         if: always()
         run: python3 -I plugin-host-testing/python/desktop_fixture_check.py

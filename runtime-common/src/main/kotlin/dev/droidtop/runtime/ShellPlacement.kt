@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Where the shell (Gaming and Desktop's MainActivity) belongs, so it starts there once rather than twice
- * (Droidtop/tracker#824). A Home press in a fresh process knew nothing of the screens, started the shell on the
+ * (mytop-project/tracker#824). A Home press in a fresh process knew nothing of the screens, started the shell on the
  * built-in screen, and the screen placement then moved it to the second screen with a second start 0.5 s later, over
  * whatever the first start had opened (What's new, on the console: "I don't have a "what's new" splash").
  *

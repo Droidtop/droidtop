@@ -19,7 +19,7 @@ internal object SteamPics {
      * file), which is read here. Null when Steam sent none (a missing access token, or the file could not be read),
      * so the caller stores nothing and asks again on the next sync. Before this, such answers were stored as rows
      * with no name and no type, marked read at Steam's change number and never asked for again: on the console,
-     * 1,150 of the 1,436 games Steam lists as owned, so the library listed 272 (Droidtop/tracker#956).
+     * 1,150 of the 1,436 games Steam lists as owned, so the library listed 272 (mytop-project/tracker#956).
      * Blocking: off the main thread.
      */
     fun keyValuesOf(info: PICSProductInfo, fetch: (String) -> ByteArray = ::fetchAppInfo): KeyValue? {

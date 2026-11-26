@@ -13,7 +13,7 @@ import org.w3c.dom.Element
 
 /**
  * A plugin's `SharedPreferences`, droidtop's own in every plugin process (docs/plugin-api.md 5.3, "Preferences and
- * SQLite are droidtop's", Droidtop/tracker#741). Android's own `getSharedPreferences` first asks the user service whether
+ * SQLite are droidtop's", mytop-project/tracker#741). Android's own `getSharedPreferences` first asks the user service whether
  * storage is unlocked, which an isolated process cannot reach, and what a plugin gets must never depend on the Android
  * it runs on (the owner, 2026-10-29: "Android updates can't be allowed to affect this"). So this is the whole store: a
  * map in memory and one file per name, written in Android's own XML format, so a plugin's settings read the same in

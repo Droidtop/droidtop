@@ -23,7 +23,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * The person's Steam account for plugins (docs/plugin-api.md 3 G8, Droidtop/tracker#379), on the session droidtop's
+ * The person's Steam account for plugins (docs/plugin-api.md 3 G8, mytop-project/tracker#379), on the session droidtop's
  * Steam store already holds: the client connection for product changes, product info, free app licences and the games
  * shown as played (`SteamApps`), and Steam's store pages with the web session droidtop makes for its own web view
  * ([SteamStore.webSession]) for free packages and product keys, the way ArchiSteamFarm does both. The broker's

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * A mode never opens another (docs/SPEC.md 2c, "A mode never opens another"; owner, 2026-10-24, Droidtop/tracker#639:
+ * A mode never opens another (docs/SPEC.md 2c, "A mode never opens another"; owner, 2026-10-24, mytop-project/tracker#639:
  * "while sections can share code, we absolutely should NOT be seeing jumps between modes"). Every place in droidtop's
  * own sources that starts, or builds the intent for, a mode's own screen (MainActivity, Standard's games screen, the
  * Android home screen, a named mode) is listed here with why it may: the person's own switch, an entry from outside

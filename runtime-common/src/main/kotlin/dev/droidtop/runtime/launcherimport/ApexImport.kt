@@ -3,7 +3,7 @@ package dev.droidtop.runtime.launcherimport
 import dev.droidtop.runtime.HomeAction
 
 /**
- * An Apex Launcher backup as an [ImportPlan] (Droidtop/tracker#564; format in the tracker's
+ * An Apex Launcher backup as an [ImportPlan] (mytop-project/tracker#564; format in the tracker's
  * coordination/standard/launcher-import-formats.md, read from Apex 4.9.20): the Launcher3 database (pages from
  * `workspaceScreens`), the preferences, and Pro's drawer folders and per-icon swipe actions when the backup has them.
  * Columns and keys are read by presence, so other versions read alike. Pure.

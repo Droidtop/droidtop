@@ -21,7 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * The companion's one question (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 S2a, rule 8: "through the
+ * The companion's one question (docs/SPEC.md "The companion's tabs", mytop-project/tracker#786 S2a, rule 8: "through the
  * one dialog with the safe choice first"): the question naming what it acts on, then the safe answer first and large,
  * the action well apart from it. Drawn in place where it was asked, not as a window: the companion is touch-only
  * (`FLAG_NOT_FOCUSABLE`), and a dialog window of its own would take the focus, and with it the pad, off the game on
@@ -49,7 +49,7 @@ internal fun CompanionAsk(
         Text(question, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         // Both answers are weighted, the safe one wider. The action was sized "at least 120dp", and its button fills
         // its width, so the Row measured it first at the whole row and Keep playing got none: the console showed a
-        // question with only "Quit" under it and no way back (Droidtop/tracker#835, capture of 2026-10-30).
+        // question with only "Quit" under it and no way back (mytop-project/tracker#835, capture of 2026-10-30).
         Row(horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             AskButton(safe, primary = true, modifier = Modifier.weight(SAFE_WEIGHT), onClick = onSafe)
             AskButton(action, primary = false, modifier = Modifier.weight(1f), onClick = onAction)

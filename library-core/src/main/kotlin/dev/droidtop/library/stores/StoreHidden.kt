@@ -6,7 +6,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A store's own hidden-games list as droidtop's Hidden (docs/SPEC.md 7g,
- * "Collections", Droidtop/tracker#402): a game the person hid in Steam is
+ * "Collections", mytop-project/tracker#402): a game the person hid in Steam is
  * hidden here too, through the one Hidden rule every list already follows
  * (the `hidden` field of the game's `game_metadata` row, §7j).
  *

@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A theme's all-capitals font never reaches the roles that carry data (Droidtop/tracker#532). */
+/** A theme's all-capitals font never reaches the roles that carry data (mytop-project/tracker#532). */
 class GamingThemeFontTest {
     private val proportional = mapOf('i' to 4f, 'm' to 12f)
 

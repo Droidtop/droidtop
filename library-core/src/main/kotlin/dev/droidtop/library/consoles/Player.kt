@@ -40,7 +40,7 @@ sealed interface Player {
          * storage access ([launchTemplateFor]). Optional data in the
          * players database (`storagePathTemplate`); null leaves the preset on
          * [argumentsTemplate] always. A plain path never depends on how much of a
-         * content URI the emulator's own file helper reads (Droidtop/tracker#270).
+         * content URI the emulator's own file helper reads (mytop-project/tracker#270).
          */
         val storagePathTemplate: String? = null,
     ) : Player

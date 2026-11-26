@@ -9,7 +9,7 @@ import org.json.JSONObject
 /** One game's play: its name and system as they were when it was played, all its time, and its last two weeks by day. */
 data class GamePlay(val title: String, val system: String?, val totalSeconds: Long, val days: Map<Long, Long>)
 
-/** What the "Your play" page says (docs/SPEC.md 7f, "Your play", Droidtop/tracker#597). */
+/** What the "Your play" page says (docs/SPEC.md 7f, "Your play", mytop-project/tracker#597). */
 data class PlaySummary(
     val weekSeconds: Long,
     val allTimeSeconds: Long,
@@ -20,7 +20,7 @@ data class PlaySummary(
 )
 
 /**
- * Play time per game, in every mode (docs/SPEC.md 7f, "Your play", Droidtop/tracker#597): Kid mode's ledger
+ * Play time per game, in every mode (docs/SPEC.md 7f, "Your play", mytop-project/tracker#597): Kid mode's ledger
  * ([PlayTimePrefs]) counts all play together, and only in Kid, for its limits; this is the person's own record,
  * written by the same watcher (`PlayTimeLimiter` in `:app`) for each session droidtop started. Pure parts here, the
  * file in [PlayLogStore].
@@ -99,7 +99,7 @@ object PlayLogStore {
     }
 }
 
-/** The "Your play" page (docs/SPEC.md 7f, Droidtop/tracker#597): this week, all time, the most played, per system. */
+/** The "Your play" page (docs/SPEC.md 7f, mytop-project/tracker#597): this week, all time, the most played, per system. */
 object PlaySummaryScreen {
     const val ID_LINK = "pref_your_play"
 

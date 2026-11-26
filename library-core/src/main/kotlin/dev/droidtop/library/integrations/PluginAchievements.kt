@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Achievements from plugins (docs/plugin-api.md 3 A8, `achievements.provider@1`; Droidtop/tracker#143 restore plan d):
+ * Achievements from plugins (docs/plugin-api.md 3 A8, `achievements.provider@1`; mytop-project/tracker#143 restore plan d):
  * the same Achievements row and page RetroAchievements and the stores fill, for a game neither covers. A provider
  * answers `set {entry}` with the game's achievements and `progress {entry}` with the ones the person earned; the first
  * provider with any is shown. A provider learns the game's title, system and store id, never a folder on the device.

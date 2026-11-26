@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /*
- * Cloud saves of a store's games (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313),
+ * Cloud saves of a store's games (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313),
  * and the same seam for the person's paired computers (docs/SPEC.md 7o,
  * [dev.droidtop.library.computers.ComputerSaves]): one launch path, two save
  * sources.
@@ -25,7 +25,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * into the game's Wine prefix before the game starts and back after it ends,
  * and the paired computers are synced after it, so the store's copy and the
  * agent's are compared too; a difference is asked, never decided
- * (Droidtop/tracker#814).
+ * (mytop-project/tracker#814).
  * The store knows the cloud; where the prefix is comes from the Windows
  * runtime through [WinePrefixLocator], an interface so the store never
  * depends on a runtime's classes (the runtime is being moved out of
@@ -48,7 +48,7 @@ enum class SaveSyncPhase { BEFORE_LAUNCH, AFTER_EXIT, MANUAL }
 data class SaveSide(val timestampMs: Long, val files: Int, val bytes: Long, val device: String? = null)
 
 /**
- * Both sides changed since they last matched; the person picks which one wins (the owner, Droidtop/tracker#814: "for
+ * Both sides changed since they last matched; the person picks which one wins (the owner, mytop-project/tracker#814: "for
  * saves, nobody 'wins' ... We ask the user"). [cloudLabel] names the other side: a store's cloud, or a paired computer
  * when [computer]. [kept]: the side that is replaced is kept as a copy that can be brought back.
  */
@@ -146,7 +146,7 @@ object StoreSaves {
                 ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
         }
         // The paired computers, after the store's cloud: this device then holds the store's copy, so a computer whose
-        // copy differs is the same question, with this device's side named as the store's too (Droidtop/tracker#814).
+        // copy differs is the same question, with this device's side named as the store's too (mytop-project/tracker#814).
         // A store sync that failed or waits for the person's pick leaves the computers for the next sync.
         if (!hasComputers || fromStore?.failed == true || fromStore?.unresolved == true) return@withContext fromStore
         val localLabel = if (store != null && fromStore != null) "This device and ${store.label}" else null
@@ -170,7 +170,7 @@ object StoreSaves {
     }
 
     /** Where [entryId]'s saves are synced: the folder droidtop gives Enginehost for it, else the Wine runtime's prefix. */
-    /** The kept copies of [entryId]'s saves a settled conflict left (Droidtop/tracker#822), newest first. Off the main thread. */
+    /** The kept copies of [entryId]'s saves a settled conflict left (mytop-project/tracker#822), newest first. Off the main thread. */
     suspend fun keptCopies(context: Context, entryId: String): List<ComputerSaves.KeptCopy> = withContext(Dispatchers.IO) {
         if (Computers.list(context).isEmpty()) emptyList() else runCatching { ComputerSaves.keptCopies(context, entryId) }.getOrDefault(emptyList())
     }

@@ -8,7 +8,7 @@ import java.time.Instant
 
 /**
  * droidtop's signing root (docs/SPEC.md 12a "Signatures: certificate chains to
- * droidtop's signing root", Droidtop/tracker#550): droidtop's one pinned trust
+ * droidtop's signing root", mytop-project/tracker#550): droidtop's one pinned trust
  * anchor, the public key of droidtop's own root. The owner's key hierarchy:
  * the owner's CA issues Droidtop Core, the master everything is DERIVED from
  * and never used directly; droidtop's signing root, Enginehost's and gamegrab's
@@ -28,7 +28,7 @@ import java.time.Instant
  * the certificate format are refused with a reason that says so, and the
  * component catalog is accepted unsigned ([CatalogSignature.Verdict.Unpinned]).
  *
- * Rotation (2026-11-04, Droidtop/tracker#876 and #550; owner: "Pin the old key
+ * Rotation (2026-11-04, mytop-project/tracker#876 and #550; owner: "Pin the old key
  * for 7 days, then expire it. That should give time for users to organically
  * move off the old cores"): the root above is the new one, trusted with no end.
  * The one it replaced ships as [PREVIOUS_RESOURCE] and is trusted only until

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.MacroPlayer
 
-/** The companion's Input tab (CompanionInput.kt, Droidtop/tracker#414 slice C12). */
+/** The companion's Input tab (CompanionInput.kt, mytop-project/tracker#414 slice C12). */
 class CompanionInputTest {
     private val companion = InputTarget.Screen(2, "local:2", "Add-on screen")
     private val main = InputTarget.Screen(0, "local:0", "Built-in screen")

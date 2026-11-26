@@ -31,7 +31,7 @@ internal fun InputStream.readHeadBytes(max: Int): ByteArray {
  * How far into a page the Twine probe looks. A published story puts the
  * story format's own script and styles (SugarCube's are ~230 KB) ahead of
  * `<tw-storydata>`, so the 8 KB head the other probes read never reaches
- * it (Droidtop/tracker#287: every SugarCube game was "not an engine game").
+ * it (mytop-project/tracker#287: every SugarCube game was "not an engine game").
  */
 internal const val TWINE_SCAN_BYTES = 1024 * 1024
 

@@ -2,7 +2,7 @@ package dev.droidtop.library.stores
 
 /*
  * What a store lets the person choose about a game's content (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313): which extras (DLC) to install with the game
+ * "Stores", mytop-project/tracker#313): which extras (DLC) to install with the game
  * and which branch (version track, Steam's "betas") it follows. The types are
  * the store-neutral shape the picker draws; a store that has nothing to choose
  * answers null from [StoreLibrary.contentOptions] and no row is drawn.

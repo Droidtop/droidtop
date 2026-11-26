@@ -40,7 +40,7 @@ class RoomIdentityStore(private val dao: GameIdentityDao) : IdentityStore {
 }
 
 /**
- * The library's games registered as identities (Droidtop/tracker#318): every entry a scan saves gets a uid by its path
+ * The library's games registered as identities (mytop-project/tracker#318): every entry a scan saves gets a uid by its path
  * on this device, with the claims the entry carries (its store id). A scrape adds what it learns (a ROM's hash) through
  * [claim]. Nothing reads a uid yet; this fills them in beside the path keys.
  */

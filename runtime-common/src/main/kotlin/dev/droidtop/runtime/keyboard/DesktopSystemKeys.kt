@@ -5,7 +5,7 @@ import android.view.KeyEvent
 
 /**
  * The keys Android keeps from every app, passed to the Desktop session while it is in front (docs/SPEC.md 6b "Where
- * Meta goes", Droidtop/tracker#697; owner, 2026-11-05: "Desktop uses droidtop's accessibility key filter while a
+ * Meta goes", mytop-project/tracker#697; owner, 2026-11-05: "Desktop uses droidtop's accessibility key filter while a
  * Desktop session is in front, so Super, Alt+Tab and similar keys reach the session. It is off everywhere else").
  *
  * Android's PhoneWindowManager consumes Meta and its chords, shows Recents for Alt+Tab and switches the keyboard

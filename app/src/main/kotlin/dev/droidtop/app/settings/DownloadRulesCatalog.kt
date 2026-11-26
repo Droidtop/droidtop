@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Settings, Download rules (docs/SPEC.md, "Download rules", Droidtop/tracker#226): the one place the download
+ * Settings, Download rules (docs/SPEC.md, "Download rules", mytop-project/tracker#226): the one place the download
  * policy is set. Every row writes [DownloadPolicy], which every download job reads, so nothing here is specific to
  * a store or a source. The same screen is reached from "Downloads and installs".
  */
@@ -143,7 +143,7 @@ object DownloadRulesCatalog {
                     ),
                 ),
             ),
-            // How long finished jobs are kept, in Downloads' Older jobs (owner, 2026-11-15, Droidtop/tracker#940).
+            // How long finished jobs are kept, in Downloads' Older jobs (owner, 2026-11-15, mytop-project/tracker#940).
             CatalogGroup(
                 id = "download_rules_history",
                 title = "History",

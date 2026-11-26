@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Packs the Steamworks support a Windows Steam game gets inside droidtop's Wine
-# prefix (docs/SPEC.md 5b, "Steamworks in the prefix", Droidtop/tracker#310):
+# prefix (docs/SPEC.md 5b, "Steamworks in the prefix", mytop-project/tracker#310):
 # gbe_fork's steamclient build (Detanup01/gbe_fork, LGPL-3.0) and its
 # ColdClientLoader, unmodified, from the upstream release named below and
 # checked against the SHA-256 recorded here.

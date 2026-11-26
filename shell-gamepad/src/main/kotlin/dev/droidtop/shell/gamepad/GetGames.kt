@@ -19,7 +19,7 @@ import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 
 /**
  * A catalog screen in a sheet kept inside Gaming's content area, clear of the persistent top and
- * bottom bars (Droidtop/tracker#218). B and the screen's own exit close it. It is a layer of the
+ * bottom bars (mytop-project/tracker#218). B and the screen's own exit close it. It is a layer of the
  * hint bar ([DeclareLayerHints]) and paints the ground under itself, so the screen it opened over
  * neither shows through nor keeps its hints.
  */
@@ -68,7 +68,7 @@ internal fun GetGamesChip(
 
 /**
  * What every "Get games" entry opens (docs/SPEC.md 13, "There is no Get games sheet"; owner, 2026-10-16,
- * Droidtop/tracker#218): the one search, empty and ready for typing, where the download sources answer. A console
+ * mytop-project/tracker#218): the one search, empty and ready for typing, where the download sources answer. A console
  * [systemId] searches that system's sources and downloads to its folder; [pc] asks the sources for PC games. It has
  * no device rows of its own: the place it was opened from already lists what is here.
  */
@@ -99,7 +99,7 @@ fun GetGamesSearch(
 
 /**
  * "Get apps" as a chip: the app catalogs screen (F-Droid, GitHub, whatever the plugins add) that also
- * lives under Updates, one registered screen with two doors (Droidtop/tracker#501).
+ * lives under Updates, one registered screen with two doors (mytop-project/tracker#501).
  */
 @Composable
 internal fun GetAppsChip(modifier: Modifier = Modifier) {

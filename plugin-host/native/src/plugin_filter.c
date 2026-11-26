@@ -1,7 +1,7 @@
 /*
  * The system-call filter of every plugin process droidtop loads from
  * descriptors (docs/plugin-api.md 5.3). It is the sandbox library's
- * lockdown (vendor/sandbox, bi0shacker001/sandbox, Droidtop/tracker#470),
+ * lockdown (vendor/sandbox, bi0shacker001/sandbox, mytop-project/tracker#470),
  * shared with Enginehost, installed for every thread
  * (SECCOMP_FILTER_FLAG_TSYNC) before any of the plugin's code is loaded;
  * nothing can lift it afterwards.

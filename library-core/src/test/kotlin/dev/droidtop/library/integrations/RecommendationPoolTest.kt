@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The pool of games the person does not own (Droidtop/tracker#52): IGDB's answer, the merge and the file. */
+/** The pool of games the person does not own (mytop-project/tracker#52): IGDB's answer, the merge and the file. */
 class RecommendationPoolTest {
     private fun similar(id: Long, name: String, count: Int = 0) = IgdbSimilar(id, name, null, null, "Platform", null, 80.0, count)
 

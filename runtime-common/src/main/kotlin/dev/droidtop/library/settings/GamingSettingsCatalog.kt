@@ -48,9 +48,9 @@ object GamingSettingsCatalog {
      * decide where its category sits.
      */
     val CATEGORY_ORDER = listOf(
-        // Reorganised 2026-10-23 into short categories, one home per setting (Droidtop/tracker#610, the owner:
+        // Reorganised 2026-10-23 into short categories, one home per setting (mytop-project/tracker#610, the owner:
         // "Settings would be very wise to reconfigure, yes").
-        // Nine since Droidtop/tracker#621 M8 (owner, 2026-10-23: "let's do all nine of those proposals"): Kids and
+        // Nine since mytop-project/tracker#621 M8 (owner, 2026-10-23: "let's do all nine of those proposals"): Kids and
         // guests is a section of Modes, as who the device is handed to is a mode, and Accessibility one of Appearance.
         // Internet since 2026-11-22 (owner: "reflow the settings to put internet settings together, so we can present our
         // own browser with deeper integration"): droidtop Browser and the sign-ins droidtop keeps for the web.
@@ -115,7 +115,7 @@ object GamingSettingsCatalog {
 
     /**
      * The Quick Menu's and the companion's Display "Screen orientation": the mode droidtop is in now, where
-     * [ID_ORIENTATION] (Gaming's own settings page) is always Gaming's (Droidtop/tracker#571 row 34: the shared row
+     * [ID_ORIENTATION] (Gaming's own settings page) is always Gaming's (mytop-project/tracker#571 row 34: the shared row
      * edited Gaming's orientation from Standard and Desktop too).
      */
     const val ID_ORIENTATION_HERE = "pref_screen_orientation_current"
@@ -230,7 +230,7 @@ object GamingSettingsCatalog {
                         inline = QuickMenuOrder.screen(),
                     ),
                 )
-                // The person's say over Home's rows (Droidtop/tracker#611): pinned, hidden, and the pinned order.
+                // The person's say over Home's rows (mytop-project/tracker#611): pinned, hidden, and the pinned order.
                 add(
                     NestedScreenItem(
                         id = "pref_gaming_home_rows",
@@ -287,7 +287,7 @@ object GamingSettingsCatalog {
                     ),
                 )
                 // Removing it is a row of its own: the field is typed in place and shows nothing of the passkey, so a blank
-                // field cannot say "remove" without leaving the row removing it by accident (Droidtop/tracker#954 item 12).
+                // field cannot say "remove" without leaving the row removing it by accident (mytop-project/tracker#954 item 12).
                 if (passkeySet) {
                     add(
                         ActionItem(
@@ -329,7 +329,7 @@ object GamingSettingsCatalog {
                         icon = CatalogIcon.SCRAPER,
                     ),
                 )
-                // What another frontend kept, brought in (Droidtop/tracker#724).
+                // What another frontend kept, brought in (mytop-project/tracker#724).
                 add(
                     NestedScreenItem(
                         id = "pref_gaming_frontend_import",
@@ -449,7 +449,7 @@ object GamingSettingsCatalog {
             },
         ),
         // Every keyboard setting in one place, with the controls: they were split over Controls, Displays and the
-        // Companion screen (Droidtop/tracker#610).
+        // Companion screen (mytop-project/tracker#610).
         CatalogGroup(
             id = GROUP_KEYBOARD,
             title = words(R.string.gaming_keyboard_on_the_screens),
@@ -476,7 +476,7 @@ object GamingSettingsCatalog {
                     registryId = "android_settings",
                     icon = CatalogIcon.ANDROID_SETTINGS,
                 ),
-                // Reachable from the main screen too, not only the companion's System card (Droidtop/tracker#826 item 6).
+                // Reachable from the main screen too, not only the companion's System card (mytop-project/tracker#826 item 6).
                 privacyDashboardItem(),
             ),
         ),
@@ -486,7 +486,7 @@ object GamingSettingsCatalog {
             category = "Controls and keyboard",
             icon = CatalogIcon.INPUT,
             items = buildList {
-                // The controllers connected now, each with its battery where Android reports one (Droidtop/tracker#723).
+                // The controllers connected now, each with its battery where Android reports one (mytop-project/tracker#723).
                 val pads = runCatching { dev.droidtop.runtime.ConnectedPads.read(context) }.getOrDefault(emptyList())
                 if (pads.isEmpty()) {
                     add(ActionItem(id = ID_PADS_NONE, title = words(R.string.gaming_no_controller_connected)))
@@ -499,7 +499,7 @@ object GamingSettingsCatalog {
                                 value = pad.percent?.let { words(R.string.gaming_pad_battery, it) } ?: words(R.string.gaming_pad_connected),
                             ),
                         )
-                        // Its button labels: Automatic, or the glyphs printed on it (Droidtop/tracker#723).
+                        // Its button labels: Automatic, or the glyphs printed on it (mytop-project/tracker#723).
                         if (pad.descriptor.isNotEmpty()) {
                             val chosen = dev.droidtop.library.controller.GlyphOverrides.get(context)[pad.descriptor]
                             add(
@@ -522,7 +522,7 @@ object GamingSettingsCatalog {
                         }
                     }
                 }
-                // How far the stick leans before it moves the cursor, against drift (Droidtop/tracker#723).
+                // How far the stick leans before it moves the cursor, against drift (mytop-project/tracker#723).
                 add(
                     SliderItem(
                         id = dev.droidtop.runtime.StickDeadZone.KEY,
@@ -548,7 +548,7 @@ object GamingSettingsCatalog {
                         ),
                     ),
                 )
-                // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (Droidtop/tracker#740):
+                // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (mytop-project/tracker#740):
                 // they need droidtop's accessibility service, which nothing else says.
                 val (chordsOn, chordsLine) = dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(context)
                 add(
@@ -733,7 +733,7 @@ object GamingSettingsCatalog {
                         run = { ctx, _ -> dev.droidtop.runtime.Capture.take(ctx.applicationContext, android.view.Display.DEFAULT_DISPLAY).message },
                     ),
                 )
-                // Typing from a phone or PC on the same network into the field in focus (Droidtop/tracker#645): the
+                // Typing from a phone or PC on the same network into the field in focus (mytop-project/tracker#645): the
                 // console screen with the QR code, where the code is confirmed.
                 add(
                     ActionItem(
@@ -805,7 +805,7 @@ object GamingSettingsCatalog {
                             title = words(R.string.gaming_brightness),
                             subtitle = words(R.string.gaming_opens_the_system_screen_where_droidtop),
                             // Which grant, by Android's own name for it: "Needs permission" said nothing of what A would
-                            // open (UI review, Droidtop/tracker#954 item 11).
+                            // open (UI review, mytop-project/tracker#954 item 11).
                             value = "Needs Modify system settings",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
@@ -906,7 +906,7 @@ object GamingSettingsCatalog {
                 // screen. Apps cannot switch power-save mode themselves
                 // (PowerManager.setPowerSaveModeEnabled is signature-only),
                 // so like Network and Bluetooth this opens the real control
-                // rather than faking one (Droidtop/tracker#84).
+                // rather than faking one (mytop-project/tracker#84).
                 add(
                     ActionItem(
                         id = ID_SYSTEM_BATTERY,
@@ -995,7 +995,7 @@ object GamingSettingsCatalog {
                         ),
                     )
                 } else {
-                    // A press says what to do instead of nothing (Droidtop/tracker#571 row 20).
+                    // A press says what to do instead of nothing (mytop-project/tracker#571 row 20).
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_SLEEP,
@@ -1051,7 +1051,7 @@ object GamingSettingsCatalog {
                         run = { ctx -> SettingsLaunch.start(ctx, controls.audioOutputIntent()) },
                     ),
                 )
-                // No Social or Updates tile (Droidtop/tracker#621 M5): Social is a section of the Quick Menu's own
+                // No Social or Updates tile (mytop-project/tracker#621 M5): Social is a section of the Quick Menu's own
                 // rail, and Updates a page of Downloads and Updates, which the Downloads section hosts.
             },
         ),
@@ -1072,7 +1072,7 @@ object GamingSettingsCatalog {
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,
                     // Named for its mode, as Desktop's row beside it is; the page it opens is titled Settings
-                    // (Droidtop/tracker#827 F0: "Home settings" is renamed Settings).
+                    // (mytop-project/tracker#827 F0: "Home settings" is renamed Settings).
                     title = words(R.string.gaming_mobile_mode),
                     subtitle = words(R.string.gaming_mobile_mode_s_home_screen_icons),
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
@@ -1125,7 +1125,7 @@ object GamingSettingsCatalog {
     fun animationsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_ANIMATIONS, true)
 
     /**
-     * The interface sounds' own volume (docs/SPEC.md "Interface sounds"; owner, 2026-10-30, Droidtop/tracker#836:
+     * The interface sounds' own volume (docs/SPEC.md "Interface sounds"; owner, 2026-10-30, mytop-project/tracker#836:
      * "navigation sounds should get their own volume"): every cue role, whether the theme or droidtop's own set
      * supplies it, at this level of the media volume; 0 is off, as the switch it replaced was. In Settings and in the
      * Audio controls the Quick Menu and the companion draw. A game's own audio is not touched.
@@ -1152,7 +1152,7 @@ object GamingSettingsCatalog {
     const val ID_BACKGROUND_MUSIC_FOLDER = "pref_gaming_background_music_folder"
 
     /**
-     * Background music in Gaming (Droidtop/tracker#725): its volume, 0 to [NAVIGATION_SOUNDS_MAX], 0 (the default)
+     * Background music in Gaming (mytop-project/tracker#725): its volume, 0 to [NAVIGATION_SOUNDS_MAX], 0 (the default)
      * being off. It plays the tracks of the folder below while the shell is in front and no game runs.
      */
     fun backgroundMusicItem(context: Context) = SliderItem(
@@ -1182,7 +1182,7 @@ object GamingSettingsCatalog {
     fun backgroundMusicFolder(context: Context): String? =
         CatalogPrefs.prefs(context).getString(ID_BACKGROUND_MUSIC_FOLDER, null)?.takeIf { it.isNotBlank() }
 
-    /** Settings > Controls' rows for the connected pads (Droidtop/tracker#723): facts, not actions. */
+    /** Settings > Controls' rows for the connected pads (mytop-project/tracker#723): facts, not actions. */
     const val ID_PADS_PREFIX = "controls_pad_"
     const val ID_PADS_NONE = "controls_pad_none"
 
@@ -1197,7 +1197,7 @@ object GamingSettingsCatalog {
     private const val NAVIGATION_SOUNDS_DEFAULT = 40
 
     /**
-     * What each screen is for (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): one row per screen other than the one
+     * What each screen is for (docs/SPEC.md 4c, ScreenRoles; mytop-project/tracker#776): one row per screen other than the one
      * droidtop started on, which holds the menus unless another screen is the main one. A screen nobody answered for
      * says so; droidtop asks once when one is first connected, and this is where the answer is changed. Reads the
      * display list and preferences: built off the main thread like the rest of this catalog.
@@ -1226,7 +1226,7 @@ object GamingSettingsCatalog {
     }
 
     /**
-     * Whether the desktop extends to each screen (docs/SPEC.md 2b, "The desktop on a second screen", Droidtop/tracker#908
+     * Whether the desktop extends to each screen (docs/SPEC.md 2b, "The desktop on a second screen", mytop-project/tracker#908
      * step D5): one row per screen other than the main one, where the desktop runs, beside the role rows. Desktop asks
      * once per screen the first time it runs with it, and this is where the answer is changed. Only with Desktop mode
      * on. Reads the display list and preferences: built off the main thread like the rest of this catalog.
@@ -1279,7 +1279,7 @@ object GamingSettingsCatalog {
                     controls.switchRadio(ctx, dev.droidtop.runtime.tasks.TaskManager.shell, radio, on)
                 }
                 if (!switched) {
-                    // Why, before Android's screen opens (Droidtop/tracker#851): with nothing privileged behind the
+                    // Why, before Android's screen opens (mytop-project/tracker#851): with nothing privileged behind the
                     // provider, the switch could never have worked, and the person is told what would make it work.
                     val why = dev.droidtop.runtime.tasks.TaskManager.shell.unavailableReason()
                     Notices.flash(
@@ -1294,7 +1294,7 @@ object GamingSettingsCatalog {
     }
 
     /**
-     * Power for the game in front (docs/SPEC.md "Power policy", Droidtop/tracker#841): one catalog item, drawn by the
+     * Power for the game in front (docs/SPEC.md "Power policy", mytop-project/tracker#841): one catalog item, drawn by the
      * Quick Menu's Performance section, the companion's System > Power card and its Game tab. Each press steps Auto,
      * Saver, Standard, Performance; a level is this game's pick and holds on its next launches, Auto leaves it to the
      * policy (Auto power on) or to Android (off). The value says what is in force and why. Null without a running
@@ -1374,7 +1374,7 @@ object GamingSettingsCatalog {
     )
 
     /** The tabs a person can put on the companion's bar or open it on, with their names. Game comes by itself. */
-    // The tabs and the pages that can be tabs of their own (Droidtop/tracker#786 S3): System, Network and Apps are
+    // The tabs and the pages that can be tabs of their own (mytop-project/tracker#786 S3): System, Network and Apps are
     // Device's pages since S3, and a saved bar's old ids are read as these (CompanionPrefs.currentId).
     private val COMPANION_TAB_CHOICES = listOf(
         CompanionPrefs.id(ControlPanel.HOME) to "Home",
@@ -1404,7 +1404,7 @@ object GamingSettingsCatalog {
     private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Mobile", "DESKTOP" to "Desktop")
 
     /**
-     * The Companion group (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): the bar's tabs and the
+     * The Companion group (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): the bar's tabs and the
      * opening tab per mode, what happens when a game starts, and a reset. Kid and Kiosk hide the group
      * ([ControlAccess.GROUP_COMPANION]). Reads [CompanionPrefs], loaded by the caller off the main thread.
      */
@@ -1640,7 +1640,7 @@ object GamingSettingsCatalog {
     )
 
     /**
-     * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). With
+     * Typing on the add-on display (docs/SPEC.md 4c, "Typing on the add-on display", mytop-project/tracker#314). With
      * the elevated helper, a switch for Android's own keyboard on the second screen (on by default, given back when
      * off); without it the switch is not drawn. Then one row whose value says how typing into other apps on that
      * screen works right now ([AddonKeyboardRules.appsKeyboard]), and whose action is the one step that would make
@@ -1650,7 +1650,7 @@ object GamingSettingsCatalog {
      */
     /**
      * One row per connected screen to give it a name of the person's own (docs/SPEC.md 4c, "Screen names",
-     * Droidtop/tracker#162): the launch chooser, the running apps list and every row that names a screen use it.
+     * mytop-project/tracker#162): the launch chooser, the running apps list and every row that names a screen use it.
      * Stored per Android's unique id for the display, so the name stays with the screen. Reads the display list and a
      * preferences file: built off the main thread like the rest of this catalog.
      */
@@ -1672,7 +1672,7 @@ object GamingSettingsCatalog {
         }
     }
 
-    // The screensaver's page (Droidtop/tracker#726): when it shows, what it shows, dimmed or not, and the game's name.
+    // The screensaver's page (mytop-project/tracker#726): when it shows, what it shows, dimmed or not, and the game's name.
     private fun screensaverItem(context: Context) = NestedScreenItem(
         id = ID_SCREENSAVER_PAGE,
         title = words(R.string.gaming_screensaver),
@@ -1750,7 +1750,7 @@ object GamingSettingsCatalog {
     /**
      * The companion's own settings screen (tabs, opening tab, when a game starts, the screen, Home's sections, the
      * keyboard), the one Settings shows under "Companion screen", for the companion to open on itself
-     * (Droidtop/tracker#786 S2b). Null where the mode hides it (Kid, Kiosk, Guest), so the person it restricts
+     * (mytop-project/tracker#786 S2b). Null where the mode hides it (Kid, Kiosk, Guest), so the person it restricts
      * cannot reach it. Reads settings files: never on the main thread.
      */
     fun companionScreen(context: Context): CatalogScreen? {
@@ -1777,7 +1777,7 @@ object GamingSettingsCatalog {
                 id = ID_DISPLAY_KEYBOARD_PLACEMENT,
                 title = words(R.string.gaming_keyboard_displays_on),
                 // "Companion" that cannot be honoured says so, and why, instead of reading as if it were in effect
-                // (Droidtop/tracker#523).
+                // (mytop-project/tracker#523).
                 subtitle = when (keyboard.lastCompanionFallback.value.takeIf { keyboard.placement.value == dev.droidtop.runtime.keyboard.KeyboardPlacement.COMPANION }) {
                     dev.droidtop.runtime.keyboard.CompanionFallback.COMPANION_KEYBOARD_OFF -> words(R.string.gaming_keyboard_companion_off)
                     dev.droidtop.runtime.keyboard.CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN -> words(R.string.gaming_keyboard_no_companion)
@@ -1793,7 +1793,7 @@ object GamingSettingsCatalog {
             NestedScreenItem(
                 id = ID_DISPLAY_COMPANION,
                 // Its category's name in the Settings column ("Companion screen", CATEGORY_ORDER); every category
-                // has an icon (Droidtop/tracker#676).
+                // has an icon (mytop-project/tracker#676).
                 title = words(R.string.gaming_companion_screen),
                 icon = CatalogIcon.DISPLAY,
                 inline = CatalogScreen(
@@ -1829,7 +1829,7 @@ object GamingSettingsCatalog {
                                         id = CompanionHomePrefs.itemId(section),
                                         title = section.label,
                                         // Every section but these two draws nothing while it has nothing to show,
-                                        // so an ON row with no section on Home is not a fault (Droidtop/tracker#328).
+                                        // so an ON row with no section on Home is not a fault (mytop-project/tracker#328).
                                         subtitle = if (section in ALWAYS_SHOWN_HOME) null else "Appears when there is something to show",
                                         current = home.shows(section),
                                         onToggle = { c, on -> CompanionHomePrefs.setShown(c, section, on) },
@@ -1913,7 +1913,7 @@ object GamingSettingsCatalog {
 
     /**
      * Where every game launches: "ASK", "FOLLOW_SHELL", "BUILT_IN" or "SECOND". The one write, shared by this row and
-     * the launch chooser's "Every game" rows (Droidtop/tracker#590).
+     * the launch chooser's "Every game" rows (mytop-project/tracker#590).
      */
     fun setGameLaunchTarget(context: Context, value: String) {
         CatalogPrefs.prefs(context).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
@@ -2000,7 +2000,7 @@ object GamingSettingsCatalog {
     }
 
     /**
-     * The icon pack Apps and Standard's drawer draw their icons with (Droidtop/tracker#508): the one choice Standard's
+     * The icon pack Apps and Standard's drawer draw their icons with (mytop-project/tracker#508): the one choice Standard's
      * launcher keeps ([IconPacks]). System icons are the default. Not shown when no launcher registered the source.
      */
     private fun iconPackItem(context: Context): ChoiceItem? {
@@ -2052,7 +2052,7 @@ object GamingSettingsCatalog {
     )
 
     /**
-     * "Rescan PC game folders" (docs/SPEC.md 7j "Places", Droidtop/tracker#397
+     * "Rescan PC game folders" (docs/SPEC.md 7j "Places", mytop-project/tracker#397
      * slice E): [rescanLibraryItem] over the PC walks only, on Game sources >
      * Folders. Selected again while it runs, it stops the rescan.
      */
@@ -2110,7 +2110,7 @@ private fun hasCompanionScreen(context: android.content.Context): Boolean =
 private val ALWAYS_SHOWN_HOME = setOf(CompanionHomeSection.NOTIFICATIONS, CompanionHomeSection.SYSTEM)
 
 /**
- * Interface size for one screen role (owner, 2026-10-29, Droidtop/tracker#656 point 3): Auto, then 75 to 150 percent
+ * Interface size for one screen role (owner, 2026-10-29, mytop-project/tracker#656 point 3): Auto, then 75 to 150 percent
  * of the canvas the display's own report gives. The main screen and the companion screen each have one, since they are
  * scaled separately. Six choices, so Left/Right step it in place; the screen redraws at the new size.
  */

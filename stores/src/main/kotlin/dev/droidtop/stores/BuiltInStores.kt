@@ -38,7 +38,7 @@ object BuiltInStores {
     }
 
     /**
-     * Offers the Steam account to plugins that hold `steam.account` (docs/plugin-api.md 3 G8, Droidtop/tracker#379):
+     * Offers the Steam account to plugins that hold `steam.account` (docs/plugin-api.md 3 G8, mytop-project/tracker#379):
      * the broker's `steam.*` ops run on the registered Steam store's session ([SteamPluginAccount]).
      */
     fun offerSteamToPlugins(context: android.content.Context) {

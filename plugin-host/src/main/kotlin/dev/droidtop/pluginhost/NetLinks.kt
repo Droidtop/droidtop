@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * The device's networks as `net.get_links` reports them to a plugin with its own sockets (docs/plugin-api.md 3 D12,
- * 5.3 "Open processes"; Droidtop/tracker#553). An open process with the `net.sockets` hole cannot list interfaces
+ * 5.3 "Open processes"; mytop-project/tracker#553). An open process with the `net.sockets` hole cannot list interfaces
  * itself (the filter refuses netlink) nor use Android's resolver (netd's socket is a refused Unix socket), so droidtop
  * reads them from Android's own view of each network ([android.net.LinkProperties]) and hands them over: a sync
  * daemon then binds and announces on the right addresses and resolves names against the right DNS servers itself.

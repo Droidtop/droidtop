@@ -24,12 +24,12 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * droidtop as the controller of a paired device's pointer (docs/SPEC.md 7q, remote input; Droidtop/tracker#645, "droidtop
+ * droidtop as the controller of a paired device's pointer (docs/SPEC.md 7q, remote input; mytop-project/tracker#645, "droidtop
  * as both the controlled device and the controller"), the touchpad of the official apps' Remote input:
  * - the screen: one finger moves the pointer, a tap clicks, two fingers scroll, a two-finger tap right-clicks;
  * - a controller: the left stick moves the pointer, the right stick scrolls, A clicks, X right-clicks, Y middle-clicks,
  *   the D-pad sends the arrow keys, Start sends Enter, and B leaves.
- * Moves are gathered and sent at most every 16 ms, through lib-kdeconnect's `input_send`.
+ * Moves are gathered and sent at most every 16 ms, through mytop-kdeconnect's `input_send`.
  */
 class KdeConnectTouchpadActivity : AppCompatActivity() {
     private lateinit var deviceId: String

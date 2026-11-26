@@ -44,7 +44,7 @@ object ScraperReadiness {
      * opened the scraper screen can act on this sentence alone.
      */
     fun pcSourceProblem(context: Context, key: String = PcScraperSourcePrefs.key(context)): String? {
-        // A metadata plugin chosen as the source (Droidtop/tracker#67) must be there to ask.
+        // A metadata plugin chosen as the source (mytop-project/tracker#67) must be there to ask.
         PcScraperSourcePrefs.pluginOf(key)?.let { id ->
             return if (PcScraper.chosenPlugin(context, key) != null) null else
                 "The plugin chosen as the PC & engine game source ($id) is not installed or is turned off. " +

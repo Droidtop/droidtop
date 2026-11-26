@@ -35,7 +35,7 @@ object PerformanceOverlay {
 
     val level: StateFlow<OverlayLevel> = levelFlow
 
-    /** Where the overlay sits and how big its text is (Droidtop/tracker#812). */
+    /** Where the overlay sits and how big its text is (mytop-project/tracker#812). */
     val corner: StateFlow<OverlayCorner> = cornerFlow
     val size: StateFlow<OverlaySize> = sizeFlow
 
@@ -73,7 +73,7 @@ object PerformanceOverlay {
     /**
      * The one answer to "can droidtop draw over a game", installed by `:app` from the code that draws
      * (`GameOverlay.canDraw`: its accessibility overlay when the service can give one, else an app overlay with
-     * "Display over other apps"). Until it is installed, only the grant counts. Droidtop/tracker#83: the row used to
+     * "Display over other apps"). Until it is installed, only the grant counts. mytop-project/tracker#83: the row used to
      * count the service as connected while the drawing code could not use it, so it offered an overlay that never
      * showed, and never the grant.
      */

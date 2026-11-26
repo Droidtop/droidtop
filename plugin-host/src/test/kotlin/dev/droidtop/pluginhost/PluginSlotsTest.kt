@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which plugin processes are one plugin's for their whole life (docs/plugin-api.md 5.6, Droidtop/tracker#53). */
+/** Which plugin processes are one plugin's for their whole life (docs/plugin-api.md 5.6, mytop-project/tracker#53). */
 class PluginSlotsTest {
     @Test
     fun `open processes and contained slots below API 29 serve one plugin and end with it`() {

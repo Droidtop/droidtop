@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The person's pinned and hidden Home rows (HomeRows, Droidtop/tracker#611). */
+/** The person's pinned and hidden Home rows (HomeRows, mytop-project/tracker#611). */
 class HomeRowsTest {
     @Test
     fun `pinning adds at the end, hiding unpins, showing clears both`() {

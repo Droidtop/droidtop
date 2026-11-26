@@ -4,7 +4,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A menu panel scrolls with the D-pad past its rows (Droidtop/tracker#381): an action's long result is reached without touch. */
+/** A menu panel scrolls with the D-pad past its rows (mytop-project/tracker#381): an action's long result is reached without touch. */
 class PanelScrollTest {
     @Test
     fun downAtTheLastRowScrollsWhenThereIsMoreBelow() {

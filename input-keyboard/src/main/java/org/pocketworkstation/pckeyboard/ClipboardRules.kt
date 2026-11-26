@@ -4,7 +4,7 @@ import java.text.Normalizer
 import java.util.Locale
 
 /*
- * The clipboard panel's rules (docs/SPEC.md 6a, "Clipboard history", Droidtop/tracker#903 H12d), with no Android
+ * The clipboard panel's rules (docs/SPEC.md 6a, "Clipboard history", mytop-project/tracker#903 H12d), with no Android
  * classes so they are tested on the JVM. Ported in part, each piece naming its origin below (NOTICE.md):
  *
  * - HeliBoard, https://github.com/Helium314/HeliBoard at 2d9869b2, GPL-3.0-only, Copyright (C) HeliBoard contributors:

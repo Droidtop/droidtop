@@ -130,7 +130,7 @@ import java.io.File
  * "Controller buttons").
  */
 /**
- * SCREENS (Droidtop/tracker#598, #776): with two screens connected, which one droidtop's menus are on. No screen is
+ * SCREENS (mytop-project/tracker#598, #776): with two screens connected, which one droidtop's menus are on. No screen is
  * assumed better (docs/SPEC.md 4c, "What each screen is for"): nothing is preselected until the person picks, and Next
  * without a pick leaves the menus where droidtop started. Each screen is listed by its name, built-in or external, and
  * size. Picking another screen answers it Main screen; picking the screen droidtop started on answers the other one

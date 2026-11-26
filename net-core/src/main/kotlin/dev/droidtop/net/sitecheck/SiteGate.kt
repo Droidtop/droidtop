@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.withLock
 class SiteCheckRequired(val host: String) : IOException("$host checks the browser first; open it in droidtop to continue")
 
 /**
- * The one place a browser check is dealt with for the requests droidtop makes (docs/SPEC.md 12a, Droidtop/tracker#751):
+ * The one place a browser check is dealt with for the requests droidtop makes (docs/SPEC.md 12a, mytop-project/tracker#751):
  * [run] makes a request with the site's clearance on it, and when the answer is a check ([SiteCheck.isChallenge]) lets
  * the browser try first ([solver]: a web view nobody sees, [solveMs] at most, never a click), asks the person only if
  * that does not pass ([asker]), and makes the request once more. Requests to one host queue behind one check: the ones

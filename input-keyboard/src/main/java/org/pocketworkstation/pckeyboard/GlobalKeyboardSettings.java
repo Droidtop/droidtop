@@ -63,18 +63,18 @@ public final class GlobalKeyboardSettings {
     // Read by PointerTracker
     public int sendSlideKeys = 0;
     //
-    // Read by PointerTracker (droidtop, Droidtop/tracker#340)
+    // Read by PointerTracker (droidtop, mytop-project/tracker#340)
     public boolean spaceDrag = true;
     //
-    // Read by LatinKeyboard (droidtop, Droidtop/tracker#342)
+    // Read by LatinKeyboard (droidtop, mytop-project/tracker#342)
     /** The key grid shape chosen for portrait (and, before H1, for both); blank when unset. */
     public String formChoice = "";
-    /** The key grid shape chosen for landscape (Droidtop/tracker#903 H1); blank when unset. */
+    /** The key grid shape chosen for landscape (mytop-project/tracker#903 H1); blank when unset. */
     public String formLandscapeChoice = "";
 
     /**
      * The key grid's form for the screen [context] draws on: the shape setting's ({@link KeyboardForm#forScreen}), or,
-     * in the input method, its mode's ({@link KeyboardModes#formFor}, Droidtop/tracker#903 H12c).
+     * in the input method, its mode's ({@link KeyboardModes#formFor}, mytop-project/tracker#903 H12c).
      */
     public KeyboardForm.Form formFor(android.content.Context context) {
         return KeyboardModes.formFor(context, KeyboardForm.forScreen(formChoice, formLandscapeChoice, context));
@@ -170,7 +170,7 @@ public final class GlobalKeyboardSettings {
             public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
 
-        // The input method's modes (Droidtop/tracker#903 H12c), each orientation's: a change builds the keys and the view
+        // The input method's modes (mytop-project/tracker#903 H12c), each orientation's: a change builds the keys and the view
         // again. The floating place only moves the frame, so it is not here.
         for (String modeKey : KeyboardModes.REBUILDING_KEYS) {
             addStringPref(modeKey, new StringPref() {

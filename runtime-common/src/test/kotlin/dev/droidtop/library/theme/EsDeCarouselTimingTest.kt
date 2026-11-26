@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A carousel camera's slide length, ES-DE's CarouselComponent::onCursorChanged (Droidtop/tracker#782). */
+/** A carousel camera's slide length, ES-DE's CarouselComponent::onCursorChanged (mytop-project/tracker#782). */
 class EsDeCarouselTimingTest {
     @Test
     fun `a whole-item step from rest takes 400 ms`() {

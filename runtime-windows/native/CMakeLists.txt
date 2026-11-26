@@ -20,7 +20,7 @@ cmake_minimum_required(VERSION 3.22.1)
 #     vortekrenderer
 #
 # The arm64 libkgslshim and libvortekrenderer have no source anywhere; they
-# come from Droidtop/droidtop-components (runtime-windows/components.pin).
+# come from mytop-project/droidtop-components (runtime-windows/components.pin).
 project(windows_runtime_natives C CXX)
 
 set(UPSTREAM ${CMAKE_CURRENT_SOURCE_DIR}/upstream)
@@ -73,7 +73,7 @@ page_16k(winlator)
 # whose ring buffer is the shared-memory protocol vortek speaks and has no
 # source. A copy built from gpu_helper.c and drawable.c alone shipped in
 # 2967, and every vortek game died at its first Present on
-# "cannot locate symbol ArrayList_add" (Droidtop/tracker#857).
+# "cannot locate symbol ArrayList_add" (mytop-project/tracker#857).
 # scripts/check-native-links.py now fails a build whose libraries cannot
 # resolve their imports.
 if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
@@ -189,7 +189,7 @@ target_link_libraries(evshim log dl)
 page_16k(evshim)
 
 # libmimalloc: vendor/mimalloc (microsoft/mimalloc v2.2.7, MIT), the allocator a game can choose for its Wine processes
-# instead of bionic's Scudo (docs/SPEC.md 9, "The allocator a game's Wine uses"; Droidtop/tracker#894). WineAllocator
+# instead of bionic's Scudo (docs/SPEC.md 9, "The allocator a game's Wine uses"; mytop-project/tracker#894). WineAllocator
 # puts it first on LD_PRELOAD, so it overrides malloc and friends (MI_MALLOC_OVERRIDE). Built as mimalloc's own
 # single-file build (src/static.c) with the defines and flags its CMakeLists gives a shared, overriding release
 # library, and native ELF TLS (-fno-emulated-tls): emulated TLS allocates through malloc, which is this library.
@@ -204,7 +204,7 @@ target_compile_options(mimalloc PRIVATE -O3 -fvisibility=hidden -ftls-model=init
 target_link_libraries(mimalloc dl)
 page_16k(mimalloc)
 
-# The Wine media handoff (docs/SPEC.md 9, "Video in Wine games"; Droidtop/tracker#601): a GStreamer element Wine's
+# The Wine media handoff (docs/SPEC.md 9, "Video in Wine games"; mytop-project/tracker#601): a GStreamer element Wine's
 # GStreamer loads, and the decode server it talks to, one process per stream. Slice 1: the server's decoder is a stub
 # that returns the media converter's blank; slice 2 brings the enginehost-ffmpeg library.
 set(MEDIADECODE ${CMAKE_CURRENT_SOURCE_DIR}/mediadecode)

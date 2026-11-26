@@ -80,7 +80,7 @@ runs:
       with:
         go-version: "1.25"
         # The newest 1.25 patch, not whichever one the runner's tool cache holds: crane links Go's standard library,
-        # and an older patch shipped its fixed CVEs (Droidtop/tracker#901, build review on 2974: GO-2026-6603 and ten more
+        # and an older patch shipped its fixed CVEs (mytop-project/tracker#901, build review on 2974: GO-2026-6603 and ten more
         # at artefact:stdlib). Go backports security fixes to each supported release line's patches.
         check-latest: true
         cache: false
@@ -226,15 +226,15 @@ runs:
         # hev-socks5-tunnel into app/src/main/jniLibs; v11 added PulseAudio 13.0,
         # libsndfile and libltdl for x86_64 (runtime-windows/src/main); v12
         # rebuilt it because the cached x86_64 modules asset predated
-        # module-pipe-source (Droidtop/tracker#80): the script had gained the
+        # module-pipe-source (mytop-project/tracker#80): the script had gained the
         # module but the key had not moved, so releases kept the old asset;
         # v13 added the arm64 module-pipe-source asset for the Desktop
-        # microphone (Droidtop/tracker#132); v14 builds the whole arm64
+        # microphone (mytop-project/tracker#132); v14 builds the whole arm64
         # PulseAudio set, which until then was GameNative's prebuilt one
-        # (Droidtop/tracker#857); v15 dropped build-scripts/proot-patches,
-        # now commits on Droidtop/proot that vendor/proot's commit carries
-        # (Droidtop/tracker#921); v16 dropped build-scripts/pulseaudio-patches
-        # the same way, for Droidtop/pulseaudio; v17 stopped editing
+        # (mytop-project/tracker#857); v15 dropped build-scripts/proot-patches,
+        # now commits on mytop-project/proot that vendor/proot's commit carries
+        # (mytop-project/tracker#921); v16 dropped build-scripts/pulseaudio-patches
+        # the same way, for mytop-project/pulseaudio; v17 stopped editing
         # vendor/libffi's Makefile.am before autoreconf (#921).
         key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/talloc/**') }}-v17
 
@@ -267,7 +267,7 @@ runs:
     - name: Fetch the Windows runtime's re-hosted files
       # The files droidtop does not build (arm64 libvortekrenderer and
       # libkgslshim, the Box64/FEXCore/WowBox64 builds, input DLLs, redirect
-      # libraries), from Droidtop/droidtop-components' windows-runtime
+      # libraries), from mytop-project/droidtop-components' windows-runtime
       # release, checked against runtime-windows/components.pin
       # (docs/SPEC.md 9).
       if: steps.wincomponents-cache.outputs.cache-hit != 'true'
@@ -297,7 +297,7 @@ runs:
         key: mozc-engine-${{ hashFiles('input-japanese/mozc-engine.pin') }}
 
     - name: Fetch Mozc's engine
-      # libmozc.so for both ABIs (Japanese typing, Droidtop/tracker#903 H7c), from this repository's
+      # libmozc.so for both ABIs (Japanese typing, mytop-project/tracker#903 H7c), from this repository's
       # mozc-engine-<version> prerelease, checked against input-japanese/mozc-engine.pin.
       if: steps.mozc-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -311,7 +311,7 @@ runs:
         key: rime-engine-${{ hashFiles('input-chinese/rime-engine.pin') }}
 
     - name: Fetch RIME's engine
-      # librime.so for both ABIs and rime_api.h (Chinese typing, Droidtop/tracker#903 H8b), from this repository's
+      # librime.so for both ABIs and rime_api.h (Chinese typing, mytop-project/tracker#903 H8b), from this repository's
       # rime-engine-<commit> prerelease, checked against input-chinese/rime-engine.pin.
       if: steps.rime-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -331,7 +331,7 @@ runs:
         key: agent-lib-${{ hashFiles('native/Cargo.toml', 'native/Cargo.lock', 'native/src/**', 'build-scripts/build-agent-lib.sh') }}-ndk-${{ env.NDK_VERSION }}
 
     - name: Build droidtop's native library
-      # libdroidtop_agent.so for both ABIs, from native/ over the shared libraries (Droidtop/tracker#867);
+      # libdroidtop_agent.so for both ABIs, from native/ over the shared libraries (mytop-project/tracker#867);
       # build-scripts/build-agent-lib.sh. It replaced fetching droidtop-agent's prebuilt release.
       if: steps.agentlib-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -376,7 +376,7 @@ runs:
         key: windowcast-lib-${{ hashFiles('app/windowcast.pin') }}
 
     - name: Fetch windowcast's Android library
-      # windowcast-android-<version>.aar, attached to Droidtop/windowcast's release by its "Viewer release"
+      # windowcast-android-<version>.aar, attached to mytop-project/windowcast's release by its "Viewer release"
       # workflow, checked against its SHA256SUMS-android-library and app/windowcast.pin and laid out as the local
       # Maven repository settings.gradle.kts reads (docs/SPEC.md 7a).
       if: steps.windowcast-cache.outputs.cache-hit != 'true'

@@ -21,7 +21,7 @@ class GameEngineDetectorTest {
     private fun touch(vararg segments: String) {
         val file = segments.fold(tmp.root) { dir, seg -> File(dir, seg) }
         file.parentFile?.mkdirs()
-        // A Godot pack is one only with its magic (Droidtop/tracker#873).
+        // A Godot pack is one only with its magic (mytop-project/tracker#873).
         if (file.name.endsWith(".pck")) file.writeText("GDPC") else file.createNewFile()
     }
 
@@ -566,7 +566,7 @@ class GameEngineDetectorTest {
 
     @Test
     fun `a stray pck without Godot's magic is not a Godot game`() {
-        // Droidtop/tracker#873: droidtop took any .pck, Enginehost only one that starts with GDPC.
+        // mytop-project/tracker#873: droidtop took any .pck, Enginehost only one that starts with GDPC.
         val stray = File(tmp.root, "data.pck")
         stray.writeText("not a pack")
         assertNull(GameEngineDetector.detect(tmp.root, defs))

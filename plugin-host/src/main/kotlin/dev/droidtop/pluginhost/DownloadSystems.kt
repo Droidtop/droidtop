@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import org.json.JSONArray
 
 /**
- * The systems a download is for (docs/plugin-api.md 1.10, the `download` bundle's `systems`; Droidtop/tracker#617):
+ * The systems a download is for (docs/plugin-api.md 1.10, the `download` bundle's `systems`; mytop-project/tracker#617):
  * what the record page's system picker offers, so the person sees only the links for the system they pick. A plugin
  * names them on each entry; droidtop reads them from the entry's heading when it names none ("Win/Linux" is Windows
  * and Linux), as forum threads put their links under one heading per platform. Pure.
@@ -53,7 +53,7 @@ object DownloadSystems {
 
     /**
      * Whether a heading over links for any system names an extra (a walkthrough, a patch, a save file): those go under
-     * "Extras" on the Downloads tab, any other under "Other" (the owner, 2026-10-23, Droidtop/tracker#617).
+     * "Extras" on the Downloads tab, any other under "Other" (the owner, 2026-10-23, mytop-project/tracker#617).
      */
     fun isExtra(heading: String): Boolean = EXTRAS.containsMatchIn(heading)
 }

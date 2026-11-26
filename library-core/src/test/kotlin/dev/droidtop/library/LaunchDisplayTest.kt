@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * [LaunchDisplay.clearRunning] (docs/SPEC.md, Droidtop/tracker#82): the
+ * [LaunchDisplay.clearRunning] (docs/SPEC.md, mytop-project/tracker#82): the
  * Quick Menu's Game tab and the dual-screen "don't cover a running game"
  * orchestration both key off [LaunchDisplay.parkedDisplayId] and
  * [LaunchDisplay.runningGame] staying in lock step -- proven here since

@@ -54,7 +54,7 @@ import kotlinx.coroutines.flow.Flow
  * - `sortName`/`collectionSortName` (Scrape=false, real): matching ES-DE's
  *   own fields exactly; a list sorts by name with them (shell-gamepad
  *   `sortTitle`, the collection one only inside a custom collection,
- *   Droidtop/tracker#766).
+ *   mytop-project/tracker#766).
  * - No ESRB/age-rating field -- confirmed real ES-DE has none either.
  * - Deliberately NOT modeled: `playcount`/`playtime`/`lastplayed`
  *   (real ES-DE's own `Statistic` column marks these auto-tracked, not
@@ -193,7 +193,7 @@ interface RomDao {
     @Query("SELECT id FROM game_metadata WHERE scrape_confidence = :confidence")
     suspend fun idsWithScrapeConfidence(confidence: String): List<String>
 
-    // Review Matches (Droidtop/tracker#318 §5): the games waiting for a pick, with their candidates (identity.MatchQueue).
+    // Review Matches (mytop-project/tracker#318 §5): the games waiting for a pick, with their candidates (identity.MatchQueue).
     @Query("SELECT * FROM match_queue WHERE game_id = :gameId")
     suspend fun matchQueueRow(gameId: String): MatchQueueEntity?
 
@@ -206,7 +206,7 @@ interface RomDao {
     @Query("DELETE FROM match_queue WHERE game_id = :gameId AND state = :state")
     suspend fun deleteQueuedMatch(gameId: String, state: String)
 
-    // Aliases learned from the person's picks (Droidtop/tracker#318 §6.4, identity.MatchAliases).
+    // Aliases learned from the person's picks (mytop-project/tracker#318 §6.4, identity.MatchAliases).
     @Query("SELECT * FROM match_aliases WHERE `key` = :key")
     suspend fun matchAlias(key: String): MatchAliasEntity?
 
@@ -507,7 +507,7 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
 }
 
 /**
- * v12 (Droidtop/tracker#318, "One identity model"): the identity tables beside the path-keyed ones, added and filled,
+ * v12 (mytop-project/tracker#318, "One identity model"): the identity tables beside the path-keyed ones, added and filled,
  * nothing re-keyed. Each `game_metadata` row gets a uid, and its path (the row's key today) becomes that uid's first
  * locator on this device, so the readers can move to uids one at a time. The uid is SQLite's own random 128 bits as
  * hex; nothing else about a row is known here to claim (its store id and hashes are minted as the library and the
@@ -541,7 +541,7 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
 }
 
 /**
- * v12 -> v13 (Droidtop/tracker#318 §4.1, §5, §6.4): the review queue, the games a scrape did not take a match for with
+ * v12 -> v13 (mytop-project/tracker#318 §4.1, §5, §6.4): the review queue, the games a scrape did not take a match for with
  * their best five candidates kept, so Review Matches opens at once and offline; and the aliases the person's picks
  * teach, so the next folder with the same name is matched without a search. Both empty to begin with.
  */
@@ -582,7 +582,7 @@ data class MatchQueueEntity(
     @ColumnInfo(name = "asked_at") val askedAt: Long,
 )
 
-/** A game's identity (Droidtop/tracker#318): minted at first sight, never changed on this device. */
+/** A game's identity (mytop-project/tracker#318): minted at first sight, never changed on this device. */
 @Entity(tableName = "games")
 data class GameEntity(
     @PrimaryKey val uid: String,
@@ -643,7 +643,7 @@ interface GameIdentityDao {
     @Query("SELECT * FROM game_locators WHERE uid = :uid")
     suspend fun locatorsOf(uid: String): List<GameLocatorEntity>
 
-    // Missing games are marked and kept (Droidtop/tracker#318 §7.3); the first date stays.
+    // Missing games are marked and kept (mytop-project/tracker#318 §7.3); the first date stays.
     @Query("UPDATE games SET orphan_since = :sinceMs WHERE uid = :uid AND orphan_since IS NULL")
     suspend fun markMissing(uid: String, sinceMs: Long)
 

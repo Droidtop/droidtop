@@ -18,7 +18,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 
 /**
  * Focus is always somewhere in a pad window (docs/SPEC.md 7j, "Every screen opens with a focused item";
- * Droidtop/tracker#820). With nothing focused, the D-pad has no node to move from and every press is dropped
+ * mytop-project/tracker#820). With nothing focused, the D-pad has no node to move from and every press is dropped
  * (console, build 2730: "I have to hit A for it to work"), so this holder, around the content of each pad window
  * (the shell, a [ShellDialog], an in-game overlay), puts the focus on the first focusable item whenever nothing in it
  * holds focus: when it opens, when a tab, pane or page change removes the focused node, and on a return to the window.

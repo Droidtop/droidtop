@@ -18,7 +18,7 @@ import timber.log.Timber
 
 /**
  * The one registry of social providers and the one way their friends, conversations and messages reach
- * the screens (docs/SPEC.md "Social", Droidtop/tracker#327): the stores droidtop runs that have friends
+ * the screens (docs/SPEC.md "Social", mytop-project/tracker#327): the stores droidtop runs that have friends
  * (Steam, `StoreLibrary.social`), the conversations other apps expose in notifications ([AppMessages]) and every running plugin entry that provides `social.provider@1`
  * ([PluginSocialProviders]). The Social place, the companion's Social tab, the Quick Menu tile and the
  * message notifications read it; none of them knows a service.

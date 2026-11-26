@@ -148,7 +148,7 @@ internal fun PcGameMenu(
 ) {
     // The page under this menu draws the runner this menu may change: it asks again when the menu closes.
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { PcPlayRefresh.bump() } }
-    // The game that is running leads with its own sheet, this menu one row into it (Droidtop/tracker#740).
+    // The game that is running leads with its own sheet, this menu one row into it (mytop-project/tracker#740).
     dev.droidtop.shell.gamepad.RunningGameFirst(entry, onClose) {
         PcGameMenuSheet(entry, library, onLaunch, onClose, siblings, onOpenOther, onProgressChanged, onOpenPage, onOpenDownloads, openEnginePicker)
     }
@@ -176,7 +176,7 @@ private fun PcGameMenuSheet(
     var loaded by remember(entry) { mutableStateOf(false) }
     var reloadToken by remember(entry) { mutableStateOf(0) }
     var picking by remember(entry) { mutableStateOf(false) }
-    // "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): the same choices as Runs with, for one launch.
+    // "Run once with…" (docs/SPEC.md 7i, mytop-project/tracker#636): the same choices as Runs with, for one launch.
     var pickingOnce by remember(entry) { mutableStateOf(false) }
     var status by remember(entry.id) { mutableStateOf<String?>(null) }
     // The progress or failure line of what the first row started (an install, a runner's setup): drawn as that
@@ -184,17 +184,17 @@ private fun PcGameMenuSheet(
     var playStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
-    // "Rescrape with…" (Droidtop/tracker#67): one game, from a source the person picks.
+    // "Rescrape with…" (mytop-project/tracker#67): one game, from a source the person picks.
     var pickingSource by remember(entry) { mutableStateOf(false) }
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
-    // "Not the same game as <store>": the first press arms it, the second unlinks (Droidtop/tracker#745).
+    // "Not the same game as <store>": the first press arms it, the second unlinks (mytop-project/tracker#745).
     var unlinkArmed by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
     var editingSource by remember(entry) { mutableStateOf<UpdateSources.Source?>(null) }
     // A linked source's row opens its record (at Downloads while an update waits); linking is only for a source not
-    // linked yet, or the record's own Change link (Droidtop/tracker#619).
+    // linked yet, or the record's own Change link (mytop-project/tracker#619).
     var viewingRecord by remember(entry) { mutableStateOf<Triple<UpdateSources.Source, String, RecordTab>?>(null) }
     var pickingEngine by remember(entry) { mutableStateOf(openEnginePicker) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
@@ -205,11 +205,11 @@ private fun PcGameMenuSheet(
     var wineScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // Which program the game runs (docs/SPEC.md 7i, "Which program runs"), in a sheet the same way.
     var programScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
-    // What plugins offer on this game (C4, Droidtop/tracker#67), in a sheet the same way.
+    // What plugins offer on this game (C4, mytop-project/tracker#67), in a sheet the same way.
     var pluginScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     val hasPluginActions = dev.droidtop.shell.gamepad.rememberHasPluginActions(entry)
     // The free-space offer before a store install or update opens its own
-    // window over the menu (Droidtop/tracker#227); null when it is closed.
+    // window over the menu (mytop-project/tracker#227); null when it is closed.
     var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
     var contentOpen by remember(entry) { mutableStateOf(false) }
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
@@ -628,7 +628,7 @@ private fun PcGameMenuSheet(
         ?.firstOrNull { segment -> segment.versions.any { version -> version.copies.any { it.path == entry.id } } }
     val finishedHere = grouping?.finished?.contains(entry.id) == true
     val titleRows = listOfNotNull<ActionSheetItem>(
-        // Typed in the row itself, the menu still open (no editor, no panel: Droidtop/tracker#954 item 12).
+        // Typed in the row itself, the menu still open (no editor, no panel: mytop-project/tracker#954 item 12).
         dev.droidtop.shell.gamepad.ActionTextRow(
             "Title",
             value = entry.gameName.orEmpty(),
@@ -691,7 +691,7 @@ private fun PcGameMenuSheet(
             }
         }
     }
-    // "Stream from <computer>" for each paired computer that has this game (Droidtop/tracker#860, docs/SPEC.md 7o):
+    // "Stream from <computer>" for each paired computer that has this game (mytop-project/tracker#860, docs/SPEC.md 7o):
     // the computer starts it and its window shows here. Files read, so on IO.
     // The game goes by the key every device uses (ComputerLibrary.keysOf: its store id, or `title2:` and its slug, and the
     // older `title:` form). A folder game was looked up by its folder path, which no computer lists, so ARTEMIS, on the
@@ -765,7 +765,7 @@ private fun PcGameMenuSheet(
                             onClose()
                             onOpenDownloads()
                         },
-                        // The job's bar and how it moves, with its line under it (Droidtop/tracker#738).
+                        // The job's bar and how it moves, with its line under it (mytop-project/tracker#738).
                         progress = if (job.done) null else job.fraction() ?: -1f,
                         look = dev.droidtop.library.integrations.PluginJobsScreen.lookOf(job),
                     ),
@@ -1043,7 +1043,7 @@ private fun PcGameMenuSheet(
     } else {
         null
     }
-    // Run with Wine instead (Droidtop/tracker#752): the engine's own runner is the default even while it needs its core,
+    // Run with Wine instead (mytop-project/tracker#752): the engine's own runner is the default even while it needs its core,
     // so Wine is never taken silently; this is the one press that makes it this game's runner, kept like a Runs with pick.
     val wineInsteadRow = if (
         loaded && runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST &&
@@ -1081,7 +1081,7 @@ private fun PcGameMenuSheet(
                                 // Install and Update stop on the free-space
                                 // offer first: the size and the room the
                                 // chosen volume has are named before the
-                                // store's screen opens (Droidtop/tracker#227).
+                                // store's screen opens (mytop-project/tracker#227).
                                 StoreStage.INSTALL, StoreStage.UPDATE ->
                                     storeOffer = StoreInstallOffer(entry, checkNotNull(store))
                                 StoreStage.WISHLIST -> status = openOnStore(context, entry)
@@ -1180,7 +1180,7 @@ private fun PcGameMenuSheet(
                 )
             }
             actions.info.forEach { add(it) }
-            // Its guides (Droidtop/tracker#817): the folder's walkthrough, guide and readme in droidtop's reader, then the
+            // Its guides (mytop-project/tracker#817): the folder's walkthrough, guide and readme in droidtop's reader, then the
             // web searches by its name (#363), one list.
             add(ActionRow("Guides", "Walkthroughs and readmes, with your place kept") { readingGuides = true })
             compat?.let {
@@ -1212,7 +1212,7 @@ private fun PcGameMenuSheet(
                 )
             }
         }
-        // What's new (docs/SPEC.md 7i, Droidtop/tracker#229): the developer's latest post on Steam, asked for like ProtonDB.
+        // What's new (docs/SPEC.md 7i, mytop-project/tracker#229): the developer's latest post on Steam, asked for like ProtonDB.
         val newsAppId = steamAppIdOf(entry)
         val newsRow = newsAppId?.let {
             val state = steamNews
@@ -1329,7 +1329,7 @@ private fun PcGameMenuSheet(
     // install offer, a picker, a text field) takes the screen while it is
     // open and the menu comes back, where it was, when it closes. Drawn under
     // it, the menu showed round the smaller sheet with its own Close row
-    // (console, build 1519, Droidtop/tracker#371).
+    // (console, build 1519, mytop-project/tracker#371).
     val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
         pickingReplacement || (pickingSameGame && grouping != null) || editingSource != null
     if (!childOpen) {
@@ -1338,7 +1338,7 @@ private fun PcGameMenuSheet(
             subtitle = entry.identityLine(available),
             rows = entries,
             // B and the system Back step out of a page before they close the menu; L2, the button that opened it,
-            // or Select on the game page close it from any page (proposal 6.E, Droidtop/tracker#644 slice 4).
+            // or Select on the game page close it from any page (proposal 6.E, mytop-project/tracker#644 slice 4).
             onBack = goBack,
             onDismiss = onClose,
             focus = focus,
@@ -1363,7 +1363,7 @@ private fun PcGameMenuSheet(
     }
     // The free-space offer before a store install or update: its own
     // window over the menu, the one place the volume is chosen
-    // (Droidtop/tracker#227).
+    // (mytop-project/tracker#227).
     StoreInstallOfferSheet(
         offer = storeOffer,
         onProceed = { o, volumePath ->
@@ -1400,7 +1400,7 @@ internal enum class PcMenuPage(val title: String) {
     Updates("Updates"),
     Runs("How it runs"),
     Saves("Controls and saves"),
-    // The per-game tools, for every kind of game (owner, 2026-10-23, Droidtop/tracker#636).
+    // The per-game tools, for every kind of game (owner, 2026-10-23, mytop-project/tracker#636).
     Manage("Manage"),
     ;
 

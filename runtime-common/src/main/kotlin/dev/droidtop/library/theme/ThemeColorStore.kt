@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The selected Gaming theme's resolved colours, worked out once and kept (docs/SPEC.md 7k, "Colours outside Gaming";
- * owner, 2026-10-30, Droidtop/tracker#827): what Mobile, Desktop, Mobile's taskbar and the shared menus draw in by
+ * owner, 2026-10-30, mytop-project/tracker#827): what Mobile, Desktop, Mobile's taskbar and the shared menus draw in by
  * default, whether or not Gaming has ever opened. The ES-DE theme is parsed and mapped
  * ([GamingThemeMapping.resolved]) on [AppScopes.io], never on the main thread, when its [Key] changes (the theme, its
  * colour scheme, variant or aspect ratio, Light or dark, High contrast, the tint) or a theme is re-downloaded in place; the answer
@@ -41,7 +41,7 @@ object ThemeColorStore {
         val aspectRatio: String?,
         val light: Boolean,
         val highContrast: Boolean,
-        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (Droidtop/tracker#844). */
+        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (mytop-project/tracker#844). */
         val tint: Int? = null,
     ) {
         /** The key as it is stored beside the colours: a JSON array, so a missing value and the word "null" differ. Pure. */
@@ -102,7 +102,7 @@ object ThemeColorStore {
         prefsWatch = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key in ReadingPrefs.PALETTE_KEYS || key in AppearancePrefs.OUTSIDE_GAMING_KEYS) refreshSoon(app, force = false)
         }.also { CatalogPrefs.prefs(app).registerOnSharedPreferenceChangeListener(it) }
-        // A new wallpaper's colours (Device colours, Droidtop/tracker#844); the system palette itself arrives with the
+        // A new wallpaper's colours (Device colours, mytop-project/tracker#844); the system palette itself arrives with the
         // configuration change below, which looks again too. The listener is Android 8.1's (API 27; minSdk is 26).
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
             try {

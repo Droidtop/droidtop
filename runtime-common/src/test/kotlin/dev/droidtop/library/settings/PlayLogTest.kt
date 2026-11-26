@@ -5,7 +5,7 @@ import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The "Your play" numbers (docs/SPEC.md 7f, Droidtop/tracker#597): per game, per system, this week and all time. */
+/** The "Your play" numbers (docs/SPEC.md 7f, mytop-project/tracker#597): per game, per system, this week and all time. */
 class PlayLogTest {
     private val zone = ZoneId.of("UTC")
     private fun at(day: Int, hour: Int) = LocalDateTime.of(2026, 10, day, hour, 0).atZone(zone).toInstant().toEpochMilli()

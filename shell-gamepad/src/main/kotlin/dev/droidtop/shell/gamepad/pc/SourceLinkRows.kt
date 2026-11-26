@@ -28,10 +28,10 @@ import kotlinx.coroutines.launch
  */
 
 /**
- * The page's row for a linked source's own page (Droidtop/tracker#397 slice
+ * The page's row for a linked source's own page (mytop-project/tracker#397 slice
  * E): it opens the link in the browser and fetches nothing. The page shows
  * only the link's host; the whole link is the row's tip. It is the Show
- * thread tab's row (Droidtop/tracker#845) until that tab draws the thread's
+ * thread tab's row (mytop-project/tracker#845) until that tab draws the thread's
  * first post.
  */
 internal const val OPEN_SOURCE_ROW = "Open source page"
@@ -45,8 +45,8 @@ internal const val SOURCE_LINK_HELP = "A link or id; blank unlinks"
 
 /**
  * The game's update sources as rows: under Versions one per source (A links or changes it), and under Show thread
- * (Droidtop/tracker#845), for each linked one whose page is known, "View thread" with the page's host
- * (Droidtop/tracker#859; the owner: "there's no "view thread" button"). [onOpen] opens that page in droidtop's web view
+ * (mytop-project/tracker#845), for each linked one whose page is known, "View thread" with the page's host
+ * (mytop-project/tracker#859; the owner: "there's no "view thread" button"). [onOpen] opens that page in droidtop's web view
  * with the source's session. Pure, for the tests.
  */
 internal fun sourceRows(
@@ -80,7 +80,7 @@ internal fun sourceRows(
     )
 }
 
-/** The game page's row that opens a linked source's page (Droidtop/tracker#859). */
+/** The game page's row that opens a linked source's page (mytop-project/tracker#859). */
 internal const val VIEW_THREAD_ROW = "View thread"
 
 /**
@@ -173,7 +173,7 @@ private suspend fun linkFound(
  * The sheet that links the game to [source]: first the search, "Search for: <text>", which starts as [gameTitle] and
  * which the person changes in the shell's text entry (the touch keyboard or the pad's), then the source's own matches
  * for that text (best first), then "Type a link or id", then "Unlink" when it is linked. Every row asks twice
- * ([SameGamePicker]): linking changes what the library tells the person about the game. Droidtop/tracker#861: the
+ * ([SameGamePicker]): linking changes what the library tells the person about the game. mytop-project/tracker#861: the
  * owner, "manual search for all sources, especially when matching, is a necessity. Right now, it forces you to use the
  * folder name."
  */
@@ -201,7 +201,7 @@ internal fun SourceLinkSheet(
     val first = 1
     val typeIndex = first + matches.size
     val choices = buildList {
-        // The search and the typed link are typed in their own rows (no editor, no panel: Droidtop/tracker#954 item 12).
+        // The search and the typed link are typed in their own rows (no editor, no panel: mytop-project/tracker#954 item 12).
         add(SameGameChoice(searchRowTitle(query), "Change what is searched for", TypedChoice(query, gameTitle, search = true)))
         matches.forEach { match ->
             add(

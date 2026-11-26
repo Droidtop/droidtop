@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** A settled save conflict's kept copies on the game page (Droidtop/tracker#822). */
+/** A settled save conflict's kept copies on the game page (mytop-project/tracker#822). */
 class KeptSaveRowsTest {
     @Before
     fun installWords() = WordsForTests.install()

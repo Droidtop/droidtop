@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** docs/SPEC.md 3d "Home and folders" (Droidtop/tracker#555 D3): one description, read by both backends. */
+/** docs/SPEC.md 3d "Home and folders" (mytop-project/tracker#555 D3): one description, read by both backends. */
 class EnvironmentMountsTest {
     @get:Rule val tmp = TemporaryFolder()
 

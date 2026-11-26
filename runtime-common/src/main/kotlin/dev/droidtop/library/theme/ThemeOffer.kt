@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * "Your theme is ready: Art Book Next. Use it / Later" (docs/SPEC.md 7f, Droidtop/tracker#532). A theme that finishes
+ * "Your theme is ready: Art Book Next. Use it / Later" (docs/SPEC.md 7f, mytop-project/tracker#532). A theme that finishes
  * downloading while nobody is looking at the choice is installed and offered, never made the active one under the
  * person: the whole shell used to change its look mid-session without a word. The shell draws the question from
  * [pending]; an unanswered one is kept in the preferences and raised again by [restore]. Both answers end it.

@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Open with, for plugins (docs/plugin-api.md 1.12, catalogue E4, Droidtop/tracker#221): which files a handler takes. */
+/** Open with, for plugins (docs/plugin-api.md 1.12, catalogue E4, mytop-project/tracker#221): which files a handler takes. */
 class FileHandlersTest {
     private fun entry(vararg associations: JSONObject, point: String = FileHandlers.POINT) =
         ProvidedPoint(point = point, extra = JSONObject().put("associations", JSONArray(associations.toList())).toString())

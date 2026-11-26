@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The order of the Quick Menu's sections, the person's to set (owner, 2026-10-23: "So long as it's reorderable, the
- * order is fine"; Droidtop/tracker#610). One list of panels in preferences, read once off the main thread ([load]);
+ * order is fine"; mytop-project/tracker#610). One list of panels in preferences, read once off the main thread ([load]);
  * the rail and the Settings screen that changes it both read [order]. The section names live here too, so the rail
  * and that screen cannot call a section by two names.
  */
@@ -28,7 +28,7 @@ object QuickMenuOrder {
         ControlPanel.DISPLAY to "Display",
         ControlPanel.DOWNLOADS to "Downloads",
         ControlPanel.PLUGINS to "Plugins",
-        // The person's own name and picture (owner, 2026-10-28, Droidtop/tracker#586).
+        // The person's own name and picture (owner, 2026-10-28, mytop-project/tracker#586).
         ControlPanel.PROFILE to "Profile",
     )
 

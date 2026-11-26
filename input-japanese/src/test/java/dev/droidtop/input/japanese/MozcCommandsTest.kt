@@ -13,7 +13,7 @@ import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.Request
 import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.SessionCommand
 import org.pocketworkstation.pckeyboard.InputEngine
 
-/** Droidtop/tracker#903 H7c: each key of the seam as the Mozc command SPEC 6a's H7a list names. */
+/** mytop-project/tracker#903 H7c: each key of the seam as the Mozc command SPEC 6a's H7a list names. */
 class MozcCommandsTest {
     private fun special(input: Input): Pair<KeyEvent.SpecialKey, List<KeyEvent.ModifierKey>> {
         assertEquals(Input.CommandType.SEND_KEY, input.type)

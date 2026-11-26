@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
 
 /**
- * The Quick Menu over Standard's home screen (docs/SPEC.md, Launcher mode "Gestures"; Droidtop/tracker#564): the
+ * The Quick Menu over Standard's home screen (docs/SPEC.md, Launcher mode "Gestures"; mytop-project/tracker#564): the
  * same sheet Gaming's R2 and Desktop's tray open, reached from a home-screen gesture set to Quick Menu. A
  * translucent window, so the home screen stays behind it. Standard has no Start menu, so Start closes it.
  *

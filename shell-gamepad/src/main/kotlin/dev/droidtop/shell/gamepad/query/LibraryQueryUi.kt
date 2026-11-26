@@ -292,7 +292,7 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    // The view's name is typed in the save row itself (no editor, no panel: Droidtop/tracker#954 item 12).
+                    // The view's name is typed in the save row itself (no editor, no panel: mytop-project/tracker#954 item 12).
                     is FilterEntry.Row -> if (entry.names != null && entry.names == naming) {
                         dev.droidtop.shell.gamepad.InPlaceTextField(
                             initial = query.text.takeIf { it.isNotBlank() } ?: "",
@@ -448,7 +448,7 @@ internal fun PersistQuery(
 }
 
 /**
- * THE search (docs/SPEC.md 12a "One search", Droidtop/tracker#315): a field
+ * THE search (docs/SPEC.md 12a "One search", mytop-project/tracker#315): a field
  * and ONE ranked list, opened from the PC library, a console gamelist's
  * Select menu and the launcher's drawer. The list is fed by [UnifiedSearch]:
  * the device's own rows from [local] (installed apps and library games,
@@ -510,38 +510,38 @@ internal fun LibrarySearchDialog(
     // The settings of this surface: matching ones follow the rows as a section called Settings, and a press opens the
     // screen the setting lives on. Null where the surface has no settings of its own to search.
     settingsRoot: CatalogScreen? = null,
-    // The person opened the search to type (a Search row they picked), so typing starts at once (Droidtop/tracker#612).
+    // The person opened the search to type (a Search row they picked), so typing starts at once (mytop-project/tracker#612).
     startTyping: Boolean = false,
-    // Get games (Droidtop/tracker#825): the source filter's chips under the field, and with no text what the sources
+    // Get games (mytop-project/tracker#825): the source filter's chips under the field, and with no text what the sources
     // feature now, so it opens on games rather than a blank list.
     getGames: Boolean = false,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
-    // (Droidtop/tracker#376: a plain String field put the caret at the start).
+    // (mytop-project/tracker#376: a plain String field put the caret at the start).
     var field by remember {
         mutableStateOf(TextFieldValue(query.text, selection = TextRange(query.text.length)))
     }
     val text = field.text
     val fieldFocus = remember { FocusRequester() }
-    // The panel's own focus, which it takes back whenever the field gives focus up (Droidtop/tracker#747).
+    // The panel's own focus, which it takes back whenever the field gives focus up (mytop-project/tracker#747).
     val panelFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
-    // Its window must not raise Android's keyboard by itself when the field takes the cursor (Droidtop/tracker#832).
+    // Its window must not raise Android's keyboard by itself when the field takes the cursor (mytop-project/tracker#832).
     dev.droidtop.shell.gamepad.KeepKeyboardDownOnFocus()
     // A page a result opens (a source's detail, a plugin's settings) takes the window over: the
-    // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
+    // search panel is not drawn under it, because two translucent windows put text on text (mytop-project/tracker#542).
     // What was typed and where the cursor was stay in this composition and are there when the page closes.
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     // A facet's small screen (a source's search options) opens as a popup over the panel, which stays on screen
-    // (Droidtop/tracker#939).
+    // (mytop-project/tracker#939).
     var activePopup by remember { mutableStateOf<CatalogScreen?>(null) }
     // The merged row whose places are being chosen from (its key), or null for the result list.
     var choosing by remember { mutableStateOf<String?>(null) }
     var firstShow by remember { mutableStateOf(true) }
     // Whether the person chose to type (A or a tap on the field, or a key typed). Putting the cursor in the field is
     // droidtop's doing, not a choice, so no keyboard comes up for it, except on one touch-only screen (owner,
-    // 2026-10-23, Droidtop/tracker#612; AddonKeyboardRules.raisesOnOwnFocus).
+    // 2026-10-23, mytop-project/tracker#612; AddonKeyboardRules.raisesOnOwnFocus).
     var typing by remember { mutableStateOf(startTyping || dev.droidtop.shell.gamepad.KeyboardTargets.raisesOnOwnFocus()) }
     // Android's keyboard, where it is the one that types here; droidtop's own (the companion's Keys) follows [typing].
     fun androidKeyboard() {
@@ -551,7 +551,7 @@ internal fun LibrarySearchDialog(
         if (activeCatalog != null) return@LaunchedEffect
         // The field lives in the dialog's own composition, which attaches a frame or more after this
         // effect starts: one early request failed silently on a reopen and left the field unfocused
-        // until A (Droidtop/tracker#376). Ask until it is attached.
+        // until A (mytop-project/tracker#376). Ask until it is attached.
         dev.droidtop.shell.gamepad.requestFocusWhenAttached(fieldFocus, "Search field")
         // Back from a page the soft keyboard stays away: the pad is on a row, not typing.
         if (!firstShow) return@LaunchedEffect
@@ -573,13 +573,13 @@ internal fun LibrarySearchDialog(
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
-    // The live sources are asked only on a press (owner, 2026-11-12, Droidtop/tracker#937); typing new text goes back
+    // The live sources are asked only on a press (owner, 2026-11-12, mytop-project/tracker#937); typing new text goes back
     // to the library and each source's own index.
     var live by remember { mutableStateOf(false) }
     // Whether the device has no network at all (the one status source, read off the main thread): every source then
     // fails for the same reason, and the page says so once.
     val offline by dev.droidtop.ui.shared.rememberOffline()
-    // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
+    // What a failed source reported in its own words, shown on request under its plain sentence (mytop-project/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     // Whether the folded "N sources need attention" row was opened; a new search folds them again.
     var failuresOpen by remember(text) { mutableStateOf(false) }
@@ -629,8 +629,8 @@ internal fun LibrarySearchDialog(
         }
 
     // The sources are started as the screen opens, while the person types, and held until it closes
-    // (Droidtop/tracker#848): a search then asks sources that are already up.
-    // Only once the person asks the sources (Droidtop/tracker#937): typing alone starts no source.
+    // (mytop-project/tracker#848): a search then asks sources that are already up.
+    // Only once the person asks the sources (mytop-project/tracker#937): typing alone starts no source.
     DisposableEffect(sourcePlatform ?: systemId, live) {
         if (live) dev.droidtop.library.integrations.SourceWarmth.prewarm(context, sourcePlatform ?: systemId)
         onDispose { if (live) dev.droidtop.library.integrations.SourceWarmth.release() }
@@ -652,7 +652,7 @@ internal fun LibrarySearchDialog(
                 live = live,
             )
         }
-            // At most one new state every 150 ms, always the newest (UnifiedSearch.pacedAtMost, Droidtop/tracker#915): every
+            // At most one new state every 150 ms, always the newest (UnifiedSearch.pacedAtMost, mytop-project/tracker#915): every
             // state rebuilds the whole result list on the main thread, and several sources answering together sent many.
             .let { with(UnifiedSearch) { it.pacedAtMost() } }
             .collect { state = it }
@@ -683,11 +683,11 @@ internal fun LibrarySearchDialog(
         switches.forEach { switch ->
             add(SearchLine.Entry("switch:${switch.label}", switch.label, on = switch.on, onPick = switch.toggle))
         }
-        // Where Get games searches (owner, 2026-10-30, Droidtop/tracker#825: "a filter to choose where it searches"): a
+        // Where Get games searches (owner, 2026-10-30, mytop-project/tracker#825: "a filter to choose where it searches"): a
         // chip per source, on or off and kept (SourceSelection), turning while its source is asked and saying so when it
         // failed. A press turns it over and searches again.
         // Shown on every search that reaches the sources, not only Get games: the chips are where each source's state
-        // shows, saved or live (owner, 2026-11-15, Droidtop/tracker#937: "I can't see when it is or isn't searching online").
+        // shows, saved or live (owner, 2026-11-15, mytop-project/tracker#937: "I can't see when it is or isn't searching online").
         if (getGames || text.isNotBlank()) {
             val chips = sourceChips(state, offline)
             if (chips.isNotEmpty()) {
@@ -702,7 +702,7 @@ internal fun LibrarySearchDialog(
             }
         }
         // With no network at all every source fails the same way, so the page says that once, first, in the words of
-        // every network page's offline notice, rather than waiting for each source to fail (Droidtop/tracker#594, rig
+        // every network page's offline notice, rather than waiting for each source to fail (mytop-project/tracker#594, rig
         // 2758; #671 had it only below the failures). The failures, their fixes and the empty note are left out then.
         if (offline && (getGames || state.sources.isNotEmpty())) {
             add(
@@ -756,7 +756,7 @@ internal fun LibrarySearchDialog(
         fun rowLine(row: SearchRow): SearchLine = SearchLine.Entry(
             "row:${row.kind}:${row.key}",
             row.title,
-            // One game from several sources names them all (Droidtop/tracker#825: "from F95zone · LewdCorner").
+            // One game from several sources names them all (mytop-project/tracker#825: "from F95zone · LewdCorner").
             subtitle = sourcesLine(row.choices.map { UnifiedSearch.placeOf(it) }) ?: row.detail,
             art = row.hit?.result?.artUrl?.takeIf { it.isNotBlank() },
             value = when {
@@ -786,12 +786,12 @@ internal fun LibrarySearchDialog(
             }
         } else if (text.isNotBlank() || getGames) {
             // What is here first, then the matches from the download sources under their own heading (owner, 2026-10-23:
-            // "Get new games should be presented under the search results", Droidtop/tracker#612). Get games with no text
-            // lists what the sources feature now (Droidtop/tracker#825).
+            // "Get new games should be presented under the search results", mytop-project/tracker#612). Get games with no text
+            // lists what the sources feature now (mytop-project/tracker#825).
             val (here, new) = state.rows.partition { !it.isNew }
             here.forEach { row -> add(rowLine(row)) }
             if (new.isNotEmpty()) {
-                // Which answer these are, in one word (Droidtop/tracker#937): the sources' saved lists until the press,
+                // Which answer these are, in one word (mytop-project/tracker#937): the sources' saved lists until the press,
                 // then what they answered live.
                 val kind = words(if (live) R.string.gamepad_source_results_live else R.string.gamepad_source_results_saved)
                 val heading = if (state.featured) FEATURED else dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES
@@ -807,7 +807,7 @@ internal fun LibrarySearchDialog(
                     add(SearchLine.Entry("setting:${hit.itemId}", hit.itemTitle, subtitle = hit.screenTitle) { activeCatalog = hit.target })
                 }
             }
-            // The live sources, on a press (owner, 2026-11-12, Droidtop/tracker#937): what is above is the library and
+            // The live sources, on a press (owner, 2026-11-12, mytop-project/tracker#937): what is above is the library and
             // each source's own index; this asks the sources that are on, over the network, and adds what they answer.
             if (!live) {
                 add(
@@ -835,7 +835,7 @@ internal fun LibrarySearchDialog(
                             UnavailableSource.waitingTitle(waiting),
                             subtitle = if (waiting.singleOrNull()?.askable == true) "Not allowed to get games yet" else UnavailableSource.waitingSubtitle(waiting),
                         ) {
-                            // One source missing only the library.sources point: ask here, and search again once allowed (Droidtop/tracker#270).
+                            // One source missing only the library.sources point: ask here, and search again once allowed (mytop-project/tracker#270).
                             val ask = waiting.singleOrNull()?.takeIf { it.askable }
                             if (ask == null) {
                                 openPlugin(waiting.singleOrNull()?.pluginId)
@@ -857,10 +857,10 @@ internal fun LibrarySearchDialog(
                         add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = words(R.string.gamepad_searches_again_after)) { activePopup = options })
                     }
                 }
-                // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", Droidtop/tracker#746):
+                // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", mytop-project/tracker#746):
                 // its icon, the attention glyph and its short reason, and A runs the one fix (SourceFix). Several fold into
                 // one row until it is opened. Technical details stay one press away, and a second press copies them.
-                // Offline, the one row at the top says why they all failed (Droidtop/tracker#594).
+                // Offline, the one row at the top says why they all failed (mytop-project/tracker#594).
                 val failed = state.sources.filter { it.failure != null }
                 if (!offline && failed.size > 1 && !failuresOpen) {
                     add(
@@ -982,7 +982,7 @@ internal fun LibrarySearchDialog(
                         GamepadAction.B -> {
                             // From the places of one game, B goes back to the results. With a keyboard up, B puts it
                             // away and keeps the query and its results, the cursor on the first result (owner,
-                            // 2026-11-15, Droidtop/tracker#938: "dismiss it from the gamepad without closing the search
+                            // 2026-11-15, mytop-project/tracker#938: "dismiss it from the gamepad without closing the search
                             // results"). Otherwise B closes.
                             when {
                                 choosing != null -> choosing = null
@@ -1049,7 +1049,7 @@ internal fun LibrarySearchDialog(
                 }
                 // Under the handler, so it always hears the pad: Back hiding the on-screen keyboard clears the
                 // field's focus, and with no focus inside the panel D-pad Up and A did nothing while a tap still
-                // worked (console, Droidtop/tracker#747). The rows take no focus (padRow), so the panel holds it.
+                // worked (console, mytop-project/tracker#747). The rows take no focus (padRow), so the panel holds it.
                 .holdKeyFocus(panelFocus)
                 .clip(MenuTokens.OverlayShape)
                 .background(MenuTokens.OverlaySurface)
@@ -1076,7 +1076,7 @@ internal fun LibrarySearchDialog(
                 singleLine = true,
                 // Android's keyboard does not come up just because the field took the cursor: Compose raised it on
                 // every focus, over the Gaming screen, even where droidtop's own keyboard serves the field on the
-                // companion (Droidtop/tracker#832). The one rule every droidtop field follows (raisesKeyboardWithFocus).
+                // companion (mytop-project/tracker#832). The one rule every droidtop field follows (raisesKeyboardWithFocus).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = ImeAction.Search,
                     showKeyboardOnFocus = dev.droidtop.shell.gamepad.raisesKeyboardWithFocus,
@@ -1088,7 +1088,7 @@ internal fun LibrarySearchDialog(
                     },
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
-                // An empty field says what it searches, and that A types (UI review, Droidtop/tracker#954 item 8).
+                // An empty field says what it searches, and that A types (UI review, mytop-project/tracker#954 item 8).
                 decorationBox = { inner ->
                     androidx.compose.foundation.layout.Box {
                         if (field.text.isEmpty()) {
@@ -1165,7 +1165,7 @@ internal data class SearchSwitch(val label: String, val on: Boolean, val toggle:
 /** What the search dialog draws, top to bottom: a heading, a muted line, or a row the pad's cursor can stop on. */
 private sealed interface SearchLine {
     data class Header(val text: String) : SearchLine
-    /** A quiet line; [busy] draws the shell's loading bar under it while something is asked (Droidtop/tracker#671). */
+    /** A quiet line; [busy] draws the shell's loading bar under it while something is asked (mytop-project/tracker#671). */
     data class Note(val text: String, val busy: Boolean = false) : SearchLine
 
     /** A line the pad's cursor stops on; A runs [onPick]. */
@@ -1186,13 +1186,13 @@ private sealed interface SearchLine {
         val subtitle: String? = null,
         val value: String? = null,
         val icon: android.graphics.Bitmap? = null,
-        /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
+        /** An on/off row's state, drawn as a switch (show, then say: mytop-project/tracker#738); null for any other row. */
         val on: Boolean? = null,
         /** A plugin's own icon as a file, for a row about the plugin itself (a failed source). */
         val iconFile: String? = null,
-        /** A state glyph beside the title (a failed source's attention, Droidtop/tracker#746). */
+        /** A state glyph beside the title (a failed source's attention, mytop-project/tracker#746). */
         val mark: StatusMark? = null,
-        /** A source result's box art, a file or a web address, drawn before the row (Droidtop/tracker#825). */
+        /** A source result's box art, a file or a web address, drawn before the row (mytop-project/tracker#825). */
         val art: String? = null,
         override val onPick: () -> Unit,
     ) : Stop
@@ -1203,7 +1203,7 @@ internal data class SourceChip(val id: String, val label: String, val on: Boolea
 
 /**
  * The filter's chips: the sources asked, in their order, then the ones turned off. While [offline] none reads as
- * failed: the page's one offline row says why (Droidtop/tracker#594). Pure.
+ * failed: the page's one offline row says why (mytop-project/tracker#594). Pure.
  */
 internal fun sourceChips(state: UnifiedState, offline: Boolean = false): List<SourceChip> =
     state.sources.map { SourceChip(it.source.id, it.source.label, on = true, busy = it.pending, failed = !offline && it.failure != null) } +
@@ -1236,7 +1236,7 @@ private fun SourceChipRow(line: SearchLine.Chips, cursorAt: Int?, onPick: (Int) 
                     onClick = { onPick(index) },
                 )
                 // Moving while its source is asked (show, then say): the shell's loading bar, short, not a stock spinner
-                // in its own colour (Droidtop/tracker#671, rig 2758).
+                // in its own colour (mytop-project/tracker#671, rig 2758).
                 if (chip.busy) {
                     dev.droidtop.shell.gamepad.ShellLoading(Modifier.padding(start = 6.dp).width(dev.droidtop.shell.gamepad.ProgressLook.InlineLoadingWidth))
                 }

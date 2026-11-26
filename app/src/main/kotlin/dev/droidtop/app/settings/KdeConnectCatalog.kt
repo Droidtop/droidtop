@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Accounts and sources > KDE Connect (docs/SPEC.md 7q "KDE Connect", Droidtop/tracker#645): droidtop as a
+ * Settings > Accounts and sources > KDE Connect (docs/SPEC.md 7q "KDE Connect", mytop-project/tracker#645): droidtop as a
  * KDE Connect device. The switch, the name the others see, devices added by address, and the devices: a request
  * to pair with its code, Accept and Refuse; the paired ones with Ping and Unpair; the others with Pair. A catalog
  * screen, so both Settings surfaces draw it, and live: it is built again when a device comes, goes or asks.

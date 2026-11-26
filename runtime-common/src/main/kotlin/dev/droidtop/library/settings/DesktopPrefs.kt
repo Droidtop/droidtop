@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
 /**
- * The one definition of Desktop mode's own settings (Droidtop/tracker#764): Settings > Desktop mode writes them, and
+ * The one definition of Desktop mode's own settings (mytop-project/tracker#764): Settings > Desktop mode writes them, and
  * the Desktop shell observes them through [changes], so a change applies to the desktop already showing and nothing
  * reads the file during composition.
  */
@@ -20,7 +20,7 @@ object DesktopPrefs {
 
     /**
      * What the shell reads: where the bar sits, the stored scale and resolution ([DesktopScale]; null for none), and
-     * whether the seat's input method is left to a container's own (Droidtop/tracker#809).
+     * whether the seat's input method is left to a container's own (mytop-project/tracker#809).
      */
     data class Values(
         val taskbarAtTop: Boolean = false,
@@ -56,7 +56,7 @@ object DesktopPrefs {
     }
 
     /**
-     * Android's density for the screen the desktop last drew on (Droidtop/tracker#386), recorded by the desktop
+     * Android's density for the screen the desktop last drew on (mytop-project/tracker#386), recorded by the desktop
      * itself, so Settings' "Automatic" names the scale the desktop uses rather than the scale of the screen Settings
      * happens to be on. Null until the desktop has drawn once. Disk: IO only.
      */

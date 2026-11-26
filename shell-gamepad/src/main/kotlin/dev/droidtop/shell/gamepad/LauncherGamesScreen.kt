@@ -78,7 +78,7 @@ internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
  * every list uses; Select's Options pins the game to the home screen and
  * opens Game folders in place (the settings screen that fills an empty
  * grid, rendered by the same navigator the shell's settings use); B leaves.
- * A PC or engine game is Gaming's PC game wired out (Droidtop/tracker#349):
+ * A PC or engine game is Gaming's PC game wired out (mytop-project/tracker#349):
  * A follows the same primary-action rule as the PC Games tab (a store game
  * that is not installed offers the install), and a long press or Options >
  * Game page opens the same page and menu; a console game's Game page is Gaming's detail for it
@@ -160,7 +160,7 @@ private fun GamesGrid(
 ) {
     val window = LocalShellWindow.current
     val pad = rememberGridPad()
-    // A PC or engine game takes the PC Games tab's primary action; it and a console game have Gaming's page (Droidtop/tracker#349).
+    // A PC or engine game takes the PC Games tab's primary action; it and a console game have Gaming's page (mytop-project/tracker#349).
     fun hasPage(entry: LibraryEntry) = library != null && hasGamePage(entry)
     var pageId by remember(openPageId) { mutableStateOf(openPageId?.takeIf { library != null }) }
     val pcLaunch = dev.droidtop.shell.gamepad.pc.rememberPcLaunch(onLaunch = onPlay, onOpenDownloads = onOpenDownloads)
@@ -334,7 +334,7 @@ private fun GamesGrid(
     if (sortOpen) {
         LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
     }
-    // Gaming's game page: the PC Games tab's page, menu and install offer, or a console game's detail (Droidtop/tracker#349).
+    // Gaming's game page: the PC Games tab's page, menu and install offer, or a console game's detail (mytop-project/tracker#349).
     val pageLibrary = library
     val openPage = pageId
     if (pageLibrary != null && openPage != null) {

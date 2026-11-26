@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Japanese typing through Mozc (Droidtop/tracker#903 H7c). The strip's lines while it cannot type yet, and its settings row. -->
+<!-- Japanese typing through Mozc (mytop-project/tracker#903 H7c). The strip's lines while it cannot type yet, and its settings row. -->
 <resources>
     <!-- One line on the candidate strip, in place of candidates, while Japanese cannot type. -->
     <string name="mozc_unavailable_network">Japanese needs its %1$d MB dictionary first, and there is no connection. It tries again in the next text field.</string>

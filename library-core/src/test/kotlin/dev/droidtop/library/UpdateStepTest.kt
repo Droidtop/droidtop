@@ -3,7 +3,7 @@ package dev.droidtop.library
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The Updates page's version step, installed first (Droidtop/tracker#792, #639). */
+/** The Updates page's version step, installed first (mytop-project/tracker#792, #639). */
 class UpdateStepTest {
     @Test
     fun `the installed version comes first and the available one after the arrow`() {

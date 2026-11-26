@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Makes, sizes, places and removes sway's headless outputs for the desktop session (Droidtop/tracker#908, step D2),
+ * Makes, sizes, places and removes sway's headless outputs for the desktop session (mytop-project/tracker#908, step D2),
  * over sway's IPC ([SwayIpc], the socket in [hostSocketDir]) for what only sway can do, and host-bridge ([bridge])
  * for the output's name and size, which it already has from the compositor.
  *

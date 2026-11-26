@@ -97,7 +97,7 @@ class ProotRuntime(
     private val microphoneEnabled: () -> Boolean = { false },
     /**
      * The person's games folders, bound at their shared-storage paths in a container that does not have "All
-     * internal storage" (docs/SPEC.md 5a, 4; Droidtop/tracker#584); read at each start.
+     * internal storage" (docs/SPEC.md 5a, 4; mytop-project/tracker#584); read at each start.
      */
     private val sharedFolders: () -> List<String> = { emptyList() },
 ) : ContainerRuntime {
@@ -363,7 +363,7 @@ class ProotRuntime(
     override val networkUnavailableReason: String =
         "Its programs run as droidtop itself, with droidtop's network. Taking it away needs the root backend (droidspaces)"
 
-    /** Real now (Droidtop/tracker#95): see [HostAudioServer]. */
+    /** Real now (mytop-project/tracker#95): see [HostAudioServer]. */
     override val audioSharingUnavailableReason: String? = null
 
     override val microphoneUnavailableReason: String? = null
@@ -523,7 +523,7 @@ class ProotRuntime(
         user: ContainerUser.Spec?,
     ): ContainerExecResult {
         requireRootfs(container)
-        // Another user (Droidtop/tracker#715): proot shows its ids instead of root's; a name the image cannot resolve
+        // Another user (mytop-project/tracker#715): proot shows its ids instead of root's; a name the image cannot resolve
         // fails the exec in Docker's words.
         val ids = user?.takeUnless { it.isRoot }?.let { spec ->
             withContext(Dispatchers.IO) { ContainerUser.resolveIn(rootfsOf(container.id), spec) }.getOrThrow().let { "${it.uid}:${it.gid}" }
@@ -564,7 +564,7 @@ class ProotRuntime(
     override val interactiveShellUnavailableReason: String? = null
 
     /**
-     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909): the same proot
+     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909): the same proot
      * session [exec] starts ([sessionCommand]), as root, with the login shell and the terminal's environment, started
      * by the terminal on its pseudo-terminal rather than here. The process gets the app's own environment plus proot's
      * variables and the session marker, as [startSession]'s ProcessBuilder would. [InteractiveShell.OnTerminal.end]
@@ -682,7 +682,7 @@ class ProotRuntime(
     // ---- process plumbing ----
 
     /**
-     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910): its display number
+     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", mytop-project/tracker#910): its display number
      * once the server is running, started here when it is not; null for the primary (sway's own Xwayland serves it),
      * with the desktop down or Wayland not shared, or without [SiblingX11.PACKAGE] in its tree. Under proot a sibling
      * has no init, and `--kill-on-exit` ends whatever a program's session leaves behind, so the server is a session
@@ -746,7 +746,7 @@ class ProotRuntime(
      *  - `--root-id`: uid/gid 0 as far as the guest can tell; a distro's
      *    package manager refuses to run otherwise. With [ids] ("uid:gid"),
      *    `--change-id` shows those instead: a program run as its image's
-     *    user, or `-u` (Droidtop/tracker#715). Either way the files it
+     *    user, or `-u` (mytop-project/tracker#715). Either way the files it
      *    writes are droidtop's own on disk.
      *  - `--link2symlink`: hard links the guest makes become proot-managed
      *    symlinks (dpkg makes them; Android refuses an app most of them).
@@ -826,7 +826,7 @@ class ProotRuntime(
             // Volumes mounted now, looked up per session: a card or USB
             // drive mounted since the last one is there the next time. Whole
             // only under "All internal storage"; otherwise just the person's
-            // games folders, at the same paths (SPEC 5a, 4; Droidtop/tracker#584).
+            // games folders, at the same paths (SPEC 5a, 4; mytop-project/tracker#584).
             val volumes = SharedVolume.mounted(context)
             val storageBinds = if (readMounts(containerId).allStorage) {
                 ContainerLayout.sharedStorageBinds(volumes)
@@ -841,7 +841,7 @@ class ProotRuntime(
             readMounts(containerId).binds(ContainerLayout.sharedHomeDir(appStorageDir))
                 .forEach { (host, guest) -> add("--bind=$host:$guest") }
             // Android refuses apps some of /proc (SELinux), and top, ps and uptime fail on them ("can't open 'stat':
-            // Permission denied", Droidtop/tracker#909): a stand-in is bound over each one this process cannot read,
+            // Permission denied", mytop-project/tracker#909): a stand-in is bound over each one this process cannot read,
             // as Termux's proot-distro does.
             ProcStandIns.binds(etcDir).forEach { (host, guest) -> add("--bind=$host:$guest") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
@@ -1101,7 +1101,7 @@ class ProotRuntime(
          * /proc/sys/kernel/overflowuid, and could not create a namespace
          * if it got further). GTK loads every icon and image through
          * glycin, which runs its decoders under bwrap: PCManFM aborted on
-         * its first icon (Droidtop/tracker#96). glycin probes bwrap once
+         * its first icon (mytop-project/tracker#96). glycin probes bwrap once
          * and, when the probe's stderr says namespaces cannot be created,
          * runs its decoders unsandboxed instead (glycin's
          * check_bwrap_syscalls_blocked, in 2.1 as in current releases).

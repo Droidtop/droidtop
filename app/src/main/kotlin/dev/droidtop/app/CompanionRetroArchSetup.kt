@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * "Save and load from here: Set up" on the companion's Game tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414
+ * "Save and load from here: Set up" on the companion's Game tab (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414
  * slice C11): shown only while RetroArch runs the game and finishing the steps would make the RetroArch manager's Game
  * rows appear, so it never promises what cannot happen. The page has up to two buttons: Get the plugin (installs the
  * RetroArch manager from droidtop's official catalog, then approve it under Plugins) and Turn on (RetroArch's Network

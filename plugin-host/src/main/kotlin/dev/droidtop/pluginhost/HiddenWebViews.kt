@@ -6,7 +6,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 
 /**
- * Where droidtop's hidden web views ([WebFetch], [HiddenWebSession]) are put while they work (Droidtop/tracker#783). A
+ * Where droidtop's hidden web views ([WebFetch], [HiddenWebSession]) are put while they work (mytop-project/tracker#783). A
  * web view that is in no window is a hidden page to its browser: it draws no frames and its timers are slowed, and a
  * site's browser check never finishes in it, so on the console F95's check that passed at once in the visible view
  * "did not pass by itself" in the hidden one. Each is laid behind the content of droidtop's screen in front, at that
@@ -19,7 +19,7 @@ object HiddenWebViews {
 
     /**
      * A web view made with the context of droidtop's screen in front and put behind its content, as the visible view is
-     * made with its own screen's (Droidtop/tracker#783); null when no droidtop screen is in front. Call on the main thread.
+     * made with its own screen's (mytop-project/tracker#783); null when no droidtop screen is in front. Call on the main thread.
      */
     fun open(): WebView? {
         val content = runCatching { window?.invoke() }.getOrNull() ?: return null

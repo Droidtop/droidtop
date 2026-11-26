@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The Updates page's one row shape, its state and its views (Droidtop/tracker#792). */
+/** The Updates page's one row shape, its state and its views (mytop-project/tracker#792). */
 class UpdatesPageRowsTest {
     @Test
     fun `a row's line is the version step, the size and where it comes from`() {

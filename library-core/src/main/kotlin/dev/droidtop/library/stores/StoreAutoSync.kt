@@ -7,7 +7,7 @@ import android.net.NetworkCapabilities
 /**
  * Reads the signed-in stores' libraries again when the Gaming shell opens, if the last good read
  * is older than the person's interval and the network is unmetered (docs/SPEC.md 7g, "Stores",
- * Droidtop/tracker#225). There is no timer, loop or worker: it runs once per opening, from the
+ * mytop-project/tracker#225). There is no timer, loop or worker: it runs once per opening, from the
  * shell, through the one [StoreSyncs.run], and a store whose read was recent is not asked.
  */
 object StoreAutoSync {

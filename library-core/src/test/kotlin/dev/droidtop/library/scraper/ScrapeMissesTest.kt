@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A scrape pass names the games it did not fill (Droidtop/tracker#374). */
+/** A scrape pass names the games it did not fill (mytop-project/tracker#374). */
 class ScrapeMissesTest {
 
     @Test

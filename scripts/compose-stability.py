@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Totals the Compose compiler reports a build made with -PcomposeReports (Droidtop/tracker#941).
+"""Totals the Compose compiler reports a build made with -PcomposeReports (mytop-project/tracker#941).
 
 For each module: how many restartable composables can skip when their inputs are unchanged, and how many classes
 Compose counts as unstable. A composable that cannot skip redraws whenever its parent does, which is how one changing

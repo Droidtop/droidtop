@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Next mark, in every guide reader, goes forward through the marks (Droidtop/tracker#817). */
+/** Next mark, in every guide reader, goes forward through the marks (mytop-project/tracker#817). */
 class GuideContentTest {
     private val marks = listOf(
         GuideBookmark(GuidePosition(5, 0.1f), "Page 6"),

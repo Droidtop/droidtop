@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Plugins on the companion (docs/plugin-api.md 3 C15, Droidtop/tracker#414 slice C9): a panel's declared abilities,
+ * Plugins on the companion (docs/plugin-api.md 3 C15, mytop-project/tracker#414 slice C9): a panel's declared abilities,
  * its abilities line, and the Recording state only a declared recorder may raise and clear.
  */
 class CompanionPluginTest {

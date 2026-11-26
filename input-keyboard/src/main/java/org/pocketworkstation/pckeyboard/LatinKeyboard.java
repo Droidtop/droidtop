@@ -578,7 +578,7 @@ public class LatinKeyboard extends Keyboard {
     /**
      * The number of input languages, or 0 when this keyboard has no language switcher. Only the input method sets
      * one ({@link #setLanguageSwitcher}); the keyboards droidtop hosts itself (the companion, the in-window panel)
-     * have a single language, which must behave as one language, not crash (Droidtop/tracker, rig-5566 on 1702).
+     * have a single language, which must behave as one language, not crash (mytop-project/tracker, rig-5566 on 1702).
      */
     private int localeCount() {
         return mLanguageSwitcher == null ? 0 : mLanguageSwitcher.getLocaleCount();

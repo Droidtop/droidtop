@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * The Downloads widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): the downloads running or
+ * The Downloads widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): the downloads running or
  * paused, each with its line and a bar for its progress, then how many games have an update. A download row opens Downloads, the updates row
  * opens Updates. Drawn again when the jobs change, at most every [THROTTLE_MS], while one is placed ([watch]).
  */
@@ -57,7 +57,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
         private suspend fun render(context: Context, widgetId: Int): RemoteViews {
             val open = DroidtopWidgets.activity(context, widgetId, "downloads", CatalogScreenLink.intent(context, DOWNLOADS_SCREEN))
             // A job's line is the one every job row says (time left, Paused, Waiting for the connection), and its progress
-            // is the bar under it, never a percent in the text (Droidtop/tracker#643: no flickering numbers).
+            // is the bar under it, never a percent in the text (mytop-project/tracker#643: no flickering numbers).
             val rows = downloads(PluginJobsCenter.entries().value).map { job ->
                 DroidtopWidgets.Row(
                     "${job.title} · ${dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job)}",

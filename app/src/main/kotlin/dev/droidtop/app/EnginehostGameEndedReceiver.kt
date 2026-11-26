@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Enginehost's report that a game droidtop launched has ended (`dev.enginehost.GAME_ENDED`, sent to droidtop's
- * package alone; Droidtop/tracker#580). For a store game whose saves droidtop keeps in sync, it starts the upload
+ * package alone; mytop-project/tracker#580). For a store game whose saves droidtop keeps in sync, it starts the upload
  * job, as a Wine game's screen does when it closes. Its extras: `path` (the game folder), `saveFolder` (the folder
  * the engine actually used), `reason`, and for a launch flagged `savesSynced` the reason it refused droidtop's folder
  * (`saveRootRefused`). Enginehost reports exactly the `saveRoot` droidtop passed when it took it; when it saved to the
@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
  * ([EnginehostSaves.afterGameEnded]), and an engine that saves beside the game leaves nothing to upload.
  *
  * Any app can send this broadcast, so it is trusted for nothing but an upload of the folder droidtop itself passed
- * (Droidtop/tracker#550 build review): it never makes droidtop copy saves from another folder, which only Enginehost's
+ * (mytop-project/tracker#550 build review): it never makes droidtop copy saves from another folder, which only Enginehost's
  * own report through its plugin's broker does (`saves.changed`, [dev.droidtop.library.saves.SaveSyncEngines]). A
  * broadcast naming a game droidtop never launched starts nothing.
  */

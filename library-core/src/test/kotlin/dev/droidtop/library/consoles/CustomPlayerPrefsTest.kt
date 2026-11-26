@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A custom player's own checks and its shared form (Droidtop/tracker#248): the check names what is
+ * A custom player's own checks and its shared form (mytop-project/tracker#248): the check names what is
  * wrong with the text before anything starts, and a shared file is a players-database document that
  * the database's own parser reads back unchanged.
  */

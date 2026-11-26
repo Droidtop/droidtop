@@ -10,7 +10,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** A theme that lands while nobody chooses is offered, never imposed (Droidtop/tracker#532). */
+/** A theme that lands while nobody chooses is offered, never imposed (mytop-project/tracker#532). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ThemeOfferTest {

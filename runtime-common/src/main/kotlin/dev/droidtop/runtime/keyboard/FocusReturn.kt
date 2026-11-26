@@ -6,7 +6,7 @@ import dev.droidtop.runtime.tasks.RunningSnapshot
 
 /**
  * Which app gets the system's focus back when a touch-only companion surface became the top activity while the
- * user was in an app on the other screen (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314).
+ * user was in an app on the other screen (docs/SPEC.md 4c, "Typing on the add-on display", mytop-project/tracker#314).
  * Android sends every key, and binds the keyboard, to the top-focused display; a companion that took that role
  * leaves the app on the other screen with no keys at all.
  */

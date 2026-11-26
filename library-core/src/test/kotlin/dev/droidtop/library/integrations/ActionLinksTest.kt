@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** droidtop:// action links, grammar 2 (docs/SPEC.md 12a "Action links", Droidtop/tracker#459): literal calls, refused whole on any bad one. */
+/** droidtop:// action links, grammar 2 (docs/SPEC.md 12a "Action links", mytop-project/tracker#459): literal calls, refused whole on any bad one. */
 class ActionLinksTest {
     private val lookup: (String) -> ActionLinks.Spec? = { ActionLinks.hostOps[it] }
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")

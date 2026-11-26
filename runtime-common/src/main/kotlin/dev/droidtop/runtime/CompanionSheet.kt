@@ -5,7 +5,7 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 
 /**
- * The companion on a device with one screen (docs/SPEC.md "The companion's tabs", One screen; Droidtop/tracker#414
+ * The companion on a device with one screen (docs/SPEC.md "The companion's tabs", One screen; mytop-project/tracker#414
  * slice C13): the same tabs in a pull-down sheet over Standard's home screen and in a tray panel over Desktop's
  * taskbar, drawn by `:app`'s sheet activity. The launcher and the Desktop shell cannot name that activity, so they open
  * it by its action here, and offer the way in only while there is no second screen to hold the companion.

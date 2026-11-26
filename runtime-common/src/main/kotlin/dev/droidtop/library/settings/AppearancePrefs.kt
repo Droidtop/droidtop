@@ -5,7 +5,7 @@ import android.content.res.Configuration
 import dev.droidtop.runtime.R
 
 /**
- * Light or dark for droidtop's whole UI (docs/SPEC.md 7k, "Light and dark"; decided 2026-10-16, Droidtop/tracker#559):
+ * Light or dark for droidtop's whole UI (docs/SPEC.md 7k, "Light and dark"; decided 2026-10-16, mytop-project/tracker#559):
  * Light, Dark, or Follow Android, the default. Every surface takes its colours from the one palette this chooses
  * between: the Gaming theme's scheme whose ground matches, else one derived for it, else droidtop's own light or dark
  * default. Lives in :runtime-common so every renderer reads the one value; Settings > Appearance writes it.
@@ -33,7 +33,7 @@ object AppearancePrefs {
      * The Settings row that chooses it. Built where the settings catalog is built (it reads the active theme, as the
      * theme rows beside it do). When the Gaming theme has a colour scheme of its own chosen, that scheme wins over this
      * on every Gaming-themed screen, so the row says so ON the row, as its chip with the scheme's own label, and how
-     * to undo it in its explanation (rig 2026-10-16, Droidtop/tracker#559: the settings page stayed dark on Light
+     * to undo it in its explanation (rig 2026-10-16, mytop-project/tracker#559: the settings page stayed dark on Light
      * until the scheme was Automatic; the follow-up rig found the explanation alone unseen, since Gaming keeps a
      * subtitle on the focus line and in Info).
      */
@@ -58,7 +58,7 @@ object AppearancePrefs {
     }
 
     /**
-     * The colour source (docs/SPEC.md 7k, "Colours outside Gaming"; owner, 2026-10-30, Droidtop/tracker#827 and #844):
+     * The colour source (docs/SPEC.md 7k, "Colours outside Gaming"; owner, 2026-10-30, mytop-project/tracker#827 and #844):
      * what Mobile, Desktop, Mobile's taskbar and the shared menus are drawn in. [DEVICE] is Android's own system
      * palette (Android 12 and later); [GAMING_THEME] is the selected Gaming theme's resolved colours; [CUSTOM] is a
      * droidtop-only palette in the accent [KEY_CUSTOM_ACCENT] names. Nothing stored is [defaultSource].
@@ -76,7 +76,7 @@ object AppearancePrefs {
     const val KEY_CUSTOM_ACCENT = "pref_global_custom_accent"
 
     /**
-     * "Tint themes to my colours" (Droidtop/tracker#844), off by default: the Gaming theme's accent and highlight become
+     * "Tint themes to my colours" (mytop-project/tracker#844), off by default: the Gaming theme's accent and highlight become
      * the colour source's, Device or Custom; with Gaming theme as the source it has nothing to tint with.
      */
     const val KEY_TINT_THEMES = "pref_global_tint_themes"

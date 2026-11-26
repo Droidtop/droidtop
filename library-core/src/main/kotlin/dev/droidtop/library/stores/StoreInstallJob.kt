@@ -122,12 +122,12 @@ object StoreInstallJob {
     fun jobFor(key: String): PluginJobsCenter.Entry? =
         PluginJobsCenter.entries().value.firstOrNull { it.nativeKind == KIND && !it.done && it.resumePayload == key }
 
-    /** The newest job for the store row [key], running or ended and still listed: what its Updates row shows (Droidtop/tracker#833). */
+    /** The newest job for the store row [key], running or ended and still listed: what its Updates row shows (mytop-project/tracker#833). */
     fun lastFor(key: String, entries: List<PluginJobsCenter.Entry> = PluginJobsCenter.entries().value): PluginJobsCenter.Entry? =
         entries.filter { it.nativeKind == KIND && keyOf(it) == key }.maxByOrNull { it.startedAtMs }
 
     /**
-     * Starts [jobId]'s store download over (Droidtop/tracker#313: a download that crashed sat Paused with an empty bar):
+     * Starts [jobId]'s store download over (mytop-project/tracker#313: a download that crashed sat Paused with an empty bar):
      * the job is cancelled, which deletes what it downloaded so far (its cancel hook, [discard]), and once it has
      * ended the same game is started again into the same folder. Only after the person confirmed: it deletes files.
      * False when [jobId] is not a store download droidtop still knows.

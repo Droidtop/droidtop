@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * Which of droidtop's own components Standard's launcher shows while it hides droidtop's package (docs/SPEC.md
- * 2c, "One droidtop icon"): the one icon, and every widget droidtop provides (Droidtop/tracker#563).
+ * 2c, "One droidtop icon"): the one icon, and every widget droidtop provides (mytop-project/tracker#563).
  *
  * Widgets are recognised by what they are (a receiver with the app widget provider metadata), not by a list of
  * classes. The list it replaces named two widgets, so the seven added later were filtered out of the launcher's

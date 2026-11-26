@@ -19,7 +19,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * A page fetched by droidtop's web view instead of its HTTP client (Droidtop/tracker#600): Cloudflare tells
+ * A page fetched by droidtop's web view instead of its HTTP client (mytop-project/tracker#600): Cloudflare tells
  * droidtop's client from a browser by more than cookies and user agent, so on a host that has shown a check a plugin's
  * GET is loaded by a web view out of sight ([HiddenWebViews]) with the cookies it would have sent, and the plugin gets
  * the page's final HTML as an ordinary answer. A check the view passes by itself (most do, in a few seconds) is waited for; one that
@@ -28,7 +28,7 @@ import org.json.JSONObject
 object WebFetch {
     /**
      * How long a check page may take to pass by itself before it is the person's. It was 12 s; on the console
-     * (Droidtop/tracker#783) the hidden view gave up at 12.7 s and the visible view then passed the same check unaided,
+     * (mytop-project/tracker#783) the hidden view gave up at 12.7 s and the visible view then passed the same check unaided,
      * so the hidden one gets as long as a person would wait. [WebViewProbe] logs how long each view takes to pass. The
      * plugin's own request timeout still bounds it.
      */
@@ -65,7 +65,7 @@ object WebFetch {
             jar.setCookie("https://$host", "$pair; Path=/; Secure")
         }
         // Made with droidtop's screen in front and put behind it, out of sight: a page in no window never finishes a check
-        // (Droidtop/tracker#783). With no droidtop screen in front it runs in no window, as before.
+        // (mytop-project/tracker#783). With no droidtop screen in front it runs in no window, as before.
         val view = HiddenWebViews.open() ?: WebView(context)
         val shown = view.isAttachedToWindow
         WebSessionActivity.webViewSetup?.invoke(view)

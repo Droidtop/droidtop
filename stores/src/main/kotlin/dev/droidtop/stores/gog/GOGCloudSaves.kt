@@ -27,7 +27,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * GOG cloud saves of one game (docs/SPEC.md 7g, "Stores", Droidtop/tracker#224): the calls of GameNative's
+ * GOG cloud saves of one game (docs/SPEC.md 7g, "Stores", mytop-project/tracker#224): the calls of GameNative's
  * GOGCloudSavesManager and its save locations (GPL-3.0, after gogdl), with the decision made by
  * [dev.droidtop.stores.util.CloudSavePlan] from the state kept at the last sync instead of GameNative's newer-timestamp
  * rule, so a conflict is the person's and never settled by a clock.

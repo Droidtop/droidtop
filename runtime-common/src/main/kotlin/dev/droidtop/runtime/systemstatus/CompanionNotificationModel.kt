@@ -2,7 +2,7 @@ package dev.droidtop.runtime.systemstatus
 
 /**
  * The companion's notification rows and Now playing card as plain rules (docs/SPEC.md "The companion's tabs",
- * Droidtop/tracker#414): what each row offers, which rows are messages, when a row's text shows, and what a media
+ * mytop-project/tracker#414): what each row offers, which rows are messages, when a row's text shows, and what a media
  * session's state means for the card. No Android here beyond constants, so it is tested without a device.
  */
 object NotificationRows {

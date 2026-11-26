@@ -63,7 +63,7 @@ fun emulatorReadsStoragePaths(context: Context, packageName: String): Boolean = 
 
 /**
  * Whether the emulator setup screens should point at All files access for an emulator
- * (Droidtop/tracker#270): its preset has a plain-path launch ([hasPathTemplate]) and the emulator
+ * (mytop-project/tracker#270): its preset has a plain-path launch ([hasPathTemplate]) and the emulator
  * cannot read plain paths ([emulatorReadsPaths] false). A hint only; a launch never waits on it.
  * Pure so the rule is testable without a device.
  */
@@ -72,7 +72,7 @@ fun emulatorNeedsAllFilesAccess(hasPathTemplate: Boolean, emulatorReadsPaths: Bo
 
 /**
  * The sentence a launch alert adds when [player] was handed a content link because it has no All files access
- * (Droidtop/tracker#270), naming the emulator setup row that gives it: "Let <Emulator> read your game folders" where
+ * (mytop-project/tracker#270), naming the emulator setup row that gives it: "Let <Emulator> read your game folders" where
  * droidtop can give the access ([EmulatorAccess.canGrantAllFiles]), "<Emulator> needs All files access" where it opens
  * Android's screen. Pure.
  */

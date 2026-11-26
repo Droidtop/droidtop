@@ -3,7 +3,7 @@ package dev.droidtop.runtime.windows
 import com.winlator.xserver.XKeycode
 
 /**
- * Steam's key names in a layout's `key_press` bindings (Droidtop/tracker#618) as the X server's key codes. Pure.
+ * Steam's key names in a layout's `key_press` bindings (mytop-project/tracker#618) as the X server's key codes. Pure.
  * Letters and digits are themselves; the rest are Steam's words, with the common spellings of each accepted, since the
  * exact spellings in Valve-written files are still to be checked against real ones (C17). A name with no X key here
  * is null, and that binding does nothing.

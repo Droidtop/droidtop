@@ -17,10 +17,10 @@ import dev.droidtop.library.settings.Modes
  *
  * - a long-press of the back key (`Activity.onKeyLongPress(KeyEvent.KEYCODE_BACK, ...)`) in the launcher and in
  *   `MainActivity`, the one route from anywhere, though not every device delivers it;
- * - a long-press of Home, Mobile's one route (owner, 2026-10-30, Droidtop/tracker#827; its home screen's
+ * - a long-press of Home, Mobile's one route (owner, 2026-10-30, mytop-project/tracker#827; its home screen's
  *   long-press menu no longer has a row for it);
  * - the Gaming Quick Menu's System tab ("Switch mode");
- * - the Desktop taskbar and Start's System section ("Switch mode", the one name, Droidtop/tracker#708);
+ * - the Desktop taskbar and Start's System section ("Switch mode", the one name, mytop-project/tracker#708);
  * - droidtop's games screen, when it is the only droidtop surface on.
  *
  * Every route opens it through [ModeSwitcher.open]: one translucent activity in `:app` (`ModeSwitcherActivity`)
@@ -70,7 +70,7 @@ object BackButtonMenu {
     /**
      * Set when the switcher sends the person to Gaming or Desktop: they asked for droidtop back, so a screen the
      * companion was left off by another app (the stock launcher after "Android") is the companion's again
-     * (Droidtop/tracker#522). Unlike the reinit extras it covers no app droidtop launched.
+     * (mytop-project/tracker#522). Unlike the reinit extras it covers no app droidtop launched.
      */
     const val EXTRA_DISPLAYS_BACK = "dev.droidtop.app.EXTRA_DISPLAYS_BACK"
 
@@ -157,7 +157,7 @@ object BackButtonMenu {
         context.startActivity(home)
         // Straight to droidtop's own launcher skips the trampoline, the one place Standard put its second-screen
         // surface back (HomeEntry.enterStandard), so the add-on display kept the last mode's page: a switch from
-        // Gaming left Gaming Home there, with no companion tabs (Droidtop/tracker#347, RP5 3061). The Alternative
+        // Gaming left Gaming Home there, with no companion tabs (mytop-project/tracker#347, RP5 3061). The Alternative
         // forwarder and the trampoline do this themselves.
         val ownLauncher = implementation == HomeRolePrefs.HomeImplementation.DROIDTOP && HomeRolePrefs.isDroidtopHome(context)
         if (ownLauncher) reassertSecondaryDisplays(context)
@@ -200,7 +200,7 @@ object BackButtonMenu {
 
     /**
      * The one way Standard starts an app-hosted mode's screen: `:app`'s MainActivity in its own task, on the mode
-     * [modeId] (Droidtop/tracker#771). Callers add their own extras (the display reinit, displays back).
+     * [modeId] (mytop-project/tracker#771). Callers add their own extras (the display reinit, displays back).
      */
     @JvmStatic
     fun appModeIntent(context: Context, modeId: String): Intent =

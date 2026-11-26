@@ -49,7 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The tabs' names, in the order L1 and R1 step through them (Droidtop/tracker#318 §5.1). */
+/** The tabs' names, in the order L1 and R1 step through them (mytop-project/tracker#318 §5.1). */
 private val TAB_NAMES = mapOf(
     MatchQueue.Tab.LIKELY to "Likely",
     MatchQueue.Tab.UNSURE to "Unsure",
@@ -76,7 +76,7 @@ private val SHEET_HINTS = listOf(
 private const val SHEET_PAGE = 12
 
 /**
- * Review Matches (docs/SPEC.md 7h, "Review Matches"; Droidtop/tracker#318 §5): the games a scrape did not take a match
+ * Review Matches (docs/SPEC.md 7h, "Review Matches"; mytop-project/tracker#318 §5): the games a scrape did not take a match
  * for, one card per game in three tabs by effort, Likely, Unsure and Not found. A card shows the game as it is on disk
  * on the left and the source's best five answers on the right, the best chosen, each with its cover and the score's
  * pips. Up and Down choose, A applies the chosen one and moves to the next card, Left and Right move between cards,
@@ -258,7 +258,7 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
                 card == null -> MenuRow(title = words(R.string.gamepad_nothing_waits_in_x, TAB_NAMES.getValue(tab)))
                 else -> {
                     // Previous and Next as taps too: Left and Right step the cards on a pad, and a person with no pad
-                    // must reach every card (Droidtop/tracker#839).
+                    // must reach every card (mytop-project/tracker#839).
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         StepLabel("Previous", enabled = cardIndex > 0) { moveCard(-1) }
                         Text(

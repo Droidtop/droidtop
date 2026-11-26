@@ -35,7 +35,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.onPad
 
 /**
- * Text typed where it stands (owner, 2026-11-19, Droidtop/tracker#954 item 12: no separate editor and no editing panel
+ * Text typed where it stands (owner, 2026-11-19, mytop-project/tracker#954 item 12: no separate editor and no editing panel
  * anywhere). The row or box that shows a value becomes this field while the person types in it: it takes the cursor at
  * once, with Android's keyboard where droidtop does not serve the screen and droidtop's own under it where it does,
  * as every droidtop field does. The keyboard's Done (or Search), B, Back, or Up and Down off a one-line field keep the

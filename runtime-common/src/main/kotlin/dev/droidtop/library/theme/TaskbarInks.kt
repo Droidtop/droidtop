@@ -6,7 +6,7 @@ import dev.droidtop.notices.ColorMath
  * Standard's taskbar inks (`StandardTaskbar`), from the colours outside Gaming (docs/SPEC.md 7k, "Colours outside
  * Gaming"): [plate] under everything, [text] on it, the [divider] between pinned and open apps, the [focusFill] of a
  * pressed or focused button, and the [accent] of the running dot and the focus ring. They were fixed dark-plate
- * constants, so a light theme never reached the bar (Droidtop/tracker#701).
+ * constants, so a light theme never reached the bar (mytop-project/tracker#701).
  */
 data class TaskbarInks(val plate: Int, val text: Int, val divider: Int, val focusFill: Int, val accent: Int) {
     companion object {

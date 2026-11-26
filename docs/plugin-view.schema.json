@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Droidtop/droidtop/docs/plugin-view.schema.json",
+  "$id": "https://github.com/mytop-project/droidtop/docs/plugin-view.schema.json",
   "title": "droidtop plugin view, version 1",
   "description": "A plugin's UI as data (docs/plugin-api.md 1.6). droidtop renders it with its own components in every mode; a plugin never draws. Unknown item types are skipped by the host, so this schema lists the types this version renders. Limits beyond the ones below (title and subtitle lengths, args size) are cut by the host, not refused.",
   "type": "object",
@@ -86,11 +86,11 @@
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string" },
         "subtitle": { "type": ["string", "null"] },
-        "needs": { "type": "string", "description": "A permission id the plugin declared (optional, not required). While the person has it turned off, droidtop draws this node as an inert row saying so, with Permissions; the rest of the page is unchanged (docs/plugin-api.md 1.6, Droidtop/tracker#521 item 5)." }
+        "needs": { "type": "string", "description": "A permission id the plugin declared (optional, not required). While the person has it turned off, droidtop draws this node as an inert row saying so, with Permissions; the rest of the page is unchanged (docs/plugin-api.md 1.6, mytop-project/tracker#521 item 5)." }
       }
     },
     "typedValue": {
-      "description": "A value droidtop writes in its own words (docs/plugin-api.md 1.6 \"Typed values\", Droidtop/tracker#521 item 7). An object droidtop cannot read shows no value.",
+      "description": "A value droidtop writes in its own words (docs/plugin-api.md 1.6 \"Typed values\", mytop-project/tracker#521 item 7). An object droidtop cannot read shows no value.",
       "oneOf": [
         { "type": ["string", "null"] },
         { "type": "object", "required": ["bool"], "properties": { "bool": { "type": "boolean" } } },
@@ -175,7 +175,7 @@
           "description": "A condition the person should know about, drawn as droidtop's own notice card named after the plugin (docs/plugin-api.md 1.6, Notices). Lengths and counts are in docs/view-limits/plugin-view-limits.json; over them the host cuts or drops and logs a plugin message.",
           "properties": {
             "type": { "const": "notice" },
-            "tone": { "enum": ["info", "caution", "danger"], "description": "danger: something the person is about to lose or risk now (since 2026-10-15, Droidtop/tracker#521 item 1). Any other value is drawn as info." },
+            "tone": { "enum": ["info", "caution", "danger"], "description": "danger: something the person is about to lose or risk now (since 2026-10-15, mytop-project/tracker#521 item 1). Any other value is drawn as info." },
             "placement": { "enum": ["section", "banner"], "description": "banner: under the page header, at most one a page." },
             "details": { "type": ["string", "null"], "description": "What Info shows; exact terms are fine here." },
             "action": { "$ref": "#/$defs/action" }

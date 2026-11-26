@@ -3,7 +3,7 @@ package dev.droidtop.library.stores
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A store's hidden list carried into droidtop's Hidden by its changes only (Droidtop/tracker#402). */
+/** A store's hidden list carried into droidtop's Hidden by its changes only (mytop-project/tracker#402). */
 class StoreHiddenTest {
     @Test
     fun `the first read hides every game the store hides`() {

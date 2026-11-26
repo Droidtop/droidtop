@@ -46,7 +46,7 @@ import kotlinx.coroutines.withContext
 import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
- * "DLC and versions" (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313): the
+ * "DLC and versions" (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313): the
  * owned DLC of a store game with what each one downloads, and the store's
  * branches (Steam's betas, a locked one asks its password). The choice is
  * remembered per game by the store; for an installed game, applying it also
@@ -124,7 +124,7 @@ internal fun StoreContentSheet(
     }
 
     BackHandler { onDismiss() }
-    // A locked version's password is typed in its own row (no editor, no panel: Droidtop/tracker#954 item 12).
+    // A locked version's password is typed in its own row (no editor, no panel: mytop-project/tracker#954 item 12).
     fun unlock(branch: StoreBranch, typed: String) {
         asking = null
         if (typed.isEmpty()) return

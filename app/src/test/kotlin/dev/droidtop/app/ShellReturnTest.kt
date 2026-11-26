@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** When the Gaming shell's resume is a return to a running game (ShellReturn, Droidtop/tracker#86). */
+/** When the Gaming shell's resume is a return to a running game (ShellReturn, mytop-project/tracker#86). */
 class ShellReturnTest {
     @Test
     fun `back from a running game is a return`() {

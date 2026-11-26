@@ -21,7 +21,7 @@ import dev.droidtop.shell.desktop.DesktopSecondOutput
 import java.lang.ref.WeakReference
 
 /**
- * The Linux desktop on a second Android display (Droidtop/tracker#908, step D3): [show] gives the display an output
+ * The Linux desktop on a second Android display (mytop-project/tracker#908, step D3): [show] gives the display an output
  * of the desktop's ([DesktopSessionService.extendTo], step D2) and opens [DesktopSecondScreenActivity] there, which
  * draws that output with a bar of its own and takes touch for it; [hide] closes it and removes the output
  * ([DesktopSessionService.retract]).

@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Mouse mode as a layout (docs/SPEC.md 5b, "Controller mouse mode"; Droidtop/tracker#618 C4): the bundled file plays
+ * Mouse mode as a layout (docs/SPEC.md 5b, "Controller mouse mode"; mytop-project/tracker#618 C4): the bundled file plays
  * what `PadMouseDriver` did, through the one engine.
  */
 class MouseModeLayoutTest {

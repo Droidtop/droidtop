@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Library > Import from another frontend (Droidtop/tracker#724): what a person kept in another frontend,
+ * Settings > Library > Import from another frontend (mytop-project/tracker#724): what a person kept in another frontend,
  * brought into droidtop's favourites and collections, matched against the games droidtop already has. Only read: no
  * ROM is touched, moved or copied, and the other frontend's files are never written. Each import says how many of
  * its games were found. Slice 1: Pegasus (its collections and its favourites); Daijisho and LaunchBox follow.

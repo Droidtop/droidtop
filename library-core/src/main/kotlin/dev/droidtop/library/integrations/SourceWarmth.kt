@@ -11,7 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the source plugins started while a search can use them (Droidtop/tracker#848). The owner: "We need to optimize
+ * Keeps the source plugins started while a search can use them (mytop-project/tracker#848). The owner: "We need to optimize
  * our python runner somehow". A plugin's process is let go a minute after its last call ([dev.droidtop.pluginhost.PluginProcesses]),
  * so a search a little later started every source cold, and a slow start (about 10 s on BlueStacks, #103) used up the
  * search's whole budget, so the source read "did not answer in time".

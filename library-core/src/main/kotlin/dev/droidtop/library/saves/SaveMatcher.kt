@@ -64,7 +64,7 @@ object SaveMatcher {
 /**
  * The save templates the person's paired computers answered with, kept by the agent core beside each game's
  * baseline (`<computer folder>/saves/<game>.spec.json`, droidtop-agent core savesync `spec_path`). This is the seam
- * until the agent core hands droidtop the Ludusavi index itself (Droidtop/tracker#546, slice 1): the interface is
+ * until the agent core hands droidtop the Ludusavi index itself (mytop-project/tracker#546, slice 1): the interface is
  * [SaveIndex], so the index replaces this class and nothing else. A computer is asked for a game's saves only by a
  * sync, so a game never synced with any computer has no entry here.
  */

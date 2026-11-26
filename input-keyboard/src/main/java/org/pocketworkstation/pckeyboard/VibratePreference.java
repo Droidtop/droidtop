@@ -10,7 +10,7 @@ public class VibratePreference extends SeekBarPreferenceString {
     
     @Override
     public void onChange(float val) {
-        // droidtop patch (Droidtop/tracker#903 H12a): plays the length as Custom strength does, every key one buzz of it.
+        // droidtop patch (mytop-project/tracker#903 H12a): plays the length as Custom strength does, every key one buzz of it.
         KeyHapticsPlayer sample = new KeyHapticsPlayer(getContext());
         sample.setStrength(VibrationStrength.CUSTOM, (int) val);
         sample.play('a');

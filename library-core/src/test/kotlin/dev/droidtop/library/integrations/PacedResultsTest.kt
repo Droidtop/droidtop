@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Droidtop/tracker#915: four sources answering together sent the result list many new states in a burst, each one
+ * mytop-project/tracker#915: four sources answering together sent the result list many new states in a burst, each one
  * rebuilt on the main thread, and fast typing in Get games gave an ANR on a device short of memory.
  */
 class PacedResultsTest {

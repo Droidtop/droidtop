@@ -26,7 +26,7 @@ object IsolatedProcess {
     /**
      * Whether this is a full-access plugin's process (`:pluginhost`, `:pluginhost1` to `:pluginhost7`, docs/plugin-api.md
      * 5.3): droidtop's UID, a plugin the person allowed full access in it. droidtop's own start never runs there
-     * (Droidtop/tracker#775): droidtop starts first, in its own process, and then starts the plugin host, which starts
+     * (mytop-project/tracker#775): droidtop starts first, in its own process, and then starts the plugin host, which starts
      * the plugins; a plugin process starting droidtop's start would start plugins of its own.
      */
     @JvmStatic

@@ -97,7 +97,7 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * still does not fit wraps onto a second line in a sheet's bar (narrower
  * than [TIGHT_HINT_BAR_WIDTH], or any bar on a compact window), and a
  * full-width bar wraps too once even the last stage overflows: it never
- * scrolls a hint out of sight (Droidtop/tracker#770). A screen reader hears the whole
+ * scrolls a hint out of sight (mytop-project/tracker#770). A screen reader hears the whole
  * set however much was folded, and the bar offers "Read controls".
  */
 @Composable
@@ -133,14 +133,14 @@ fun TouchHintBar(
         // The fit rule, measured at the live text size: each hint is its keycap, 4dp, its label, and the gap,
         // plus the pill's own side padding on a touch-first window. Without the padding a portrait bar
         // accepted a stage 16dp a hint too wide and wrapped "B Back" alone onto a second line, never
-        // reaching the later drops (Droidtop/tracker#660).
-        // Over a theme's own canvas there is no bar plate, so each pill carries its own (Droidtop/tracker#668).
+        // reaching the later drops (mytop-project/tracker#660).
+        // Over a theme's own canvas there is no bar plate, so each pill carries its own (mytop-project/tracker#668).
         val plated = background.alpha == 0f
         val pill = if (window.touchFirst || plated) TOUCH_PILL_PADDING * 2 else 0.dp
         // One answer to "what is shown, and does it fit on one line": the fit rule's stage, and whether even its
         // last stage overflows. A full-width bar that still overflows wraps like a sheet's bar instead of
         // scrolling: a scrolled row cut "A Open" mid-word at Largest text in portrait and hid the hints after it,
-        // with nothing saying there was more (Droidtop/tracker#770). No hint drops to make room: a pill can be
+        // with nothing saying there was more (mytop-project/tracker#770). No hint drops to make room: a pill can be
         // the only touch route to its action (#839).
         val (shown, overflows) = remember(hints, maxWidth, tight, pill, density.fontScale, labelStyle, glyphStyle) {
             with(density) {
@@ -197,7 +197,7 @@ fun TouchHintBar(
 }
 
 /**
- * The one way a shell element takes a tap (Droidtop/tracker#679): the click, and the click's own focus target made
+ * The one way a shell element takes a tap (mytop-project/tracker#679): the click, and the click's own focus target made
  * unfocusable ahead of it. A `clickable` is a focus target, so without this the D-pad could park on a row or pill
  * whose screen moves its own cursor, a node with no visible selection where A does nothing (rig, build 546: Down out
  * of the PC grid landed in the hint bar). The shell's cursor is the selection everywhere; a tap is still the press.
@@ -229,7 +229,7 @@ fun Modifier.padRow(
 }
 
 /**
- * The shell's one pressable list row (Droidtop/tracker#763): a focus target the pad's cursor lands on, framed while it
+ * The shell's one pressable list row (mytop-project/tracker#763): a focus target the pad's cursor lands on, framed while it
  * is there ([selectionFrame] in [shape], [rest] when not), where A on the pad and a tap ([padRow]) both run [onClick].
  * The pad handler sits ahead of the focus target, as [GameCard]'s does, so A reaches it. A row that is not [enabled]
  * takes neither focus nor taps and is drawn by its caller as dimmed. The caller adds its own size and padding after.
@@ -368,7 +368,7 @@ fun Keycap(label: String, modifier: Modifier = Modifier, height: Dp = MenuTokens
 fun ShoulderGlyph(label: String, modifier: Modifier = Modifier, badge: Boolean = false, dimmed: Boolean = false) {
     // The strip's edition sits in a box as tall as the selected tab's pill,
     // centred the same way, so the two read on one line (tester, 2026-09-29,
-    // Droidtop/tracker#157: "L1/R1 are smaller than the tab labels and look
+    // mytop-project/tracker#157: "L1/R1 are smaller than the tab labels and look
     // misaligned with the pill"). One keycap style either way.
     if (badge) {
         Box(modifier.heightIn(min = MenuTokens.TabPillHeight), contentAlignment = Alignment.Center) {

@@ -75,7 +75,7 @@ object LauncherSearch {
             }
         }
 
-    /** An app shortcut that matches a query (Droidtop/tracker#704): its label, its app's name, and its icon if any. */
+    /** An app shortcut that matches a query (mytop-project/tracker#704): its label, its app's name, and its icon if any. */
     class ShortcutHit(
         val title: String,
         val appTitle: String,

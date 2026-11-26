@@ -1,6 +1,6 @@
 /*
  * The program-tree binding of the sandbox library (docs/SPEC.md 5b "Containment and copy-on-write layers for Wine",
- * piece 0; Droidtop/tracker#584): one broker listener that a whole tree of processes (Wine, its wineserver, the
+ * piece 0; mytop-project/tracker#584): one broker listener that a whole tree of processes (Wine, its wineserver, the
  * translators, the game) attaches to through libsbx_child.so, served on the broker's own threads.
  *
  * Piece 0 is learning only: the decider allows every request, and the audit writes each distinct one, once, to the

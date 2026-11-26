@@ -3,14 +3,14 @@ package dev.droidtop.hostbridge
 import dev.droidtop.runtime.DisplayOutput
 
 /**
- * One compositor output the desktop session uses and the Android display it is for (Droidtop/tracker#908, step D2).
+ * One compositor output the desktop session uses and the Android display it is for (mytop-project/tracker#908, step D2).
  * [outputName] is the compositor's name for it ("HEADLESS-2"); the primary's is "" while the compositor has not
  * named it, which host-bridge's calls take as the primary all the same.
  */
 data class DesktopOutput(val display: DisplayOutput, val outputName: String)
 
 /**
- * The rules of the desktop's extra outputs (Droidtop/tracker#908, step D2), pure so they are tested on the JVM
+ * The rules of the desktop's extra outputs (mytop-project/tracker#908, step D2), pure so they are tested on the JVM
  * (DesktopOutputsTest): which name is the output sway just made, where it goes in the layout, the sway commands, and
  * the session's list of outputs, the primary first and never replaced or removed.
  */
@@ -37,7 +37,7 @@ object DesktopOutputs {
 
     /**
      * Whether the compositor reports [name] at [width] x [height] pixels and at [scale], everything that sets its
-     * box's size: what the outputs right of it wait for before they are placed again (Droidtop/tracker#908, step
+     * box's size: what the outputs right of it wait for before they are placed again (mytop-project/tracker#908, step
      * D3). The scale is compared to the protocol's 24.8 fixed point it crosses as.
      */
     fun reports(placements: List<OutputPlacement>, name: String, width: Int, height: Int, scale: Double): Boolean =
@@ -50,7 +50,7 @@ object DesktopOutputs {
     private const val SCALE_STEP = 1.0 / 256
 
     /**
-     * The compositor output an Android surface on the display [displayId] shows (Droidtop/tracker#908, step D3): the
+     * The compositor output an Android surface on the display [displayId] shows (mytop-project/tracker#908, step D3): the
      * primary's for the primary's display (which is "" while the compositor has not named it), the extra output
      * [extendTo][extended] gave any other display, or null when that display has none (not yet, or no longer).
      */

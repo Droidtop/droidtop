@@ -1,7 +1,7 @@
 package dev.droidtop.mapping
 
 /**
- * A controller layout as Steam stores it (Droidtop/tracker#618; docs/SPEC.md 5b "Controller layouts"): a KeyValues
+ * A controller layout as Steam stores it (mytop-project/tracker#618; docs/SPEC.md 5b "Controller layouts"): a KeyValues
  * file whose root is `controller_mappings`. The owner, 2026-10-23: "we want all profiles we use to be compatible with
  * steam. If a steam user who doesn't use droidtop wants to use it, they should be able to". So the file is the stored
  * layout, and this class is a read view over its node tree ([root]): everything a reader here does not know is still in

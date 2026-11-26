@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * A conversion engine for tests only (Droidtop/tracker#903 H6, extended in H7a): a few romaji to kana, and a tiny kanji
+ * A conversion engine for tests only (mytop-project/tracker#903 H6, extended in H7a): a few romaji to kana, and a tiny kanji
  * table, so the engine seam is proved to carry what Mozc, librime and libhangul need (H7 to H9) without any of them.
  *
  * - Letters compose kana at the caret; Left and Right move the caret. Like Mozc, it counts the reading in code points

@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** D21, paired devices (docs/plugin-api.md 3, Droidtop/tracker#556, #553): what a plugin reads and what it may announce. */
+/** D21, paired devices (docs/plugin-api.md 3, mytop-project/tracker#556, #553): what a plugin reads and what it may announce. */
 class HostDevicesApisTest {
     @Test
     fun `a plugin reads each device's kind, state and only its own counterpart's value`() {

@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The host paces each metadata source itself (docs/plugin-api.md 3 A3, Droidtop/tracker#568); the plugin is not trusted to. */
+/** The host paces each metadata source itself (docs/plugin-api.md 3 A3, mytop-project/tracker#568); the plugin is not trusted to. */
 class MetadataPacingTest {
     private fun entry(extra: String) = ProvidedPoint("library.metadata", extra = extra)
 

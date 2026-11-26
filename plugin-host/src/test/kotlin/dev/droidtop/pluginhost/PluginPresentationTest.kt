@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A plugin's presentation fields (docs/plugin-api.md 1.2 "Presentation", Droidtop/tracker#521 item 2). */
+/** A plugin's presentation fields (docs/plugin-api.md 1.2 "Presentation", mytop-project/tracker#521 item 2). */
 class PluginPresentationTest {
     private val payload = setOf("res/icon.png", "res/shot1.webp", "res/shot2.png", "plugin.py")
 

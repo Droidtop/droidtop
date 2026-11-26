@@ -3,7 +3,7 @@ package dev.droidtop.runtime.tasks
 import java.io.File
 
 /**
- * Android 12's phantom process limit (docs/SPEC.md "Child processes and Android's limit", Droidtop/tracker#816).
+ * Android 12's phantom process limit (docs/SPEC.md "Child processes and Android's limit", mytop-project/tracker#816).
  * Android counts the native processes every app forks (proot and each program in a container, sway, Xwayland, Wine
  * and its tree), allows [DEFAULT_LIMIT] across all apps, and kills the excess, signal 9, with nothing said. There is
  * no switch for it on Android 12 and 13. With Shizuku droidtop can lift it, after the person agrees, and put it back.
@@ -62,7 +62,7 @@ object PhantomProcesses {
 
     /**
      * The same processes by program, most first ("proot" to 6, "sway" to 1), so a rig can see what fills the count
-     * (Droidtop/tracker#816, "measure and cut"). Blocking: IO only.
+     * (mytop-project/tracker#816, "measure and cut"). Blocking: IO only.
      */
     fun breakdown(uid: Int, packageName: String, procRoot: File = File("/proc")): List<Pair<String, Int>> =
         ours(uid, packageName, procRoot).groupingBy { it }.eachCount().entries

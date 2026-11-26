@@ -27,7 +27,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * droidtop's action links (docs/SPEC.md 12a "Action links", Droidtop/tracker#459, grammar 2): literal API calls,
+ * droidtop's action links (docs/SPEC.md 12a "Action links", mytop-project/tracker#459, grammar 2): literal API calls,
  * joined by `&`, read by one parser, shown step by step and run only on the person's press. Owner, 2026-10-10:
  * "They should be literal api call strings through the URL parser. They can be strung together using ampersands,
  * and we should support base64".
@@ -683,7 +683,7 @@ object ActionLinks {
                 review.notice?.let { notice ->
                     val paragraphs = notice.trim().split(Regex("\\n+")).map { it.trim() }.filter { it.isNotEmpty() }
                     val lastNotice = noticeSteps.lastOrNull()?.number == step.number
-                    // The catalog's text under droidtop's own caution card (Droidtop/tracker#521 item 10), as on the catalog's page.
+                    // The catalog's text under droidtop's own caution card (mytop-project/tracker#521 item 10), as on the catalog's page.
                     add(
                         NoticeItem(
                             id = "links_actions_${step.number}_notice_card",
@@ -704,7 +704,7 @@ object ActionLinks {
                 }
                 when {
                     review.problem != null -> {
-                        // The reason is its own text block: the rig showed no reason under the "Cannot run" row (Droidtop/tracker#480).
+                        // The reason is its own text block: the rig showed no reason under the "Cannot run" row (mytop-project/tracker#480).
                         add(TextBlockItem("links_actions_${step.number}_problem_reason", text = review.problem))
                         add(ActionItem("links_actions_${step.number}_problem", "Cannot run"))
                     }

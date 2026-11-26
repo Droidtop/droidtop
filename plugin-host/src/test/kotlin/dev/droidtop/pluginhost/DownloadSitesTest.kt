@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Add site and the list of added sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648). */
+/** Add site and the list of added sites (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648). */
 class DownloadSitesTest {
     private val taken = DownloadSites.SHIPPED
 

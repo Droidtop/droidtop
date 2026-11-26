@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Hacker's Latin path as the first engine (Droidtop/tracker#903 H6): the old code ([LatinOldPath], LatinIME's own
+ * Hacker's Latin path as the first engine (mytop-project/tracker#903 H6): the old code ([LatinOldPath], LatinIME's own
  * methods copied word for word) and [LatinEngine] run side by side on the same inputs and must agree on everything:
  * where Hacker's composes, the strip's suggestions with how it draws them and the word a separator types, and the
  * composing text through typing, deleting, committing and resetting.

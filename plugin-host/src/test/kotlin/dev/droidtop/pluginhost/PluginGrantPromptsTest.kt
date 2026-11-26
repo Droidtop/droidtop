@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The first-use sheet's one surface (docs/plugin-api.md 4.3, Droidtop/tracker#128): opened per question, Not now when it cannot be. */
+/** The first-use sheet's one surface (docs/plugin-api.md 4.3, mytop-project/tracker#128): opened per question, Not now when it cannot be. */
 class PluginGrantPromptsTest {
     private val request = GrantPromptRequest("acme.one", "Acme", "net.any", "Use any website", "To fetch covers", PermissionTier.DANGEROUS)
 

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The accessibility route's splice (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314). */
+/** The accessibility route's splice (docs/SPEC.md 4c, "Typing on the add-on display", mytop-project/tracker#314). */
 class TextSpliceTest {
     private fun at(text: String, start: Int, end: Int = start) = FieldText(text, start, end)
 

@@ -18,7 +18,7 @@ import dev.droidtop.ui.shared.Motion
  * card, as Steam's does; otherwise it sits slightly dimmed on a small shadow. It glides in over [Motion.LiftMs] and
  * settles back over the slower [Motion.ReleaseMs]. A wide (landscape) card grows half as much.
  *
- * The card itself keeps its size: the art grows inside its fixed edge (owner on the console, Droidtop/tracker#632:
+ * The card itself keeps its size: the art grows inside its fixed edge (owner on the console, mytop-project/tracker#632:
  * the image "scales up but the outline stays at the original size, so the image is clipped by it or pokes
  * through"). When the whole card grew, its top passed the edge its row clips at, more on a taller card, and the
  * window's ring, measured through the same clip, landed inside the art. Now the ring and the clip are the card's own

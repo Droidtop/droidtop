@@ -13,7 +13,7 @@ class SourceIndexTest {
 
     @Test
     fun `each source has a file of its own, named safely from its id`() {
-        // Droidtop/tracker#937: indexes are per source, because sources are turned on and off one by one.
+        // mytop-project/tracker#937: indexes are per source, because sources are turned on and off one by one.
         assertEquals("plugin_gamegrab.abandonware.db", SourceIndex.fileName("plugin_gamegrab.abandonware"))
         assertEquals("plugin_a_b.db", SourceIndex.fileName("plugin_a/b"))
     }

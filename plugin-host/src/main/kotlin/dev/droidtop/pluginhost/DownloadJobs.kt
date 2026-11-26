@@ -54,7 +54,7 @@ fun interface DownloadMultiPost {
 }
 
 /**
- * The first stage of a download whose address nobody knows yet (Droidtop/tracker#354; the owner: "the button should
+ * The first stage of a download whose address nobody knows yet (mytop-project/tracker#354; the owner: "the button should
  * send the download call over the downloader API, so the actual task sits on the other side of it"): a source is asked
  * for it inside the download's own job, in Downloads from the press. [resolve] runs with [stage] in its coroutine; what
  * it hands to [DownloadJobs.run] there becomes this job's download ([DownloadStage.fetch]), and what it returns is the
@@ -91,7 +91,7 @@ class DownloadPart(
 )
 
 /**
- * The one runner for a HTTP(S) download of one file, or of several as one entry (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181):
+ * The one runner for a HTTP(S) download of one file, or of several as one entry (docs/SPEC.md 12a "Downloads", mytop-project/tracker#181):
  * the download engine (libaria2 in its own process, docs/SPEC.md 12a "One download engine") does the transfer and
  * carries on from aria2's control file, so the job is a native job in the one [PluginJobsCenter] list that can Pause
  * and Resume, and survives a lost connection, a network change or a restart. Callers register a post-processing step under a name ([registerPost]) and run a job with [run].
@@ -286,7 +286,7 @@ object DownloadJobs {
         args[ARG_VERSION_FOLDER]?.let { return placeAllInFolder(listOf(file), listOf(args)).single().parentFile!! }
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
         require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
-        // A name already in the folder keeps both (Droidtop/tracker#355 G5): the new one is "Name (2).ext", never a
+        // A name already in the folder keeps both (mytop-project/tracker#355 G5): the new one is "Name (2).ext", never a
         // failure after the whole download and never a replacement.
         val target = freeName(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
         moveFile(file, target)
@@ -361,7 +361,7 @@ object DownloadJobs {
 
     /**
      * [name] in [folder], or the first of "Name (2).ext", "Name (3).ext", ... that is free, so a download never replaces
-     * what is there (Droidtop/tracker#355 G5). Throws when 99 copies already exist.
+     * what is there (mytop-project/tracker#355 G5). Throws when 99 copies already exist.
      */
     internal fun freeName(folder: File, name: String): File {
         val first = File(folder, name)
@@ -376,7 +376,7 @@ object DownloadJobs {
     /**
      * Moves [from] to [to], also onto another volume: droidtop's downloads area is on the device's shared storage and a
      * game folder is often on an SD card, where a rename cannot go (EXDEV), so a download placed there failed with "could
-     * not be placed in the game folder" (RP5, exFAT SD card, a BIOS file, Droidtop/tracker#558). When the rename is
+     * not be placed in the game folder" (RP5, exFAT SD card, a BIOS file, mytop-project/tracker#558). When the rename is
      * refused, the bytes are copied under a hidden name in [to]'s folder, synced, renamed into place on that volume and
      * only then is [from] deleted, so a failure leaves the download where it was and no half file under [to]'s name.
      * Throws with [to]'s path when it cannot be done. [rename] is [File.renameTo] (a test refuses it).
@@ -493,7 +493,7 @@ object DownloadJobs {
         // version folder must be new.
         val folder = if (version != null) newVersionFolder(destination, version) else freeName(destination, stem)
         val building = File(destination, ".${folder.name}.unpacking")
-        // What a run cut short left (Droidtop/tracker#842) is cleared by the extractor before it fills the folder again.
+        // What a run cut short left (mytop-project/tracker#842) is cleared by the extractor before it fills the folder again.
         try {
             ArchiveExtractor.extract(file, building, onProgress = unpackProgress(JobHandle.current(), targetName))
         } catch (e: java.io.IOException) {
@@ -534,7 +534,7 @@ object DownloadJobs {
     }
 
     /**
-     * An unpack's progress on its job's row (Droidtop/tracker#842): a long unpack used to show no change at all, so it
+     * An unpack's progress on its job's row (mytop-project/tracker#842): a long unpack used to show no change at all, so it
      * looked stuck. Told only when the percent moves, so a many-file archive does not rebuild the jobs list per file.
      */
     internal fun unpackProgress(job: JobHandle?, name: String): (dev.droidtop.runtime.util.ArchiveExtractionProgress) -> Unit {
@@ -666,7 +666,7 @@ object DownloadJobs {
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
-        // Asked from a download whose source was asked first (Droidtop/tracker#354): this is that job's download, not
+        // Asked from a download whose source was asked first (mytop-project/tracker#354): this is that job's download, not
         // a second job. Its secrets stay held until that job ends.
         DownloadStage.current()?.let { stage ->
             stage.fetch = args
@@ -680,7 +680,7 @@ object DownloadJobs {
 
     /**
      * Starts a download whose address a [DownloadResolver] registered as [resolver] finds first, inside the job
-     * (Droidtop/tracker#354): it is in Downloads from this call, whoever asked for it and whether or not they stay. Waits
+     * (mytop-project/tracker#354): it is in Downloads from this call, whoever asked for it and whether or not they stay. Waits
      * for it and says its progress through [onStatus]; a caller that stops waiting leaves it running. [args] reach the
      * resolver unchanged.
      */
@@ -762,7 +762,7 @@ object DownloadJobs {
 
     /**
      * The newest download job for each update, by its [ARG_UPDATE_FOR] tag: running, held, or ended and still listed
-     * (Droidtop/tracker#833). One pass over the jobs, for a whole page of rows.
+     * (mytop-project/tracker#833). One pass over the jobs, for a whole page of rows.
      */
     fun updateJobs(
         entries: List<PluginJobsCenter.Entry> = PluginJobsCenter.entries().value,
@@ -794,7 +794,7 @@ object DownloadJobs {
             part[ARG_NAME]?.let { secretHeaders[it] }?.let { putAll(it) }
         }
         // A file on a download site the person signed in to under Internet sends that site's cookies
-        // (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): read now, from droidtop's vault, so they are never
+        // (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648): read now, from droidtop's vault, so they are never
         // in the job's persisted arguments and a restarted job still has them.
         val url = part[ARG_URL] ?: return given
         return DownloadSites.withCookie(given, url, runCatching { DownloadSites.cookies(context) }.getOrDefault(emptyMap()))
@@ -829,7 +829,7 @@ object DownloadJobs {
     }
 
     /**
-     * A resolved job (Droidtop/tracker#354): the source is asked for the download inside this job, then the download
+     * A resolved job (mytop-project/tracker#354): the source is asked for the download inside this job, then the download
      * runs here as any other. A Resume in this process goes on with the same download; a restart goes on only when
      * every byte had arrived, and otherwise drops what the old answer left and asks the source again.
      */
@@ -1265,7 +1265,7 @@ object DownloadJobs {
         /**
          * The file's size as the caller was told it (a source's descriptor, a file host's or debrid service's file list,
          * the page's Content-Length in droidtop's web view): the job's percent and total when the server sends no length,
-         * so the row draws a bar rather than a spinner (Droidtop/tracker#877). Zero when nobody said.
+         * so the row draws a bar rather than a spinner (mytop-project/tracker#877). Zero when nobody said.
          */
         expectedBytes: Long = 0L,
     ) {
@@ -1288,7 +1288,7 @@ object DownloadJobs {
         } catch (e: TransferException) {
             val failure = EngineFailure(e.code, e.message)
             // A signed-in download site that refuses its own cookies has ended the session (docs/SPEC.md 12a "Download
-            // sites", Droidtop/tracker#648): the site reads Expired, and Open on the job signs in to it again, here.
+            // sites", mytop-project/tracker#648): the site reads Expired, and Open on the job signs in to it again, here.
             val status = failure.refusedStatus
             if (status == 401 || status == 403) {
                 DownloadSites.sentTo(context, url, headers)?.let { site ->
@@ -1411,7 +1411,7 @@ object DownloadJobs {
 }
 
 /**
- * Recognises the files of one split archive by name (Droidtop/tracker#419): byte-split parts `X.7z.001`, `X.zip.001`
+ * Recognises the files of one split archive by name (mytop-project/tracker#419): byte-split parts `X.7z.001`, `X.zip.001`
  * or `X.rar.001` with `.002`, ... (joined by concatenation), and RAR volumes `X.part1.rar`, `X.part2.rar`, ... All
  * names must belong to one set and be numbered 1 to N without a gap or a repeat, in any order.
  */

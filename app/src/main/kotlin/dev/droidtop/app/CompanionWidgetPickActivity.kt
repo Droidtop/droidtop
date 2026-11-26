@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
  * (`ACTION_APPWIDGET_PICK`, which handles the bind permission), then the widget's own configure screen when it has
  * one, and the id kept in [CompanionWidgetPrefs]. A translucent Activity of its own because binding needs an Activity
  * result, which the second-screen hosts (a Presentation, the registry's surface) cannot receive: every companion host
- * opens this one, on its own screen, so Standard's second screen can add widgets like Gaming's (Droidtop/tracker#347).
+ * opens this one, on its own screen, so Standard's second screen can add widgets like Gaming's (mytop-project/tracker#347).
  */
 class CompanionWidgetPickActivity : Activity() {
     private var widgetId = -1

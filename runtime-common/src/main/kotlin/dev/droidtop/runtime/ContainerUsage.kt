@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * What a running container uses now (docs/SPEC.md 3d, "Resource usage"; Droidtop/tracker#757 slice 3): how many
+ * What a running container uses now (docs/SPEC.md 3d, "Resource usage"; mytop-project/tracker#757 slice 3): how many
  * processes it has, the memory they hold (resident set, summed) and the share of the device's processor they used
  * over the sample, 0 to 100 for the whole device.
  */

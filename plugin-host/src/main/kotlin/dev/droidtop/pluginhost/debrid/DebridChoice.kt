@@ -17,7 +17,7 @@ sealed interface DebridCost {
 }
 
 /**
- * Which of the person's debrid accounts serves a job (Droidtop/tracker#638; owner: "If services provide free
+ * Which of the person's debrid accounts serves a job (mytop-project/tracker#638; owner: "If services provide free
  * unrestricted premium downloads, those get used first ... as little impact on the user as possible"): the one it
  * costs least, the person's order settling a tie, or with spread mode the slot-limited account with the fewest of
  * droidtop's jobs running. An account a limit refused rests until the service's reset. Costs are asked of the

@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Artwork from plugins (docs/plugin-api.md 3 A4, Droidtop/tracker#714): what a provider is told and how its pictures are read. */
+/** Artwork from plugins (docs/plugin-api.md 3 A4, mytop-project/tracker#714): what a provider is told and how its pictures are read. */
 class PluginArtworkTest {
     @Test
     fun `a provider is told the game's title, system and store ids, and the kinds wanted`() {

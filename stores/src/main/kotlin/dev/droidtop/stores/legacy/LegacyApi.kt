@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Legacy Games' launcher API (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), as its own launcher calls it and as the
+ * Legacy Games' launcher API (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), as its own launcher calls it and as the
  * two open-source clients that keep people's games read it (borgx/legacygames-backup and gpuccio87/legacy-games-buyout,
  * both MIT): the account's purchases and giveaways, and each game's installer link. Every call carries the account's
  * e-mail and password (`usertoken: Basic ...`), which is why droidtop keeps them, sealed, and the launcher's fixed

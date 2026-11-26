@@ -13,7 +13,7 @@ import dev.droidtop.runtime.overlay.OverlayRequest
 import dev.droidtop.runtime.overlay.OverlayRequests
 
 /**
- * The HOME chords through droidtop's accessibility service (docs/SPEC.md "In-game overlays", Droidtop/tracker#740):
+ * The HOME chords through droidtop's accessibility service (docs/SPEC.md "In-game overlays", mytop-project/tracker#740):
  * HOME + R2, L2 or Start opens an overlay over whatever is on screen, any app, droidtop's own screens and Android's
  * ([OverlayRequests]); HOME alone is HOME. Even the
  * home app never receives HOME itself, so only the service's key filter can see the chord.
@@ -56,7 +56,7 @@ object HomeOverlayKeys {
         val sink = OverlayRequests.keys
         val decision = chords.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount, fromPad, sink != null, event.eventTime)
         // Every decision on HOME, a chord button or a key it took, so a console log shows where a chord went
-        // (Droidtop/tracker#740); a key passed on untouched is not logged.
+        // (mytop-project/tracker#740); a key passed on untouched is not logged.
         if (decision.consume || event.keyCode == KeyEvent.KEYCODE_HOME || HomeChords.kindOf(event.keyCode) != null) {
             android.util.Log.i(
                 "droidtop.input",

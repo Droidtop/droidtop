@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The on-device tests, run on the emulator .github/workflows/emulator-tests.yml starts (Droidtop/tracker#735):
+# The on-device tests, run on the emulator .github/workflows/emulator-tests.yml starts (mytop-project/tracker#735):
 # the x86_64 debug build and its test APK from one android-build run are installed, the rig tests that make sense on
 # a stock emulator are run with `am instrument`, and droidtop is started once to see that it stays up.
 #
@@ -24,11 +24,11 @@ summary="$out/summary.md"
 
 say() { echo "$*" | tee -a "$summary"; }
 
-# Tests known to fail, each with the issue that carries the finding (Droidtop/tracker#741, from the first run of these
+# Tests known to fail, each with the issue that carries the finding (mytop-project/tracker#741, from the first run of these
 # tests anywhere, which found the contained plugin folder failing in an isolated process on stock Android 13 and 14).
 # A known test that fails is reported and does not fail the run. One that PASSES fails the run, so that the entry is
 # removed as the issue is fixed and cannot go stale; any other failure is a failure.
-# Empty since the contained folder's listing and mkdirs work (fibrewall 8be4adc, folders held by path, Droidtop/tracker#741).
+# Empty since the contained folder's listing and mkdirs work (fibrewall 8be4adc, folders held by path, mytop-project/tracker#741).
 KNOWN_FAILING=()
 
 # The "class#method" of every test am instrument says failed, one per line ("1) method(class)").
@@ -69,7 +69,7 @@ instrument() {
       status=1
     fi
   done
-  # The numbers a rig test measured (Droidtop/tracker#848), in the summary: the uploaded results are not the only place.
+  # The numbers a rig test measured (mytop-project/tracker#848), in the summary: the uploaded results are not the only place.
   grep '^rig start: ' "$log" | tr -d '\r' | while IFS= read -r line; do say "  - ${line#rig start: }"; done
   if [ "$status" != 0 ] || [ -n "$failing" ]; then
     # What failed and where, in the log and the summary: the full output is only in the uploaded results.

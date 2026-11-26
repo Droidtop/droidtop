@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** GOG's and Epic's achievements as the game page shows them (Droidtop/tracker#230). */
+/** GOG's and Epic's achievements as the game page shows them (mytop-project/tracker#230). */
 class StoreAchievementsTest {
     @Test
     fun `GOG's achievements carry their date, their icon, secrecy and rarity`() {

@@ -24,7 +24,7 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 val CATALOG_SHEET_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back"))
 
 /**
- * A catalog screen as a popup over the screen it was opened from (owner, 2026-11-15, Droidtop/tracker#939: "Facets
+ * A catalog screen as a popup over the screen it was opened from (owner, 2026-11-15, mytop-project/tracker#939: "Facets
  * shouldn't be entire pages, generally. They should be popups or overlays. A facet shouldn't take over, it should give
  * information to the main UI"). A panel of the shell's panel width, no taller than the content area, drawn on the
  * overlay surface over a dimmed copy of what is under it, which stays on screen. B and the screen's own exit close it,

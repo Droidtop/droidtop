@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** G7, theme tokens (docs/plugin-api.md 3, Droidtop/tracker#559): what `ui.get_theme` answers. */
+/** G7, theme tokens (docs/plugin-api.md 3, mytop-project/tracker#559): what `ui.get_theme` answers. */
 class ThemeTokensApiTest {
     @Test
     fun `the answer names the theme and every token as RRGGBB`() {

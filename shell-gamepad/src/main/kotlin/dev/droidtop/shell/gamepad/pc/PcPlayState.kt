@@ -63,7 +63,7 @@ internal data class PcPlayState(
     val store: StoreStage? = null,
     /** How far a running download is, 0 to 1; null when none is. */
     val progress: Float? = null,
-    /** How the download's bar moves (Droidtop/tracker#643); null when the page shows no download. */
+    /** How the download's bar moves (mytop-project/tracker#643); null when the page shows no download. */
     val look: dev.droidtop.library.settings.JobLook? = null,
     /** Set when no runner offers the game: the button opens the Engine picker, the one place to say what it is. */
     val chooseEngine: Boolean = false,
@@ -123,7 +123,7 @@ internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId
  */
 internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: PluginJobsCenter.Entry?): PcPlayState {
     // The job's own words, as the Downloads place says them ("Waiting for Wi-Fi", "About 3 min left"); the bar under the
-    // button shows how far (Droidtop/tracker#643).
+    // button shows how far (mytop-project/tracker#643).
     val said = download?.let { PluginJobsScreen.oneLine(it) }.orEmpty()
     val look = download?.let { PluginJobsScreen.lookOf(it) }
     val own = entry.ownStore() != null
@@ -241,7 +241,7 @@ internal fun installerPlayState(installer: dev.droidtop.library.FolderInstaller)
 /**
  * The words on the primary control and the shell's A hint for a runner's setup step: what it gets ("Install
  * Enginehost", "Get Ren'Py support"), never a bare "Install", which on a game's page reads as installing the game
- * (Droidtop/tracker#657; the game's own Install is [installerPlayState]'s). Pure.
+ * (mytop-project/tracker#657; the game's own Install is [installerPlayState]'s). Pure.
  */
 internal fun primaryActionLabel(option: dev.droidtop.library.RunnerOption): String = option.actionLabel ?: when (option.action) {
     RunnerAction.INSTALL_ENGINEHOST -> "Install Enginehost"
@@ -311,7 +311,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcP
     val menuChanges by PcPlayRefresh.token.collectAsState()
     // The runner is worked out again when a Windows setup starts or ends: the
     // page stayed on "Set up Windows games" after it finished because nothing
-    // re-asked (Droidtop/tracker#300). Progress lines do not re-ask.
+    // re-asked (mytop-project/tracker#300). Progress lines do not re-ask.
     val setupRunning = windowsSetup is WindowsSetup.State.Installing
     // And again on coming back to droidtop: what a launch did while the page waited (Enginehost got the core it
     // needed, a runner was set up) shows, where the page stayed on "Get Ren'Py 7.6 support" after the game had run

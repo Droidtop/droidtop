@@ -7,7 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 /**
  * Asks for the microphone once, when the person switches the desktop's
- * Microphone row on (docs/SPEC.md 3d, Droidtop/tracker#80), and records the
+ * Microphone row on (docs/SPEC.md 3d, mytop-project/tracker#80), and records the
  * answer as that row's setting: granted turns it on, refused leaves it off.
  * No screen of its own; the row's text already gave the reason.
  */

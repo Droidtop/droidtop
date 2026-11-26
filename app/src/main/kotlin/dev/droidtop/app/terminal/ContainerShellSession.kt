@@ -21,7 +21,7 @@ import java.util.UUID
 import kotlin.concurrent.thread
 
 /**
- * One shell in a container on droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909):
+ * One shell in a container on droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909):
  * a Termux [TerminalSession] whose program runs on the pseudo-terminal Termux's JNI makes (`/dev/ptmx`, fork, `setsid`,
  * the slave as the controlling terminal; `TIOCSWINSZ` when the view's size changes). The program starts when the
  * [com.termux.view.TerminalView] it is attached to is first laid out.

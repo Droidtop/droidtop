@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Plugins on the companion (CompanionPlugins.kt, Droidtop/tracker#414 slice C9). */
+/** Plugins on the companion (CompanionPlugins.kt, mytop-project/tracker#414 slice C9). */
 class CompanionPluginsTest {
     private val load = AsyncActionItem(id = "pv_load", title = "Load state", confirmTitle = "Load slot 3? Unsaved play is lost.", run = { _, _ -> "Loaded" })
     private val save = ActionItem(id = "pv_save", title = "Save state", run = {})

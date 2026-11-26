@@ -45,7 +45,7 @@ import dev.droidtop.runtime.util.LatestWrites
 import kotlin.math.roundToInt
 
 /**
- * The companion's one slider row (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 S2a): the name and the
+ * The companion's one slider row (docs/SPEC.md "The companion's tabs", mytop-project/tracker#786 S2a): the name and the
  * value on one line, then a drawn track between a step button at each end, the Quick Menu's step
  * ([dev.droidtop.library.settings.QuickTiles.sliderStep] for a catalog slider). A finger drags or taps the track; the
  * buttons step. Every catalog slider, every pinned slider, every volume and both brightnesses draw this; there is no

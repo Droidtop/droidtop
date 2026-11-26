@@ -22,7 +22,7 @@ object TaskbarPolicy {
     /**
      * Whether the taskbar is drawn at all: it is Standard's, so only while Standard is the mode in use ([modeInUse],
      * `Modes.lastMode`), never over a game started from Gaming or Desktop. Standard being switched on is not enough
-     * (Droidtop/tracker#639, the console on 2026-10-30: the bar showed over a game started from Gaming, and its Apps
+     * (mytop-project/tracker#639, the console on 2026-10-30: the bar showed over a game started from Gaming, and its Apps
      * button opened Standard's drawer, a jump from Gaming into Standard). Pure.
      */
     fun shown(enabled: Boolean, modeInUse: String, appInFront: Boolean, droidtopIsHome: Boolean): Boolean =
@@ -44,7 +44,7 @@ object TaskbarPolicy {
     fun without(open: List<String>, key: String): List<String> = open.filterNot { it == key }
 
     /**
-     * The open list from Android's own task list (Droidtop/tracker#702), when droidtop can read it exactly
+     * The open list from Android's own task list (mytop-project/tracker#702), when droidtop can read it exactly
      * ([dev.droidtop.runtime.tasks.Fidelity.EXACT], the one list the Quick Menu, the companion and Desktop's bar read):
      * the apps of [open] still in [running], in the bar's own order, then the other running apps in the task list's
      * order, the one in [front] always kept, the oldest dropped past [max]. Without an exact list the bar keeps its own
@@ -67,7 +67,7 @@ object TaskbarPolicy {
     }
 
     /**
-     * Whether something in front folds the bar on one display by itself (Droidtop/tracker#700): a game from droidtop's
+     * Whether something in front folds the bar on one display by itself (mytop-project/tracker#700): a game from droidtop's
      * library in front on it ([gameHere]), on any display, whose own controls a bar must not cover; or, on a display
      * that is not the default one ([defaultDisplay] false: the console's external screen, a monitor), any app in front
      * ([appInFront]), where the bar folds out of the way and Show (or Mode/Meta, which focus it) brings it back

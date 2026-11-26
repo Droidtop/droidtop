@@ -8,7 +8,7 @@ import org.json.JSONObject
 import org.json.JSONTokener
 
 /*
- * Debrid as a step of droidtop's download service (docs/SPEC.md "Download rules", Droidtop/tracker#638). The provider
+ * Debrid as a step of droidtop's download service (docs/SPEC.md "Download rules", mytop-project/tracker#638). The provider
  * flows are ported from romgi's Dart (lib/services/debrid/, Copyright (c) 2025 Christian Prado, MIT License; the
  * notice is in NOTICE.md), and widened from one file to a whole torrent.
  */

@@ -19,7 +19,7 @@ interface IncomingFile {
 }
 
 /**
- * The folder phone-sent files go into (docs/SPEC.md, "Type from another device", file transfer, Droidtop/tracker#645):
+ * The folder phone-sent files go into (docs/SPEC.md, "Type from another device", file transfer, mytop-project/tracker#645):
  * the one the person chose on the console beforehand, else Download/droidtop. The Android implementation lives in
  * `:app`; the session calls it from the server's thread, never the main thread, outside its own lock, so a fake stands in
  * for it in tests. It never picks a folder of its own: a game folder is written into only when the person picked it.

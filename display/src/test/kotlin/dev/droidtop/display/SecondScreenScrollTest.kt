@@ -34,7 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A vertical drag that starts on anything a companion page holds scrolls the page (Droidtop/tracker#328):
+ * A vertical drag that starts on anything a companion page holds scrolls the page (mytop-project/tracker#328):
  * a rail capsule, a tappable tile, a heading with its own tap detector and an Android widget. A sideways
  * drag on a rail still scrolls the rail, and a tap still taps.
  */

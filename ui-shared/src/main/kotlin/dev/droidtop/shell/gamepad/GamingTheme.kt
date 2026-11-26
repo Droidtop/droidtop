@@ -91,7 +91,7 @@ class GamingPalette(
     val bodyFamilyCapsOnly: Boolean = false,
     /**
      * The theme's views (`system`, `gamelist`) that draw their own clock or system status: on those the shell's
-     * floating cluster yields (docs/SPEC.md 7k2, Droidtop/tracker#658).
+     * floating cluster yields (docs/SPEC.md 7k2, mytop-project/tracker#658).
      */
     val ownStatusViews: Set<String> = emptySet(),
     /**
@@ -200,7 +200,7 @@ class GamingPalette(
  * Whether a font draws no lower case: every small letter as wide as its capital, in a face that is not monospaced
  * ([width] measures one character). A theme font like that (Art Book Next's) is fine for headings and labels but turns
  * a URL, a plugin's name or a version into capitals, so the roles that carry data keep droidtop's own face
- * (Droidtop/tracker#532). Pure, for the tests.
+ * (mytop-project/tracker#532). Pure, for the tests.
  */
 fun isCapsOnlyFont(width: (Char) -> Float): Boolean =
     ('a'..'z').all { width(it) == width(it.uppercaseChar()) } && width('i') != width('m')
@@ -244,7 +244,7 @@ object GamingTheme {
     /**
      * Whether [refresh] has resolved the theme's palette once in this process. Until it has, a Gaming surface draws
      * with [outsidePalette] rather than the dark default: a cold start drew Home dark for the seconds the theme took to
-     * parse, then turned light, while What's new between them was already light (UI review, Droidtop/tracker#954 item 5).
+     * parse, then turned light, while What's new between them was already light (UI review, mytop-project/tracker#954 item 5).
      */
     private var resolved by mutableStateOf(false)
     private var holders by mutableIntStateOf(0)
@@ -305,7 +305,7 @@ object GamingTheme {
     }
 
     init {
-        // The role tokens UI droidtop does not draw reads (docs/SPEC.md 7k, Droidtop/tracker#559): the theme's while a
+        // The role tokens UI droidtop does not draw reads (docs/SPEC.md 7k, mytop-project/tracker#559): the theme's while a
         // Gaming surface holds one; otherwise droidtop's own for the appearance, which RoleTokens works out itself.
         dev.droidtop.library.theme.RoleTokens.provider = {
             if (holders > 0 && resolved) current.let { dev.droidtop.library.theme.RoleTokens.of(it.colors, it.highContrast) } else null
@@ -314,7 +314,7 @@ object GamingTheme {
 
     private data class PaletteKey(
         val theme: String?,
-        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (Droidtop/tracker#844). */
+        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (mytop-project/tracker#844). */
         val tint: Int?,
         val colorScheme: String?,
         val variant: String?,
@@ -521,7 +521,7 @@ fun GamingTheme(outsideGaming: Boolean = false, content: @Composable () -> Unit)
     val palette = GamingTheme.palette
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
         MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography) {
-            // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
+            // No full-screen input method over droidtop's own fields (mytop-project/tracker#485 comment 6224857113).
             ProvideShellCanvas { dev.droidtop.ui.shared.NoFullscreenTextInput(content) }
         }
     }

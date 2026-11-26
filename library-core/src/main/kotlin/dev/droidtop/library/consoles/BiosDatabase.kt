@@ -36,7 +36,7 @@ object BiosDatabase {
     /**
      * The file names (lower case, without their folder) of every BIOS image the database knows, for any system: a ROM
      * walk never makes one a game ([RomScanWalk.walk]), so a PS2 BIOS dropped beside the games is not "ps2 0230a
-     * 20080220" on Home (Droidtop/tracker#665). Empty until [all] has loaded.
+     * 20080220" on Home (mytop-project/tracker#665). Empty until [all] has loaded.
      */
     @Volatile
     var fileNames: Set<String> = emptySet()

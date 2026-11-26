@@ -44,7 +44,7 @@ class PluginCrashPolicy(
         val refusal = PluginTiers.refusal(record, grants) ?: return@withContext PluginTiers.of(record, grants) to null
         val state = PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST)
         if (state == GrantState.ASK && userInitiated) {
-            // The red dialog, not the first-use sheet (Droidtop/tracker#481): Cancel leaves it unanswered, to be asked again.
+            // The red dialog, not the first-use sheet (mytop-project/tracker#481): Cancel leaves it unanswered, to be asked again.
             val update = PluginTiers.FULL_TRUST in grants.fresh
             if (PluginDangers.askFullAccess(record, update)) store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
             grants = store.read(record.manifest.id)
@@ -61,7 +61,7 @@ class PluginCrashPolicy(
      * kept and Not now holds for the rest of this run ([PluginRefusals]); on any other start, noted as wanted, which its
      * permission row says. A plugin left at Ask first used to be started without the hole and never asked: Syncthing,
      * whose network is such a hole, ran with no sockets and failed every 30 s (rig, AVD dev.3354,
-     * Droidtop/tracker#926). True when an answer changed its grants. Blocks while the sheet is up: on [Dispatchers.IO].
+     * mytop-project/tracker#926). True when an answer changed its grants. Blocks while the sheet is up: on [Dispatchers.IO].
      */
     private fun askUnansweredHoles(record: PluginRecord, grants: PluginGrants.Snapshot, userInitiated: Boolean): Boolean {
         val id = record.manifest.id
@@ -87,7 +87,7 @@ class PluginCrashPolicy(
     }
 
     /**
-     * The settings the person changed since [record] last heard (Droidtop/tracker#880), told now that it runs: the
+     * The settings the person changed since [record] last heard (mytop-project/tracker#880), told now that it runs: the
      * owner, "A setting changing is a notice the plugin gets the next time it runs, not a call made while the page is
      * open". Only to a plugin that subscribed; the rest read them with `settings.get`.
      */
@@ -111,7 +111,7 @@ class PluginCrashPolicy(
             tellSettingsChanged(record)
             return null
         }
-        // Protection did not start (Droidtop/tracker#481): during a call the person started, ask in red whether to run it
+        // Protection did not start (mytop-project/tracker#481): during a call the person started, ask in red whether to run it
         // this time anyway; from the background it waits for the Plugins page, which asks for every such plugin at once.
         val report = PluginDangers.protectionReport(runner.loadFailure(id)) ?: return loadFailure(record)
         if (userInitiated && PluginDangers.askRunUnprotected(id, record.manifest.label, report)) {
@@ -259,7 +259,7 @@ class PluginCrashPolicy(
     }
 
     /**
-     * Starts [record] for calls to [point] without making one (Droidtop/tracker#848): the gates [handle] applies, then
+     * Starts [record] for calls to [point] without making one (mytop-project/tracker#848): the gates [handle] applies, then
      * the load, in this policy's runner, so the plugin's process stays up while this policy is held. Null when it is
      * ready, else why not, as [handle] would answer. A search starts its sources this way first, so a cold start is
      * not spent out of the search's own budget. Never asks the person anything: nothing they started is waiting on it.
@@ -277,7 +277,7 @@ class PluginCrashPolicy(
     /**
      * Why a call to [point] must not be made ([PluginGrants.pointRefusal]), or null when it may. A point set to Ask first
      * (or not answered yet) is asked about on the first-use sheet during a call the person started, and the answer is
-     * kept: Allow turns it on, Never blocks it, Not now leaves it to be asked again (Droidtop/tracker#270). From the
+     * kept: Allow turns it on, Never blocks it, Not now leaves it to be asked again (mytop-project/tracker#270). From the
      * background it stays refused, with a note that the plugin wanted it.
      */
     private suspend fun pointGate(record: PluginRecord, point: String, userInitiated: Boolean): String? = withContext(Dispatchers.IO) {

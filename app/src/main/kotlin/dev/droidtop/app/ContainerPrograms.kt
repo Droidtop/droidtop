@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The app containers' own programs that droidtop runs (docs/SPEC.md 3 "The image's own program", Droidtop/tracker#555
+ * The app containers' own programs that droidtop runs (docs/SPEC.md 3 "The image's own program", mytop-project/tracker#555
  * D6b): one job per container in the process's scope, so a program keeps running whatever screen is open, and ends
  * with droidtop's process (proot sessions are killed on exit). Stop cancels the job, which ends the program's session.
  */
@@ -44,7 +44,7 @@ internal object ContainerPrograms {
         data object Stopped : State
         data class Running(val sinceMs: Long) : State
         data class Waiting(val restartInMs: Long, val lastExit: Int) : State
-        /** [why]: Android's phantom process limit, when that ended it (Droidtop/tracker#816), in plain words. */
+        /** [why]: Android's phantom process limit, when that ended it (mytop-project/tracker#816), in plain words. */
         data class Ended(val exitCode: Int, val gaveUp: Boolean, val why: String? = null) : State
         data class Failed(val message: String) : State
     }
@@ -123,9 +123,9 @@ internal object ContainerPrograms {
                 return@launch
             }
             val log = ContainerProgram.hostLogFile(app.filesDir, container.id).apply { parentFile?.mkdirs() }
-            // As its image's user, or -u's (Droidtop/tracker#715). The script opens the log before it switches.
+            // As its image's user, or -u's (mytop-project/tracker#715). The script opens the log before it switches.
             val user = ContainerUser.parse(config.user)
-            // Each second the log grew, its length and the time (`logs --since`, Droidtop/tracker#715); every
+            // Each second the log grew, its length and the time (`logs --since`, mytop-project/tracker#715); every
             // TRIM_EVERY_MS it is trimmed, and the times move with it. One loop, so the two never cross.
             val trimmer = launch {
                 val times = LogTimes.fileFor(log)
@@ -203,7 +203,7 @@ internal object ContainerPrograms {
     /**
      * Starts every container whose "Start with the desktop" is on, once the desktop session is up: its program when its
      * image names one, else the container itself, a sibling with nothing of its own to run but its init
-     * (Droidtop/tracker#808, docs/SPEC.md 3d "Start with the desktop").
+     * (mytop-project/tracker#808, docs/SPEC.md 3d "Start with the desktop").
      */
     suspend fun startWithDesktop(context: Context, runtime: ContainerRuntime) {
         val ids = settings(context).stringPropertyNames().filter { it.endsWith(KEY_AUTOSTART) }.map { it.removeSuffix(KEY_AUTOSTART) }

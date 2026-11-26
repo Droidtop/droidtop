@@ -19,7 +19,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * Offline voice typing's download (Droidtop/tracker#343): which files of the engine's AAR and the model's archive are
+ * Offline voice typing's download (mytop-project/tracker#343): which files of the engine's AAR and the model's archive are
  * kept, that nothing is kept unless the whole download matches its pinned SHA-256, and how heard words are typed.
  */
 class OfflineVoiceTest {

@@ -4,11 +4,11 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Plugins list's Show filter (Droidtop/tracker#513, #792). */
+/** The Plugins list's Show filter (mytop-project/tracker#513, #792). */
 class PluginListFilterTest {
     @Test
     fun `a plugin that wants new access and has a newer version is under Updates`() {
-        // On the console F95zone read "Wants new access" and its update showed nowhere on the list (Droidtop/tracker#792).
+        // On the console F95zone read "Wants new access" and its update showed nowhere on the list (mytop-project/tracker#792).
         assertTrue(PluginListFilter.UPDATES.keeps("Wants new access", hasUpdate = true))
         assertTrue(PluginListFilter.NEEDS_APPROVAL.keeps("Wants new access", hasUpdate = true))
     }

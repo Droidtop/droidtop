@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Settings search finds a plugin's Approve on its page (Droidtop/tracker#759). */
+/** Settings search finds a plugin's Approve on its page (mytop-project/tracker#759). */
 class SettingsSearchPluginPagesTest {
     private fun page(id: String, label: String) = CatalogScreen(
         id = "plugin_detail_$id",

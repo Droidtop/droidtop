@@ -1,4 +1,4 @@
-kaomoji.txt is the kaomoji list Hacker Keyboard Reborn's emoji panel offers (Droidtop/tracker#903 H4).
+kaomoji.txt is the kaomoji list Hacker Keyboard Reborn's emoji panel offers (mytop-project/tracker#903 H4).
 
 Source: AnySoftKeyboard, ime/addons/quick_text/src/main/res/xml/popup_kaomoji.xml at commit
 9f61011dc76628b8bf493c309f283fa4a8988e56 (github.com/AnySoftKeyboard/AnySoftKeyboard, Apache License 2.0).

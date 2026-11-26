@@ -341,7 +341,7 @@ Java_dev_droidtop_pluginhost_SandboxFiles_nativeRegister(JNIEnv *env, jclass cla
  * (/system, opened O_PATH), so stat answers S_IFDIR. ART builds a class loader's native-library list from the folders that
  * File.isDirectory says exist (DexPathList.makePathElements); the library folder under /droidtop-sandbox/ held only
  * registered files, so it was left out and System.loadLibrary found nothing in it although each library opened
- * (Droidtop/tracker#926, rig AVD dev.3341). A read open of "/" was refused to a contained plugin (EACCES, rig AVD
+ * (mytop-project/tracker#926, rig AVD dev.3341). A read open of "/" was refused to a contained plugin (EACCES, rig AVD
  * dev.3347): its lockdown passes the path to the kernel, and SELinux keeps the isolated domain out of rootfs. An O_PATH
  * open is not an open for reading (no file-open check, nothing to list), fstat of it needs only getattr, and every
  * domain may look up /system; an open process's broker reads /system by its rules. Returns 0 or a negative errno.

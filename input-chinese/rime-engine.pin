@@ -1,4 +1,4 @@
-# RIME for Chinese typing (Droidtop/tracker#903 H8a, H8b): rime/librime 56737cd29a4d393a104a2098ece3697aa2810465 with
+# RIME for Chinese typing (mytop-project/tracker#903 H8a, H8b): rime/librime 56737cd29a4d393a104a2098ece3697aa2810465 with
 # the lua, octagram and predict plugins, built by .github/workflows/rime-engine.yml on osfans/trime v3.3.13's recipe
 # and released on this repository as the prerelease below.
 # tag and sha256: rime-engine.tar.zst (librime.so for both ABIs, include/rime_api.h, each library's licence, VERSION),

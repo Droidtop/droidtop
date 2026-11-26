@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * The rig check of `priv.packages` (docs/plugin-api.md 2.7, Droidtop/tracker#130) on a real console, through droidtop's
+ * The rig check of `priv.packages` (docs/plugin-api.md 2.7, mytop-project/tracker#130) on a real console, through droidtop's
  * real broker and the installed Shizuku plugin, on a throwaway app the test installs and removes itself
  * (`:rigtest-throwaway`, carried in this test APK). Run by hand with `am instrument`, never in CI:
  *

@@ -7,7 +7,7 @@ import org.pocketworkstation.pckeyboard.InputEngine
 import org.pocketworkstation.pckeyboard.InputEngines
 
 /**
- * Japanese for droidtop's keyboard (Droidtop/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam"). :app calls
+ * Japanese for droidtop's keyboard (mytop-project/tracker#903 H7c; docs/SPEC.md 6a, "The engine seam"). :app calls
  * [install] at start (Seams.kt), which registers Mozc's engine for the input language "ja" with [InputEngines] and adds
  * the "Japanese" row to the keyboard's settings. :input-keyboard knows nothing of this module.
  */

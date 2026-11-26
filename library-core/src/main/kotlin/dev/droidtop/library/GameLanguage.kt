@@ -3,7 +3,7 @@ package dev.droidtop.library
 import java.util.Locale
 
 /**
- * A Windows game's language (docs/SPEC.md 7i, "Game properties"; Droidtop/tracker#228): the languages Steam's API
+ * A Windows game's language (docs/SPEC.md 7i, "Game properties"; mytop-project/tracker#228): the languages Steam's API
  * names ([steam], partner.steamgames.com "Languages") with the Linux locale Wine reads for each ([locale]). The one
  * table for a game's own language, the prefix's language and the Steamworks shim's; a store's download language is
  * chosen when the game is installed and is not this.

@@ -77,7 +77,7 @@ object CustomPlayerPrefs {
      * [players] of [systemId] as a players-database document (`{"players":[...]}`, the rows
      * [KnownPlayers] reads and droidtop-platforms' `players/` publishes), so a preset someone made
      * here can be shared as a file, loaded on another device with [importJson], or proposed for the
-     * database as it is (Droidtop/tracker#248).
+     * database as it is (mytop-project/tracker#248).
      */
     fun shareJson(systemId: String, players: List<Player.AmStart>): String {
         val rows = JSONArray()

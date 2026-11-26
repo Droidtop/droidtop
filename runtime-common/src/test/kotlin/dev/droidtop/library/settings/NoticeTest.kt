@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The notice model's focus and accessibility rules (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485,
+ * The notice model's focus and accessibility rules (docs/SPEC.md 7k, "Notices"; mytop-project/tracker#485,
  * final design test 6): a notice is a stop of the pad only when something happens there, A does the
  * action or else opens Info, and a screen reader hears the tone first and gets Info and the action as
  * custom actions.

@@ -59,7 +59,7 @@ private const val SLIDE_SECONDS = 12L
 @Composable
 internal fun Screensaver(entries: List<LibraryEntry>, onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    // What it shows, dimmed or not, and the name (Settings > Screensaver, Droidtop/tracker#726).
+    // What it shows, dimmed or not, and the name (Settings > Screensaver, mytop-project/tracker#726).
     val look by remember { dev.droidtop.library.settings.ScreensaverPrefs.lookChanges(context) }
         .collectAsState(initial = dev.droidtop.library.settings.ScreensaverLook())
     // Owns focus and input: any key or tap dismisses it. Without this

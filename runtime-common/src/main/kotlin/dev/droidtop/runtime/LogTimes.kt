@@ -4,7 +4,7 @@ import java.io.File
 import java.io.RandomAccessFile
 
 /**
- * When a program's log got its lines, for `logs --since` and `--until` (Droidtop/tracker#715). The program writes
+ * When a program's log got its lines, for `logs --since` and `--until` (mytop-project/tracker#715). The program writes
  * its output straight to its log, so its lines carry no times. Instead, while the program runs, droidtop notes the
  * log's length each second it grew, in a file beside it ([fileFor]): "at this time the log was this long". A time
  * then reads as a place in the log, to the second, and the program's output is left exactly as it wrote it.

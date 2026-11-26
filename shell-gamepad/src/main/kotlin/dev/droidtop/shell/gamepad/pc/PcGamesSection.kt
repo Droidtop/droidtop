@@ -495,7 +495,7 @@ internal fun PcGamesSection(
     // installed (the owner, 2026-11-20, could not tell from a row reading "Game" that a Steam game was his to install).
     fun searchLine(entry: LibraryEntry): String =
         listOfNotNull(badgeOf(entry)?.text, "Not installed".takeIf { entry.needsInstall() }).joinToString(" · ").ifEmpty { "Game" }
-    // Home's strip and band (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a), built off the main thread from what
+    // Home's strip and band (docs/SPEC.md 7i, "Home"; mytop-project/tracker#485 F7a), built off the main thread from what
     // the shell already holds. Only while Home is showing.
     val homeAll = remember(games, others) { games.orEmpty() + others }
     val homeSearchAll = remember(games, searchOthers) { games.orEmpty() + searchOthers }
@@ -515,7 +515,7 @@ internal fun PcGamesSection(
         state.shelfIndex = shelf
         state.itemIndex = item
     }
-    // Shelves plugins ask for, after Home's own (docs/plugin-api.md 3 C11, Droidtop/tracker#316). Home's own are
+    // Shelves plugins ask for, after Home's own (docs/plugin-api.md 3 C11, mytop-project/tracker#316). Home's own are
     // shown first with the plugin shelves it already had; the plugins' (from an answer kept for 15 minutes, so a
     // library change rarely asks them) follow when ready. Real entries only.
     var pluginShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
@@ -546,7 +546,7 @@ internal fun PcGamesSection(
         }
     }
     // Which Home rows started the most games, read once each time Home opens, so the order is worked out then and never
-    // shifts while the person is on it (Droidtop/tracker#611).
+    // shifts while the person is on it (mytop-project/tracker#611).
     val homeUse by produceState(initialValue = emptyMap<String, Int>(), state.home) {
         value = if (state.home) withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.use(context) } else emptyMap()
     }
@@ -554,7 +554,7 @@ internal fun PcGamesSection(
     // followed after: a change is the person's own, so the row moves with the cursor on it.
     LaunchedEffect(state.home) { withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.load(context) } }
     val homeRules by dev.droidtop.library.settings.HomeRows.rules.collectAsState()
-    // The Home row whose heading menu is open (Droidtop/tracker#611): Pin to top, Move up and down, Hide.
+    // The Home row whose heading menu is open (mytop-project/tracker#611): Pin to top, Move up and down, Hide.
     var rowMenu by remember { mutableStateOf<PcShelf?>(null) }
     LaunchedEffect(games, others, ownership, recentlyAdded, homeUse, homeRules) {
         val all = games ?: return@LaunchedEffect
@@ -562,10 +562,10 @@ internal fun PcGamesSection(
         val own = withContext(Dispatchers.Default) { homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded) }
         // The first paint shows Home's own rows before the slower ones below. After that the list is set once per
         // change: set twice (without Recommended, then with it) the shelves shifted under the cursor and the
-        // scroll that follows it restarted on every update (Droidtop/tracker#616).
+        // scroll that follows it restarted on every update (mytop-project/tracker#616).
         if (homeShelfList.isEmpty()) homeShelfList = own + pluginShelfList
         val home = all + others
-        // Droidtop's own recommendations, after Home's own rows (Droidtop/tracker#611): the recommender names games the
+        // Droidtop's own recommendations, after Home's own rows (mytop-project/tracker#611): the recommender names games the
         // person has and has not played that look like what they do play. Home only; worked out off the main thread.
         val recommended = if (!state.home) {
             null
@@ -577,7 +577,7 @@ internal fun PcGamesSection(
                 recommendedShelf(titles, home)
             }
         }
-        // The games this person plays at this time of day, from the launch log (Droidtop/tracker#611). Home only.
+        // The games this person plays at this time of day, from the launch log (mytop-project/tracker#611). Home only.
         val usualNow = if (!state.home) {
             null
         } else {
@@ -672,7 +672,7 @@ internal fun PcGamesSection(
         }
         state.itemIndex = state.itemIndex.coerceIn(0, last.coerceAtLeast(0))
     }
-    // A tab of an imported collection the store no longer has goes with it (Droidtop/tracker#756). Read from the
+    // A tab of an imported collection the store no longer has goes with it (mytop-project/tracker#756). Read from the
     // membership as it is stored, never from the empty value shown before the first read.
     LaunchedEffect(Unit) {
         CollectionMembership.flow(context).collect { stored ->
@@ -729,21 +729,21 @@ internal fun PcGamesSection(
     // button read ([storeStageOf]); everything else launches, a multi-part
     // game's card launching the part to continue with, not always the first
     // (docs/SPEC.md 7n). An install or update stops on the free-space
-    // offer first (Droidtop/tracker#227): the size and the room the chosen
+    // offer first (mytop-project/tracker#227): the size and the room the chosen
     // game folder has are named before anything downloads; a download
     // already running goes straight to the store's queue.
-    // The rule is shared with every host outside Gaming (rememberPcLaunch, Droidtop/tracker#349).
+    // The rule is shared with every host outside Gaming (rememberPcLaunch, mytop-project/tracker#349).
     val downloads by StoreInstallJob.live.collectAsState()
     val pcLaunch = rememberPcLaunch(
         onLaunch = { entry ->
-            // A start from a Home row counts for that row's place on Home (Droidtop/tracker#611).
+            // A start from a Home row counts for that row's place on Home (mytop-project/tracker#611).
             if (state.home && !state.stripFocused) currentShelf?.id?.let { dev.droidtop.library.settings.HomeRows.noteStart(context, it) }
             onLaunch(folded?.continuing?.get(entry.id) ?: entry)
         },
         onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
     )
     val launch: (LibraryEntry) -> Unit = pcLaunch.launch
-    // A on a game opens its page, never a launch (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page
+    // A on a game opens its page, never a launch (owner, 2026-10-24, mytop-project/tracker#641: "hitting A on the page
     // shouldn't immediately launch the game, it should open the game's page"): a PC game's page with Play focused, a
     // Retro game's details; an app, which has no game page, opens. X is Play now ([playsNow]).
     val activate: (LibraryEntry) -> Unit = { entry ->
@@ -767,7 +767,7 @@ internal fun PcGamesSection(
     }
     // Home's destination row: a library's menu, or Random game, which opens a game's page (a PC game) or its
     // options (a Retro game or a game app), so Play is one press from there. The pick is from every game Home
-    // holds, PC, Retro and game apps, hidden ones left out (Droidtop/tracker#507).
+    // holds, PC, Retro and game apps, hidden ones left out (mytop-project/tracker#507).
     fun openDestination(index: Int) {
         state.destIndex = index
         val destination = HOME_DESTINATIONS.getOrNull(index) ?: return
@@ -879,8 +879,8 @@ internal fun PcGamesSection(
 
     // Home also shows the Retro library and the launcher apps: it is empty only when they are too.
     if (knownEmpty && (!state.home || (retro.isEmpty() && apps.isEmpty()))) {
-        // An empty library is its own place's empty state, with Game sources as its button (Droidtop/tracker#533); it
-        // opens the Game sources place itself, the "PC setup" screen of links being gone (Droidtop/tracker#571 row 4).
+        // An empty library is its own place's empty state, with Game sources as its button (mytop-project/tracker#533); it
+        // opens the Game sources place itself, the "PC setup" screen of links being gone (mytop-project/tracker#571 row 4).
         dev.droidtop.shell.gamepad.EmptyLibrary(
             line = if (state.home) "No games yet" else "No PC games yet",
             actionLabel = "Game sources",
@@ -961,7 +961,7 @@ internal fun PcGamesSection(
     val rowStates = remember { mutableMapOf<String, LazyListState>() }
     fun rowState(id: String) = rowStates.getOrPut(id) { LazyListState() }
     fun gridColumns(): Int = (gridState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column } ?: 0) + 1
-    // On the shelves the ones above and below too, and in the grid the rows above and below (Droidtop/tracker#782).
+    // On the shelves the ones above and below too, and in the grid the rows above and below (mytop-project/tracker#782).
     PreloadBackdrops(
         remember(currentList, shelves, state.onShelves, state.shelfIndex, state.itemIndex) {
             if (state.onShelves) {
@@ -980,7 +980,7 @@ internal fun PcGamesSection(
     // "Gaming motion and focus").
     val tilesState = rememberLazyGridState()
     val homeCardsState = rememberLazyListState()
-    // The first shelf's card widths in pixels, for its Steam-style follow (keepHeroInView, Droidtop/tracker#632).
+    // The first shelf's card widths in pixels, for its Steam-style follow (keepHeroInView, mytop-project/tracker#632).
     val density = androidx.compose.ui.platform.LocalDensity.current
     val heroRowCard = capsuleWidth(cardSize)
     val heroRowPx = with(density) { heroRowCard.toPx() to heroWidth(heroRowCard).toPx() }
@@ -1159,15 +1159,15 @@ internal fun PcGamesSection(
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
                             else focusedEntry?.let(activate)
                         }
-                        // X is Play now on a game (Droidtop/tracker#641); Filter is in the list options. Y is Search on Home.
+                        // X is Play now on a game (mytop-project/tracker#641); Filter is in the list options. Y is Search on Home.
                         GamepadAction.X -> if (playsNow && !onDest && !onHomeStrip && !state.stripFocused) focusedEntry?.let(launch) else return@onPad false
-                        // Y is Search on Home and on every list (proposal 6.A, Droidtop/tracker#644 slice 4); Sort By
+                        // Y is Search on Home and on every list (proposal 6.A, mytop-project/tracker#644 slice 4); Sort By
                         // is in the list options with Filter.
                         GamepadAction.Y -> state.searchOpen = true
                         // L2 is the focused thing's menu, as R2 is the global
                         // one; a long press opens the same menu. Select is the
                         // list's options, whatever is focused (owner, 2026-10-23,
-                        // Droidtop/tracker#621). A pinned tab's menu is Edit,
+                        // mytop-project/tracker#621). A pinned tab's menu is Edit,
                         // Unpin and Move.
                         GamepadAction.L2 -> {
                             val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
@@ -1204,7 +1204,7 @@ internal fun PcGamesSection(
                     state.stripFocused = true
                     activateChip(index)
                 },
-                // A pinned tab's menu, the one L2 opens on it (Droidtop/tracker#621).
+                // A pinned tab's menu, the one L2 opens on it (mytop-project/tracker#621).
                 onLongPress = { index ->
                     (tabs.getOrNull(index) as? PcTab.Grid)?.takeIf { !it.builtIn }?.let { pinned ->
                         state.stripFocused = true
@@ -1231,7 +1231,7 @@ internal fun PcGamesSection(
                         state.stripFocused = false
                         if (state.itemIndex == index) tiles.getOrNull(index)?.let { state.showGrid(it.query) } else moveTo(state.shelfIndex, index)
                     },
-                    // The tile's menu, the one L2 and Select open (owner, 2026-10-23, Droidtop/tracker#621).
+                    // The tile's menu, the one L2 and Select open (owner, 2026-10-23, mytop-project/tracker#621).
                     onLongPress = { index ->
                         state.stripFocused = false
                         moveTo(state.shelfIndex, index)
@@ -1264,7 +1264,7 @@ internal fun PcGamesSection(
                                     state.homeCard = index
                                 }
                             },
-                            // The activity spot opens Updates, its own page (Droidtop/tracker#792).
+                            // The activity spot opens Updates, its own page (mytop-project/tracker#792).
                             onActivity = { onOpenSection(GamingSection.UPDATES) },
                             onBell = onOpenQuickMenu,
                             onFriends = { onOpenSection(GamingSection.SOCIAL) },
@@ -1281,7 +1281,7 @@ internal fun PcGamesSection(
                         state.destFocused = false
                         if (state.shelfIndex == shelf && state.itemIndex == item) activate(entry) else moveTo(shelf, item)
                     },
-                    // A long press opens the thing's menu, the one L2 opens (owner, 2026-10-23, Droidtop/tracker#610, #621).
+                    // A long press opens the thing's menu, the one L2 opens (owner, 2026-10-23, mytop-project/tracker#610, #621).
                     onLongPressCapsule = ::openOptions,
                     downloads = downloads,
                     partsOf = ::partsOf,
@@ -1441,7 +1441,7 @@ internal fun PcGamesSection(
                 dev.droidtop.library.integrations.SourceDestinations.consoleNamesOf(ConsoleSystemsRepository.allSystems(context))
             }
         }
-        // The grid behind follows the typed text once it rests (GridFollow, Droidtop/tracker#884), not on every key.
+        // The grid behind follows the typed text once it rests (GridFollow, mytop-project/tracker#884), not on every key.
         val gridFollow = remember { GridFollow() }
         var gridTyped by remember { mutableIntStateOf(0) }
         LaunchedEffect(gridTyped) {
@@ -1517,9 +1517,9 @@ internal fun PcGamesSection(
             onScraped = onRequestRescan,
             onDismiss = { state.optionsOpen = false },
             games = listed,
-            // X is Play now on a game (Droidtop/tracker#641) and Y is Search (#644 slice 4), so Filter and Sort by are
+            // X is Play now on a game (mytop-project/tracker#641) and Y is Search (#644 slice 4), so Filter and Sort by are
             // here: the menu's own two rows, which close it and open the sheets. Passed as list options under the same
-            // names, they were caught by those rows' own case, which opened nothing (Droidtop/tracker#954 15b).
+            // names, they were caught by those rows' own case, which opened nothing (mytop-project/tracker#954 15b).
             onOpenSort = { state.sortOpen = true },
             onOpenFilter = { state.filterOpen = true },
             // The ownership List options (docs/SPEC.md 7j) and the strip's
@@ -1690,7 +1690,7 @@ internal fun PcGamesSection(
     tabMenu?.let { view ->
         PinnedTabMenu(
             view = view,
-            // The name is typed in its row, the menu still open (no editor, no panel: Droidtop/tracker#954 item 12).
+            // The name is typed in its row, the menu still open (no editor, no panel: mytop-project/tracker#954 item 12).
             onRename = { name ->
                 val trimmed = name.trim()
                 if (trimmed.isNotEmpty() && trimmed != view.name) {
@@ -1739,7 +1739,7 @@ private fun PinnedTabMenu(
     onMove: (step: Int, toFirst: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // The one sheet of choices (Droidtop/tracker#610), its name typed in place.
+    // The one sheet of choices (mytop-project/tracker#610), its name typed in place.
     dev.droidtop.shell.gamepad.ActionSheet(
         title = view.name,
         rows = listOf(
@@ -1824,7 +1824,7 @@ private fun PcShelvesHome(
     LazyColumn(
         state = columnState,
         // What is left under the band, not the whole page: the full height ran the list's end off the screen, where
-        // a row the cursor reached counted as shown and was never scrolled to (Droidtop/tracker#616).
+        // a row the cursor reached counted as shown and was never scrolled to (mytop-project/tracker#616).
         modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(
             top = Space.Sm,
@@ -1911,7 +1911,7 @@ private fun PcShelvesHome(
 }
 
 /**
- * Where each stop of the shelves page is in its one column (Droidtop/tracker#616). Home's strip is an item of its
+ * Where each stop of the shelves page is in its one column (mytop-project/tracker#616). Home's strip is an item of its
  * own right after the first shelf, or first on an empty Home; the destinations end the column. PC Games' Overview
  * has no strip. Pure, for the tests.
  */
@@ -1997,7 +1997,7 @@ internal class HomeDestination(val section: GamingSection?, val label: String)
 
 /**
  * Home's destination row: the Retro and PC game menus, in the left menu's order, then Random game
- * (Droidtop/tracker#507), which opens one game picked at random from everything Home holds.
+ * (mytop-project/tracker#507), which opens one game picked at random from everything Home holds.
  */
 internal val HOME_DESTINATIONS = listOf(
     HomeDestination(GamingSection.GAMES, "Retro Games"),
@@ -2006,7 +2006,7 @@ internal val HOME_DESTINATIONS = listOf(
 )
 
 /**
- * Home's destination row (Droidtop/tracker#273): one large tile per library.
+ * Home's destination row (mytop-project/tracker#273): one large tile per library.
  * Drawn by the page that owns the cursor, so [selected] says which tile the
  * pad is on; a tap opens at once, as a strip chip does.
  */
@@ -2031,7 +2031,7 @@ private fun HomeDestinations(selected: Int?, onOpen: (Int) -> Unit, modifier: Mo
 /** The most PC games the search lists as rows; the grid behind it narrows to all of them. */
 private const val SEARCH_GAME_ROWS = 20
 
-/** What A does on a game card in Gaming (owner, 2026-10-24, Droidtop/tracker#641): open it, never launch it. */
+/** What A does on a game card in Gaming (owner, 2026-10-24, mytop-project/tracker#641): open it, never launch it. */
 internal enum class CardPress { PAGE, DETAILS, LAUNCH }
 
 /** A PC game opens its page, a Retro game its details, and an app, which has no game page, opens. Pure. */
@@ -2042,7 +2042,7 @@ internal fun cardPress(entry: LibraryEntry): CardPress = when {
 }
 
 /**
- * A Home row heading's menu (Droidtop/tracker#611, "A row heading's menu has Pin to top, Move up / Move down, and
+ * A Home row heading's menu (mytop-project/tracker#611, "A row heading's menu has Pin to top, Move up / Move down, and
  * Hide"): the same choices Settings > Shell > Home rows has for the row, on the row itself. Move is among the pinned
  * rows, the only ones with a place of their own; the others go where use puts them.
  */

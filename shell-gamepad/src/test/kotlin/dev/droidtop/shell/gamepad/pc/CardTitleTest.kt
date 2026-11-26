@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A card title breaks between run-together words, never inside one (Droidtop/tracker#942). */
+/** A card title breaks between run-together words, never inside one (mytop-project/tracker#942). */
 class CardTitleTest {
     private val zw = '\u200B'
 

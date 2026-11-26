@@ -95,7 +95,7 @@ class PluginScheduleJobService : JobService() {
     private var running: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {
-        // droidtop's own job runs plugins' schedules, so the plugin host is up first (Droidtop/tracker#775).
+        // droidtop's own job runs plugins' schedules, so the plugin host is up first (mytop-project/tracker#775).
         PluginHostStart.start(applicationContext)
         running = scope.launch {
             val app = applicationContext

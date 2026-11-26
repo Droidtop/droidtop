@@ -27,7 +27,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Stores a plugin provides (docs/plugin-api.md 3 A13, `library.stores@1`, Droidtop/tracker#220): each running plugin's
+ * Stores a plugin provides (docs/plugin-api.md 3 A13, `library.stores@1`, mytop-project/tracker#220): each running plugin's
  * `library.stores` entry becomes one [StoreLibrary] registered beside droidtop's own, so its games join the PC library,
  * the automatic sync and every place that reads [StoreLibraries], the way a built-in store's do. The plugin answers
  * for the account and the library; droidtop keeps the rows, draws everything, and signs the person in with the

@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What an entry to the Updates page says (Droidtop/tracker#792). */
+/** What an entry to the Updates page says (mytop-project/tracker#792). */
 class UpdatesWaitingTest {
     @Test
     fun `an entry says how many are available, or that everything is up to date`() {

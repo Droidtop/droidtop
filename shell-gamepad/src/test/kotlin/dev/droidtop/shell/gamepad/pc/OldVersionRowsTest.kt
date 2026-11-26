@@ -11,9 +11,9 @@ import org.junit.Before
 import org.junit.Test
 import dev.droidtop.library.settings.WordsForTests
 
-/** The rows that remove a game's older version folders on Versions (docs/SPEC.md 7i; Droidtop/tracker#624). */
+/** The rows that remove a game's older version folders on Versions (docs/SPEC.md 7i; mytop-project/tracker#624). */
 class OldVersionRowsTest {
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 

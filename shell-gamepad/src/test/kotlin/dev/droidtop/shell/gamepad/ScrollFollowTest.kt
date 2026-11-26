@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * A D-pad move keeps the selection on screen (docs/SPEC.md 6e; Droidtop/tracker#616 and the console report of
+ * A D-pad move keeps the selection on screen (docs/SPEC.md 6e; mytop-project/tracker#616 and the console report of
  * 2026-10-23: on Home and Plugins, the D-pad moved past the visible area without scrolling).
  */
 class ScrollFollowTest {

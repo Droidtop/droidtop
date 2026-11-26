@@ -137,7 +137,7 @@ Findings:
 - **L, M: heavy checkout.** Recursive checkout of all 9 submodules takes 55-73 s. gamenative alone is ~800 MB of worktree, including `lsfg-vk-android/thirdparty/pe-parse/tests/assets/corkami-poc-dataset` (93 MB of test PE files) and `app/src/legacy/assets` (465 MB). A blob filter or sparse checkout would help.
 - **L, S: action versions.** actions/checkout@v4, cache@v4, setup-java@v4 and upload-artifact@v4 are Node-20 majors, and runners already warn that Node 20 is deprecated (seen in the gamenative-tux logs). Bump them.
 - **M, S: the publish is not atomic.** `gh release delete` followed by `gh release create` leaves a window with no release, and update checks during the window fail silently. If the create fails after the delete (an asset upload error, the API), `latest` stays missing until the next green push. Fix: create or upload into a new release, then retarget, or `gh release upload --clobber` plus `gh release edit --notes`.
-- **L, S: wrong comment.** The step comment says "The repo is private", but `Droidtop/droidtop` is PUBLIC.
+- **L, S: wrong comment.** The step comment says "The repo is private", but `mytop-project/droidtop` is PUBLIC.
 - **The `pull_request` triggers are unused.** No PR runs appear in the sample, because everything is pushed straight to main. That ties to H3.
 - **What a failure blocks:**
   - A red android-build blocks that commit's APK and channel publish.
@@ -198,7 +198,7 @@ Findings:
   - `build-toolchains`: a pre-release holding musl cross toolchains of 108 MB and 115 MB, dated 2026-08-20.
   - **No `testing` and no `stable` release exists.**
 - `release-info.json` on latest has `formatVersion 1, versionCode 568, versionName "0.1.0-dev-568", apkName, apkSha256, debugApkName, debugApkSha256, commit`. That matches what `AppSelfUpdate.fetch()` requires: formatVersion == 1, a 64-hex digest, and a fallback to the release APK when there is no debug key.
-- The updater is `app/src/main/kotlin/dev/droidtop/app/update/AppSelfUpdate.kt` plus `UpdateNow.kt`. It fetches `https://github.com/Droidtop/droidtop/releases/download/<tag>/release-info.json`, compares versionCode, downloads, checks the SHA-256 and commits a PackageInstaller session (silent on API 31+ when it is eligible). Frequency can be Off, Daily, Weekly or Monthly. There is a channel choice and a debug toggle.
+- The updater is `app/src/main/kotlin/dev/droidtop/app/update/AppSelfUpdate.kt` plus `UpdateNow.kt`. It fetches `https://github.com/mytop-project/droidtop/releases/download/<tag>/release-info.json`, compares versionCode, downloads, checks the SHA-256 and commits a PackageInstaller session (silent on API 31+ when it is eligible). Frequency can be Off, Daily, Weekly or Monthly. There is a channel choice and a debug toggle.
 
 Gaps:
 - **H, M: channel semantics are broken by construction.**
@@ -247,7 +247,7 @@ Gaps:
 
 | Repo | What | Health | How droidtop consumes it |
 |---|---|---|---|
-| droidtop-platforms | engines/platforms/players/BIOS database tree plus generators | Healthy: daily "Plugins index" commits, CI (generated-files, plugins-index) 10/10 green. **No LICENSE** | Submodule `c74eba36`, 17 commits behind head. Copied into assets by library-core/build.gradle.kts, refreshed at runtime from `raw.githubusercontent.com/droidtop/droidtop-platforms/main`. Sensible, but the pin is never auto-bumped |
+| droidtop-platforms | engines/platforms/players/BIOS database tree plus generators | Healthy: daily "Plugins index" commits, CI (generated-files, plugins-index) 10/10 green. **No LICENSE** | Submodule `c74eba36`, 17 commits behind head. Copied into assets by library-core/build.gradle.kts, refreshed at runtime from `raw.githubusercontent.com/mytop-project/droidtop-platforms/main`. Sensible, but the pin is never auto-bumped |
 | gamenative-tux (fork of utkarshdalal/GameNative) | Wine/Box64 runtime, compiled whole into :runtime-windows | **"Sync upstream" failed 10/10 days (09-14..09-23)**: modify/delete conflicts on 3 upstream workflows plus content conflicts in PluviaApp.kt, EpicAppScreen.kt, SettingsGroupInterface.kt. 29 ahead / 62 behind upstream. push-build-check last green 09-11. 1.37 GB | Pinned at `fac0a168`, its current head (good). URL still points at `bi0shacker001/` |
 | windowcast | streaming protocol + SDK (THE streaming system) | Last commit 09-02, CI 5/5 green, GPL-3.0 | Not vendored. Referenced only in comments and SPEC §7a |
 | droidtop-theme-patches | per-system theme overlay fragments | Scaffold only: 3 commits on 08-28, including a revert of AI-generated content. No CI, **no LICENSE** | Not consumed by code, only mentioned in NOTICE.md |

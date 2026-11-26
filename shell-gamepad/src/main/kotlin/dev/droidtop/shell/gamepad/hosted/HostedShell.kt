@@ -71,7 +71,7 @@ import androidx.compose.ui.window.DialogProperties
 
 /*
  * The Gaming shell's own pieces, handed to the modes that have no Gaming shell around them
- * (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350): a sheet that a pad and a finger
+ * (docs/SPEC.md 2b "Desktop chrome with a pad", mytop-project/tracker#350): a sheet that a pad and a finger
  * both drive, the Quick Menu, and a legend for the buttons. Desktop draws its chrome over a compositor
  * surface and has no left menu, no footer and no Compose focus tree the pad can walk, so what it shows
  * with a pad is built from the same MenuPanel, MenuRow, sliding focus ring and hint row Gaming's menus
@@ -97,7 +97,7 @@ class HostedRow(
 
 /**
  * Where a [HostedListSheet]'s cursor stands, for a caller that takes the sheet away and brings it back (a
- * menu opened from a row is the only window shown, and closing it returns to the same row, Droidtop/tracker#371).
+ * menu opened from a row is the only window shown, and closing it returns to the same row, mytop-project/tracker#371).
  */
 class HostedCursor {
     var index: Int = 0
@@ -210,7 +210,7 @@ fun HostedListSheet(
         // The platform's default dialog width (440dp on the emulator rig) would cap the sheet below its own width.
         ShellDialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             GatePadInThisDialog()
-            // Desktop is immersive (Droidtop/tracker#555 D4): a sheet that let its own window show the bars made the
+            // Desktop is immersive (mytop-project/tracker#555 D4): a sheet that let its own window show the bars made the
             // desktop under it resize as it opened and closed, unlike the Quick Menu's frame, which already hid them.
             HideSystemBarsInThisDialog()
             MenuPanel(
@@ -334,7 +334,7 @@ fun PadLegend(
 }
 
 /**
- * The Quick Menu outside Gaming (docs/SPEC.md 7j, Droidtop/tracker#350): Desktop's tray opens the same
+ * The Quick Menu outside Gaming (docs/SPEC.md 7j, mytop-project/tracker#350): Desktop's tray opens the same
  * sheet Gaming's R2 does, with its running apps, notifications, system, audio, display, performance,
  * downloads and plugin sections, instead of a second control panel of its own. No game is running in it
  * (a game launched from Desktop is an Android task, listed under Running apps); the places open in
@@ -346,7 +346,7 @@ fun QuickMenuStandalone(
     onDismiss: () -> Unit,
     // The tab it opens on (OverlayQuickMenuRigTest opens each one); null for the menu's own choice.
     startSection: QuickSection? = null,
-    // Power and mode's Search tile (Droidtop/tracker#621 M4), where the host has the one search (over a game); null
+    // Power and mode's Search tile (mytop-project/tracker#621 M4), where the host has the one search (over a game); null
     // for none (Desktop's tray). Kiosk and Kid never get it, as in Gaming.
     onSearch: (() -> Unit)? = null,
 ) {
@@ -373,7 +373,7 @@ fun QuickMenuStandalone(
 }
 
 /**
- * What Android's accessibility button opens (Droidtop/tracker#839; the owner: "We should probably add an accessibility
+ * What Android's accessibility button opens (mytop-project/tracker#839; the owner: "We should probably add an accessibility
  * button that lets the user pick what menu to open"): the touch route to the menus the HOME chords open, for a person
  * with no pad. Four rows, each opening the same menu its chord does, not a copy: the Quick Menu (HOME + R2), the menu of
  * what is in front (HOME + L2; [contextTitle] names it), the Start menu (HOME + Start), and the mode switcher.
@@ -406,7 +406,7 @@ private val HOSTED_SHEET_WIDTH = 520.dp
 
 /**
  * The left menu's launcher content over a game (HOME + Start, docs/SPEC.md "In-game overlays: HOME chords",
- * Droidtop/tracker#740): the shell's own [dev.droidtop.shell.gamepad.LeftMenu], with the destinations the UI mode
+ * mytop-project/tracker#740): the shell's own [dev.droidtop.shell.gamepad.LeftMenu], with the destinations the UI mode
  * allows, Resume first while a game runs and the cursor on it. A destination is opened by the host
  * ([onOpenSection], a Gaming section's name, and its place's screen id when it is a place), which leaves the game
  * for droidtop; R2 swaps to the Quick Menu, as it does in Gaming.
@@ -445,7 +445,7 @@ fun LeftMenuStandalone(
 }
 
 /**
- * The running game's own overlay (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords", Droidtop/tracker#740): its
+ * The running game's own overlay (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords", mytop-project/tracker#740): its
  * own surface, not the Quick Menu (the owner, 2026-10-29: "You shouldn't be adding to tbe quick menu. The pause goes in
  * the overlay, which is supposed to be different"). It is the running game's sheet ([RunningGameSheet][dev.droidtop.shell.gamepad.RunningGameSheet]),
  * the same one L2 opens on the running game in Gaming: Resume closes the overlay (the game never left), Restart starts
@@ -569,7 +569,7 @@ private fun GameOptions(
 
 /**
  * HOME + L2 over an app droidtop did not launch, Android's Settings included (docs/SPEC.md "In-game overlays: HOME
- * chords", Droidtop/tracker#740): that app's menu over it. Its name, then Resume (closes the overlay; the app never
+ * chords", mytop-project/tracker#740): that app's menu over it. Its name, then Resume (closes the overlay; the app never
  * left), Close the app on a second press (the task manager's one way, [dev.droidtop.runtime.tasks.TaskManager.close],
  * its outcome said on the row) and App info (Android's page for the app, [onAppInfo]).
  */

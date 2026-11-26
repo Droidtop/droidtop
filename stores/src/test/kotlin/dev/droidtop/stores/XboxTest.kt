@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Xbox: the tokens and the played PC games (Droidtop/tracker#335). Answers written here in the shape Playnite's XboxLibrary reads. */
+/** Xbox: the tokens and the played PC games (mytop-project/tracker#335). Answers written here in the shape Playnite's XboxLibrary reads. */
 class XboxTest {
     @Test
     fun `the PC games are those played, typed as games, once each, with clean names`() {

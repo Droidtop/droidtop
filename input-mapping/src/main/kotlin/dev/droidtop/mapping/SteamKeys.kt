@@ -1,7 +1,7 @@
 package dev.droidtop.mapping
 
 /**
- * Steam's key names in a layout's `key_press` bindings as Android key codes (Droidtop/tracker#383), for a host that
+ * Steam's key names in a layout's `key_press` bindings as Android key codes (mytop-project/tracker#383), for a host that
  * injects keys the way Android reports them (the desktop's seat, through its one Android-to-evdev table). Pure; the
  * codes are Android's `KeyEvent.KEYCODE_*` values, written out as [PadInputs] writes its own, so this module keeps no
  * Android types. Letters, digits and F1 to F12 are themselves; the rest are Steam's words, with the common spellings of

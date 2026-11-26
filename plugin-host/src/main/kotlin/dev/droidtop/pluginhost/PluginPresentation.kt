@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * How a plugin presents itself beyond `label` and `description` (docs/plugin-api.md 1.2 "Presentation",
- * Droidtop/tracker#521 item 2): the facts droidtop draws on the plugin's page and the list row in its own layout,
+ * mytop-project/tracker#521 item 2): the facts droidtop draws on the plugin's page and the list row in its own layout,
  * so no plugin stuffs its publisher, its home page or a "what it is" line into its description.
  *
  * Read from the signed manifest and kept on the record with the same keys. Everything is optional and checked, never
@@ -39,7 +39,7 @@ data class PluginPresentation(
         const val SUMMARY_MAX = 80
         const val PUBLISHER_MAX = 60
         const val SCREENSHOTS_MAX = 6
-        /** The fixed category list (docs/plugin-api.md 1.2, "Categories", Droidtop/tracker#179), in the order droidtop shows it. */
+        /** The fixed category list (docs/plugin-api.md 1.2, "Categories", mytop-project/tracker#179), in the order droidtop shows it. */
         val CATEGORIES = listOf("sources", "emulators", "system", "sync", "integrations", "appearance", "other")
 
         /** Each category in the person's words. */

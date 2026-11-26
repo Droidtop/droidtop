@@ -13,7 +13,7 @@ import dev.droidtop.library.settings.UiModePrefs
 import kotlinx.coroutines.launch
 
 /**
- * droidtop's one entry point for links (docs/SPEC.md 12a "Links", Droidtop/tracker#459): its own `droidtop://` action
+ * droidtop's one entry point for links (docs/SPEC.md 12a "Links", mytop-project/tracker#459): its own `droidtop://` action
  * links, the third-party schemes a plugin registers (the disabled-until-needed aliases), every https link (droidtop is a general web-link handler that names no site) and text shared to droidtop. It has
  * no screen of its own: [LinkRouter] decides, and this opens the screen the answer names, says the line it carries,
  * or passes a web link nobody claims on to the browser. Where Settings is hidden (Kiosk, Kid) droidtop opens no link

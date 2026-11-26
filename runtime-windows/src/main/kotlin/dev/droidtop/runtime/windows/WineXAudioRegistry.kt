@@ -3,7 +3,7 @@ package dev.droidtop.runtime.windows
 import java.io.File
 
 /**
- * Repairs XAudio2's COM registration in a prefix (Droidtop/tracker#898).
+ * Repairs XAudio2's COM registration in a prefix (mytop-project/tracker#898).
  *
  * The prefix template droidtop starts from (GameNative's prefix pack) registers XAudio2 2.7's class, in the 32-bit
  * view, to `xapofx1_5.dll`. Wine's xapofx DLLs register no COM class and export no `DllGetClassObject` (they build

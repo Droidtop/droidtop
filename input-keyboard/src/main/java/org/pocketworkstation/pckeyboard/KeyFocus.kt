@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import kotlin.math.abs
 
 /**
- * Where a pad's focus ring goes on the input method's keys (Droidtop/tracker#338; docs/SPEC.md 6a "A pad on the
+ * Where a pad's focus ring goes on the input method's keys (mytop-project/tracker#338; docs/SPEC.md 6a "A pad on the
  * keyboard"). Pure: keys are boxes, the focus is a point, so it survives a layer switch (Shift, symbols) by landing on
  * whatever key is nearest it on the new layer.
  *

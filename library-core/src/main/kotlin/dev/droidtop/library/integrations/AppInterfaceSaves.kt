@@ -26,7 +26,7 @@ import org.json.JSONObject
 
 /**
  * Saves both ways between droidtop and an app's plugin, and the engine games droidtop offers it (docs/plugin-api.md 3
- * A7a, Droidtop/tracker#547). The owner: "The two applications should detect and work with each other over the plugin
+ * A7a, mytop-project/tracker#547). The owner: "The two applications should detect and work with each other over the plugin
  * API so no matter what, saves go where they're needed". `saves where` gives the app the same folder droidtop's own
  * launch passes ([dev.droidtop.library.EngineGameProvider.launch]), after the same sync, so which app starts a game
  * makes no difference; `saves report_changed` is the game-ended report droidtop takes from Enginehost's broadcast
@@ -39,7 +39,7 @@ import org.json.JSONObject
 class AppInterfaceSaves(
     private val context: Context,
     private val library: () -> Library,
-    // Built on first use: its folder is looked up on disk, and this object is made at droidtop's start (Droidtop/tracker#775).
+    // Built on first use: its folder is looked up on disk, and this object is made at droidtop's start (mytop-project/tracker#775).
     private val records: () -> GameRecordStore,
 ) : SavesExchange {
 

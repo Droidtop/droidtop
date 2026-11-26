@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Themes from plugins (docs/plugin-api.md 3 C7, `theme.pack@1`, Droidtop/tracker#714): a plugin lists ES-DE themes
+ * Themes from plugins (docs/plugin-api.md 3 C7, `theme.pack@1`, mytop-project/tracker#714): a plugin lists ES-DE themes
  * and each is a row of Browse themes beside ES-DE's own list, marked with the plugin's name. A theme is a git
  * repository droidtop clones and updates with the same downloader as ES-DE's own themes, into the same themes
  * folder, and the same engine reads it with the same limits: a theme can never run code, and a plugin never writes

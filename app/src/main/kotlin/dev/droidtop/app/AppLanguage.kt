@@ -12,7 +12,7 @@ import org.xmlpull.v1.XmlPullParser
 import java.util.Locale
 
 /**
- * droidtop's own language (docs/SPEC.md 7k, "Language is part of the system"; Droidtop/tracker#627): Follow Android,
+ * droidtop's own language (docs/SPEC.md 7k, "Language is part of the system"; mytop-project/tracker#627): Follow Android,
  * the default, or one of the languages droidtop ships (res/xml/locales_config.xml, the list Android 13's per-app
  * language screen shows too). The choice is AppCompat's per-app locale, which Android keeps from 13 on and AppCompat
  * keeps before that. Games, apps and an ES-DE theme's own labels keep theirs.

@@ -33,7 +33,7 @@ class PcFolderScanTest {
         File(temp.root, path).mkdirs()
     }
 
-    // A .pck is a Godot pack only with Godot's header (GameEngineDetector.isGodot, Droidtop/tracker#873).
+    // A .pck is a Godot pack only with Godot's header (GameEngineDetector.isGodot, mytop-project/tracker#873).
     private fun file(path: String, contents: String = if (path.endsWith(".pck")) "GDPC" else "x") {
         val file = File(temp.root, path)
         file.parentFile?.mkdirs()
@@ -373,7 +373,7 @@ class PcFolderScanTest {
         assertFalse(facts.hasPath("Game.exe", folderWanted = true))
     }
 
-    // --- one set of verdicts for both walks (Droidtop/tracker#275) ------------
+    // --- one set of verdicts for both walks (mytop-project/tracker#275) ------------
 
     private fun freshVerdicts(name: String = "none.tsv") = PcFolderScan.EngineVerdicts.load(File(temp.root, name), defs)
 
@@ -528,7 +528,7 @@ class PcFolderScanTest {
 
     @Test
     fun `an old Unity player with no UnityPlayer dll is a PC game beside a newer Unity one`() {
-        // Droidtop/tracker#312, the store folder's shape with placeholder names: a 32-bit
+        // mytop-project/tracker#312, the store folder's shape with placeholder names: a 32-bit
         // Unity 5.6 player links the engine into its own exe (no UnityPlayer.dll) and keeps
         // Mono under its _Data folder; its sibling is a Unity 2019 player.
         file("Humble/.gamenative")

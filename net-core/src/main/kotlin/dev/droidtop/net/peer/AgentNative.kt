@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /**
  * droidtop's side of droidtop-agent (docs/SPEC.md 7o "Computers"): the agent's
- * Rust core, built in the Droidtop/droidtop-agent repository as
+ * Rust core, built in the mytop-project/droidtop-agent repository as
  * `libdroidtop_agent.so` and fetched against `net-core/agent-lib.pin`. One
  * entry point: an operation name and its arguments as JSON, a JSON reply.
  * Pairing, the session channel, the save rule and the merges are the same

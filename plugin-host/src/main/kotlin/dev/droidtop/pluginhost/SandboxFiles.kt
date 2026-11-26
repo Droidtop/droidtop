@@ -35,7 +35,7 @@ internal object SandboxFiles {
 
     /**
      * Makes the virtual folder [path] a directory to stat, so a class loader keeps it in its native-library list
-     * (Droidtop/tracker#926). Returns 0 or a negative errno.
+     * (mytop-project/tracker#926). Returns 0 or a negative errno.
      */
     fun registerDirectory(path: String): Int = nativeRegisterDirectory(path)
 

@@ -106,7 +106,7 @@ class DownloadPolicyTest {
 
     @Test
     fun `checks for updates follow the network rule, and the retired update switch moves to the stricter rule`() {
-        // A check is a few small reads: only Wi-Fi only keeps it off mobile data (Droidtop/tracker#833).
+        // A check is a few small reads: only Wi-Fi only keeps it off mobile data (mytop-project/tracker#833).
         assertFalse(DownloadPolicy.checksOnMetered(DownloadSettings(network = NetworkRule.WIFI_ONLY)))
         assertTrue(DownloadPolicy.checksOnMetered(DownloadSettings(network = NetworkRule.SMALL_ON_MOBILE)))
         assertTrue(DownloadPolicy.checksOnMetered(DownloadSettings(network = NetworkRule.ANY)))

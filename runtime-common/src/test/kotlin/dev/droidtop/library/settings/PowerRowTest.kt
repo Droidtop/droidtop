@@ -6,7 +6,7 @@ import dev.droidtop.runtime.power.PowerLevel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The Power row's stepping and words (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 3b). */
+/** The Power row's stepping and words (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 3b). */
 class PowerRowTest {
     @Test
     fun `a press steps Auto, Saver, Standard, Performance, then Auto again`() {

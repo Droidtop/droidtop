@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * What the person chose for one Steam game's content (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313): the branch it follows and the owned DLC
+ * "Stores", mytop-project/tracker#313): the branch it follows and the owned DLC
  * turned off. DLC is kept as the ones left out, so a DLC bought later is on
  * by default, which is what an install did before there was a picker.
  */

@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Which language a wordlist is kept for (Droidtop/tracker#339). */
+/** Which language a wordlist is kept for (mytop-project/tracker#339). */
 class KeyboardDictionariesTest {
     @Test
     fun theLanguageComesFromTheHeader() {

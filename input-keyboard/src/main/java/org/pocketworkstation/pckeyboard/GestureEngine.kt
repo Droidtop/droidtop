@@ -3,7 +3,7 @@ package org.pocketworkstation.pckeyboard
 import kotlin.math.max
 
 /**
- * The gesture seam (Droidtop/tracker#903 H6; docs/SPEC.md 6a, "Glide typing" and "The gesture seam"): a finger's
+ * The gesture seam (mytop-project/tracker#903 H6; docs/SPEC.md 6a, "Glide typing" and "The gesture seam"): a finger's
  * stroke over the keys, with its timing, and the keys' geometry in; ranked words out. The owner: "Gesture typing:
  * still a seam only. The official swipe libraries come later." droidtop's own guesser ([GlideClassifier], #341) is the
  * first engine ([ClassifierGestureEngine]), behind it with its results unchanged; [GestureLibrary] is the slot a later

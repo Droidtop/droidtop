@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The foreground service that keeps droidtop's Steam connection alive
- * (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313; the owner, 2026-10-08, did
+ * (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313; the owner, 2026-10-08, did
  * not like the connection closing after the last job because "it leaves us
  * unable to use chat"). It holds nothing itself: the connection and its
  * retries are [SteamConnection]'s. What Android needs is a reason to keep the

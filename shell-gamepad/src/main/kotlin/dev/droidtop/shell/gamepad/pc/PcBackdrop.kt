@@ -131,7 +131,7 @@ internal fun neighbourBackdrops(list: List<LibraryEntry>, index: Int, reach: Int
         .filter { it != 0 }.mapNotNull { list.getOrNull(index + it)?.backdropArt() }.distinct()
 
 /**
- * The backdrops worth having ready on the shelves (Droidtop/tracker#782, #632; the owner on the console, 2026-10-30:
+ * The backdrops worth having ready on the shelves (mytop-project/tracker#782, #632; the owner on the console, 2026-10-30:
  * "Should probably read ahead on these"): beside the cursor on its own shelf, and on the shelves above and below, the
  * game Up or Down lands on ([landing]: the place the cursor last had on that shelf, else its first game) and its
  * neighbours. Moving between the hero shelf and a shelf of posters waited on the next backdrop's decode, in both

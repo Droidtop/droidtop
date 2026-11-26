@@ -7,7 +7,7 @@ import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** The clipboard kept from one Wayland client (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#787). */
+/** The clipboard kept from one Wayland client (docs/SPEC.md 3d "Clipboard per container", mytop-project/tracker#787). */
 class WaylandClipboardFilterTest {
     private val registry = 2
 

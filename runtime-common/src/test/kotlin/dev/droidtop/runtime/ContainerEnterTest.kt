@@ -9,7 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** docs/SPEC.md 3d "Entering another container" and "Exported commands" (Droidtop/tracker#555 D5, D7). */
+/** docs/SPEC.md 3d "Entering another container" and "Exported commands" (mytop-project/tracker#555 D5, D7). */
 class ContainerEnterTest {
     @get:Rule val tmp = TemporaryFolder()
 

@@ -78,7 +78,7 @@ class SecondScreenPairingTest {
     }
 }
 
-/** The desktop on a second screen (Droidtop/tracker#908 step D5): nothing of the companion's covers it there. */
+/** The desktop on a second screen (mytop-project/tracker#908 step D5): nothing of the companion's covers it there. */
 class SecondScreenDesktopTest {
     private fun output(id: Int, kind: dev.droidtop.runtime.DisplayOutputKind = dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN) =
         dev.droidtop.runtime.DisplayOutput(id = "d$id", androidDisplayId = id, kind = kind, widthPx = 1920, heightPx = 1080)

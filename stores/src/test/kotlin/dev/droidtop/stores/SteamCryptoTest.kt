@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * Steam's depot manifests carry their file names encrypted, and JavaSteam decrypts them (DepotManifest.decryptFilenames)
  * through CryptoHelper, which needs Bouncy Castle's provider in the build (console, build 1767: every Steam download
- * died with NoClassDefFoundError: org.bouncycastle.jce.provider.BouncyCastleProvider; Droidtop/tracker#313).
+ * died with NoClassDefFoundError: org.bouncycastle.jce.provider.BouncyCastleProvider; mytop-project/tracker#313).
  */
 class SteamCryptoTest {
     @Test

@@ -29,7 +29,7 @@ object PcRunnerOptions {
      * pressing a game into readiness must stop on an offer that names
      * what will be fetched and lets the person decline -- a download is
      * not something A on a game row may start on its own
-     * (Droidtop/tracker#140).
+     * (mytop-project/tracker#140).
      *
      * A suspend function because the answer is a person's: [runAction]
      * cannot proceed until it comes back. Null in a process with no
@@ -79,7 +79,7 @@ object PcRunnerOptions {
         val engine = detected?.engine
         val target = engine?.let { EnginesDatabase.enginehostTargetFor(context, it) }
         val engineVersion = engine?.let { resolveEngineVersion(context, gameRoot, it) }
-        // What Enginehost itself lists for this engine (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): a core it has
+        // What Enginehost itself lists for this engine (docs/plugin-api.md 3 A7b, mytop-project/tracker#752): a core it has
         // or can get; null when no list decides, and the bundle provider's answer stands as before.
         val cores = engine?.let { EnginesDatabase.defFor(context, it) }
             ?.let { def -> EngineCoreList.verdict(context, def.id, engineVersion) }
@@ -188,7 +188,7 @@ object PcRunnerOptions {
      * far along it is), [onFailure] the one line that ends a failed
      * attempt. Rendering progress as failure is how the system-files
      * download used to look like an error the person never asked for
-     * (Droidtop/tracker#140); the default keeps them together for any
+     * (mytop-project/tracker#140); the default keeps them together for any
      * caller that has one slot.
      *
      * A GOG installer's row ([PcInfo.installer]) has nothing to launch:
@@ -211,7 +211,7 @@ object PcRunnerOptions {
         }
         val (runners, runner) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val measured = forEntry(context, entry)
-            // The runner this launch will use: a pending "Run once with…" choice, else the saved one (Droidtop/tracker#752).
+            // The runner this launch will use: a pending "Run once with…" choice, else the saved one (mytop-project/tracker#752).
             measured to resolvedFor(context, entry, measured, LaunchStrategyOverridePrefs.peekForLaunch(context, entry.id))
         }
         val setupAction = runner?.option?.action
@@ -311,7 +311,7 @@ data class PcRunners(val engine: GameEngine?, val options: List<RunnerOption>) {
     /**
      * The one short line for a game no runner can take at all, naming
      * what is missing instead of "no runner offers this game"
-     * (Droidtop/tracker#287). A game whose engine has an Enginehost
+     * (mytop-project/tracker#287). A game whose engine has an Enginehost
      * plugin never lands here: it has a setup row ("Install the HTML
      * plugin") and the action to run it. The line ends with the one next
      * step that always exists, the page's Engine row (the engine pin,

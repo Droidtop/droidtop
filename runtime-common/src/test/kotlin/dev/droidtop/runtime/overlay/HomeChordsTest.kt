@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The HOME chords (docs/SPEC.md "In-game overlays", Droidtop/tracker#740). */
+/** The HOME chords (docs/SPEC.md "In-game overlays", mytop-project/tracker#740). */
 class HomeChordsTest {
     private val chords = HomeChords()
     private var overlayOpen = false

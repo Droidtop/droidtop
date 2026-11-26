@@ -27,7 +27,7 @@ class ActionRow(
     val title: String,
     val detail: String? = null,
     val danger: Boolean = false,
-    /** A job this row stands for: its bar under the title, as on every job row (show, then say: Droidtop/tracker#738). */
+    /** A job this row stands for: its bar under the title, as on every job row (show, then say: mytop-project/tracker#738). */
     val progress: Float? = null,
     val look: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
     /** An option the row turns on or off: its state as a switch in the value column. Null: not an option. */
@@ -37,7 +37,7 @@ class ActionRow(
 ) : ActionSheetItem
 
 /**
- * A row whose value is typed in the row itself (owner, 2026-11-19, Droidtop/tracker#954 item 12: no editor and no
+ * A row whose value is typed in the row itself (owner, 2026-11-19, mytop-project/tracker#954 item 12: no editor and no
  * panel): it shows [title] and [value] ([hint] while blank); A or a tap turns it into an [InPlaceTextField], and when
  * the person is done [onDone] gets the text, with the sheet still open.
  */
@@ -58,7 +58,7 @@ class ActionHeading(val title: String) : ActionSheetItem
 class ActionNote(val text: String) : ActionSheetItem
 
 /**
- * The one sheet of choices for a thing (Droidtop/tracker#610: "a shared ActionSheet and row model"): [title], a
+ * The one sheet of choices for a thing (mytop-project/tracker#610: "a shared ActionSheet and row model"): [title], a
  * [subtitle] line when there is one, then [rows], the first row focused. Up and Down move between the [ActionRow]s, A
  * chooses, and Select or L2 closes it ([onDismiss]), L2 because L2 opens the focused thing's menu (docs/SPEC.md 7j). B
  * and the system Back go to [onBack], which is [onDismiss] unless the sheet has pages to step out of first (the game

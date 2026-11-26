@@ -11,7 +11,7 @@ data class FoundPlace(
 )
 
 /**
- * What droidtop knows about one game's saves, in the three honest states the owner asked for (Droidtop/tracker#546,
+ * What droidtop knows about one game's saves, in the three honest states the owner asked for (mytop-project/tracker#546,
  * 2026-10-14: "Let's also get all the saves detected"): no rule known, a rule known but no saves found, and saves
  * found, with where and when. A fourth, [Unknown], is a rule that exists but cannot be applied to this game yet: a
  * name the game's files hold that droidtop could not read, or a folder it may not list. It is never shown as "none".

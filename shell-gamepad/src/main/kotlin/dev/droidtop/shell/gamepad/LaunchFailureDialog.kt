@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * The Gaming shell's launch-failure dialog (Droidtop/tracker#171): a
+ * The Gaming shell's launch-failure dialog (mytop-project/tracker#171): a
  * failed launch is a focused moment -- [LaunchFailureMessage]'s plain
  * sentence and a clear next step -- not raw exception text on a black
  * screen the pad's B cannot dismiss. The shell stays visible behind it;

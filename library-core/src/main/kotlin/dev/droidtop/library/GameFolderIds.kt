@@ -26,7 +26,7 @@ import java.security.MessageDigest
  *     title once the version is taken off its name ([titleKey]): a game
  *     whose `MyGame-v0.5` folder was replaced by `MyGame-v0.6` is the same
  *     game at a new version (docs/SPEC.md 7g, "A folder game keeps its
- *     identity across a version bump", Droidtop/tracker#397 slice E). Only a
+ *     identity across a version bump", mytop-project/tracker#397 slice E). Only a
  *     folder that VANISHED is matched, so two version folders side by side
  *     stay two games;
  *  3. a `.gamenative` file left by an earlier build or by GameNative

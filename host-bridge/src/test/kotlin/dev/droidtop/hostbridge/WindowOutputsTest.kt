@@ -6,7 +6,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which bar lists a window and where it can be moved (Droidtop/tracker#908, step D4; docs/SPEC.md 2b). */
+/** Which bar lists a window and where it can be moved (mytop-project/tracker#908, step D4; docs/SPEC.md 2b). */
 class WindowOutputsTest {
     private data class Window(val id: Int, val output: String)
 

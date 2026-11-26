@@ -67,7 +67,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // A Presentation is an ordinary focusable Dialog window layered ABOVE
         // every activity on its display. Left focusable it takes key focus
         // from whatever is underneath it (an app launched onto this display
-        // got no keyboard, Droidtop/tracker#156) and, because touching a
+        // got no keyboard, mytop-project/tracker#156) and, because touching a
         // focusable window on another display moves the system's top-focused
         // display, every tap on the companion pulled the gamepad away from
         // the shell on the other screen. This surface is touch-only (no text
@@ -110,7 +110,7 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
      * One log line per touch-down, so a device check can tell "the touch
      * never reached this window" (an input-association problem, nothing in
      * droidtop can fix that) from "it arrived and the UI ignored it"
-     * (Droidtop/tracker#155) with `logcat -s droidtop.SecondScreen`.
+     * (mytop-project/tracker#155) with `logcat -s droidtop.SecondScreen`.
      */
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
         if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {

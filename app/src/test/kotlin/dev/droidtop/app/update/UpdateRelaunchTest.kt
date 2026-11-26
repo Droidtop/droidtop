@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** When droidtop opens Home again after replacing itself (Droidtop/tracker#202). */
+/** When droidtop opens Home again after replacing itself (mytop-project/tracker#202). */
 class UpdateRelaunchTest {
     private val now = 10_000_000_000L
 

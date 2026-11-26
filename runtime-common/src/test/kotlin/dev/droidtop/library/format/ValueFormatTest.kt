@@ -5,7 +5,7 @@ import org.junit.Test
 import java.util.TimeZone
 
 /**
- * The one value formatter (docs/SPEC.md 7k, "Values"; Droidtop/tracker#485 F2a). These cases used to live
+ * The one value formatter (docs/SPEC.md 7k, "Values"; mytop-project/tracker#485 F2a). These cases used to live
  * beside five private copies (the PC game page, the companion, the theme renderer, Containers, the store
  * content sheet); they are held here once so the copies cannot come back with their own rules.
  */

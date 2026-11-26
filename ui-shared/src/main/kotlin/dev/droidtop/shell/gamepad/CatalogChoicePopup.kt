@@ -16,7 +16,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 
 /**
  * A short choice's options in a small pop-up over the page, where a tap on its row opens them (owner, 2026-11-05,
- * Droidtop/tracker#673, option 1: "A tap opens a small pop-up over the row, never a full page, and never changes the
+ * mytop-project/tracker#673, option 1: "A tap opens a small pop-up over the row, never a full page, and never changes the
  * value by itself"). The list is the dialogs' one component ([DialogChoices]), the current option under the cursor;
  * a tap or A on an option picks it, B or a tap outside leaves the value as it was. A choice of text sizes
  * ([ChoiceItem.sampleScale]) shows a sample line at the option under the cursor. Long choices keep the picker.

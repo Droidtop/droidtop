@@ -46,13 +46,13 @@ object GameNaming {
     /**
      * A dotted version written straight onto a title with no separator, a capital V
      * after a lower-case letter: `SomeGameV0.80`. [NAME_VERSION] needs a separator, so
-     * without this the version stayed in the title (Droidtop/tracker#282).
+     * without this the version stayed in the title (mytop-project/tracker#282).
      */
     private val GLUED_VERSION = Regex("""^(.*[a-z])V(\d+(?:\.\d+)+[a-zA-Z]?)$""")
 
     /**
      * A version written straight after a character no English word goes on through: punctuation or a letter of
-     * another script, `新生活は妹ちゃんと!ver1.8`, `タイトルv1.02` (Droidtop/tracker#174, rig 2026-10-14). `ver` or
+     * another script, `新生活は妹ちゃんと!ver1.8`, `タイトルv1.02` (mytop-project/tracker#174, rig 2026-10-14). `ver` or
      * `version` takes any number; a bare `v` only a dotted one. After a Latin letter it stays the title's
      * (`Forever1.0`): there `ver` may be the end of a word.
      */
@@ -369,7 +369,7 @@ object GameNaming {
      * [sameGame]'s comparison key: the game-identity fold ([TitleKeys]) without its separators, [TitleKeys.compact],
      * so spacing a distribution added or took away does not split a game (`ThiefofHearts` beside `Thief of Hearts`,
      * the real folder set GameGroupingTest keeps whole). The cross-device key is [TitleKeys.slug], which keeps word
-     * breaks (the owner's Lutris form, Droidtop/tracker#870); keeping them here too would split real libraries, so this is
+     * breaks (the owner's Lutris form, mytop-project/tracker#870); keeping them here too would split real libraries, so this is
      * built to the recommendation, owner to confirm.
      */
     fun nameKey(name: String): String = TitleKeys.compact(name)

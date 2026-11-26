@@ -40,7 +40,7 @@ internal data class FolderCounts(val roots: List<RootCount>, val shortcuts: Int)
 }
 
 /**
- * Game sources > Folders (docs/SPEC.md 7j "Places", Droidtop/tracker#397
+ * Game sources > Folders (docs/SPEC.md 7j "Places", mytop-project/tracker#397
  * slice E): the game folders droidtop looks in for games, console ROMs included, each
  * with how many it found there and when it last looked, or "Not available"
  * when the folder cannot be read (an SD card that is out: its games are kept,
@@ -53,7 +53,7 @@ internal data class FolderCounts(val roots: List<RootCount>, val shortcuts: Int)
  */
 internal object FoldersCatalog {
     /**
-     * The one game folders screen (Droidtop/tracker#589): Settings > Library > Game folders, Game sources > Folders,
+     * The one game folders screen (mytop-project/tracker#589): Settings > Library > Game folders, Game sources > Folders,
      * the empty libraries' Add a folder and the Launcher's games grid all open this id. It was two screens over the
      * same `GamesRootPrefs` list, each with its own add and rescan rows.
      */
@@ -74,7 +74,7 @@ internal object FoldersCatalog {
     /**
      * The one "Add a folder" row (Game sources > Folders and Settings > Game folders): Android's folder picker, the
      * folder stored as a game folder, and the row says what happened ("Added Games"), since the folder shows up in the
-     * list only after the picker has gone (Droidtop/tracker#537).
+     * list only after the picker has gone (mytop-project/tracker#537).
      */
     fun addFolderItem(id: String) = FolderPickItem(
         id = id,
@@ -103,7 +103,7 @@ internal object FoldersCatalog {
     /**
      * Each configured game folder with the games the library holds under it (the most specific folder when one is
      * inside another, [PcSource.of]): the PC and engine games, and the console ROMs by system. The ROMs used to be
-     * left out, so a "Roms" folder read "0 games" while Retro Games listed them (Droidtop/tracker#846). Also whether
+     * left out, so a "Roms" folder read "0 games" while Retro Games listed them (mytop-project/tracker#846). Also whether
      * it can be read, and when a walk of either kind last finished it ([GamesRoots.scannedAt]). The library's own
      * index, read once; one `stat` and listing per folder for "Not available". Off the main thread.
      */
@@ -159,7 +159,7 @@ internal object FoldersCatalog {
 
     /**
      * One folder's own page: what was found there and when, a rescan, and Remove as a named row behind a question.
-     * A folder row used to remove the folder on A, with nothing on the row saying so (Droidtop/tracker#589), so two
+     * A folder row used to remove the folder on A, with nothing on the row saying so (mytop-project/tracker#589), so two
      * presses could drop a 2,000-game folder.
      */
     private fun folderScreen(root: RootCount, now: Long) = CatalogScreen(

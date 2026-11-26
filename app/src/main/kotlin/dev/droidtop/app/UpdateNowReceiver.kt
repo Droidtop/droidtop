@@ -36,9 +36,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * The broadcast is held open (goAsync) while the pass runs, never past [UpdateNow.broadcastHoldMs]: while
  * it is held droidtop's process is not cached, so Android does not freeze it. The APK download is a job in
- * droidtop's own Downloads (Droidtop/tracker#226), which carries on after the broadcast is released while
+ * droidtop's own Downloads (mytop-project/tracker#226), which carries on after the broadcast is released while
  * the process lives and resumes from its partial file if the process was lost; the install and the return
- * to Home afterwards are [dev.droidtop.app.update.UpdateRelaunchReceiver]'s (Droidtop/tracker#202).
+ * to Home afterwards are [dev.droidtop.app.update.UpdateRelaunchReceiver]'s (mytop-project/tracker#202).
  */
 class UpdateNowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

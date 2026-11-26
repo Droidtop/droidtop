@@ -2,7 +2,7 @@ package dev.droidtop.runtime
 
 /**
  * How a backend runs an interactive login shell in a container on droidtop's own terminal (docs/SPEC.md 3d, "A
- * terminal on Android"; Droidtop/tracker#909). [ContainerRuntime.interactiveShell] answers it; the terminal screen in
+ * terminal on Android"; mytop-project/tracker#909). [ContainerRuntime.interactiveShell] answers it; the terminal screen in
  * `:app` runs it. Built from the same argv and environment the backend's [ContainerRuntime.exec] uses, with
  * [ContainerTerminal.LOGIN_SHELL_COMMAND] as the command and [ContainerTerminal.SHELL_ENVIRONMENT] added, so the two
  * cannot drift apart.

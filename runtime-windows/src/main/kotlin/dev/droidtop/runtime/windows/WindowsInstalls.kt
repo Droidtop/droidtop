@@ -29,7 +29,7 @@ import org.json.JSONObject
  * folder as game n ([addGame]) is all it takes for the library row to start in it. An install that has
  * been started and not yet added is [Pending]; [PcContainers.ofContainer] opens its prefix for the
  * prefix tools and settings. [addGame] is the one door a game folder becomes a library game through
- * for a prefix made here; a general "Add a game" flow (Droidtop/tracker#407) calls it.
+ * for a prefix made here; a general "Add a game" flow (mytop-project/tracker#407) calls it.
  */
 object WindowsInstalls {
 
@@ -58,7 +58,7 @@ object WindowsInstalls {
     internal fun unpackable(installer: File): Boolean = installer.extension.equals("exe", ignoreCase = true)
 
     /**
-     * Installs from [installer] the way the owner chose (docs/SPEC.md 7c, Droidtop/tracker#405): the files are taken
+     * Installs from [installer] the way the owner chose (docs/SPEC.md 7c, mytop-project/tracker#405): the files are taken
      * out of it without running it ([InnoExtract], into a new folder inside [target] if one was chosen, else in
      * droidtop's own storage) and the folder becomes a library game in the shared prefix; only when that cannot be
      * done, because it is not an Inno Setup installer or the unpacker could not be had, is it run in a new prefix of

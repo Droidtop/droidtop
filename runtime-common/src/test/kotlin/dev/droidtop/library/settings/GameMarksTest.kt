@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The person's own rating and status per game (Droidtop/tracker#722). */
+/** The person's own rating and status per game (mytop-project/tracker#722). */
 class GameMarksTest {
     @Test
     fun `marks read back, and empty or broken ones are dropped`() {

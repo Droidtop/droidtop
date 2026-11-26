@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * The keyboard's clipboard history as a plain model (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340):
+ * The keyboard's clipboard history as a plain model (docs/SPEC.md 6a, "Editing helpers", mytop-project/tracker#340):
  * bounded, newest first, with pinned entries kept and listed first. Text only; a clip longer than [maxChars] is
  * dropped rather than truncated (the clipboard bridge does the same, SPEC 6d), a blank clip or one the source
  * flagged sensitive is never recorded, and nothing is recorded while incognito ([ClipIntake] decides for every source).
@@ -84,7 +84,7 @@ class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: 
 
     /**
      * Adds the entries in [encoded] to those already here; a line that does not parse is skipped. Merged, not
-     * replaced: a clip recorded while the file was still loading stays (Droidtop/tracker#772), and on a text both
+     * replaced: a clip recorded while the file was still loading stays (mytop-project/tracker#772), and on a text both
      * have, the one here wins.
      */
     fun restore(encoded: String) {

@@ -17,22 +17,22 @@ android {
     // a test fixture, or needing Robolectric just to reach AssetManager.
     sourceSets {
         // The notice colours and the colour arithmetic are the shared library droidtop and Enginehost both
-        // compile (lib-ui's notices module, vendor/lib-ui, Droidtop/lib-ui, pinned as a submodule; docs/SPEC.md 7k "Notices").
+        // compile (mytop-ui's notices module, vendor/mytop-ui, mytop-project/mytop-ui, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
-            java.srcDir("../vendor/lib-ui/notices/src/commonMain/kotlin")
-            // The version and trust code droidtop and Enginehost share (vendor/lib-net, Droidtop/lib-net,
+            java.srcDir("../vendor/mytop-ui/notices/src/commonMain/kotlin")
+            // The version and trust code droidtop and Enginehost share (vendor/mytop-net, mytop-project/mytop-net,
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
-            java.srcDir("../vendor/lib-net/version/src/main/kotlin")
-            java.srcDir("../vendor/lib-net/trust/src/main/kotlin")
-            // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, Droidtop/tracker#204).
-            java.srcDir("../vendor/lib-net/launch-contract/src/main/kotlin")
-            // The pad model droidtop and Enginehost share: Droidtop/lib-input's PadFamily, PadFamilies.classify (SDL's ids)
-            // and FaceLayout (Droidtop/tracker#867 D4), compiled in the same way.
-            java.srcDir("../vendor/lib-input/pads/src/main/kotlin")
-            // A container's architecture and translator (Droidtop/lib-containers :arch), and running x86 programs and
-            // Ren'Py's Linux launcher through it (Droidtop/lib-runners :launch): docs/SPEC.md 3c, Droidtop/tracker#962.
-            java.srcDir("../vendor/lib-containers/arch/src/main/kotlin")
-            java.srcDir("../vendor/lib-runners/launch/src/main/kotlin")
+            java.srcDir("../vendor/mytop-net/version/src/main/kotlin")
+            java.srcDir("../vendor/mytop-net/trust/src/main/kotlin")
+            // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, mytop-project/tracker#204).
+            java.srcDir("../vendor/mytop-net/launch-contract/src/main/kotlin")
+            // The pad model droidtop and Enginehost share: mytop-project/mytop-input's PadFamily, PadFamilies.classify (SDL's ids)
+            // and FaceLayout (mytop-project/tracker#867 D4), compiled in the same way.
+            java.srcDir("../vendor/mytop-input/pads/src/main/kotlin")
+            // A container's architecture and translator (mytop-project/mytop-containers :arch), and running x86 programs and
+            // Ren'Py's Linux launcher through it (mytop-project/mytop-runners :launch): docs/SPEC.md 3c, mytop-project/tracker#962.
+            java.srcDir("../vendor/mytop-containers/arch/src/main/kotlin")
+            java.srcDir("../vendor/mytop-runners/launch/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")
@@ -48,7 +48,7 @@ android {
 
 dependencies {
     implementation(project(":net-core"))
-    // zstd OCI layers (OciFlattener.uncompressed, Droidtop/tracker#950): the pure-Java decoder
+    // zstd OCI layers (OciFlattener.uncompressed, mytop-project/tracker#950): the pure-Java decoder
     // :runtime-linux-noroot and :shell-default already use, at the same version.
     implementation("com.github.alesimula:murine-aircompressor:2.0.9")
     implementation(libs.androidx.core.ktx)

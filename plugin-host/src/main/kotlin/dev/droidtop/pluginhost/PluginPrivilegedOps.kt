@@ -37,7 +37,7 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
      * Ready while a running provider plugin serves either interface and something privileged answers behind it. A
      * provider plugin that is installed but not running (not approved yet, turned off, disabled after a crash) needs the
      * person: [BackendState.NEEDS_PERMISSION], so Kill says to approve it instead of to add it (console, build 1773).
-     * One that runs with nothing behind it (the Shizuku plugin with no Shizuku app, Droidtop/tracker#851) is
+     * One that runs with nothing behind it (the Shizuku plugin with no Shizuku app, mytop-project/tracker#851) is
      * [BackendState.UNBACKED], never ready: droidtop does not claim a backend that cannot act.
      */
     override fun state(): BackendState {
@@ -171,7 +171,7 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
 
     /**
      * A long-lived root process through the provider's stream session ([ProviderProcess], `exec_stream`), for the
-     * rooted desktop stack (dev.droidtop.runtime.RootProcess, Droidtop/tracker#394). Only a provider that holds
+     * rooted desktop stack (dev.droidtop.runtime.RootProcess, mytop-project/tracker#394). Only a provider that holds
      * `priv.shell` at root level answers: a Shizuku plugin running over ADB gives null here, so the rooted stack never
      * gets a shell-user process it would mistake for root.
      */
@@ -183,7 +183,7 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         const val ROOT_LEVEL = "root"
         const val INSTALLED_CACHE_MS = 5_000L
 
-        /** How long a probe's answer stands (Droidtop/tracker#851): long enough that [state] stays cheap, short enough that starting Shizuku shows. */
+        /** How long a probe's answer stands (mytop-project/tracker#851): long enough that [state] stays cheap, short enough that starting Shizuku shows. */
         const val PROBE_MS = 30_000L
     }
 }

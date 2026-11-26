@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonObject
 
 /**
  * The DLC and branch picker's rules for Steam (docs/SPEC.md 7g, "Stores",
- * Droidtop/tracker#313). Pure: the plan, the names, the install row and the
+ * mytop-project/tracker#313). Pure: the plan, the names, the install row and the
  * choice come in, so the rules are testable without a database or a session.
  */
 internal object SteamContent {

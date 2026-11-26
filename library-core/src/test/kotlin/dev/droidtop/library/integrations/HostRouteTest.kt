@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
-/** A source's plain file-host address goes to the person's accounts first (Droidtop/tracker#638, owner 2026-11-04). */
+/** A source's plain file-host address goes to the person's accounts first (mytop-project/tracker#638, owner 2026-11-04). */
 class HostRouteTest {
     private fun d(url: String, session: String? = null, auth: String? = null, swarm: String? = null) =
         AcquireDownloadDescriptor(url, mapOf("Referer" to "https://source.example/"), "Game.zip", "abc", null, session = session, auth = auth, swarm = swarm)

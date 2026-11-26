@@ -34,7 +34,7 @@ object ModeStartup {
         fun on(piece: ModePiece) = piece in live
 
         // droidtop's dynamic app shortcuts and the full-page widget offer Gaming and Desktop only while each is on
-        // (Droidtop/tracker#563).
+        // (mytop-project/tracker#563).
         DroidtopShortcuts.refresh(app)
         DroidtopWidgets.refreshAll(app)
 
@@ -83,7 +83,7 @@ object ModeStartup {
         // Other apps' "Open with" lists offer droidtop only while Desktop
         // mode, which runs what it opens, is on.
         setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
-        // The Desktop widget is offered in launchers' pickers only while Desktop is on (Droidtop/tracker#563).
+        // The Desktop widget is offered in launchers' pickers only while Desktop is on (mytop-project/tracker#563).
         setComponentEnabled(app, DesktopWidgetProvider::class.java.name, on(ModePiece.DESKTOP_SESSION))
 
         // Desktop switched off takes its running session with it: the

@@ -19,7 +19,7 @@ object DevicePaletteFixture {
     val palette = GamingThemeMapping.DevicePalette(accent1, neutral1)
 }
 
-/** Device colours and the theme tint (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#844). */
+/** Device colours and the theme tint (docs/SPEC.md 7k, "Colours outside Gaming"; mytop-project/tracker#844). */
 class ColourSourceMappingTest {
     private val p = DevicePaletteFixture.palette
 

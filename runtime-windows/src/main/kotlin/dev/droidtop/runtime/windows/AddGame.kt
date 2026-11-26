@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * "Add a game" from a file or a folder (docs/SPEC.md 7g, "Adding a game by hand", Droidtop/tracker#407): the person
+ * "Add a game" from a file or a folder (docs/SPEC.md 7g, "Adding a game by hand", mytop-project/tracker#407): the person
  * points at a game where it already is, and it becomes a library row like any other. The files are never copied,
  * moved or written to; droidtop records only where the game is.
  *

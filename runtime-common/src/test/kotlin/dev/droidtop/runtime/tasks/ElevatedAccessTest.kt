@@ -234,7 +234,7 @@ class ElevatedAccessTest {
         assertEquals("wireless", shell.exec(listOf("id"))?.stdout)
     }
 
-    /** Droidtop/tracker#851: the Shizuku plugin installed with no Shizuku app running has nothing behind it. */
+    /** mytop-project/tracker#851: the Shizuku plugin installed with no Shizuku app running has nothing behind it. */
     @Test
     fun `a provider plugin with nothing behind it is never claimed, and says why`() {
         val unbacked = BackendState.UNBACKED

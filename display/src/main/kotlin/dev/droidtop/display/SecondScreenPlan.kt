@@ -6,7 +6,7 @@ import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DualScreenOrchestration
 
 /**
- * The second-screen decisions [SecondScreenOrchestrator.observe] acts on (Droidtop/tracker#765), pure so they are
+ * The second-screen decisions [SecondScreenOrchestrator.observe] acts on (mytop-project/tracker#765), pure so they are
  * tested apart from the display events and activity starts that feed and follow them.
  */
 internal object SecondScreenPlan {
@@ -90,7 +90,7 @@ internal object SecondScreenPlan {
             .map { it.androidDisplayId }
             .sortedBy { if (it == companionDisplayId) 0 else 1 }
 
-    // The desktop on a second screen (docs/SPEC.md 2b, Droidtop/tracker#908 step D5): while the desktop is drawn on a
+    // The desktop on a second screen (docs/SPEC.md 2b, mytop-project/tracker#908 step D5): while the desktop is drawn on a
     // display ([desktopOn], DesktopExtension), nothing of the companion's and no idle cover is put there.
 
     /** The display the companion's Presentation goes on: [candidate] (DualScreenOrchestration's), unless the desktop is drawn there. */

@@ -3,7 +3,7 @@ package dev.droidtop.app
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Droidtop/tracker#786 S9: the companion's paired Bluetooth list, connected devices first. */
+/** mytop-project/tracker#786 S9: the companion's paired Bluetooth list, connected devices first. */
 class PairedDevicesTest {
     @Test fun `connected devices come first, then by name`() {
         val list = listOf(

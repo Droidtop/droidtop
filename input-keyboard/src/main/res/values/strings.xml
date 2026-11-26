@@ -322,9 +322,9 @@
     <!-- Add to dictionary hint -->
     <string name="hint_add_to_dictionary">\u2190 Touch again to save</string>
     
-    <!-- droidtop (Droidtop/tracker#903 H7a): the suggestion strip while a language's own typing loads its data. -->
+    <!-- droidtop (mytop-project/tracker#903 H7a): the suggestion strip while a language's own typing loads its data. -->
     <string name="engine_getting_ready">%1$s is getting ready\u2026</string>
-    <!-- droidtop (Droidtop/tracker#903 H7c): the same line while the language's dictionary downloads, with how far it has come. -->
+    <!-- droidtop (mytop-project/tracker#903 H7c): the same line while the language's dictionary downloads, with how far it has come. -->
     <string name="engine_getting_ready_percent">%1$s is getting ready\u2026 %2$d%%</string>
 
     <!-- Inform the user that a particular language has an available dictionary -->
@@ -359,13 +359,13 @@
 	<string name="layout_material_black" translatable="false">Material Black</string>
     <string name="layout_material_dark" translatable="false">Material Dark</string>
     <string name="layout_material_light" translatable="false">Material Light</string>
-    <!-- droidtop: Hacker Keyboard Reborn's modern themes (Droidtop/tracker#903 H12b). Modern is the old "Follow light or dark", id 8. -->
+    <!-- droidtop: Hacker Keyboard Reborn's modern themes (mytop-project/tracker#903 H12b). Modern is the old "Follow light or dark", id 8. -->
     <string name="layout_modern">Modern</string>
     <string name="layout_dynamic">Dynamic, from the wallpaper</string>
     <string name="layout_modern_high_contrast">High contrast</string>
     <string name="layout_match_host">Match droidtop</string>
 
-    <!-- droidtop: "Light and dark" for the modern themes (Droidtop/tracker#903 H12b). -->
+    <!-- droidtop: "Light and dark" for the modern themes (mytop-project/tracker#903 H12b). -->
     <string name="title_light_dark">Light and dark</string>
     <string name="light_dark_follow_system">Follow the system</string>
     <string name="light_dark_follow_host">Follow droidtop\'s Light or dark</string>
@@ -560,7 +560,7 @@
 
     <string name="title_vibrate_len">Vibrate duration</string>
 
-    <!-- droidtop patch (Droidtop/tracker#903 H12a): in place of Vibrate on keypress. Light, Medium and Strong give each
+    <!-- droidtop patch (mytop-project/tracker#903 H12a): in place of Vibrate on keypress. Light, Medium and Strong give each
          key class (letter, modifier, delete, space and enter) its own haptic; Custom buzzes every key for the Vibrate
          duration, as Hacker's Keyboard did. -->
     <string name="title_vibrate_strength">Vibration strength</string>
@@ -727,7 +727,7 @@
     <string name="seek_pref_max">100%</string>
     <string name="title_editing_helpers">Editing helpers</string>
     <string name="title_dictionaries">Dictionaries</string>
-    <!-- The pad-driven keyboard slab's named keys (Droidtop/tracker#485, #772). -->
+    <!-- The pad-driven keyboard slab's named keys (mytop-project/tracker#485, #772). -->
     <string name="slab_description">Keyboard</string>
     <string name="slab_backspace">Backspace</string>
     <string name="slab_space">Space</string>
@@ -789,7 +789,7 @@
     <string name="summary_incognito">Learn no words and record no clipboard history while on. Password fields and editors that ask for no personalised learning are always treated this way.</string>
     <string name="title_clipboard_history">Clipboard history</string>
     <string name="summary_clipboard_history">Keep the text you copy so it can be pinned and pasted again. Clips marked sensitive, and copies from password fields, are never kept.</string>
-    <!-- "Keep clips for" (Droidtop/tracker#903 H12d): pinned clips stay whatever it says. -->
+    <!-- "Keep clips for" (mytop-project/tracker#903 H12d): pinned clips stay whatever it says. -->
     <string name="title_clipboard_keep">Keep clips for</string>
     <string-array name="clipboard_keep_entries">
         <item>1 hour</item>
@@ -812,7 +812,7 @@
     <string name="notification_channel_name">Hacker\'s Keyboard</string>
     <string name="notification_channel_description">Hacker\'s Keyboard</string>
     <string name="notification_action_settings">Settings</string>
-    <!-- droidtop: offline voice typing, downloaded on request (Droidtop/tracker#343). -->
+    <!-- droidtop: offline voice typing, downloaded on request (mytop-project/tracker#343). -->
     <string name="title_offline_voice">Offline voice typing</string>
     <string name="summary_offline_voice">Dictation on this device, with nothing sent anywhere. Downloads the speech engine and an English model first</string>
     <string name="offline_voice_on">On: the voice key types what you say, offline. Takes %1$d MB on this device</string>
@@ -832,12 +832,12 @@
     <string name="offline_voice_failed_not_placed">Couldn\'t put the download in place</string>
     <string name="offline_voice_downloading_engine">Downloading the engine: %1$d of %2$d MB</string>
     <string name="offline_voice_downloading_model">Downloading the English model: %1$d of %2$d MB</string>
-    <!-- The tool strip and its panels (Droidtop/tracker#340, #772). -->
+    <!-- The tool strip and its panels (mytop-project/tracker#340, #772). -->
     <string name="tool_switch_keyboard">Switch keyboard</string>
     <string name="tool_clipboard">Clipboard</string>
     <string name="tool_emoji">Emoji</string>
     <string name="tool_layout">Layout: %1$s</string>
-    <!-- The input method's modes (Droidtop/tracker#903 H12c). -->
+    <!-- The input method's modes (mytop-project/tracker#903 H12c). -->
     <string name="tool_mode">Mode: %1$s</string>
     <string name="title_modes">Modes</string>
     <string name="modes_status">For this orientation. Normal gives back the keyboard as it was.</string>
@@ -880,14 +880,14 @@
     <string name="tool_incognito_recording_nothing">Incognito: nothing new is recorded.</string>
     <string name="tool_back">Back</string>
     <string name="tool_clipboard_empty">Nothing copied yet.</string>
-    <!-- The strip a phone typing into this device shows above the tools (Droidtop/tracker#903). -->
+    <!-- The strip a phone typing into this device shows above the tools (mytop-project/tracker#903). -->
     <string name="remote_typing">Phone connected · typing</string>
     <string name="remote_typing_sent">Phone connected · typing · %1$s</string>
     <string name="remote_not_received">Not received. %1$s</string>
     <string name="tool_pin">Pin</string>
     <string name="tool_unpin">Unpin</string>
     <string name="tool_delete">Delete</string>
-    <!-- The clipboard panel (Droidtop/tracker#903 H12d). -->
+    <!-- The clipboard panel (mytop-project/tracker#903 H12d). -->
     <string name="clip_hint">Tap a clip to paste it. Hold it, or press X on a pad, to pin or delete it.</string>
     <string name="clip_clear_unpinned">Clear unpinned</string>
     <plurals name="clip_clear_ask">
@@ -913,7 +913,7 @@
     <string name="clip_keep_status">Unpinned clips are kept for %1$s.</string>
     <string name="tool_macro_problems_more">". %1$d more like it."</string>
     <string name="tool_macros_empty">None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c</string>
-    <!-- The emoji panel (Droidtop/tracker#342, #772). -->
+    <!-- The emoji panel (mytop-project/tracker#342, #772). -->
     <string name="emoji_search">Search</string>
     <string name="emoji_loading">Loading emoji…</string>
     <string name="emoji_recent">Recent</string>
@@ -930,7 +930,7 @@
     <string name="emoji_group_symbols">Symbols</string>
     <string name="emoji_group_flags">Flags</string>
     <string name="emoji_group_kaomoji">Kaomoji</string>
-    <!-- GIFs and stickers from the person's own folders (Droidtop/tracker#903 H5). -->
+    <!-- GIFs and stickers from the person's own folders (mytop-project/tracker#903 H5). -->
     <string name="emoji_group_gifs">GIFs</string>
     <string name="emoji_group_stickers">Stickers</string>
     <string name="gif_loading">Loading…</string>
@@ -955,7 +955,7 @@
     <string name="gif_folders_scanned">Images found: %1$d.</string>
     <string name="gif_folders_unreadable">Couldn\'t read some folders: %1$d. Remove them and add them again.</string>
     <string name="gif_folder_not_kept">Android did not let the keyboard keep reading that folder. Pick it again, or another folder.</string>
-    <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
+    <!-- Why a wordlist was not added (mytop-project/tracker#339, #772). -->
     <string name="dictionary_refused_no_language">The wordlist doesn\'t say its language. Its first line needs locale=</string>
     <string name="dictionary_refused_no_words">The wordlist has no words</string>
     <string name="dictionary_refused_engine">This language\'s dictionary does not fit the keyboard\'s engine: %1$s</string>

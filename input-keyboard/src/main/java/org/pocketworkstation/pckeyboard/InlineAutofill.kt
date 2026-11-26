@@ -23,7 +23,7 @@ import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
 
 /**
- * Autofill suggestions in the keyboard (docs/SPEC.md 6a, "Inline autofill", Droidtop/tracker#342, Android 11+): a
+ * Autofill suggestions in the keyboard (docs/SPEC.md 6a, "Inline autofill", mytop-project/tracker#342, Android 11+): a
  * password manager or the platform's autofill service offers its suggestions to the input method as small views,
  * which are drawn in a row above the keys instead of in a dropdown over the app. Only used on Android 11 and later;
  * the input method asks for them in `onCreateInlineSuggestionsRequest` and shows them with [show].
@@ -84,7 +84,7 @@ object InlineAutofill {
 /**
  * Holds the autofill chips so they are drawn only inside it. A chip is a surface owned by the autofill service's
  * process and always draws on top of the app; without clipping, a chip scrolled out of the row would cover the keys
- * (Droidtop/tracker#342). Each frame every [InlineContentView] below is clipped to this view's bounds. The same
+ * (mytop-project/tracker#342). Each frame every [InlineContentView] below is clipped to this view's bounds. The same
  * approach as the platform's inline suggestion sample (Apache-2.0): a transparent top-most surface lets the
  * chips' surfaces stack under the keyboard's window content.
  */

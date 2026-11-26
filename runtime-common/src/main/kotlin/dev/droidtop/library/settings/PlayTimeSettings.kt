@@ -4,7 +4,7 @@ import android.content.Context
 import dev.droidtop.runtime.R
 
 /**
- * The Play time page of Settings (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): the daily and
+ * The Play time page of Settings (docs/SPEC.md 7f "Play-time limits", mytop-project/tracker#421): the daily and
  * the weekly limit for Kid mode, and what has been played so far. One page, built here in `:runtime-common`
  * beside the other Gaming settings; the limits themselves are [PlayTimePrefs] and are enforced by `:app`'s
  * play-time limiter. Hidden in Kid, Kiosk and Guest like the other items that control the restriction
@@ -44,7 +44,7 @@ object PlayTimeSettings {
         val (limits, today, week) = PlayTimePrefs.snapshot(context)
         val timers = PlayTimePrefs.sessionTimers(context)
         return listOf(
-            // Outside Kid mode, for the person's own play (Droidtop/tracker#721); Kid mode keeps the limits below.
+            // Outside Kid mode, for the person's own play (mytop-project/tracker#721); Kid mode keeps the limits below.
             CatalogGroup(
                 id = "play_time_session",
                 title = words(R.string.play_time_this_session),

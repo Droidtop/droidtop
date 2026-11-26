@@ -42,7 +42,7 @@ public final class SettingsGlobalFragment : AbstractSettingsFragment() {
     }
 
     // The recreate Text size triggers must not drop the user back at this
-    // screen's root (Droidtop/tracker#139): the navigator saves its pushed
+    // screen's root (mytop-project/tracker#139): the navigator saves its pushed
     // screens and the row to refocus.
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)

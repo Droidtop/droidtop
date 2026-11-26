@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** docs/plugin-api.md 3 A7a (Droidtop/tracker#547): saves both ways with an app's plugin, and the engine games it is offered. */
+/** docs/plugin-api.md 3 A7a (mytop-project/tracker#547): saves both ways with an app's plugin, and the engine games it is offered. */
 class HostSavesOpsTest {
     @Test
     fun `saves where and report_changed need saves exchange, a normal permission`() {

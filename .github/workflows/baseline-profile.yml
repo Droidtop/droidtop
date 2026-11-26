@@ -1,6 +1,6 @@
 name: Baseline profile
 
-# Records droidtop's own baseline profile (docs/SPEC.md 10b, Droidtop/tracker#954 item 13) on an Android emulator, with
+# Records droidtop's own baseline profile (docs/SPEC.md 10b, mytop-project/tracker#954 item 13) on an Android emulator, with
 # :baselineprofile's walk (the start into Gaming's Home, PC Games and Settings), and uploads it. A person copies it to
 # app/src/release/generated/baselineProfiles/ in a commit of their own: a build never records one (it needs a device),
 # and CI never commits. By hand, and monthly so the profile follows the code. The emulator starts as emulator-tests.yml

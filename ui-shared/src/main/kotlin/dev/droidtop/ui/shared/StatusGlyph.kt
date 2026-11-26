@@ -19,11 +19,11 @@ import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.StatusMark
 
 /**
- * The host's status glyphs, one vocabulary for every list (Droidtop/tracker#644, docs/DESIGN-LANGUAGE.md: a status is a
+ * The host's status glyphs, one vocabulary for every list (mytop-project/tracker#644, docs/DESIGN-LANGUAGE.md: a status is a
  * glyph, each tone with its own shape so colour is never the only signal): working is a turning ring in the accent,
  * attention a circle with "!" in the caution ink, error an octagon with "!" in the danger ink; signed in a circle with a
  * check and synced a cloud with a check, in the accent; signed out a crossed-out person and offline a crossed-out
- * cloud, in the info ink (show, then say: Droidtop/tracker#738). [accent] is the surface's own.
+ * cloud, in the info ink (show, then say: mytop-project/tracker#738). [accent] is the surface's own.
  */
 @Composable
 fun StatusGlyph(mark: StatusMark, accent: Color, modifier: Modifier = Modifier, size: Dp = 18.dp) {

@@ -42,7 +42,7 @@ class LauncherSearchActivity : ComponentActivity() {
             }
         }
         val games = library.backgroundScanState(LibraryKinds.GAMES)
-        // Get games, outside Gaming (Downloads and Updates' row, Droidtop/tracker#825): the same one search Gaming opens,
+        // Get games, outside Gaming (Downloads and Updates' row, mytop-project/tracker#825): the same one search Gaming opens,
         // with the source filter and what the sources feature.
         if (intent?.getBooleanExtra(EXTRA_GET_GAMES, false) == true) {
             setContent {
@@ -56,7 +56,7 @@ class LauncherSearchActivity : ComponentActivity() {
         setContent {
             dev.droidtop.app.ui.DroidtopTheme {
                 val entries by games.collectAsStateWithLifecycle()
-                // Settings > Search bar's providers (Droidtop/tracker#704), read off the main thread; on until read.
+                // Settings > Search bar's providers (mytop-project/tracker#704), read off the main thread; on until read.
                 val providers by androidx.compose.runtime.produceState(true to true) {
                     value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         com.android.launcher3.LauncherPrefs.SEARCH_CALCULATOR.get(applicationContext) to
@@ -77,7 +77,7 @@ class LauncherSearchActivity : ComponentActivity() {
                                 open = { LauncherSearch.launch(this@LauncherSearchActivity, hit) },
                             )
                         } +
-                            // The apps' own shortcuts (Droidtop/tracker#704), read off the main thread.
+                            // The apps' own shortcuts (mytop-project/tracker#704), read off the main thread.
                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 if (com.android.launcher3.LauncherPrefs.SEARCH_SHORTCUTS.get(applicationContext)) {
                                     LauncherSearch.findShortcuts(applicationContext, query)
@@ -106,7 +106,7 @@ class LauncherSearchActivity : ComponentActivity() {
                     },
                     // Standard's own settings (the Global settings screen) are searched with the rest.
                     settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.app.settings.DroidtopWideSettings.SCREEN_GLOBAL) },
-                    // The web, with the search bar's provider, as one row (Droidtop/tracker#564).
+                    // The web, with the search bar's provider, as one row (mytop-project/tracker#564).
                     webSearch = { query -> app.murinelauncher.widget.search.WebSearch.open(this@LauncherSearchActivity, query) },
                     onDismiss = { finish() },
                 )

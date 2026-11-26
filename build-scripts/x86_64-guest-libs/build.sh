@@ -19,7 +19,7 @@
 # The library list and configure flags follow Bliss-Bass/GameNative-x64
 # (scripts/build-x86_64-bionic-libs.sh, GPL-3.0), which runs the same Wine on
 # x86_64 Android tablets. Added here: libandroid-sysvshm (SysV shm for MIT-SHM,
-# from Droidtop/proton-wine-tux android/android_sysvshm), exec-redirect
+# from mytop-project/proton-wine-tux android/android_sysvshm), exec-redirect
 # (exec-redirect.c beside this file) and SDL2, which evshim (the controller
 # shim preloaded into Wine) and winebus.sys's SDL backend dlopen as
 # libSDL2-2.0.so.0; on arm64 it comes from the aarch64 image. And GnuTLS with
@@ -254,7 +254,7 @@ done < <(find "$STAGE/usr/lib" -type f -name '*.so*')
 [[ $missing -eq 0 ]] || exit 1
 
 # Every ELF must be x86-64: an aarch64 or host library here is the exact
-# failure this asset exists to end (Droidtop/tracker#242).
+# failure this asset exists to end (mytop-project/tracker#242).
 bad=0
 while IFS= read -r f; do
     desc=$(file -b "$f")

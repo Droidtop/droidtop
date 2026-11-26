@@ -77,7 +77,7 @@ struct ToplevelInfo {
     bool minimized = false;
     bool maximized = false;
     bool fullscreen = false;
-    // The compositor's name for the output the window is listed on (Droidtop/tracker#908, step D4): the one it
+    // The compositor's name for the output the window is listed on (mytop-project/tracker#908, step D4): the one it
     // entered last among those it is on, or the one it was on last when it is on none (a window sway hid in its
     // scratchpad); "" when there is none or the output gave no name. output_match.h's windowOutput is the rule.
     std::string output;
@@ -121,12 +121,12 @@ public:
     bool isConnected() const { return display_ != nullptr; }
 
     // True once the dispatch thread has seen the connection fail: the
-    // compositor exited or closed the socket (Droidtop/tracker#688). Set
+    // compositor exited or closed the socket (mytop-project/tracker#688). Set
     // from the dispatch thread, read from any thread; disconnect() does not
     // set it, so a connection droidtop closed itself never reads as lost.
     bool connectionLost() const { return connectionLost_; }
 
-    // ---- Outputs (Droidtop/tracker#908) ----
+    // ---- Outputs (mytop-project/tracker#908) ----
     //
     // Every wl_output the compositor advertises is tracked, in bind order.
     // [outputName] picks one by the name its wl_output v4 `name` event gave
@@ -212,7 +212,7 @@ public:
     // sees it.
     void setToplevelsListener(ToplevelsChangedCallback callback, void* userData);
 
-    // ---- Text fields, over input-method-unstable-v2 (Droidtop/tracker#685) ----
+    // ---- Text fields, over input-method-unstable-v2 (mytop-project/tracker#685) ----
     //
     // host-bridge registers as the seat's input method, which is how a
     // compositor tells a keyboard that a text field (a text-input-v3 client:
@@ -223,7 +223,7 @@ public:
     // connect().
     void setTextFieldListener(TextFieldCallback callback, void* userData);
 
-    // Whether droidtop holds the seat's one input method (Droidtop/tracker#809). Released, a container's own input
+    // Whether droidtop holds the seat's one input method (mytop-project/tracker#809). Released, a container's own input
     // method (fcitx5, ibus) can take the seat, and text fields no longer show the keyboard. Any thread; applies at
     // once on a connection, else from the next connect().
     void setInputMethodTaken(bool taken);

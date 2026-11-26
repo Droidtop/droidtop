@@ -42,7 +42,7 @@ internal val START_MENU_KINDS: Set<LibraryEntryKind> = LibraryEntryKind.entries.
 /** What a Start-menu row stands for: a Linux app of the container or a library entry, and the pin that names it. */
 /**
  * A Start menu row's height: compact, so about twice as many rows fit as at Gaming's 72 dp, and never under a
- * 48 dp touch target (Droidtop/tracker#555 D4, from the pad user's review).
+ * 48 dp touch target (mytop-project/tracker#555 D4, from the pad user's review).
  */
 internal val START_ROW_HEIGHT = 56.dp
 
@@ -50,10 +50,10 @@ private class StartTarget(val pin: TaskbarPin, val entry: LibraryEntry?, val lin
 
 /**
  * The Start menu (docs/SPEC.md 2b), as one sheet a pad and a finger both drive ([HostedListSheet],
- * Droidtop/tracker#350). Sections, top to bottom: Pinned (what is on the taskbar), Linux apps (the
- * container's own desktop entries, right after Pinned, Droidtop/tracker#555 D4), System (the taskbar's own
+ * mytop-project/tracker#350). Sections, top to bottom: Pinned (what is on the taskbar), Linux apps (the
+ * container's own desktop entries, right after Pinned, mytop-project/tracker#555 D4), System (the taskbar's own
  * buttons), droidtop (the places), a plugin's shelves, then the library's Games (with their artwork), Windows
- * (Wine shortcuts) and Android apps (Droidtop/tracker#348). Its rows are compact (56 dp, [START_ROW_HEIGHT]). A takes the row's own action
+ * (Wine shortcuts) and Android apps (mytop-project/tracker#348). Its rows are compact (56 dp, [START_ROW_HEIGHT]). A takes the row's own action
  * (a PC or engine game takes Gaming's primary-action rule, a store game that is not installed offers the
  * install); X pins it to the taskbar or takes it off; Y and a long press open the row's menu: Open, the
  * game page of a PC, engine or console game, and pin or unpin.
@@ -71,7 +71,7 @@ internal fun StartMenu(
     onOpenTerminal: (() -> Unit)?,
     onSearch: (String) -> Unit,
     onDismiss: () -> Unit,
-    /** The session's own rows (Droidtop/tracker#687): Restart and Stop while it runs, and Lock screen. */
+    /** The session's own rows (mytop-project/tracker#687): Restart and Stop while it runs, and Lock screen. */
     onRestartDesktop: (() -> Unit)? = null,
     onStopDesktop: (() -> Unit)? = null,
     onLockScreen: (() -> Unit)? = null,
@@ -109,7 +109,7 @@ internal fun StartMenu(
 
     // The places (Stores, Social, Downloads and installs, Updates, Plugins): Desktop has no left
     // menu, so the Start menu lists them, from the one place list, each opened in droidtop's
-    // screen host (docs/SPEC.md 7j "Places in every mode", Droidtop/tracker#346). Read when the
+    // screen host (docs/SPEC.md 7j "Places in every mode", mytop-project/tracker#346). Read when the
     // menu opens: the unread count is a plain number the social hub keeps current.
     val places = remember { Place.visible(UiModePrefs.get(context)) }
     val unread = remember { SocialBadge.unread }
@@ -120,7 +120,7 @@ internal fun StartMenu(
         val byId = entries?.associateBy { it.id }.orEmpty()
         val out = ArrayList<HostedRow>()
         // The one search (docs/SPEC.md 12a), opened from the first row: apps, games and download sources in
-        // one ranked list, with the container's apps among them (Droidtop/tracker#351).
+        // one ranked list, with the container's apps among them (mytop-project/tracker#351).
         out.add(
             HostedRow(
                 key = "search",
@@ -173,7 +173,7 @@ internal fun StartMenu(
             val target = if (entryId != null) {
                 byId[entryId]?.let { StartTarget(pin, it, null) }
             } else {
-                // A pin made before its app had an icon shows the icon the app has now (Droidtop/tracker#689).
+                // A pin made before its app had an icon shows the icon the app has now (mytop-project/tracker#689).
                 linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key }
                     ?.let { app -> StartTarget(if (pin.art == null) pin.copy(art = linuxIconUri(app)) else pin, null, app) }
             }
@@ -182,7 +182,7 @@ internal fun StartMenu(
             }
         }
         // The primary container's own applications, right after Pinned: what the desktop runs
-        // (Droidtop/tracker#555 D4). Launched into the session, so
+        // (mytop-project/tracker#555 D4). Launched into the session, so
         // their windows appear on the desktop behind this menu.
         if (sessionLive) {
             linuxAppsError?.let { message ->
@@ -197,7 +197,7 @@ internal fun StartMenu(
                 )
             }
             linuxApps.forEach { app ->
-                // Its icon from the container's theme, when there is one (Droidtop/tracker#689); pinned, the pin keeps it.
+                // Its icon from the container's theme, when there is one (mytop-project/tracker#689); pinned, the pin keeps it.
                 val target = StartTarget(TaskbarPin(TaskbarPins.linuxKey(app.id), app.name, linuxIconUri(app)), null, app)
                 // The app's own name, and under it what kind of program it is when the entry says (foot: "Terminal").
                 out.add(rowFor(target, key = "linux:" + app.id, section = "Linux apps", subtitle = app.genericName, art = app.iconFile != null))
@@ -218,11 +218,11 @@ internal fun StartMenu(
             )
         }
         out.add(HostedRow(key = "system:containers", title = "Containers", section = "System", onSelect = { openContainers(context); dismiss() }))
-        // The modes this person can switch to from here, not all three (Droidtop/tracker#571 row 37).
+        // The modes this person can switch to from here, not all three (mytop-project/tracker#571 row 37).
         val gamingOn = dev.droidtop.library.settings.Modes.isEnabledInStorage(context, dev.droidtop.library.settings.Mode.GAMING)
         out.add(HostedRow(key = "system:modes", title = "Switch mode", subtitle = if (gamingOn) "Switch to Gaming or Android" else "Switch to Android", section = "System", onSelect = { openModes(context); dismiss() }))
         out.add(HostedRow(key = "system:settings", title = "Settings", section = "System", onSelect = { openSettings(context); dismiss() }))
-        // A way out from inside Desktop (Droidtop/tracker#687): a setting that applies when the desktop next starts,
+        // A way out from inside Desktop (mytop-project/tracker#687): a setting that applies when the desktop next starts,
         // or a desktop that stopped answering, needed a trip out of the mode or the notification's Stop.
         if (sessionLive) {
             restartDesktop?.let { restart ->
@@ -282,7 +282,7 @@ internal fun StartMenu(
         if (entries == null || sections == null) {
             out.add(HostedRow(key = "library-loading", title = "Loading the library…", section = "Library", onSelect = {}))
         } else if (sections.isEmpty()) {
-            // The way to fill it, not a row that does nothing (Droidtop/tracker#571 row 29).
+            // The way to fill it, not a row that does nothing (mytop-project/tracker#571 row 29).
             out.add(
                 HostedRow(
                     key = "library-empty",
@@ -299,7 +299,7 @@ internal fun StartMenu(
             StartSection.entries.forEach { section ->
                 // A Wine shortcut is a fullscreen Activity over the desktop, not a window on it: Wine draws into its own
                 // X server view, and a Windows program as a desktop window waits on Wine in the container (SPEC 2b,
-                // §11). The row says so, so the Windows heading does not promise a window (Droidtop/tracker#698).
+                // §11). The row says so, so the Windows heading does not promise a window (mytop-project/tracker#698).
                 val subtitle = if (section == StartSection.WINDOWS) OPENS_FULLSCREEN else null
                 sections[section].orEmpty().forEach { item ->
                     out.add(rowFor(targetOf(item.entry, item.label), key = "entry:" + item.entry.id, section = section.title, subtitle = subtitle, art = true))
@@ -308,7 +308,7 @@ internal fun StartMenu(
         }
         out
     }
-    // One window at a time (Droidtop/tracker#371): while a row's menu is open the Start menu is not drawn, and
+    // One window at a time (mytop-project/tracker#371): while a row's menu is open the Start menu is not drawn, and
     // it comes back on the same row.
     val cursor = remember { HostedCursor() }
     val target = menuFor
@@ -360,7 +360,7 @@ internal fun StartMenu(
                 ),
             )
         }
-        // What plugins offer on this game or app (docs/plugin-api.md 3 C4, Droidtop/tracker#67): one row, shown when
+        // What plugins offer on this game or app (docs/plugin-api.md 3 C4, mytop-project/tracker#67): one row, shown when
         // a plugin's static filter matches, opening the actions' own page; `enabled` is asked there.
         val actionsContext = LocalContext.current
         val actionTarget = target.entry?.let { dev.droidtop.library.integrations.PluginContextActions.targetOf(it) }
@@ -411,5 +411,5 @@ internal fun StartMenu(
     }
 }
 
-/** What a Windows row in Start says about how it opens (Droidtop/tracker#698). */
+/** What a Windows row in Start says about how it opens (mytop-project/tracker#698). */
 private const val OPENS_FULLSCREEN = "Opens fullscreen over the desktop"

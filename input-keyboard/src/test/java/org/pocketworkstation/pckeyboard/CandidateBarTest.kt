@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The candidate bar's model (Droidtop/tracker#903 H6): the row, the expand button, the grid's pages and the pad's moves. */
+/** The candidate bar's model (mytop-project/tracker#903 H6): the row, the expand button, the grid's pages and the pad's moves. */
 class CandidateBarTest {
     private fun candidates(n: Int, focused: Int = -1, pageSize: Int = 0) =
         InputEngine.Candidates((0 until n).map { InputEngine.Candidate("w$it", if (it % 2 == 0) "note$it" else null) }, focused, pageSize)

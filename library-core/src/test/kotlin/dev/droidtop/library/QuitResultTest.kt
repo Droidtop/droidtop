@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * The state rule behind the Quick Menu's "Quit to Library"
- * (docs/SPEC.md, Droidtop/tracker#82): droidtop's own running-game
+ * (docs/SPEC.md, mytop-project/tracker#82): droidtop's own running-game
  * bookkeeping clears ONLY when the game really ended, and the row's
  * subtitle is [QuitResult.message] -- never a claim that didn't happen.
  * [QuitResult] carries no Android framework, so the rule is unit-tested

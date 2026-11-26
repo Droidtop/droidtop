@@ -5,7 +5,7 @@ import java.io.IOException
 import java.io.InputStream
 
 /**
- * Just enough of tar to unpack rime-data-luna.tar.gz (Droidtop/tracker#903 H8b), which build-data-luna.sh makes with
+ * Just enough of tar to unpack rime-data-luna.tar.gz (mytop-project/tracker#903 H8b), which build-data-luna.sh makes with
  * GNU tar: regular files and directories, GNU long names and pax `path` records. Links, devices and anything else are
  * refused rather than skipped, so the data is exactly the files its list names. Every header's checksum is checked.
  * Pure (java.io); the keyboard module's commons-compress is not reached for, as :input-chinese depends on the keyboard

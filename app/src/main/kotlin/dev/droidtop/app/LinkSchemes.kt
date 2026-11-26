@@ -10,7 +10,7 @@ import dev.droidtop.pluginhost.PluginStore
 import java.util.concurrent.Executors
 
 /**
- * Switches droidtop's link-scheme aliases (docs/SPEC.md 12a "Links", Droidtop/tracker#459): the manifest declares
+ * Switches droidtop's link-scheme aliases (docs/SPEC.md 12a "Links", mytop-project/tracker#459): the manifest declares
  * each scheme in [PluginLinks.MANIFEST_SCHEMES] as a disabled activity-alias of [LinkActivity]; an alias is enabled
  * while an installed, runnable plugin registers that scheme and disabled again when none does, so Android offers
  * droidtop for fdroidrepos:// only once something in droidtop opens it. Runs at process start and after every plugin

@@ -68,7 +68,7 @@ internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): Catal
     title = words(R.string.gamepad_settings),
     categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
     // Merged first, then filtered: the places Global settings links to (Updates) were merged in after the filter ran,
-    // so Settings kept a second Updates (Droidtop/tracker#610).
+    // so Settings kept a second Updates (mytop-project/tracker#610).
     groups = { ctx ->
         withoutPlaceLinks(mergeShortScreens(GamingSettingsCatalog.settingsGroups(ctx)) { it.groups(ctx) }, placeScreenIds)
     },

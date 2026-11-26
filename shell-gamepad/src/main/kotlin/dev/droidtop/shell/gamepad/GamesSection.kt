@@ -189,9 +189,9 @@ internal fun GamesSection(
     // the same for artwork after an in-place scrape.
     var gamelistOptionsOpen by remember { mutableStateOf(false) }
     var sortVersion by remember { mutableIntStateOf(0) }
-    // The focused game's own menu, from L2 or a long press on its card (Droidtop/tracker#621 M6).
+    // The focused game's own menu, from L2 or a long press on its card (mytop-project/tracker#621 M6).
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
-    // Where that game's card is on the screen, so the menu opens beside it (Droidtop/tracker#827); null centres it.
+    // Where that game's card is on the screen, so the menu opens beside it (mytop-project/tracker#827); null centres it.
     var optionsAnchor by remember { mutableStateOf<AnchorRect?>(null) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
@@ -453,7 +453,7 @@ internal fun GamesSection(
                 key = entry.id,
                 label = labels[index],
                 logoPath = entry.artworkUri,
-                // A opens the game's details, where Play is (Droidtop/tracker#641).
+                // A opens the game's details, where Play is (mytop-project/tracker#641).
                 onSelect = { onShowDetail(entry) },
                 // Lets a themed carousel/grid honour its own real
                 // <imageType> for this game instead of always drawing the
@@ -666,7 +666,7 @@ internal fun GamesSection(
                 if (entries.isEmpty()) {
                     // An empty library offers the one thing that fills it,
                     // never a sentence with nothing to press
-                    // (Droidtop/tracker#172): the same Game folders screen
+                    // (mytop-project/tracker#172): the same Game folders screen
                     // Settings and the Launcher's games grid open, drawn in
                     // place. CatalogNavigator owns its own B, so B leaves it.
                     val foldersScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(GAME_FOLDERS_SCREEN_ID) }
@@ -678,7 +678,7 @@ internal fun GamesSection(
                             CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
                         }
                     } else {
-                        // The one empty state of a games place (Droidtop/tracker#533).
+                        // The one empty state of a games place (mytop-project/tracker#533).
                         EmptyLibrary(
                             line = "No games yet",
                             actionLabel = "Add a folder",
@@ -711,7 +711,7 @@ internal fun GamesSection(
                         // press Back out of its gamelist (this branch is rebuilt
                         // every time), found by id in the current carousel so a
                         // rescan that reorders the cards cannot move it
-                        // (Droidtop/tracker#642).
+                        // (mytop-project/tracker#642).
                         val restoredSystemIndex = remember {
                             restoredFocusIndex(orderedGroups.map { it.key }, nav.focusHere)
                         }
@@ -1082,7 +1082,7 @@ internal fun GamesSection(
                             HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
                             // Sort by and Filter live in the list options on Select, as on PC Games: named here so a
-                            // themed view shows its way to them, and a tap on the hint opens them (Droidtop/tracker#260,
+                            // themed view shows its way to them, and a tap on the hint opens them (mytop-project/tracker#260,
                             // rig 2778: "no X Filter and no Y Sort ... and no other on-screen route").
                             HintBinding(GamepadAction.SELECT, "List options"),
                             HintBinding(GamepadAction.B, "Back"),
@@ -1183,7 +1183,7 @@ internal fun GamesSection(
                                     .anchorFor(cardBounds)
                                     .focusRequester(pad.requester(index))
                                     .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
-                                // A opens the details, where Play is (Droidtop/tracker#641).
+                                // A opens the details, where Play is (mytop-project/tracker#641).
                                 onActivate = { onShowDetail(entry) },
                                 onShowDetail = { onShowDetail(entry) },
                                 onOptions = {
@@ -1234,7 +1234,7 @@ internal val EMPTY_FOLDERS_HINTS = listOf(
 )
 
 /**
- * One gamelist's own state, held together (Droidtop/tracker#763): the sort and filter it shows ([query], stored per
+ * One gamelist's own state, held together (mytop-project/tracker#763): the sort and filter it shows ([query], stored per
  * list by PersistQuery once [queryLoaded]), whether its Sort or Filter sheet is open, and the text its Select menu's
  * Search narrows it by. GamesSection remembers one per group.
  */

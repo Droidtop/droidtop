@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A status value's box is sized to the widest value of its shape, so the row does not move (Droidtop/tracker#886). */
+/** A status value's box is sized to the widest value of its shape, so the row does not move (mytop-project/tracker#886). */
 class CompactStatusTest {
     @Test fun `each shape reserves its widest value`() {
         assertEquals("8888 MB/888.8 GB", compactTemplate("1.2/3.4 GB"))

@@ -311,7 +311,7 @@ abstract class SteamDatabase : RoomDatabase() {
          * brought across keeps GameNative's reading until its product info
          * changes, so every game GameNative had read looked like DLC of app 0
          * and the library left it out: the owner's library listed 725 games
-         * where Steam counts 1,245 (Droidtop/tracker#360). App 0 is no game,
+         * where Steam counts 1,245 (mytop-project/tracker#360). App 0 is no game,
          * so 0 always means "none".
          */
         internal const val NO_BASE_GAME_FROM_GAMENATIVE =
@@ -324,7 +324,7 @@ abstract class SteamDatabase : RoomDatabase() {
             }
         }
 
-        /** Version 3: each licence's billing type, read on the next sync (Droidtop/tracker#377). */
+        /** Version 3: each licence's billing type, read on the next sync (mytop-project/tracker#377). */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE steam_license ADD COLUMN billing_type INTEGER NOT NULL DEFAULT -1")

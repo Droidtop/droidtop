@@ -7,7 +7,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** Droidtop/tracker#909: a stand-in only for each /proc file this process cannot read. */
+/** mytop-project/tracker#909: a stand-in only for each /proc file this process cannot read. */
 class ProcStandInsTest {
     @get:Rule
     val temp = TemporaryFolder()

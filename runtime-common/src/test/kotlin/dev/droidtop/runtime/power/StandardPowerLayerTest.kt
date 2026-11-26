@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The standard layer's pure parts (docs/SPEC.md "Power policy", Droidtop/tracker#841 slice 3a). */
+/** The standard layer's pure parts (docs/SPEC.md "Power policy", mytop-project/tracker#841 slice 3a). */
 class StandardPowerLayerTest {
     @Test
     fun `each level maps to Android's game mode`() {

@@ -7,7 +7,7 @@ import android.os.Process
 
 /**
  * Who is calling one of droidtop's own binders, components or providers (docs/plugin-api.md 5.6, "Every path but the
- * API", Droidtop/tracker#53). An open or full-access plugin runs as droidtop's own UID, so Android lets it reach
+ * API", mytop-project/tracker#53). An open or full-access plugin runs as droidtop's own UID, so Android lets it reach
  * droidtop's non-exported services and providers; the UID cannot tell the two apart, the process can. A process's name
  * comes from the system's own record of the processes it started ([ActivityManager.getRunningAppProcesses]), never from
  * the process itself, which could rewrite its own command line.
@@ -115,7 +115,7 @@ internal class AppCaller(val isolated: Boolean, private val appUid: Int, private
     companion object {
         /**
          * A one-way call (no caller pid) is droidtop's when it comes from droidtop's UID and carries [secret], the token
-         * only droidtop's checked call could fetch (Droidtop/tracker#511). Pure, so it is unit-tested.
+         * only droidtop's checked call could fetch (mytop-project/tracker#511). Pure, so it is unit-tested.
          */
         fun tokenAllows(callingUid: Int, appUid: Int, token: Long, secret: Long): Boolean =
             callingUid == appUid && secret != 0L && token == secret

@@ -21,7 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * The one way an app another container exported (docs/SPEC.md 3d "Exported apps") is run: in its own container,
  * started first where the backend needs that, through the desktop session's primary ([DesktopSessionService
  * .runInPrimary]), so its window reaches the shared desktop. The desktop's own menus reach it over the launch request
- * channel ([DesktopLibraryEntries]); from outside the shell (the Desktop widget, Droidtop/tracker#563) [fromOutside]
+ * channel ([DesktopLibraryEntries]); from outside the shell (the Desktop widget, mytop-project/tracker#563) [fromOutside]
  * reuses the running session, or brings Desktop up, which starts it, and runs the app once it has connected.
  */
 internal object ExportLaunch {

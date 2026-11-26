@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * The folder-level halves of targeted indexing (docs/SPEC.md 7g, Droidtop/tracker#354): the walk's own rules asked
+ * The folder-level halves of targeted indexing (docs/SPEC.md 7g, mytop-project/tracker#354): the walk's own rules asked
  * of ONE reported folder. The real shipped engine rules are used, as in [PcFolderScanTest].
  */
 class TargetedDetectionTest {

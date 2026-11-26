@@ -52,7 +52,7 @@ object Http {
         followRedirects: Boolean = true,
         watch: Watch? = null,
     ): Response {
-        // A site that checks the browser is dealt with in one place for every request (Droidtop/tracker#751): the
+        // A site that checks the browser is dealt with in one place for every request (mytop-project/tracker#751): the
         // site's clearance goes on the request, and a check in the answer is passed and the request made once more.
         val gate = SiteGates.current ?: return requestOnce(url, method, headers, body, timeouts, maxBytes, token, followRedirects, watch)
         return gate.run(url, headers) { withClearance -> requestOnce(url, method, withClearance, body, timeouts, maxBytes, token, followRedirects, watch) }

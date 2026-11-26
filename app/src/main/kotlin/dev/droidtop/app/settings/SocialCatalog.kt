@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The Social place (docs/SPEC.md "Social" and 7j "Places", Droidtop/tracker#327): every provider's
+ * The Social place (docs/SPEC.md "Social" and 7j "Places", mytop-project/tracker#327): every provider's
  * friends in one list, the conversations, and each account's standing. Steam and every plugin that
  * provides `social.provider@1` are drawn the same way, by droidtop, from [SocialHub]. A catalog screen
  * like the other places, so pad and touch work the way they do everywhere and a message is typed in the
@@ -94,7 +94,7 @@ internal object SocialCatalog {
                 add(CatalogGroup(id = "social_friends", title = "Friends", items = friends.map { contactRow(it, "social_friend_", badged) }))
             }
             // Nothing to show yet: the page says what it is for and what will appear, over the two setup
-            // rows that are its actions (Droidtop/tracker#504), instead of two bare rows on an empty page.
+            // rows that are its actions (mytop-project/tracker#504), instead of two bare rows on an empty page.
             add(CatalogGroup(id = "social_accounts", title = accountsTitle(hasContacts = contacts.isNotEmpty()), items = accountRows(context, available)))
         }
     }

@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Standard's taskbar takes the colours outside Gaming (Droidtop/tracker#701). */
+/** Standard's taskbar takes the colours outside Gaming (mytop-project/tracker#701). */
 class TaskbarInksTest {
     private fun behind(inks: TaskbarInks) = listOf(ColorMath.over(inks.plate, ColorMath.BLACK), ColorMath.over(inks.plate, ColorMath.WHITE))
 

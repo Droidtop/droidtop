@@ -62,7 +62,7 @@ struct OutputHead {
     int32_t x = 0;
     int32_t y = 0;
     bool enabled = false;
-    // What its size in the layout follows from (Droidtop/tracker#908): the
+    // What its size in the layout follows from (mytop-project/tracker#908): the
     // current mode (its OutputMode record holds the size), wl_output.transform
     // and the scale. Read at `done`, into WaylandGlobals::placements.
     zwlr_output_mode_v1* current_mode = nullptr;
@@ -92,7 +92,7 @@ struct WantedOutputSize {
     double scale = 0;
 };
 
-// One wl_output the compositor advertises (Droidtop/tracker#908: every one,
+// One wl_output the compositor advertises (mytop-project/tracker#908: every one,
 // no longer only the first). Touched on the dispatch thread only, apart from
 // the registry round trips in connect() before that thread starts.
 struct TrackedOutput {
@@ -157,14 +157,14 @@ struct WaylandGlobals {
     // broken connection.
     zwlr_foreign_toplevel_manager_v1* toplevel_manager = nullptr;
 
-    // Text fields (input-method-unstable-v2, Droidtop/tracker#685). Optional.
+    // Text fields (input-method-unstable-v2, mytop-project/tracker#685). Optional.
     zwp_input_method_manager_v2* input_method_manager = nullptr;
     // The state the manager's events land in, made by connect() before the
     // registry is read so registry_global can attach the listener at bind
     // time (see there).
     struct ToplevelState* toplevel_state = nullptr;
 
-    // Every wl_output, in bind order (Droidtop/tracker#908). The first is the
+    // Every wl_output, in bind order (mytop-project/tracker#908). The first is the
     // primary: the output host-bridge presented and sized when it tracked
     // one only, and what an unnamed request (presentOutput(surface),
     // setOutputSize(w, h, scale)) still means. When it goes, the next one
@@ -227,10 +227,10 @@ struct OutputCapture {
     // The first copy into a newly presented window is a plain copy, not
     // copy_with_damage: an idle desktop has no damage to wait for, so a
     // surface presented again (back from an Android app) stayed black
-    // until the first touch changed something (Droidtop/tracker#386).
+    // until the first touch changed something (mytop-project/tracker#386).
     bool firstFrame = true;
 
-    // Frame pacing (Droidtop/tracker#950, item 2): the shortest time between
+    // Frame pacing (mytop-project/tracker#950, item 2): the shortest time between
     // the starts of two captures, from the refresh rate of the display the
     // surface is on (0: none). A busy desktop otherwise asked for the next
     // frame the moment one arrived, flat out, against the container's own
@@ -326,7 +326,7 @@ struct ToplevelState {
         bool maximized = false;
         bool fullscreen = false;
         // The compositor's name for the output the window is listed on ("" for none or unnamed), from `on` and
-        // `lastOutput` at each `done` (windowOutput in output_match.h, Droidtop/tracker#908 step D4).
+        // `lastOutput` at each `done` (windowOutput in output_match.h, mytop-project/tracker#908 step D4).
         std::string output;
         // The outputs the window is on, in the order it entered them, and the one it was on last.
         std::vector<wl_output*> on;
@@ -715,7 +715,7 @@ void toplevel_handle_app_id(void* data, zwlr_foreign_toplevel_handle_v1* handle,
     }
 }
 
-// Which output a window is on (Droidtop/tracker#908, step D4): each bar lists the windows on its own output, and
+// Which output a window is on (mytop-project/tracker#908, step D4): each bar lists the windows on its own output, and
 // the move to another screen offers the others. The rule is output_match.h's windowOutput; the name is resolved at
 // the handle's `done`, which the compositor sends after an enter or a leave as after any other change.
 void toplevel_handle_output_enter(void* data, zwlr_foreign_toplevel_handle_v1* handle, wl_output* output) {
@@ -904,7 +904,7 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         globals->shm = static_cast<wl_shm*>(
             wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (std::strcmp(interface, wl_output_interface.name) == 0) {
-        // Every output (Droidtop/tracker#908). Version 4 when offered, for
+        // Every output (mytop-project/tracker#908). Version 4 when offered, for
         // its `name` event (the name sway's IPC and wlr-output-management
         // also use); 2 is what this client bound before, and what it still
         // takes from a compositor offering less than 4: those outputs are
@@ -960,7 +960,7 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         // registry round trips. Events for a proxy with no listener are
         // dropped, so a listener added after them left every window that
         // was open before this connection (a desktop re-entered with apps
-        // running) out of the taskbar for good (Droidtop/tracker#94).
+        // running) out of the taskbar for good (mytop-project/tracker#94).
         if (globals->toplevel_state) {
             zwlr_foreign_toplevel_manager_v1_add_listener(
                 globals->toplevel_manager, &kToplevelManagerListener, globals->toplevel_state);
@@ -1133,7 +1133,7 @@ void allocateShmBuffer(OutputCapture* cap) {
 // each pixel's B and R and writing it opaque (pixel_swizzle.h): wl_shm's
 // XRGB8888/ARGB8888 are bytes B,G,R,X on a little-endian device, Android's
 // WINDOW_FORMAT_RGBA_8888 is R,G,B,A. A row at a time, with NEON on arm64 and
-// SSSE3 on x86_64 (Droidtop/tracker#950, item 1; it was a byte-at-a-time loop,
+// SSSE3 on x86_64 (mytop-project/tracker#950, item 1; it was a byte-at-a-time loop,
 // 2.2 M pixels a frame at 1920x1152). Handing Android BGRA with no swap, and a
 // GPU blit, are the issue's next steps.
 void blitFrameToWindow(OutputCapture* cap) {

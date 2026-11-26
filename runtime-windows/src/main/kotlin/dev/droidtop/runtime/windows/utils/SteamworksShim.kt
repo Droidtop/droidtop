@@ -14,7 +14,7 @@ import timber.log.Timber
 
 /**
  * Steamworks inside droidtop's Wine prefix (docs/SPEC.md 5b, "Steamworks in
- * the prefix", Droidtop/tracker#310).
+ * the prefix", mytop-project/tracker#310).
  *
  * A Windows Steam game's own `steam_api(64).dll` starts only when a Steam
  * client is running and it can load that client's `steamclient(64).dll`;
@@ -44,7 +44,7 @@ import timber.log.Timber
  * never calls Steam (the loader then only starts the game).
  */
 object SteamworksShim {
-    /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/steamworks-shim.yml. */
+    /** Release of mytop-project/droidtop that carries the asset; see .github/workflows/steamworks-shim.yml. */
     const val RELEASE_TAG = "steamworks-shim-20261008-e3304a76"
     const val SHA256 = "391b346d3ff2820e74313d21fa8e6258ab803e2d2b1e32566a0f5b583c95e040"
     private val release = PinnedReleaseAsset(RELEASE_TAG, "steamworks-shim.tzst", SHA256, "steamworks-shim", "the Steamworks support for Steam games")

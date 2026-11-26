@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** File hosts through their own API (Droidtop/tracker#638 part 5): PixelDrain's links, the person's key, and the order. */
+/** File hosts through their own API (mytop-project/tracker#638 part 5): PixelDrain's links, the person's key, and the order. */
 class HostLinksTest {
     private val sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
@@ -155,7 +155,7 @@ class HostLinksTest {
 
     @Test
     fun aPageThatLeadsToAServedHostHandsItOverAndAnyOtherPageDoesNot() {
-        // Droidtop/tracker#650: a masked forum link, unmasked in the view, ends on the host's link.
+        // mytop-project/tracker#650: a masked forum link, unmasked in the view, ends on the host's link.
         val pd = listOf(PixelDrain(Canned()))
         assertTrue(HostLinks.served("https://pixeldrain.com/u/abc123", pd))
         assertFalse(HostLinks.served("https://f95zone.to/masked/pixeldrain.com/1/2/", pd))

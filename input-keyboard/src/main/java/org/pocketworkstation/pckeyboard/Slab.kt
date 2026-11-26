@@ -3,13 +3,13 @@ package org.pocketworkstation.pckeyboard
 import android.view.KeyEvent
 
 /**
- * The pad-driven keyboard slab's model (docs/SPEC.md 4c, "The text-entry slab"; Droidtop/tracker#485 S7, slice 6):
+ * The pad-driven keyboard slab's model (docs/SPEC.md 4c, "The text-entry slab"; mytop-project/tracker#485 S7, slice 6):
  * its layers, its keys, where the pad's cursor is, and what each press sends. Pure: no view and no Android beyond
  * key-code constants, so every rule here is a unit test. [SlabView] draws it; [KeyboardPanel] hosts it.
  *
  * The face-button map (X Backspace, Y Space, L1 Shift with a double press for Caps, R1 the symbols layer, R2 Enter,
  * B Done or Cancel, Select the clipboard) is the S7 design's own, and the settled default: Valve documents none for
- * the Deck's keyboard, so there is nothing to match (#485, 2026-10-16; SPEC 4c, Droidtop/tracker#772).
+ * the Deck's keyboard, so there is nothing to match (#485, 2026-10-16; SPEC 4c, mytop-project/tracker#772).
  */
 object Slab {
     /** What a key does. [Char] types its character, shifted by the state when it is a letter. */
@@ -39,7 +39,7 @@ object Slab {
     }
 
     /**
-     * A pad button the slab and the keyboard's own pad handling ([PadKeys]) give a key's job (Droidtop/tracker#772: one
+     * A pad button the slab and the keyboard's own pad handling ([PadKeys]) give a key's job (mytop-project/tracker#772: one
      * enum where there were two, Cap and Button, bridged by name). A key's keycap shows the one that does its job, the
      * host drawing the glyph its layout prints; the D-pad and A are [move] and [press] on the focused key instead.
      */
@@ -78,7 +78,7 @@ object Slab {
 
     /**
      * A word a key shows, in the person's language: [SlabView.word] reads it from the keyboard's strings
-     * (Droidtop/tracker#772). Key legends a physical keyboard prints the same in every language (Tab, Esc, Ctrl, Alt,
+     * (mytop-project/tracker#772). Key legends a physical keyboard prints the same in every language (Tab, Esc, Ctrl, Alt,
      * Super, F1, &123, abc and the arrows) are not words and stay as they are.
      */
     enum class Word { BACKSPACE, SPACE, SHIFT, CAPS, DONE, CANCEL, CLIPBOARD, SYSTEM_KEYBOARD, SEARCH, SAVE, NEXT, GO, ENTER }
@@ -109,7 +109,7 @@ object Slab {
 
     /**
      * A whole keyboard's bottom row: no Clipboard, globe or Done, which belong to a text field that can close, and the
-     * four arrows together. Nothing on the Input tab closes (Droidtop/tracker#567).
+     * four arrows together. Nothing on the Input tab closes (mytop-project/tracker#567).
      */
     private fun extrasBottomRow(first: Key) = listOf(
         first,
@@ -123,7 +123,7 @@ object Slab {
     /**
      * The rows of [layer]. [large] is the Large keys form (automatic at font scale 1.3): four letter rows, the digits on
      * the symbols layer, as the S7 layout has it (5.2).
-     * [extras] adds a whole keyboard's keys for the companion's Input tab and Desktop (Droidtop/tracker#567): Esc, Tab,
+     * [extras] adds a whole keyboard's keys for the companion's Input tab and Desktop (mytop-project/tracker#567): Esc, Tab,
      * Ctrl, Alt, Super and the up and down arrows above the letters, and F1 to F12 above the symbols.
      */
     fun rows(layer: Layer, large: Boolean, extras: Boolean = false): List<List<Key>> {
@@ -315,7 +315,7 @@ object Slab {
     }
 
     /**
-     * The key a whole keyboard sends while [action]'s key is held (Droidtop/tracker#567: a PC game moves while an arrow
+     * The key a whole keyboard sends while [action]'s key is held (mytop-project/tracker#567: a PC game moves while an arrow
      * or a letter is held), with what is latched held under it: Ctrl, Alt and Super, and Shift for an upper-case
      * character or a named key while Shift is on. Null for a key that is not a key press (Shift, a modifier, a layer
      * switch), which acts on release through [press].

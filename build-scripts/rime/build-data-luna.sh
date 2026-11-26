@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds rime-data-luna, the Chinese pinyin data the keyboard downloads the
-# first time Chinese is used (Droidtop/tracker#903 H8), already deployed, so the
+# first time Chinese is used (mytop-project/tracker#903 H8), already deployed, so the
 # phone does not compile dictionaries. Run by .github/workflows/rime-engine.yml.
 #
 #   build-data-luna.sh RIME_DEPLOYER OPENCC_SHARE PRELUDE ESSAY LUNA OUT
@@ -76,7 +76,7 @@ patch:
 EOF
 
 {
-    echo "rime-data-luna, built by build-scripts/rime/build-data-luna.sh (droidtop, Droidtop/tracker#903 H8)."
+    echo "rime-data-luna, built by build-scripts/rime/build-data-luna.sh (droidtop, mytop-project/tracker#903 H8)."
     echo "rime/rime-prelude $(git -C "$prelude" rev-parse HEAD) (LGPL-3.0)"
     echo "rime/rime-essay $(git -C "$essay" rev-parse HEAD) (LGPL-3.0)"
     echo "rime/rime-luna-pinyin $(git -C "$luna" rev-parse HEAD) (LGPL-3.0)"

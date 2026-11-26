@@ -1,4 +1,4 @@
-en.txt is the emoji list the keyboard's emoji panel and search read (Droidtop/tracker#342).
+en.txt is the emoji list the keyboard's emoji panel and search read (mytop-project/tracker#342).
 
 Source: FlorisBoard, app/src/main/assets/ime/media/emoji/en.txt at commit
 fe1241f4921b3eae923571ff7a3e113a7e10d677 (github.com/florisboard/florisboard, Apache License 2.0).

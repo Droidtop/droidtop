@@ -38,7 +38,7 @@ object HackersKeyCodes {
      * open the options dialog, start voice input, cycle language, enter
      * compose mode, the Fn layer. They have no meaning to a container and
      * are dropped rather than guessed at. The fork's own constants, read
-     * directly (Droidtop/tracker#772): Kotlin in this package sees
+     * directly (mytop-project/tracker#772): Kotlin in this package sees
      * `LatinKeyboardView`'s package-private ones, so a renumbering there
      * reaches here too.
      */

@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * A droidspaces container's rootfs as a tar stream, as root (docs/SPEC.md 3d "Backup" and "Copy";
- * Droidtop/tracker#758). The tree is root's, so Android's own `tar` (toybox) runs through the root shell (Shizuku or
+ * mytop-project/tracker#758). The tree is root's, so Android's own `tar` (toybox) runs through the root shell (Shizuku or
  * Sui) rather than as the app, which is what proot's ContainerArchive does; the commands are [RootTar]'s. As root, tar
  * reads every file and keeps owners and modes on the way back in. A socket left behind is dead state in a stopped container and unknown to tar,
  * so it is left out. The container must be stopped; the runtime sees to that.

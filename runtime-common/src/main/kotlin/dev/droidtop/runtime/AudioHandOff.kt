@@ -22,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The one launch audio hand-off (docs/SPEC.md "Launch audio hand-off",
- * Droidtop/tracker#160): before another app comes in front, droidtop
+ * mytop-project/tracker#160): before another app comes in front, droidtop
  * closes EVERY audio output stream of its own, and opens them again when
  * the user is back.
  *
@@ -81,7 +81,7 @@ object AudioHandOff {
      * (uptimeMillis) and the experiment letter, so one logcat shows the
      * exact order and gaps of every audio open, start, stop and release,
      * the launch dispatch and droidtop's activity lifecycle
-     * (Droidtop/tracker#160).
+     * (mytop-project/tracker#160).
      */
     fun mark(what: String) {
         Log.i(TAG, "t=${SystemClock.uptimeMillis()} $what")

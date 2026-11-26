@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 data class OwnScreen(val taskId: Int, val title: String, val displayId: Int)
 
 /**
- * droidtop's own screens that are open as windows of their own (Droidtop/tracker#750, rig 2638): the running-apps
+ * droidtop's own screens that are open as windows of their own (mytop-project/tracker#750, rig 2638): the running-apps
  * list leaves droidtop out ([TaskPolicy.hiddenFromList]), so without this Settings opened from Desktop's Start menu
  * was on screen and nowhere on the bar. Each screen adds itself while it exists; the list is in-process and needs
  * no privilege. Main thread.

@@ -4,7 +4,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Plays a [ControllerLayout] (Droidtop/tracker#618 C3; docs/SPEC.md 5b "Controller layouts"): a pad's presses and
+ * Plays a [ControllerLayout] (mytop-project/tracker#618 C3; docs/SPEC.md 5b "Controller layouts"): a pad's presses and
  * sticks in, what the game receives out. Pure and single-threaded; time is passed in, so every rule is tested
  * without a clock.
  *

@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Home's pinned tiles (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): catalog items by id
+ * Home's pinned tiles (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): catalog items by id
  * ([PinnedControls]), drawn from the same tile model the Quick Menu's grid uses ([QuickTiles.tile]). A slider pin
  * has a step button on each side. "Edit pins" lists every System, Display and Sound item with Pin or Unpin, so
  * pinning never needs a long-press, plus the live stat tiles and every plugin tile offered on the companion (slice
@@ -197,7 +197,7 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
         return
     }
     if (item is SliderItem) {
-        // A pinned slider is the one slider row, a drawn track with a step at each end (Droidtop/tracker#786 S2a).
+        // A pinned slider is the one slider row, a drawn track with a step at each end (mytop-project/tracker#786 S2a).
         val app = context.applicationContext
         CompanionSliderRow(
             title = tile.label,
@@ -238,7 +238,7 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
                 }
             }
             // A pinned link opens its screen (Updates, Social, Android settings); it did nothing
-            // (Droidtop/tracker#571 row 24). Only links with a screen id are offered for pinning.
+            // (mytop-project/tracker#571 row 24). Only links with a screen id are offered for pinning.
             QuickPress.OPEN -> (item as? dev.droidtop.library.settings.NestedScreenItem)?.registryId?.let { id ->
                 runCatching {
                     context.startActivity(
@@ -252,7 +252,7 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
 }
 
 /**
- * A pin's face: its glyph, name, switch where it has one, and value (Droidtop/tracker#786 S9: a pin never shows only
+ * A pin's face: its glyph, name, switch where it has one, and value (mytop-project/tracker#786 S9: a pin never shows only
  * text). [state] is what a screen reader hears after the name, the value when not given.
  */
 @Composable
@@ -289,7 +289,7 @@ private fun PinFace(
             dev.droidtop.shell.gamepad.QuickGlyphIcon(glyph, ink, Modifier.size(20.dp))
             Text(label, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 2)
         }
-        // An on/off tile shows its switch, as the Quick Menu's tile does (show, then say: Droidtop/tracker#738).
+        // An on/off tile shows its switch, as the Quick Menu's tile does (show, then say: mytop-project/tracker#738).
         on?.let { androidx.compose.material3.Switch(checked = it, onCheckedChange = null) }
         if (value != null) {
             Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -317,7 +317,7 @@ private data class NetworkPinState(
 )
 
 /**
- * The Network pin (Droidtop/tracker#786 S9): its glyph and the network's name (with the helper app), lit while Wi-Fi
+ * The Network pin (mytop-project/tracker#786 S9): its glyph and the network's name (with the helper app), lit while Wi-Fi
  * is on; a tap switches Wi-Fi through the helper, the Wi-Fi switch's own path, and otherwise, or when the switch did
  * not take, opens the Network page. Read off the main thread, again after each tap.
  */

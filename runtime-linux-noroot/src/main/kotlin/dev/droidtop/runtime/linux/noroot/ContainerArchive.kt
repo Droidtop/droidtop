@@ -16,7 +16,7 @@ import java.nio.file.attribute.PosixFilePermission.OWNER_READ
 
 /**
  * Export and import of one proot container's rootfs as a tar stream
- * (docs/SPEC.md 3d "Backup", Droidtop/tracker#81), through Android's own
+ * (docs/SPEC.md 3d "Backup", mytop-project/tracker#81), through Android's own
  * `tar` (toybox) so symlinks, modes and empty directories survive without a
  * tar writer in the app. Ownership is not carried: every file in a proot
  * rootfs is the app's own, and extraction as a non-root app cannot set
@@ -70,7 +70,7 @@ internal object ContainerArchive {
     /**
      * Copies [rootfs] into [into], which must not exist yet: [export] piped straight into [import], so the copy keeps
      * what a backup keeps (symlinks, modes, empty directories) and needs no room for an archive in between
-     * (Droidtop/tracker#757, Clone).
+     * (mytop-project/tracker#757, Clone).
      */
     fun copy(rootfs: File, into: File, errorLog: File) {
         val reader = java.io.PipedInputStream(1 shl 16)
@@ -94,7 +94,7 @@ internal object ContainerArchive {
 
     /**
      * What stops toybox tar finishing over a proot rootfs, all of it found
-     * in one walk of [dir] (Droidtop/tracker#81; rig, emulator, the whole
+     * in one walk of [dir] (mytop-project/tracker#81; rig, emulator, the whole
      * message of tar's stderr):
      *
      *  - proot makes an empty placeholder with no permissions at every bind
@@ -140,7 +140,7 @@ internal object ContainerArchive {
         }
     }
 
-    /** [prepareForTar] over the whole of [rootfs], for an increment's find and tar (Droidtop/tracker#808). */
+    /** [prepareForTar] over the whole of [rootfs], for an increment's find and tar (mytop-project/tracker#808). */
     fun prepare(rootfs: File) = prepareForTar(rootfs, rootfs, mutableListOf())
 
     /**

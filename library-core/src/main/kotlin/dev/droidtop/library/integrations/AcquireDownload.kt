@@ -100,7 +100,7 @@ internal object AcquireDownload {
             )
         }
         // A plain address the source gave on a file host (not a page it started, not a GitHub asset) goes to the person's
-        // host and debrid accounts first, as a link opened in droidtop's view does (Droidtop/tracker#638; the owner,
+        // host and debrid accounts first, as a link opened in droidtop's view does (mytop-project/tracker#638; the owner,
         // 2026-11-04: "torbox integration doesn't seem to be working, it downloads everything directly").
         val routed = withContext(Dispatchers.IO) {
             runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
@@ -150,7 +150,7 @@ internal object AcquireDownload {
             onStatus = onStatus,
             onPercent = onPercent,
             // A file of one part has its size from the source, else from the page droidtop's web view took it from: the
-            // row's bar uses it when the server sends no length (Droidtop/tracker#877), as the download policy does.
+            // row's bar uses it when the server sends no length (mytop-project/tracker#877), as the download policy does.
             sizeBytes = if (parts.size == 1) (descriptors.first().size ?: captured.first()?.size ?: 0L) else 0L,
         )
     }

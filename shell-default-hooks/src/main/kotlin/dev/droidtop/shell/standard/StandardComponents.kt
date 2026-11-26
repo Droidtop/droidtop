@@ -2,7 +2,7 @@ package dev.droidtop.shell.standard
 
 /**
  * The class names Standard starts by name across the one-way `:app` -> shells edge, written once
- * (Droidtop/tracker#771): `:app`'s main and companion activities, Launcher3's own activity, droidtop's HOME trampoline
+ * (mytop-project/tracker#771): `:app`'s main and companion activities, Launcher3's own activity, droidtop's HOME trampoline
  * and the Alternative forwarder. Start a mode's screen with [BackButtonMenu.appModeIntent].
  */
 internal object StandardComponents {

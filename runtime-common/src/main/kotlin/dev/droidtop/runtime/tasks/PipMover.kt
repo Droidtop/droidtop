@@ -8,7 +8,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Picture-in-picture video moves to the companion screen (docs/SPEC.md "The companion's tabs", Droidtop/tracker#430):
+ * Picture-in-picture video moves to the companion screen (docs/SPEC.md "The companion's tabs", mytop-project/tracker#430):
  * when an app on the main screen goes into picture-in-picture, its task is moved to the companion's display through
  * the helper app's shell (`am display move-stack`), and moved back to the main screen when the companion goes. An
  * app cannot move another app's task, so without a `priv.shell` provider nothing happens.

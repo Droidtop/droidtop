@@ -4,7 +4,7 @@ import android.content.Context
 import dev.droidtop.library.social.SocialPresence
 
 /**
- * droidtop's own Steam settings (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313):
+ * droidtop's own Steam settings (docs/SPEC.md 7g, "Stores", mytop-project/tracker#313):
  * the person's standing (which is also whether the connection is kept) and
  * whether a new message notifies; its Cloud saves switch is [dev.droidtop.stores.util.CloudSaveSetting], in this file. One small preferences file; read
  * off the main thread like every settings read.

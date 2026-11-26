@@ -55,7 +55,7 @@ fun ViewStrip(
     val window = LocalShellWindow.current
     val shoulderGlyphs = window.showsShoulderGlyphs()
     // The chosen tab's plate is one shape behind the chips that glides from tab to tab as the view changes
-    // (DroidDeck's sliding selection pill, Droidtop/tracker#363), rather than a plate each chip turns on and off. It
+    // (DroidDeck's sliding selection pill, mytop-project/tracker#363), rather than a plate each chip turns on and off. It
     // follows the strip's own scroll at once and moves over Motion's focus time only when the chosen tab changes.
     val plateColor = MenuTokens.SurfaceSelected
     val plateX = remember { Animatable(0f) }
@@ -82,7 +82,7 @@ fun ViewStrip(
     }
     // The strip runs along the top edge, where the status cluster floats:
     // it ends short of the cluster so R1 is never under the clock
-    // (Droidtop/tracker#292). The cluster's width already holds its margins.
+    // (mytop-project/tracker#292). The cluster's width already holds its margins.
     val clusterWidth = StatusClusterRoom.size.width
     val end = if (clusterWidth > 0.dp) clusterWidth else window.edgePadding
     Row(
@@ -95,7 +95,7 @@ fun ViewStrip(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Xs),
             horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-            // The end the strip can scroll to fades, so a chip cut at the edge says there is more (Droidtop/tracker#661).
+            // The end the strip can scroll to fades, so a chip cut at the edge says there is more (mytop-project/tracker#661).
             modifier = Modifier
                 .weight(1f, fill = false)
                 .drawBehind {

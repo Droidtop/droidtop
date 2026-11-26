@@ -1,6 +1,6 @@
 # Translating and improving droidtop's words
 
-droidtop is set up to be translated on [Weblate](https://weblate.org/) (owner, 2026-11-05, Droidtop/tracker#627:
+droidtop is set up to be translated on [Weblate](https://weblate.org/) (owner, 2026-11-05, mytop-project/tracker#627:
 "Weblate. Can we also ask for better english strings, since our current ones are terrible?"). No language is
 translated yet: "We don't handle translations ourselves immediately. We're just putting the groundwork in place to
 trivialize it". This page is how it works once the project exists, and what creating it needs.
@@ -51,7 +51,7 @@ Settings, Appearance, Language and Android 13's per-app language screen offer.
 
 1. A Weblate project: Hosted Weblate's free plan for libre projects (apply at
    <https://hosted.weblate.org/hosting/>, naming the GPL licence and the repository), or a self-hosted Weblate.
-2. Access to Droidtop/droidtop for Weblate: its SSH key added as a deploy key with write access, or the Weblate GitHub
+2. Access to mytop-project/droidtop for Weblate: its SSH key added as a deploy key with write access, or the Weblate GitHub
    app, so it can push `ci/weblate-*` branches. It needs no other repository and no access to `main`.
 3. A custom language "English (developer)", code `en_DEVEL`, set as the project's source language.
 4. One component per row of the table above:

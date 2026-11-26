@@ -5,8 +5,8 @@ import android.content.res.Configuration
 import android.preference.PreferenceManager
 
 /**
- * Light or dark for the keyboard (Droidtop/tracker#562, #337; docs/SPEC.md 6a "Light and dark"), and Hacker Keyboard
- * Reborn's own themes (Droidtop/tracker#903 H2 and H12b; docs/SPEC.md 6a, "Themes, light and dark").
+ * Light or dark for the keyboard (mytop-project/tracker#562, #337; docs/SPEC.md 6a "Light and dark"), and Hacker Keyboard
+ * Reborn's own themes (mytop-project/tracker#903 H2 and H12b; docs/SPEC.md 6a, "Themes, light and dark").
  *
  * HKR's modern themes ([modern]) draw flat plates ([KeyPlates]) in colours of their own: Modern ([FOLLOW], the default
  * for anyone who never chose a theme, HKR's [LIGHT] and [DARK]), Dynamic ([DYNAMIC], the wallpaper's Material You
@@ -175,7 +175,7 @@ object KeyboardAppearance {
     )
 
     /**
-     * The keyboard's colours now, for what is drawn in [context] (Droidtop/tracker#903 H2, the theme seam, extended
+     * The keyboard's colours now, for what is drawn in [context] (mytop-project/tracker#903 H2, the theme seam, extended
      * by H12b). In a keyboard the host embeds (droidtop's in-window, companion and overlay keyboards), the host's
      * colours for its light or dark, so it matches the screen around it. Inside the input method, the colours of the
      * theme chosen ([themeColors]): HKR's own, or the host's under Match droidtop.
@@ -219,7 +219,7 @@ object KeyboardAppearance {
 }
 
 /**
- * The colours of everything droidtop draws for the keyboard (Droidtop/tracker#772: the slab, the panels and the glide
+ * The colours of everything droidtop draws for the keyboard (mytop-project/tracker#772: the slab, the panels and the glide
  * trail had three sources): [ground] behind it, [panel] for a panel's sheet, [key] and [keyFocused] for keys and
  * chips, [text] and [muted] for their words, [accent] for what is lit (a pressed key, the glide trail). The panels
  * and the trail take [KeyboardAppearance.colors]; a surface that draws the slab passes its own surface's.

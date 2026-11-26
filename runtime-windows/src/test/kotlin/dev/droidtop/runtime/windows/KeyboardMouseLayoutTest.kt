@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** The bundled "Keyboard (WASD) and Mouse" layout (Droidtop/tracker#618) and the X keys its names become. */
+/** The bundled "Keyboard (WASD) and Mouse" layout (mytop-project/tracker#618) and the X keys its names become. */
 class KeyboardMouseLayoutTest {
     private val layout = ControllerLayout.parse(File("src/main/res/raw/controls_keyboard_mouse.vdf").readText())
 

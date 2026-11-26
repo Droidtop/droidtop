@@ -10,7 +10,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * GOG's wishlist (docs/SPEC.md 7g, "Wishlist", Droidtop/tracker#134): the product ids GOG keeps for the signed-in
+ * GOG's wishlist (docs/SPEC.md 7g, "Wishlist", mytop-project/tracker#134): the product ids GOG keeps for the signed-in
  * account at `embed.gog.com/user/wishlist.json` (asked for with the same bearer token as the owned-game ids), then a
  * name and a cover for each id droidtop has not seen before, from the same product and GamesDB endpoints the library
  * already uses. The result is droidtop's own copy ([Wishlist]); the library reads that, never the network. Read-only:
@@ -19,7 +19,7 @@ import timber.log.Timber
 internal object GOGWishlist {
     private const val TAG = "GOG"
 
-    // The stores' shared client (Droidtop/tracker#766: one HTTP client per job in this module).
+    // The stores' shared client (mytop-project/tracker#766: one HTTP client per job in this module).
     private val http get() = dev.droidtop.stores.util.StoreHttp.http
 
     /** The wished product ids in a `wishlist.json` body: `{"wishlist":{"1207658691":true,...}}`. Sorted, so the order is the same every sync. */

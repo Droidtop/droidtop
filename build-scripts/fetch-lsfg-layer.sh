@@ -17,7 +17,7 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf -- "${work:?}"' EXIT
 curl -fsSL --retry 5 --retry-delay 10 -o "$work/l.tar.zst" \
-    "https://github.com/Droidtop/droidtop/releases/download/$tag/lsfg-vk-layer.tar.zst"
+    "https://github.com/mytop-project/droidtop/releases/download/$tag/lsfg-vk-layer.tar.zst"
 echo "$sha  $work/l.tar.zst" | sha256sum -c -
 rm -rf -- "${DEST:?}"
 mkdir -p "$DEST"

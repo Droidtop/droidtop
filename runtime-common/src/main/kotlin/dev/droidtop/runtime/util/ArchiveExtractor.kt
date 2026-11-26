@@ -89,7 +89,7 @@ object ArchiveExtractor {
         }
 
     /**
-     * Unpacks a RAR archive split into volumes (`X.part1.rar`, `X.part2.rar`, ...; Droidtop/tracker#419) into
+     * Unpacks a RAR archive split into volumes (`X.part1.rar`, `X.part2.rar`, ...; mytop-project/tracker#419) into
      * [destination]: libarchive reads [volumes], in part order, as one stream, so an entry that runs across two
      * volumes comes out whole. The same checks as [extract]; a failure clears [destination] and leaves the volumes.
      */

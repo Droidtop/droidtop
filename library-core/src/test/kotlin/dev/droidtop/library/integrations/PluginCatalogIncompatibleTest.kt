@@ -19,7 +19,7 @@ class PluginCatalogIncompatibleTest {
 
     @Test
     fun `a release older than this droidtop runs says so, as Root modules 1_0_0 did`() {
-        // Droidtop/tracker#932: listed with a red tag, never installed by Install all.
+        // mytop-project/tracker#932: listed with a red tag, never installed by Install all.
         val why = release(PLUGIN_MANIFEST_MIN_CONTRACT_VERSION - 1).incompatibility()
         assertNotNull(why)
         assertTrue(why!!.contains("older droidtop"))

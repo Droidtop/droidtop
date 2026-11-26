@@ -5,7 +5,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * A plugin loaded once per process, not once per call (Droidtop/tracker#884). [PluginCrashPolicy] asks its runner to
+ * A plugin loaded once per process, not once per call (mytop-project/tracker#884). [PluginCrashPolicy] asks its runner to
  * load a plugin before every call, which is how a stopped or restarted process is started again. A plugin already
  * loaded in its live process returned true only after droidtop had acquired the process, read the grants and every
  * installed record, opened every file the plugin needs, started a new file broker and made a blocking binder call; one

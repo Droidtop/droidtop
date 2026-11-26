@@ -3,7 +3,7 @@
 # plugin-host/native/sqlite/, where plugin-host/native/CMakeLists.txt builds
 # it into droidtop's native library: a plugin's SQLite is droidtop's own,
 # never Android's (docs/plugin-api.md 5.3, "Preferences and SQLite are
-# droidtop's", Droidtop/tracker#741). The release, its size, the SHA3-256
+# droidtop's", mytop-project/tracker#741). The release, its size, the SHA3-256
 # sqlite.org lists for it and its SHA-256 are plugin-host/sqlite.pin; a
 # mismatch fails the build rather than compiling something else.
 set -eu

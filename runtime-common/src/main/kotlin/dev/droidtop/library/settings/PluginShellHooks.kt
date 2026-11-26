@@ -23,7 +23,7 @@ object PluginShellHooks {
         fun companionTabs(context: Context, mode: String): List<Pair<String, String>> = emptyList()
 
         /**
-         * "Plugin actions" on an app's long-press menu (Droidtop/tracker#67), when a plugin offers one for
+         * "Plugin actions" on an app's long-press menu (mytop-project/tracker#67), when a plugin offers one for
          * [packageName]; null otherwise. Answered from memory: the launcher builds that menu on the main thread.
          */
         fun appMenu(context: Context, packageName: String, label: String): MenuEntry? = null

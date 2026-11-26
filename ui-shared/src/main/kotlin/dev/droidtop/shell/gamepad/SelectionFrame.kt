@@ -46,7 +46,7 @@ fun Modifier.selectionFrame(
     restOutline: Color = Color.Transparent,
     selectedFill: Color = MenuTokens.SurfaceSelected,
     ringOutset: Dp = 0.dp,
-    // A row (Droidtop/tracker#644, the visual language's "Focus"): focused, it is the accent at 22 percent behind it and
+    // A row (mytop-project/tracker#644, the visual language's "Focus"): focused, it is the accent at 22 percent behind it and
     // a 4 dp accent bar at its leading edge, and no ring. Controls keep the ring; art grows instead ([art]).
     row: Boolean = false,
     art: Boolean = false,
@@ -72,7 +72,7 @@ fun Modifier.selectionFrame(
 }
 
 /**
- * The one way a row shows the cursor, in every menu (Droidtop/tracker#644, docs/DESIGN-LANGUAGE.md "Type and focus"):
+ * The one way a row shows the cursor, in every menu (mytop-project/tracker#644, docs/DESIGN-LANGUAGE.md "Type and focus"):
  * the accent at 22 percent behind it ([MenuTokens.SurfaceSelected]) and a 4 dp accent bar the row's full height at its
  * leading edge. No ring, no growth, no flash: the row never moves under the cursor. [shown] is the cursor being here
  * while a pad drives ([PadModality]). [current] is "you are here" (the left menu's destination, the Settings category
@@ -103,6 +103,6 @@ fun Modifier.rowFocus(shown: Boolean, current: Boolean = false): Modifier = comp
 /** How tall "you are here" is on a row's edge. */
 private val RowCurrentMark = 20.dp
 
-/** A focused row's leading bar (Droidtop/tracker#644). */
+/** A focused row's leading bar (mytop-project/tracker#644). */
 private val RowFocusBar = 4.dp
 

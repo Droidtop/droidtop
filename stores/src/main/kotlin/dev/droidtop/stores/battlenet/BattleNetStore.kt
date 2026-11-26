@@ -20,7 +20,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Battle.net as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335): the games of the account, read
+ * Battle.net as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335): the games of the account, read
  * the way Playnite's BattleNetLibrary reads them (MIT, JosefNemec/PlayniteExtensions,
  * `Services/BattleNetAccountClient.cs`): `account.battle.net/api/games-and-subs` and `/api/classic-games` with the
  * account site's session, which the person's sign-in on Blizzard's page leaves. Blizzard serves games only through its

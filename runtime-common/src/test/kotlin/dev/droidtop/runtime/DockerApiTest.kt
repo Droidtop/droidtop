@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** docs/SPEC.md 3d, "The Docker Engine API" (Droidtop/tracker#555 D14): the socket's HTTP and the routes it answers. */
+/** docs/SPEC.md 3d, "The Docker Engine API" (mytop-project/tracker#555 D14): the socket's HTTP and the routes it answers. */
 class DockerApiTest {
     private fun read(text: String) = EngineHttp.read(ByteArrayInputStream(text.toByteArray(Charsets.ISO_8859_1)))
 

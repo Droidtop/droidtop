@@ -18,7 +18,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The layout a physical keyboard types in on the desktop (docs/SPEC.md 6b
- * "Keyboard layout", Droidtop/tracker#387). The setting is Automatic by
+ * "Keyboard layout", mytop-project/tracker#387). The setting is Automatic by
  * default: the attached physical keyboard's layout when Android reports one,
  * otherwise the on-screen keyboard's language, otherwise US; the row says
  * which and where it came from. The keymap is compiled in the primary by the

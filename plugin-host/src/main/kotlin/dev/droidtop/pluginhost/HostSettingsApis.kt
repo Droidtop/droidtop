@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The declared settings' host ops (Droidtop/tracker#880, docs/plugin-api.md 1.10). The plugin reads the values the
+ * The declared settings' host ops (mytop-project/tracker#880, docs/plugin-api.md 1.10). The plugin reads the values the
  * person set when it runs, and pushes the text only it knows for a row. Its own data, so no permission.
  */
 internal object HostSettingsApis {

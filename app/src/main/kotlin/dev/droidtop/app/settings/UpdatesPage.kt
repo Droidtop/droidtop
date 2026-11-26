@@ -54,12 +54,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * Updates: one first-class page for everything that has a newer version (docs/SPEC.md 10b "The Updates page",
- * Droidtop/tracker#792; the owner, 2026-10-30: "We need a cleaner and more uniform updates page that covers everything
+ * mytop-project/tracker#792; the owner, 2026-10-30: "We need a cleaner and more uniform updates page that covers everything
  * (plugins, games, etc)"). Its header says when droidtop last checked; its bar is Check now and Update all; its views,
  * on the shell's strip (L1 and R1), are All and each kind that has updates, each with its count. Every update is one
  * row of one shape: its picture, its name, "installed → available · size · from where", and its state in the value
  * column (Update, its percent while it downloads, Waiting, Failed · Retry), A starting it. A row's state is its
- * download job's, read from the jobs center (Droidtop/tracker#833): the page keeps none of its own. It reads only what
+ * download job's, read from the jobs center (mytop-project/tracker#833): the page keeps none of its own. It reads only what
  * checks already recorded; Check now is what asks. The page is its own: the Quick Menu's Downloads and Updates tab, the
  * left menu (with its badge) and the companion reach it, each saying how many are waiting ([UpdatesWaiting]); none
  * draws its rows.
@@ -86,7 +86,7 @@ object UpdatesPage {
     }
 
     /**
-     * The Quick Menu's Downloads tab (Droidtop/tracker#749): the running and recent jobs, under one row that opens
+     * The Quick Menu's Downloads tab (mytop-project/tracker#749): the running and recent jobs, under one row that opens
      * Updates and says how many are waiting (the owner, 2026-10-30: "An updates link should be in the Downloads and
      * Updates tab. Not there directly, but a shortcut"). The updates themselves are only on their page.
      */
@@ -108,7 +108,7 @@ object UpdatesPage {
         layout = CatalogLayout.STRIP,
         // Off the main thread as a whole: the rows read preferences and what the slow kinds last read.
         groups = { context -> withContext(Dispatchers.IO) { page(context).asGroups() } },
-        // Live (Droidtop/tracker#748): a kind that finished reading, an update that started or ended, each rebuilds
+        // Live (mytop-project/tracker#748): a kind that finished reading, an update that started or ended, each rebuilds
         // the rows at once.
         live = kotlinx.coroutines.flow.combine(changes, dev.droidtop.pluginhost.PluginJobsCenter.entries()) { _, _ -> },
     )
@@ -121,8 +121,8 @@ object UpdatesPage {
 
     /**
      * Get new games, in Gaming only: the page is Gaming's, which opens it in place by the row's id; in another mode the
-     * row is not listed, since it would open Gaming over that mode (Droidtop/tracker#639). Under Downloads and Updates'
-     * Get games (Droidtop/tracker#749).
+     * row is not listed, since it would open Gaming over that mode (mytop-project/tracker#639). Under Downloads and Updates'
+     * Get games (mytop-project/tracker#749).
      */
     fun getNewGamesRow(context: Context): CatalogItem? {
         if (Modes.lastMode(context) != Mode.GAMING.id) return null
@@ -158,7 +158,7 @@ object UpdatesPage {
     }
 
     /**
-     * One row's state from its job (Droidtop/tracker#833): [job] is the state of the newest job for the update, null
+     * One row's state from its job (mytop-project/tracker#833): [job] is the state of the newest job for the update, null
      * when it has none; [pressed] is whether its press is still running (before the job starts, and through any install
      * step after it). Pure.
      */
@@ -216,9 +216,9 @@ object UpdatesPage {
     /**
      * Where the rows come from. The quick ones (droidtop's own build, the plugins, the library's games) are read each
      * time the rows are; the slow one (the package manager's apps) is read in the background and kept, so the page shows
-     * at once and it fills in its own rows when it is ready (Droidtop/tracker#748). Plugins are read the way Settings >
+     * at once and it fills in its own rows when it is ready (mytop-project/tracker#748). Plugins are read the way Settings >
      * Plugins reads them, from the catalogs on file each time: a kept copy missed updates the Plugins list showed
-     * (Droidtop/tracker#837). The trusted plugin repositories are the plugins' second source, read the same way from
+     * (mytop-project/tracker#837). The trusted plugin repositories are the plugins' second source, read the same way from
      * what their last check found ([PluginRepoUpdates.pendingUpdates]).
      */
     private enum class Section(val kind: Kind, val checking: String) {
@@ -316,7 +316,7 @@ object UpdatesPage {
         val versionLine = line(update.step, update.sizeBytes, update.from)
         val jobLine = job?.takeIf { state != State.AVAILABLE && state != State.STARTING }?.let { PluginJobsScreen.oneLine(it) }
         val subtitle = listOfNotNull(versionLine, jobLine).joinToString(" · ")
-        // The compact status while it downloads ("1.2/3.4 GB"), else the state's word (Droidtop/tracker#886).
+        // The compact status while it downloads ("1.2/3.4 GB"), else the state's word (mytop-project/tracker#886).
         val value = if (state == State.DOWNLOADING && job != null) PluginJobsScreen.compactValue(job) ?: state.label else state.label
         val progress = progressOf(state, job?.shownPercent ?: -1)
         // Pressing a row that is already under way would only join its job: it is drawn, not offered.
@@ -335,7 +335,7 @@ object UpdatesPage {
     }
 
     private suspend fun page(context: Context): CatalogPage {
-        // Opening the page checks again when the last check is old, so it shows what is out now (Droidtop/tracker#792).
+        // Opening the page checks again when the last check is old, so it shows what is out now (mytop-project/tracker#792).
         UpdateChecks.refreshIfStale(context)
         val (updates, unread) = collect(context)
         UpdatesWaiting.publish(updates.size)
@@ -345,7 +345,7 @@ object UpdatesPage {
         val jobs = DownloadJobs.updateJobs()
         // What Update all starts: every row that is not already under way, except droidtop's own. Installing droidtop
         // replaces it and ends every other update mid-way, and on the Plugins tab it updated droidtop although no row
-        // there named it (Droidtop/tracker#506); droidtop's row keeps its own Update.
+        // there named it (mytop-project/tracker#506); droidtop's row keeps its own Update.
         val installable = updates.filter { update ->
             update.install != null && update.kind != Kind.DROIDTOP && stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED }
         }
@@ -375,11 +375,11 @@ object UpdatesPage {
                         add(TextBlockItem(id = "updates_none", text = "Up to date"))
                     }
                     shown.forEach { add(rowOf(it, jobs)) }
-                    // What is out but held back, and why (Droidtop/tracker#882): never an update, so not counted and not in
+                    // What is out but held back, and why (mytop-project/tracker#882): never an update, so not counted and not in
                     // Update all.
                     if (kind == null || kind == Kind.PLUGINS) addAll(heldBack)
                     // droidtop always has its row: an update when one is known, else where it stands and the way to ask
-                    // again (Droidtop/tracker#837; the owner: "there's nowhere to download/install an update to droidtop
+                    // again (mytop-project/tracker#837; the owner: "there's nowhere to download/install an update to droidtop
                     // anymore"). Not an update, so it is not counted and Update all does not run it.
                     if ((kind == null || kind == Kind.DROIDTOP) && updates.none { it.kind == Kind.DROIDTOP }) {
                         add(droidtopStatusRow(context, failure))
@@ -426,7 +426,7 @@ object UpdatesPage {
                     id = "updates_all",
                     label = "Update all",
                     enabled = installable.isNotEmpty(),
-                    // Short, or nothing (owner, 2026-11-15, Droidtop/tracker#153): the rows say the rest.
+                    // Short, or nothing (owner, 2026-11-15, mytop-project/tracker#153): the rows say the rest.
                     disabledReason = if (updates.any { it.install != null && it.kind != Kind.DROIDTOP }) "Updating" else null,
                 ) { ctx ->
                     // Every update starts at once as its own job; their pools decide the order, and each row shows its
@@ -496,7 +496,7 @@ object UpdatesPage {
 
     /**
      * Installed plugins with a newer version, from both of their sources as last read: a catalog (what Settings > Plugins
-     * reads) and a trusted plugin repository (what its screen under Plugin repositories reads), Droidtop/tracker#837. A
+     * reads) and a trusted plugin repository (what its screen under Plugin repositories reads), mytop-project/tracker#837. A
      * plugin both offer is one row, the higher version's, the catalog's on a tie ([PluginRepoUpdates.pendingUpdates]).
      */
     private fun plugins(context: Context): List<Update> {
@@ -551,7 +551,7 @@ object UpdatesPage {
     }
 
     /**
-     * Plugin updates droidtop knows are out and will not take, each with why and where to look (Droidtop/tracker#882):
+     * Plugin updates droidtop knows are out and will not take, each with why and where to look (mytop-project/tracker#882):
      * F95zone sat at 0.4.0-22 with 0.7.3-54 out, and Updates showed no row and no reason. A newer bundle a trusted
      * repository carries under another key than the one trusted for its origin, and a catalog whose refresh is refused
      * (its master key changed since it was accepted, say), so that its plugins are offered from an older copy. Neither
@@ -690,7 +690,7 @@ object UpdatesPage {
 
     /**
      * A folder game whose linked source names a newer version: the update's own screen, pushed in place by whatever
-     * draws Updates (owner, 2026-10-24, Droidtop/tracker#639: "Clicking the update should present the facet containing
+     * draws Updates (owner, 2026-10-24, mytop-project/tracker#639: "Clicking the update should present the facet containing
      * the downloads"; "Facets go where they fit. No clunky redirects"). It is a nested screen, so A has nothing to run:
      * no activity starts and no game page opens from this row, in any mode.
      */
@@ -717,7 +717,7 @@ object UpdatesPage {
             withContext(Dispatchers.IO) {
                 val update = AppSelfUpdate
                 listOf(
-                    // What each kind does once a check finds an update (Droidtop/tracker#570).
+                    // What each kind does once a check finds an update (mytop-project/tracker#570).
                     CatalogGroup(
                         id = "updates_settings_kinds",
                         title = null,

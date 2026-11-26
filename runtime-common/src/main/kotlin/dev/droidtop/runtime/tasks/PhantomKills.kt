@@ -2,7 +2,7 @@ package dev.droidtop.runtime.tasks
 
 /**
  * Whether Android's phantom process limit ended one of droidtop's programs (docs/SPEC.md "Child processes and
- * Android's limit", Droidtop/tracker#816). Android kills the excess with signal 9, so the program only sees exit 137,
+ * Android's limit", mytop-project/tracker#816). Android kills the excess with signal 9, so the program only sees exit 137,
  * and says why once, in its own log: `ActivityManager: Killing PhantomProcessRecord {… <pid>:<uid>/u0a… <name>}`. Reading
  * that log needs the privileged shell (Shizuku or wireless debugging); without it the answer is unknown, never no.
  */

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-/** The program tree's environment (Droidtop/tracker#584, piece 0), against the names and flags of vendor/sandbox's sbx.h. */
+/** The program tree's environment (mytop-project/tracker#584, piece 0), against the names and flags of vendor/sandbox's sbx.h. */
 class SandboxHostTest {
     private val lib = File("/data/app/x/lib/arm64")
 

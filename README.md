@@ -6,11 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Droidtop/droidtop/releases"><img alt="Latest build" src="https://img.shields.io/github/v/release/Droidtop/droidtop?include_prereleases&label=build&style=flat-square"></a>
-  <a href="https://github.com/Droidtop/droidtop/actions/workflows/android-build.yml"><img alt="Android build" src="https://img.shields.io/github/actions/workflow/status/Droidtop/droidtop/android-build.yml?branch=main&label=android%20build&style=flat-square"></a>
-  <a href="https://github.com/Droidtop/droidtop/actions/workflows/android-checks.yml"><img alt="Lint and tests" src="https://img.shields.io/github/actions/workflow/status/Droidtop/droidtop/android-checks.yml?branch=main&label=lint%20%26%20tests&style=flat-square"></a>
+  <a href="https://github.com/mytop-project/droidtop/releases"><img alt="Latest build" src="https://img.shields.io/github/v/release/mytop-project/droidtop?include_prereleases&label=build&style=flat-square"></a>
+  <a href="https://github.com/mytop-project/droidtop/actions/workflows/android-build.yml"><img alt="Android build" src="https://img.shields.io/github/actions/workflow/status/mytop-project/droidtop/android-build.yml?branch=main&label=android%20build&style=flat-square"></a>
+  <a href="https://github.com/mytop-project/droidtop/actions/workflows/android-checks.yml"><img alt="Lint and tests" src="https://img.shields.io/github/actions/workflow/status/mytop-project/droidtop/android-checks.yml?branch=main&label=lint%20%26%20tests&style=flat-square"></a>
   <img alt="Android 8.0 and newer" src="https://img.shields.io/badge/Android-8.0%2B-3ddc84?style=flat-square">
-  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/Droidtop/droidtop?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/mytop-project/droidtop?style=flat-square"></a>
   <img alt="Status: early development" src="https://img.shields.io/badge/status-early%20development-d69e2e?style=flat-square">
 </p>
 
@@ -49,7 +49,7 @@ A mode that is switched off runs no code. Turning Gaming off does not stop games
 
 You need a handheld or phone on Android 8.0 or newer with an arm64-v8a or x86_64 processor.
 
-1. Open [Releases](https://github.com/Droidtop/droidtop/releases) on the device and pick the newest build.
+1. Open [Releases](https://github.com/mytop-project/droidtop/releases) on the device and pick the newest build.
 2. Download `droidtop.apk`.
 3. Open the file. Android asks you to allow installs from your browser or file manager; allow it for this install.
 4. Start droidtop and follow the first-run steps.
@@ -58,7 +58,7 @@ Later builds install over the first, by hand or through **Settings > Software up
 
 `droidtop-debug.apk` is the same code built debuggable, for inspecting with adb. It is several times slower to start and to navigate, so most people want `droidtop.apk`. `release-info.json` carries the version code, the file names, their SHA-256 digests and the commit.
 
-Engine games run in [Enginehost](https://github.com/Droidtop/enginehost), a separate app that droidtop launches for you. Install it if you play Ren'Py, RPG Maker or similar games.
+Engine games run in [Enginehost](https://github.com/mytop-project/enginehost), a separate app that droidtop launches for you. Install it if you play Ren'Py, RPG Maker or similar games.
 
 ### Updates
 
@@ -102,7 +102,7 @@ Screenshots are from an emulator running a recent build, with a test library.
 All sources feed one library model:
 
 - **Android apps.**
-- **Console ROMs.** Read from ES-DE's `<root>/<system>/<rom>` folder layout and launched in an installed emulator chosen from a player database. The database lives in [droidtop-platforms](https://github.com/Droidtop/droidtop-platforms).
+- **Console ROMs.** Read from ES-DE's `<root>/<system>/<rom>` folder layout and launched in an installed emulator chosen from a player database. The database lives in [droidtop-platforms](https://github.com/mytop-project/droidtop-platforms).
 - **PC games.** Steam, GOG, Epic, Amazon and loose folders, run under Wine and Box64 through a fork of [GameNative](https://github.com/utkarshdalal/GameNative).
 - **Engine games.** Detected from the game folder and launched through Enginehost. Kirikiroid2 and EasyRPG Player are also launch options for the engines they cover.
 
@@ -122,7 +122,7 @@ The plugin format is in [docs/plugin-api.md](docs/plugin-api.md).
 
 ## Pythia, the desktop manager
 
-[Pythia](https://github.com/bi0shacker001/pythia) is the associated desktop manager: a multi-system game library manager (GPL-3.0). It does not run games. It keeps track of which games exist, where, on which of your systems and platforms, and what each one needs to run. Pythia can act as the computer's droidtop agent, so a handheld pairs with it directly.
+[Pythia](https://github.com/mytop-project/pythia) is the associated desktop manager: a multi-system game library manager (GPL-3.0). It does not run games. It keeps track of which games exist, where, on which of your systems and platforms, and what each one needs to run. Pythia can act as the computer's droidtop agent, so a handheld pairs with it directly.
 
 ## Status
 
@@ -133,7 +133,7 @@ droidtop is in early development. Builds are named `0.2.0-dev.<number>`, where t
 - **Not complete:** scraping of artwork and metadata.
 - **Root:** nothing in the handheld or launcher features needs it. Only the rooted desktop container stack does.
 
-Remote streaming of a desktop is not part of droidtop. It is a separate project, [windowcast](https://github.com/Droidtop/windowcast).
+Remote streaming of a desktop is not part of droidtop. It is a separate project, [windowcast](https://github.com/mytop-project/windowcast).
 
 The design and the decisions behind it are in [docs/SPEC.md](docs/SPEC.md). It is long, so use its headings.
 
@@ -162,12 +162,12 @@ The result is logged under `DroidtopUpdateNow`. The same pass is the **Check now
 Releases are built by CI. `android-build.yml` makes the release and debug APKs, and `android-checks.yml` runs lint and unit tests. To clone with everything the build needs:
 
 ```bash
-git clone --recurse-submodules https://github.com/Droidtop/droidtop.git
+git clone --recurse-submodules https://github.com/mytop-project/droidtop.git
 ```
 
 `settings.gradle.kts` lists every module with a comment on each. The main ones are `:app`, `:library-core` (the library), `:shell-gamepad` (Gaming), `:shell-default` (Launcher) and `:shell-desktop` (Desktop). `build-scripts/build-vendor-deps.sh` cross-compiles the native dependencies for both ABIs.
 
-Third-party sources live under `vendor/` as Git submodules, including DroidSpaces, sway, wayland, libffi, go-containerregistry and [droidtop-platforms](https://github.com/Droidtop/droidtop-platforms).
+Third-party sources live under `vendor/` as Git submodules, including DroidSpaces, sway, wayland, libffi, go-containerregistry and [droidtop-platforms](https://github.com/mytop-project/droidtop-platforms).
 
 ## Credits and licence
 

@@ -16,7 +16,7 @@ interface DesktopClipboard {
 }
 
 /**
- * The clipboard bridge for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): `clipboard.get_text` under
+ * The clipboard bridge for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221): `clipboard.get_text` under
  * `clipboard.read` (dangerous, so every read is in the activity log; and only during a call the person started, as
  * catalogue D6 and threat T5 decided, so a plugin cannot watch what is copied) and `clipboard.set_text` under `clipboard.write`
  * (always in the activity log too), on the desktop's clipboard through the bridge's own sync, so a plugin cannot set

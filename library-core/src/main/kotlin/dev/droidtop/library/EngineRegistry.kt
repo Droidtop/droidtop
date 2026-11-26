@@ -213,7 +213,7 @@ object EngineRegistryParser {
  * The rules used to list the folder again and `stat` all of its entries for
  * each condition of each of the database's rows, which on an SD card behind
  * Android's FUSE layer made one engine check cost seconds
- * (Droidtop/tracker#275). A facts object is for one detection pass on one
+ * (mytop-project/tracker#275). A facts object is for one detection pass on one
  * thread; it is never shared.
  */
 class FolderListing(val folder: File) {

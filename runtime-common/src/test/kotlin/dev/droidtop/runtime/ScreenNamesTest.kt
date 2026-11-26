@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** How droidtop names screens (docs/SPEC.md 4c, "Screen names", Droidtop/tracker#162). */
+/** How droidtop names screens (docs/SPEC.md 4c, "Screen names", mytop-project/tracker#162). */
 class ScreenNamesTest {
     private fun screen(id: Int, name: String, cls: ScreenClass, w: Int, h: Int, unique: String = "local:$id") =
         ScreenFacts(id, unique, name, cls, w, h)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lists every sentence in docs/SPEC.md that says something is not built, not yet done or still open, with the line
-# it is on, so a sweep can check each against the code (Droidtop/tracker#718): a sentence the code has made untrue is
+# it is on, so a sweep can check each against the code (mytop-project/tracker#718): a sentence the code has made untrue is
 # deleted or rewritten, one that is still true is kept. State comes from code, not from notes.
 #
 #   scripts/spec-unbuilt.sh            every such sentence about a feature, "line: sentence"

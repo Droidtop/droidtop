@@ -26,7 +26,7 @@ object JobOpener {
 
     private fun open(context: Context, target: OpenTarget): Boolean {
         // In Gaming a game's page opens over the job row, so Back returns to it; Standard's own games screen has its
-        // page; any other mode has none to offer, and a job row never opens another mode's (Droidtop/tracker#639).
+        // page; any other mode has none to offer, and a job row never opens another mode's (mytop-project/tracker#639).
         if (target is OpenTarget.Game && dev.droidtop.library.GameSurfaces.showPage?.invoke(target.entryId) == true) return true
         // A download site whose session ended: its sign-in opens here, in droidtop's web view, not in Settings (#648).
         if (target is OpenTarget.SiteSignIn) {
@@ -44,7 +44,7 @@ object JobOpener {
             is OpenTarget.Folder -> documentIntent(File(target.path), DocumentsContract.Document.MIME_TYPE_DIR)
             is OpenTarget.File -> documentIntent(File(target.path), mimeOf(target.path))
             is OpenTarget.SiteSignIn -> null
-            // The plugin's own page on Plugins, where it is approved (Droidtop/tracker#759).
+            // The plugin's own page on Plugins, where it is approved (mytop-project/tracker#759).
             is OpenTarget.Plugin -> CatalogScreenLink.intent(context, Place.ID_PLUGINS, target.pluginId)
         } ?: return false
         return runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess

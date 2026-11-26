@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Home's strip (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a, final design B.2 and D.1). */
+/** Home's strip (docs/SPEC.md 7i, "Home"; mytop-project/tracker#485 F7a, final design B.2 and D.1). */
 class HomeModelTest {
     private val day = 24L * 60 * 60 * 1000
     private val now = 1_700_000_000_000L
@@ -66,7 +66,7 @@ class HomeModelTest {
         val job = HomeCard.Download("j", "Hades", 45, said = "About 8 min left", look = dev.droidtop.library.settings.JobLook.ACTIVE)
         val busy = HomeModel.tabs(emptyList(), friendsOn = true, friends = emptyList(), downloads = listOf(job))
         assertEquals(listOf("What's new", "Friends", "Downloads · 1"), busy.map { it.label })
-        // The bar shows how far; the line is the Downloads place's, never a percent (Droidtop/tracker#643).
+        // The bar shows how far; the line is the Downloads place's, never a percent (mytop-project/tracker#643).
         assertEquals("About 8 min left", job.line)
         // The download finished while the cursor was on its tab: the tab stays, empty.
         val kept = HomeModel.tabs(emptyList(), friendsOn = false, friends = emptyList(), downloads = emptyList(), keep = HomeTabKind.DOWNLOADS)

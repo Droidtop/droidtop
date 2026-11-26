@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * "Add the update and DLC in the emulator" for a Switch game
- * (docs/SPEC.md 7m, "Switch content"; Droidtop/tracker#13). No tested
+ * (docs/SPEC.md 7m, "Switch content"; mytop-project/tracker#13). No tested
  * emulator exposes an install intent, and handing it the file as a VIEW
  * intent would start the file as a game, so droidtop cannot install
  * anything. What it can honestly do is open the door: start the emulator

@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Glide typing's word guesser (Droidtop/tracker#341) on a QWERTY grid of 100-pixel keys, with strokes drawn through
+ * Glide typing's word guesser (mytop-project/tracker#341) on a QWERTY grid of 100-pixel keys, with strokes drawn through
  * each word's keys and wobbled, as a finger draws them.
  */
 class GlideClassifierTest {

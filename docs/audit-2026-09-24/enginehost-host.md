@@ -102,7 +102,7 @@ Derive the defaults from the key file. (Low, S)
 ### 1.4 Config editor, detection
 
 `ConfigEditorActivity` (828 lines) writes `enginehost.json`, using `EngineDetector` and `EngineRegistry` (registry snapshot
-from the `vendor/droidtop-platforms` submodule, refreshed unsigned from `raw.githubusercontent.com/droidtop/droidtop-platforms/main`,
+from the `vendor/droidtop-platforms` submodule, refreshed unsigned from `raw.githubusercontent.com/mytop-project/droidtop-platforms/main`,
 `K/EngineRegistry.kt:400-448`). `DetectedConfig` writes the config itself when detection is complete.
 
 ### 1.5 Controller mapping

@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * The PC surface names no store in its code (docs/SPEC.md 7j "Filters",
- * Droidtop/tracker#397 slice A): a string literal that says "Steam" (or any
+ * mytop-project/tracker#397 slice A): a string literal that says "Steam" (or any
  * casing of it) in the shell or in the PC library's shared vocabulary is a
  * store special-cased by name. Store names come from the registry
  * ([dev.droidtop.library.stores.StoreLibraries]); Steam's own code lives in

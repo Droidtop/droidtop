@@ -6,7 +6,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Glide (swipe) typing's word guesser (Droidtop/tracker#341): a finger's path over the keys in, the dictionary words
+ * Glide (swipe) typing's word guesser (mytop-project/tracker#341): a finger's path over the keys in, the dictionary words
  * whose key-to-key path is closest out. Ported from AnySoftKeyboard's `GestureTypingDetector`
  * (ime/app/src/main/java/com/anysoftkeyboard/gesturetyping/GestureTypingDetector.java, revision 8cf81a3a, Apache-2.0),
  * with its scoring unchanged:
@@ -121,7 +121,7 @@ class GlideClassifier(
     /**
      * The corners of a whole stroke's [n] raw points, kept as [addPoint] keeps them: what [path] gives after the same
      * points were added one by one; null with none. It touches nothing of the finger's own points, so the gesture seam
-     * ([ClassifierGestureEngine], Droidtop/tracker#903 H6) scores a stroke on another thread.
+     * ([ClassifierGestureEngine], mytop-project/tracker#903 H6) scores a stroke on another thread.
      */
     fun pathOf(xs: IntArray, ys: IntArray, n: Int): ShortArray? {
         val keptX = IntArray(MAX_GESTURE_LENGTH)

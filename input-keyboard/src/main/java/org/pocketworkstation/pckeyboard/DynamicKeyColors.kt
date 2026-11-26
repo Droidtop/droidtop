@@ -9,7 +9,7 @@ import android.content.res.Configuration
 import android.os.Build
 
 /**
- * "Dynamic (wallpaper)" (Droidtop/tracker#903 H12b; docs/SPEC.md 6a, "Themes, light and dark"): Hacker Keyboard
+ * "Dynamic (wallpaper)" (mytop-project/tracker#903 H12b; docs/SPEC.md 6a, "Themes, light and dark"): Hacker Keyboard
  * Reborn's keys in Android's Material You palette, the one Android 12 and later derives from the wallpaper. Below
  * Android 12 there is no palette and the theme draws as Modern ([KeyboardAppearance.LIGHT] and [DARK]).
  *

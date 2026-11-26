@@ -167,14 +167,14 @@ interface PluginContext {
      * The plugin's config folder: `config` in its own folder ([privateDataDir]), made by droidtop before the plugin
      * starts, read, written and listed by path in every tier, kept until the plugin is removed. For what the plugin
      * keeps (its settings files, keys, a native engine's home). Empty where the host has no folder for the plugin
-     * (owner, 2026-11-17, Droidtop/tracker#741). Native code finds it as `XDG_CONFIG_HOME` too.
+     * (owner, 2026-11-17, mytop-project/tracker#741). Native code finds it as `XDG_CONFIG_HOME` too.
      */
     fun configDir(): String = privateDataDir().takeIf { it.isNotEmpty() }?.let { "$it/$CONFIG_DIR" }.orEmpty()
 
     /**
      * The plugin's cache folder: `cache` in its own folder, made by droidtop before the plugin starts, read, written and
      * listed by path in every tier, for what can be made again (droidtop may empty it). Empty where the host has no
-     * folder for the plugin (Droidtop/tracker#741). Native code finds it as `XDG_CACHE_HOME` too.
+     * folder for the plugin (mytop-project/tracker#741). Native code finds it as `XDG_CACHE_HOME` too.
      */
     fun cacheDir(): String = privateDataDir().takeIf { it.isNotEmpty() }?.let { "$it/$CACHE_DIR" }.orEmpty()
 

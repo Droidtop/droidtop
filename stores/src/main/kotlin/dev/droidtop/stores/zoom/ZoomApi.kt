@@ -7,7 +7,7 @@ import okhttp3.Request
 import org.json.JSONObject
 
 /**
- * ZOOM Platform's launcher API (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), as Heroic Games Launcher reads it
+ * ZOOM Platform's launcher API (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), as Heroic Games Launcher reads it
  * (`src/backend/storeManagers/zoom`, GPL-3.0): the person signs in on ZOOM's own page, which returns with a launcher
  * token (`li_token`), and every call carries it as a bearer token. `li/loggedin` names the account, `li/games` lists
  * it a page at a time, `li/game/<id>/files` gives each game's installer files per system and `li/download/<file>` a

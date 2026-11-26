@@ -47,7 +47,7 @@ data class Facet(
         /**
          * droidtop's icon set: the names an `icon` may take on `action`, `status`, `badge` and `toggle` (docs/plugin-api.md
          * 1.10, "The kinds"). Each target draws a name with its own glyph, so a plugin picks a meaning, never a picture. A
-         * name not in the set is dropped and logged, and the facet is drawn without it (Droidtop/tracker#221: a tray slot
+         * name not in the set is dropped and logged, and the facet is drawn without it (mytop-project/tracker#221: a tray slot
          * has room for an icon, not for words).
          */
         val ICONS: Set<String> = setOf(
@@ -72,14 +72,14 @@ sealed interface FacetSubject {
     data class Game(val gameId: String) : FacetSubject
 
     /**
-     * A Desktop window droidtop asked the plugin about (Droidtop/tracker#221): [windowId] is droidtop's own id for it
+     * A Desktop window droidtop asked the plugin about (mytop-project/tracker#221): [windowId] is droidtop's own id for it
      * (host-bridge's toplevel id), never the compositor's, and [appId] is the app id the compositor reported. droidtop
      * names the subject when it asks; a plugin cannot name a window it was not shown.
      */
     data class Window(val windowId: Long, val appId: String) : FacetSubject
 
     /**
-     * A file or folder the person picked, for "Open with" and the file actions (Droidtop/tracker#221, catalogue E4):
+     * A file or folder the person picked, for "Open with" and the file actions (mytop-project/tracker#221, catalogue E4):
      * [token] is droidtop's document token for it (D4), never a path, and [mime] its type.
      */
     data class File(val token: String, val mime: String) : FacetSubject
@@ -176,7 +176,7 @@ sealed interface FacetBody {
         val votes: Long?,
         val tags: List<String>,
         val genres: List<String>,
-        /** The platforms the game is for, the languages it is in, and its content notes (Droidtop/tracker#845). */
+        /** The platforms the game is for, the languages it is in, and its content notes (mytop-project/tracker#845). */
         val platforms: List<String> = emptyList(),
         val languages: List<String> = emptyList(),
         val contentNotes: List<String> = emptyList(),
@@ -184,7 +184,7 @@ sealed interface FacetBody {
 
     /**
      * [sections]: the source's other named texts ("Installation", "Developer notes"), in its order; [thread]: the
-     * source page's main text as it reads, for Show thread (Droidtop/tracker#845).
+     * source page's main text as it reads, for Show thread (mytop-project/tracker#845).
      */
     data class Description(
         val overview: String?,
@@ -210,11 +210,11 @@ sealed interface FacetBody {
         val systems: List<String> = emptyList(),
         /** The pieces of one split release on one host (2026-10-29): picked together, as one Downloads job. */
         val parts: List<DownloadPart> = emptyList(),
-        /** `build` (the game), `patch` or `extra` (Droidtop/tracker#838): only a build is ever picked by droidtop itself. */
+        /** `build` (the game), `patch` or `extra` (mytop-project/tracker#838): only a build is ever picked by droidtop itself. */
         val role: String = "build",
         /** False for an item the source marks unofficial (a thread's `*`). */
         val official: Boolean = true,
-        /** The build a game's link is for ("Steam Build", Droidtop/tracker#845); null for the default build. */
+        /** The build a game's link is for ("Steam Build", mytop-project/tracker#845); null for the default build. */
         val build: String? = null,
     )
 

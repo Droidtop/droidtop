@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Counts play and holds the play-time limits (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): while
+ * Counts play and holds the play-time limits (docs/SPEC.md 7f "Play-time limits", mytop-project/tracker#421): while
  * a game runs ([LaunchDisplay.running]) and Kid mode is on, every [TICK_MS] it adds the time since the last
  * tick to the ledger ([PlayTimePrefs]) and asks [PlayEnforcer] what to do: warn five minutes before a limit,
  * say so at the limit, and close the game a minute later through the one quit path
@@ -35,9 +35,9 @@ import kotlinx.coroutines.withContext
  * Watched from the process, not from a screen: the game is another app and no shell of droidtop is in front.
  * Nothing runs for a person who has set no limit beyond one prefs read per tick, and nothing at all while no
  * game runs. Outside Kid mode the session timers do the same for one session (docs/SPEC.md 7f "This session",
- * Droidtop/tracker#721): a reminder every so many minutes, and the game closed after a set time through its own
+ * mytop-project/tracker#721): a reminder every so many minutes, and the game closed after a set time through its own
  * [PlayEnforcer], with the same warning and grace. In every mode it also adds the session to the game's own play time ([PlayLogStore], docs/SPEC.md 7f
- * "Your play", Droidtop/tracker#597).
+ * "Your play", mytop-project/tracker#597).
  */
 object PlayTimeLimiter {
     private const val TAG = "droidtop.PlayTime"
@@ -148,7 +148,7 @@ object PlayTimeLimiter {
         val back = PendingIntent.getActivity(
             app,
             0,
-            // Back to the mode in use, never the default one over it (Droidtop/tracker#639).
+            // Back to the mode in use, never the default one over it (mytop-project/tracker#639).
             ModeReturn.intent(app),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

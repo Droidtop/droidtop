@@ -6,7 +6,7 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * droidtop's own handling of a plugin's site account (docs/plugin-api.md 3 G3, Droidtop/tracker#544 items 1 and 2):
+ * droidtop's own handling of a plugin's site account (docs/plugin-api.md 3 G3, mytop-project/tracker#544 items 1 and 2):
  * the account row on the plugin's page, and the Sign in / Open the site action under a source that answered
  * `SIGN_IN_REQUIRED` or `BROWSER_CHECK_REQUIRED`. The plugin declares where its site signs people in (the `signIn`
  * address of its `web.session` permission) and reports that it needs a sign-in; droidtop draws the words and runs the
@@ -58,7 +58,7 @@ object PluginWebAccount {
 
     /**
      * The `expiredText` of [record]'s `web.session` entry: the sentences its site's page shows for a download link that
-     * has expired (Droidtop/tracker#783). The plugin knows its site's words; droidtop never guesses at a page. Up to
+     * has expired (mytop-project/tracker#783). The plugin knows its site's words; droidtop never guesses at a page. Up to
      * [MAX_EXPIRED_TEXTS], each one line of at most 200 characters; empty when it declared none.
      */
     fun expiredText(record: PluginRecord): List<String> {
@@ -95,7 +95,7 @@ object PluginWebAccount {
      */
     fun open(context: Context, record: PluginRecord, need: Need): Boolean {
         val account = of(context, record)
-        // A check is the site's, not the account's: a plugin with no web.session still gets one (Droidtop/tracker#600).
+        // A check is the site's, not the account's: a plugin with no web.session still gets one (mytop-project/tracker#600).
         if (need == Need.SIGN_IN && (account == null || !account.allowed)) return false
         if (account != null && !account.allowed) return false
         val metAt = SiteChecks.pendingFor(record.manifest.id)?.let { NetScope.hostOf(it) }
@@ -112,7 +112,7 @@ object PluginWebAccount {
         val withClearance = withClearance(stored, SiteChecks.read(vault, record.manifest.id), domains.distinct())
         val mode = if (need == Need.SIGN_IN) WebSessionRequest.Mode.SIGN_IN else WebSessionRequest.Mode.CHECK
         // A check on a site the plugin signs in to also waits for the sign-in: a page past the check but signed out has
-        // no download links (Droidtop/tracker#600, owner: "f95zone requires users to be logged in to see links").
+        // no download links (mytop-project/tracker#600, owner: "f95zone requires users to be logged in to see links").
         val done = if (account != null) doneCookie(record) else null
         val result = showKept(
             context,
@@ -134,7 +134,7 @@ object PluginWebAccount {
     }
 
     /**
-     * The web view for [request], with [record]'s process kept loaded while it is open (Droidtop/tracker#783): the person
+     * The web view for [request], with [record]'s process kept loaded while it is open (mytop-project/tracker#783): the person
      * may take minutes on the site's page, longer than [PluginProcesses.IDLE_MS], and what they came for goes on in the
      * plugin afterwards. A plugin with no process running is not started for it.
      */
@@ -159,12 +159,12 @@ object PluginWebAccount {
     /**
      * Opens [url] (any https page: the plugin's own site, or a file host its page links to) in droidtop's web view with
      * [record]'s session, for the person to start the download there (docs/SPEC.md 7g, "Getting an update";
-     * Droidtop/tracker#599): droidtop opens the link the source gave, the person passes whatever the page asks
+     * mytop-project/tracker#599): droidtop opens the link the source gave, the person passes whatever the page asks
      * (a masked link, a captcha, the host's own button) and every download the page starts, up to [max], is handed
      * back to droidtop with the cookies, user agent and referrer it needs. The session's cookies go only to the
      * plugin's declared sites; a session the site renewed meanwhile is kept. Nothing when `web.session` is turned off.
      *
-     * The link opens out of sight first ([HiddenWebSession], docs/SPEC.md 12a, Droidtop/tracker#783): a page that leads
+     * The link opens out of sight first ([HiddenWebSession], docs/SPEC.md 12a, mytop-project/tracker#783): a page that leads
      * to a host droidtop serves hands over there, and one that starts a download gives it, with no page shown. A page that
      * says the link has expired ([expiredText]) asks [refresh] once for a current link from the plugin, which opens the
      * same way. Only a page the person has something to do on opens in the visible view.
@@ -183,7 +183,7 @@ object PluginWebAccount {
         val vault = PluginVault.forContext(context)
         // Without the permission the page still opens, signed out: the person may still start a public download.
         val stored = if (grant == GrantState.GRANTED) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
-        // droidtop's sign-in for a declared download site the plugin keeps none of its own for (Droidtop/tracker#648).
+        // droidtop's sign-in for a declared download site the plugin keeps none of its own for (mytop-project/tracker#648).
         val shared = if (grant == GrantState.GRANTED) runCatching { DownloadSites.sharedWith(context, record.manifest.id, domains) }.getOrDefault(emptyMap()) else emptyMap()
         val borrowed = shared.keys.filter { stored?.cookies?.get(it).isNullOrBlank() }
         val inUse = DownloadSites.borrow(stored, shared)
@@ -198,7 +198,7 @@ object PluginWebAccount {
         if (hidden?.end == HiddenWebSession.End.PERSON) keepAfter(context, record, vault, stored, borrowed, hidden.result)
         val result = if (hidden == null || hidden.end == HiddenWebSession.End.PERSON) showKept(context, record, request) else hidden.result
         keepAfter(context, record, vault, stored, borrowed, result)
-        // The page led to a host droidtop serves (a masked link the person unmasked, Droidtop/tracker#650): that link
+        // The page led to a host droidtop serves (a masked link the person unmasked, mytop-project/tracker#650): that link
         // goes through the resolvers above, and opens its own page only if none serves it (the view does not hand off
         // the page it was opened on, so this ends there).
         result.handoff?.let { return openForDownloads(context, record, it, max) }

@@ -155,7 +155,7 @@ object PluginCatalog {
             noteRefresh(context, source, null)
             "Up to date"
         } catch (failure: Exception) {
-            // Kept for Updates (Droidtop/tracker#882): a catalog refused on every check left its plugins at the copy
+            // Kept for Updates (mytop-project/tracker#882): a catalog refused on every check left its plugins at the copy
             // fetched before, and Updates showed no row and no reason. A plain "no network" is not worth a row.
             if (failure !is NotPublished && failure !is java.io.IOException) noteRefresh(context, source, describe(failure))
             if (lastGoodIndex(context, source) != null) {
@@ -177,7 +177,7 @@ object PluginCatalog {
 
     /**
      * The catalogs whose last refresh was refused, with why (the sentence [refresh] gave): their plugins are offered
-     * from the copy fetched before, which may not know their newest releases (Droidtop/tracker#882). Updates says so
+     * from the copy fetched before, which may not know their newest releases (mytop-project/tracker#882). Updates says so
      * instead of showing nothing. Preferences only.
      */
     fun refreshProblems(context: Context): List<Pair<PluginCatalogSource, String>> {
@@ -213,7 +213,7 @@ object PluginCatalog {
 
         /**
          * The person trusts a different key, and this catalog, the source that trust came from, marks it superseded by
-         * the key it names now (Droidtop/tracker#887): the refresh follows it ([followSuperseded]), and from then on
+         * the key it names now (mytop-project/tracker#887): the refresh follows it ([followSuperseded]), and from then on
          * it is [Offered]. A key change with no such marker stays [KeyChanged], for the person to review.
          */
         data class Superseded(val stored: UserOriginKey) : OriginState
@@ -317,12 +317,12 @@ object PluginCatalog {
     fun updateFor(plugin: PluginCatalogPlugin, record: PluginRecord, channel: PluginChannel): PluginCatalogRelease? {
         val latest = latest(plugin, channel) ?: return null
         if (latest.manifestSha256.equals(record.archiveDigest, ignoreCase = true)) return null
-        // A newer release this droidtop cannot run is not an update (Droidtop/tracker#932).
+        // A newer release this droidtop cannot run is not an update (mytop-project/tracker#932).
         if (latest.incompatibility() != null) return null
         val installed = plugin.releases.firstOrNull { it.manifestSha256.equals(record.archiveDigest, ignoreCase = true) }
         if (installed != null && (compareReleases(latest, installed) ?: 0) <= 0) return null
         // A build the catalog does not list (from a repository's unstable line, a file) is judged by its own version:
-        // RetroArch 1.7.0 from its repository was offered the catalog's 1.6.0 as an update (Droidtop/tracker#882).
+        // RetroArch 1.7.0 from its repository was offered the catalog's 1.6.0 as an update (mytop-project/tracker#882).
         // ... except where the installed copy no longer verifies: the catalog's copy of the same version is then the
         // re-signed one (the 2026-11-05 rotation re-signed every release in place), and the only way back. App releases
         // and F-Droid 0.1.3 installed before it stayed stopped with nothing offered (BlueStacks dev.3398).
@@ -347,10 +347,10 @@ object PluginCatalog {
 
     /**
      * A newer release of [record] that a catalog lists under a key the person has not trusted for its origin
-     * (Droidtop/tracker#882): the catalog names one key for the origin and the person trusts another, so [offerFor]
+     * (mytop-project/tracker#882): the catalog names one key for the origin and the person trusts another, so [offerFor]
      * offers nothing and the update was invisible. On the console, gamegrab-sources was re-signed under a new root
      * (2026-11-05) and F95zone 0.4.0-22 showed no update while 0.8.1-62 was listed. It is never installed from here:
-     * the person reviews the new key on the catalog's page (the owner, Droidtop/tracker#852: "a changed key goes to
+     * the person reviews the new key on the catalog's page (the owner, mytop-project/tracker#852: "a changed key goes to
      * Review"). Null when an offer exists, or no catalog lists a newer release.
      */
     data class HeldOffer(
@@ -455,7 +455,7 @@ object PluginCatalog {
             when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Installed -> {
                     // Open on the finished job goes to the plugin's own page, where a new plugin is approved
-                    // (Droidtop/tracker#759: a path to it in words led nowhere).
+                    // (mytop-project/tracker#759: a path to it in words led nowhere).
                     dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Plugin(result.record.manifest.id))
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"
@@ -591,7 +591,7 @@ object PluginCatalog {
         val masterMoved = master != null && source.masterKeyBase64 != null &&
             UserOriginKeys.keySha256(master) != UserOriginKeys.keySha256(source.masterKeyBase64)
         if (masterMoved) {
-            // checkAdded let it through only under this catalog's own superseded marker (Droidtop/tracker#887).
+            // checkAdded let it through only under this catalog's own superseded marker (mytop-project/tracker#887).
             PluginCatalogSources.put(PluginCatalogSources.storeFile(context), source.copy(masterKeyBase64 = master, indexSigned = source.indexSigned || checked.signed))
         }
         followSuperseded(context, PluginCatalogSources.byId(context, source.id) ?: source, checked.index)
@@ -608,7 +608,7 @@ object PluginCatalog {
     }
 
     /**
-     * Follows this catalog's superseded markers (Droidtop/tracker#887): each origin whose key the person trusts through
+     * Follows this catalog's superseded markers (mytop-project/tracker#887): each origin whose key the person trusts through
      * this catalog, and which the catalog marks superseded by the key it names now, is trusted under the new key, with
      * the old one recorded so its plugins keep their approval and an update signed by the new key is the same
      * publisher. The person is told: the owner, "We still tell the user the key is changing, of course". A notice, not
@@ -695,7 +695,7 @@ object PluginCatalog {
             if (declared == null) error("the catalog had a master key when you accepted it and this copy names none, so it was not read")
             val acceptedSha = UserOriginKeys.keySha256(accepted)
             val declaredSha = UserOriginKeys.keySha256(declared)
-            // The catalog marks the master the person accepted as superseded by the one it names now (Droidtop/tracker#887):
+            // The catalog marks the master the person accepted as superseded by the one it names now (mytop-project/tracker#887):
             // followed, since the marker comes from this very catalog. Anything else stops dead, as before.
             val marked = acceptedSha != null && declaredSha != null && dev.droidtop.pluginhost.KeySupersession.follows(info.superseded, acceptedSha, declaredSha)
             if (declaredSha != acceptedSha && !marked) {
@@ -840,7 +840,7 @@ object PluginCatalog {
      * its publisher's rotation and not someone else's key: [UserOriginKeys.replace] remembers the old key as this
      * one's predecessor, so the origin's plugins update under it keeping their approval and grants, and the ones an
      * update already sent back to waiting are approved again ([PluginStore.keyReplaced]). One decision for a publisher's
-     * key change, where it used to be removing the key, adding it again and approving every plugin (Droidtop/tracker#270).
+     * key change, where it used to be removing the key, adding it again and approving every plugin (mytop-project/tracker#270).
      */
     fun replaceOriginKey(context: Context, source: PluginCatalogSource, origin: String, keyBase64: String?): String {
         if (keyBase64 == null) return "\"$origin\": the catalog gives no usable key for it."

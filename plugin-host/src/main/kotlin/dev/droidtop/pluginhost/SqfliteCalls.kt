@@ -6,7 +6,7 @@ import java.util.concurrent.Executors
 
 /**
  * `sqflite`'s method channel (`com.tekartik.sqflite`), answered by droidtop over its own SQLite ([BundledSqlite]) in
- * every plugin process (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's", Droidtop/tracker#741). The
+ * every plugin process (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's", mytop-project/tracker#741). The
  * package's Android half would open Android's own SQLite, which an isolated process cannot, and what a plugin gets must
  * not depend on the Android it runs on. Its Dart half is unchanged: every method, argument, reply and error below is
  * the Android half's (tekartik/sqflite `sqflite_android`, `SqflitePlugin` and `Database`, read at 52dbf98), so a plugin

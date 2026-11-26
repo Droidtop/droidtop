@@ -7,7 +7,7 @@
 // Which compositor output a request means, kept free of Wayland types so the
 // rule reads on its own. "" always means the primary output: the first
 // wl_output bound, which is the one output host-bridge presented before it
-// tracked more than one (Droidtop/tracker#908). A name means the output
+// tracked more than one (mytop-project/tracker#908). A name means the output
 // whose wl_output `name` event (wl_output v4) said it, "HEADLESS-1" under
 // sway.
 
@@ -42,7 +42,7 @@ inline int findHeadIndex(const std::string& wanted, const std::string& primaryNa
     return -1;
 }
 
-// Which output a window is listed on (Droidtop/tracker#908, step D4), from
+// Which output a window is listed on (mytop-project/tracker#908, step D4), from
 // wlr-foreign-toplevel-management's output_enter and output_leave, kept free
 // of Wayland types like the rules above. [on] is the outputs the window is
 // on now, in the order it entered them; [last] the output it was on most

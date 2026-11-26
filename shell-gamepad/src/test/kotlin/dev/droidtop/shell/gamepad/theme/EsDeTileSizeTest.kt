@@ -57,7 +57,7 @@ class EsDeTileSizeTest {
         assertNull(esDeTileSize(10f, 10f, 0f, 0f))
     }
 
-    /** Droidtop/tracker#733: a 2000 px cover tiled at 200 px is decoded at an eighth, still covering the tile. */
+    /** mytop-project/tracker#733: a 2000 px cover tiled at 200 px is decoded at an eighth, still covering the tile. */
     @Test
     fun `a big source is sampled down to the largest power of two that still covers the tile`() {
         assertEquals(8, esDeTileSampleSize(2000, 2000, 200f, 200f))

@@ -30,7 +30,7 @@ import timber.log.Timber
  * bcrypt, crypt32 and secur32 open for their public-key work.
  */
 object X86_64GuestLibs {
-    /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-guest-libs.yml. */
+    /** Release of mytop-project/droidtop that carries the asset; see .github/workflows/x86_64-guest-libs.yml. */
     const val RELEASE_TAG = "x86_64-guest-libs-20261008-8a05a54d"
     const val ASSET = "x86_64-guest-libs.tzst"
     const val SHA256 = "4e849852062b917f8f309c2cebd7873c696741c172e94edb29a868d86631ccbd"

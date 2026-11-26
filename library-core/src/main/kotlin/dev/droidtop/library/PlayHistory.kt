@@ -38,7 +38,7 @@ interface PlayHistoryStore {
      */
     suspend fun moveTo(fromId: String, toId: String)
 
-    /** The launch log since [sinceMs] (Droidtop/tracker#611): one [PlayStart] per start, kept [PlayStarts.KEEP_MS]. */
+    /** The launch log since [sinceMs] (mytop-project/tracker#611): one [PlayStart] per start, kept [PlayStarts.KEEP_MS]. */
     suspend fun startsSince(sinceMs: Long): List<PlayStart> = emptyList()
 
     /** Empties the launch log; the play counts and last-played times stay (Home rows, "Forget when I play"). */
@@ -98,7 +98,7 @@ data class GameLinks(
     val sources: List<SourceLink> = emptyList(),
     /**
      * The store row this folder is the same game as (docs/SPEC.md 7m, "A store's copy and a local copy",
-     * Droidtop/tracker#745): a store key ("steam:440") the person linked it to, or [NOT_THE_SAME] when the person
+     * mytop-project/tracker#745): a store key ("steam:440") the person linked it to, or [NOT_THE_SAME] when the person
      * said it is not the store's game, which also stops [storeIds] from linking it. Null: nobody said.
      */
     val sameAs: String? = null,
@@ -125,7 +125,7 @@ data class GameLinks(
             .reduceOrNull { best, next -> if (dev.droidtop.shared.version.Versions.compareLoose(GameUpdates.normalize(next), GameUpdates.normalize(best)) > 0) next else best }
 
     /**
-     * The link whose record gives [latestKnown], the one an update row shows the downloads of (Droidtop/tracker#639);
+     * The link whose record gives [latestKnown], the one an update row shows the downloads of (mytop-project/tracker#639);
      * the first link when none answered a version. A computer's (`computer:<id>`) has no record page and is passed
      * over. Pure.
      */

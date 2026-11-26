@@ -58,7 +58,7 @@ fun RemoteInputState.consoleLine(): String = when (this) {
 }
 
 /**
- * Typing from another device (docs/SPEC.md, "Type from another device", Droidtop/tracker#645): one session on top of
+ * Typing from another device (docs/SPEC.md, "Type from another device", mytop-project/tracker#645): one session on top of
  * [HandoffServer]. The device's LAN address on a random port serves a page at `/r/<token>`; the first device to open
  * it is shown a random six digit code, and the console asks whether the device shows the same ([confirm] or
  * [refuse]). Nothing is accepted before Confirm. Only that one device is served afterwards; any other gets a 409.

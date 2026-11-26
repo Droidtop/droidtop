@@ -1264,7 +1264,7 @@ bool VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
             // Once, not per frame: BlueStacks' Vulkan (Mesa) rejects the
             // window buffers ("android_format_is_yuv: unhandled format: 5")
             // and logged this 624 times in a minute while the screen stayed
-            // black (Droidtop/tracker#242). The caller uploads the pixels.
+            // black (mytop-project/tracker#242). The caller uploads the pixels.
             ahbImportUnsupported = true;
             RLOG_E("updateWindowContentAHB: import failed for id=%" PRId64 "; uploading window pixels from now on", id);
             return false;

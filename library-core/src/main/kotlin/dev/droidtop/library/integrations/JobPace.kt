@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.exp
 
 /**
- * How fast a running job moves and roughly how long it has left, said calmly (docs/SPEC.md 7j "Places", Droidtop/tracker#643;
+ * How fast a running job moves and roughly how long it has left, said calmly (docs/SPEC.md 7j "Places", mytop-project/tracker#643;
  * owner, 2026-10-24: "The current 'flickery numbers for download progress', for instance, is bad"). The rate is an
  * exponential moving average over about [TAU_MS], weighted by the time between reports so an uneven stream of them
  * cannot tip it; it measures bytes where the job counts them, else things, else its percent. The time left is said in

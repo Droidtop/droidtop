@@ -6,7 +6,7 @@ import dev.droidtop.pluginhost.WebSessionDownload
 /**
  * A source's acquire reply that names a file host's address outright (`download.url`, no page started in the web view)
  * reached the Downloads job as it was, so the person's TorBox or Real-Debrid account, and their own host account, were
- * never asked: only a link droidtop opened in its view went through `HostLinks` (Droidtop/tracker#638; the owner,
+ * never asked: only a link droidtop opened in its view went through `HostLinks` (mytop-project/tracker#638; the owner,
  * 2026-11-04: "torbox integration doesn't seem to be working, it downloads everything directly"). Each such address is
  * now offered to the same `HostLinks` first; what serves it replaces the address, and anything else is left as the source
  * gave it.

@@ -8,7 +8,7 @@ import dev.droidtop.pluginhost.PluginGrantPrompts
 import dev.droidtop.shell.gamepad.PluginGrantSheet
 
 /**
- * The first-use sheet's one window (docs/plugin-api.md 4.3, Droidtop/tracker#128). The broker asks
+ * The first-use sheet's one window (docs/plugin-api.md 4.3, mytop-project/tracker#128). The broker asks
  * [PluginGrantPrompts], which opens this activity through [open]; it draws [PluginGrantSheet] the way
  * [ModeSwitcherActivity] draws the mode switcher, and goes when the question does (answered, or Not now after the
  * broker's wait). Leaving it any other way answers Not now.

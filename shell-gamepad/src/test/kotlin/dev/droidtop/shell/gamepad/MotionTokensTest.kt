@@ -137,7 +137,7 @@ class MotionTokensTest {
         assertEquals(12f + 768 * 0.014f, barGutterDp(768), 0.001f)
     }
 
-    // Home's hero row (Droidtop/tracker#632): cards 100 wide plus a 10 gap (step 110), the hero 250 wide, 600 in view.
+    // Home's hero row (mytop-project/tracker#632): cards 100 wide plus a 10 gap (step 110), the hero 250 wide, 600 in view.
     @Test
     fun heroRowDoesNotScrollWhileTheGrownCardFits() {
         assertEquals(0f, heroScrollTarget(current = 0f, index = 2, step = 110f, heroPx = 250f, span = 600f), 0f)

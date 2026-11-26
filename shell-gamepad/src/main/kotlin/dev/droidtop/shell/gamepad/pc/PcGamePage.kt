@@ -98,7 +98,7 @@ internal fun PcGamePage(
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenOptions: () -> Unit,
-    // "Choose a runner" on a game no runner offers: opens the Engine picker (Droidtop/tracker#287).
+    // "Choose a runner" on a game no runner offers: opens the Engine picker (mytop-project/tracker#287).
     onChooseEngine: () -> Unit = onOpenOptions,
     // A copy's own Install, Update or Play from its row on Versions (docs/SPEC.md 7i, "Which copy"); null draws no copy rows' action.
     onPlayCopy: ((LibraryEntry) -> Unit)? = null,
@@ -119,7 +119,7 @@ internal fun PcGamePage(
         val path = entry.groupingPath() ?: return@produceState
         value = withContext(Dispatchers.IO) { folderSizeBytes(path) }
     }
-    // Scrape is the first row of Edit metadata (docs/SPEC.md 7i, "The action band"; the owner, Droidtop/tracker#845:
+    // Scrape is the first row of Edit metadata (docs/SPEC.md 7i, "The action band"; the owner, mytop-project/tracker#845:
     // "put "scrape" IN the edit metadata panel"), through the one PC scrape pipeline (docs/SPEC.md 7n). What the scrape
     // said is the row's line while the panel is open, and a flash once it is done.
     val scope = rememberCoroutineScope()
@@ -170,7 +170,7 @@ internal fun PcGamePage(
             onOptions = { copy -> copyOptions = copy },
         )
     }
-    // The game's other version folders, each removable once its saves are moved here (docs/SPEC.md 7i; Droidtop/tracker#624).
+    // The game's other version folders, each removable once its saves are moved here (docs/SPEC.md 7i; mytop-project/tracker#624).
     val olds = remember(entry, siblings) { dev.droidtop.library.integrations.OldVersions.of(entry, siblings) }
     val oldSizes by produceState(emptyMap<String, dev.droidtop.library.FolderSizes.Size>(), olds) {
         value = withContext(Dispatchers.IO) {
@@ -209,7 +209,7 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.get(context, entry.id) }
     }
     var cloudToken by remember(entry.id) { mutableIntStateOf(0) }
-    // The copies a settled save conflict kept (Droidtop/tracker#822): each can be brought back from Details. Read off the
+    // The copies a settled save conflict kept (mytop-project/tracker#822): each can be brought back from Details. Read off the
     // main thread, again after a sync or a restore.
     val keptCopies by produceState(emptyList<dev.droidtop.library.computers.ComputerSaves.KeptCopy>(), entry.id, cloudToken) {
         value = dev.droidtop.library.stores.StoreSaves.keptCopies(context, entry.id)
@@ -268,7 +268,7 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) }
-    // Whether it plays with no network (Droidtop/tracker#422): the art the game draws from the internet is looked up in
+    // Whether it plays with no network (mytop-project/tracker#422): the art the game draws from the internet is looked up in
     // the image cache once, off the main thread, as the page opens; the rest is the entry's own facts.
     val artNotSaved by produceState(0, entry.id, entry.artworkUri, entry.heroUri, entry.logoUri) {
         val remote = dev.droidtop.library.OfflineReadiness.remoteArt(entry)
@@ -293,7 +293,7 @@ internal fun PcGamePage(
             offline = offlineRow,
             cloudSaves = cloudRow,
             setVersion = setVersion,
-            // Typed in its own row (no editor, no panel: Droidtop/tracker#954 item 12); blank goes back to the folder's name.
+            // Typed in its own row (no editor, no panel: mytop-project/tracker#954 item 12); blank goes back to the folder's name.
             onSetVersion = if (isFolder) {
                 PageFact.Typed(
                     initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
@@ -328,7 +328,7 @@ internal fun PcGamePage(
                         val link = links?.link(source.key)
                         if (link != null) viewingRecord = Triple(source, link.externalId, RecordTab.OVERVIEW) else editingSource = source
                     },
-                    // View thread (Droidtop/tracker#859): droidtop's web view with the source's session, never another
+                    // View thread (mytop-project/tracker#859): droidtop's web view with the source's session, never another
                     // browser; a download started there is placed as this game's update, as Open thread's is (#862).
                     onOpen = { source, _ ->
                         val link = links?.link(source.key)
@@ -398,7 +398,7 @@ internal fun PcGamePage(
     // service has them, achievements (docs/SPEC.md 7h, "Game info"). Asked for once when the page opens.
     var infoScreen by remember(entry.id) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     val infoRows = dev.droidtop.shell.gamepad.rememberGameInfoRows(entry, copies = siblings)
-    // Saves and the achievements sign-in are rows of Options (Droidtop/tracker#845), and glyphs of the status row; the
+    // Saves and the achievements sign-in are rows of Options (mytop-project/tracker#845), and glyphs of the status row; the
     // achievements themselves are Activity's, the rest Overview's.
     val savesInfo = infoRows.firstOrNull { it.kind == GameInfoKind.SAVES }
     val signInInfo = infoRows.firstOrNull { it.isAchievementsSignIn }
@@ -429,7 +429,7 @@ internal fun PcGamePage(
             tab = PageTab.DETAILS,
         )
     }
-    // The kernel drivers this Windows game has installed (docs/SPEC.md 5b, "Kernel drivers"; Droidtop/tracker#607):
+    // The kernel drivers this Windows game has installed (docs/SPEC.md 5b, "Kernel drivers"; mytop-project/tracker#607):
     // one line, read on IO, that opens its Drivers list.
     val driversLine by produceState<String?>(null, entry.id, windowsRoute, infoScreen) {
         if (!windowsRoute || infoScreen != null) return@produceState
@@ -446,7 +446,7 @@ internal fun PcGamePage(
     val keptRows = remember(keptCopies, restoring) {
         keptSaveRows(keptCopies, restoring, System.currentTimeMillis()) { copy -> restoreAsk = copy }
     }
-    // Play time on the person's other devices (Droidtop/tracker#469): one file read, on IO.
+    // Play time on the person's other devices (mytop-project/tracker#469): one file read, on IO.
     val playedElsewhere by produceState(emptyList<dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere>(), entry.id) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -458,10 +458,10 @@ internal fun PcGamePage(
             }.getOrNull().orEmpty()
         }
     }
-    // How the person has played it, droidtop's own record, on Activity (Droidtop/tracker#845); play time counts the
-    // person's other devices too (Droidtop/tracker#469).
+    // How the person has played it, droidtop's own record, on Activity (mytop-project/tracker#845); play time counts the
+    // person's other devices too (mytop-project/tracker#469).
     val activity = remember(entry, playedElsewhere) { activityRows(entry, System.currentTimeMillis(), playedElsewhere = playedElsewhere) }
-    // The person's own rating and status (Droidtop/tracker#722): read off the main thread, A turns each to its next
+    // The person's own rating and status (mytop-project/tracker#722): read off the main thread, A turns each to its next
     // value and it is saved at once, apart from the scraped fields.
     var mark by remember(entry.id) { mutableStateOf(dev.droidtop.library.settings.GameMark()) }
     androidx.compose.runtime.LaunchedEffect(entry.id) {
@@ -479,7 +479,7 @@ internal fun PcGamePage(
             parts,
         )
     }
-    // The status row under the title (owner, Droidtop/tracker#845: "a set of icons to indicate the status of each
+    // The status row under the title (owner, mytop-project/tracker#845: "a set of icons to indicate the status of each
     // thing"), from what the page already knows; nothing is asked for it.
     val statuses = remember(entry, play, runner, cloudStore, lastSync, online, cloudStatus, savesInfo, achievementsInfo, signInInfo) {
         pageStatuses(
@@ -531,7 +531,7 @@ internal fun PcGamePage(
             onChooseEngine()
         } else if (play.pressable) {
             // The setup step runs over the page, which stays: closing it
-            // hid the page behind the offer (Droidtop/tracker#293).
+            // hid the page behind the offer (mytop-project/tracker#293).
             if (play.ready) playAt?.takeIf { it.isAttached }?.let { FloodOrigin.markLaunch(screenRect(it, view)) }
             if (play.ready || play.store != null) onClose()
             onPlay()
@@ -561,12 +561,12 @@ internal fun PcGamePage(
                 statuses = statuses,
                 strip = strip,
                 rowsByTab = rowsByTab,
-                // Scrape first (owner, Droidtop/tracker#845), then the game's own title.
+                // Scrape first (owner, mytop-project/tracker#845), then the game's own title.
                 editMetadataRows = { close ->
                     listOfNotNull(
                         scrapeRow(entry, scrapeStatus, "the PC sources") { scrape() },
                         // The person's own title for the game (docs/SPEC.md 7n), kept by the library.
-                        // Typed in the row itself, with the panel still open (no editor, no panel: Droidtop/tracker#954 item 12).
+                        // Typed in the row itself, with the panel still open (no editor, no panel: mytop-project/tracker#954 item 12).
                         if (library != null) {
                             dev.droidtop.shell.gamepad.ActionTextRow(
                                 "Title",
@@ -589,7 +589,7 @@ internal fun PcGamePage(
                         },
                     )
                 },
-                // What the owner moved off the page's buttons (Droidtop/tracker#845), only the ones this game has, then
+                // What the owner moved off the page's buttons (mytop-project/tracker#845), only the ones this game has, then
                 // the rest of the game's menu, the one L2 opens.
                 optionsRows = { close ->
                     val savesScreen = savesInfo?.screen
@@ -666,7 +666,7 @@ internal fun PcGamePage(
         }
     }
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
-    // Bringing back a kept copy replaces the saves here, which are kept as a copy first (Droidtop/tracker#822): asked
+    // Bringing back a kept copy replaces the saves here, which are kept as a copy first (mytop-project/tracker#822): asked
     // once, the safe choice first and under the cursor (the shell's one confirmation).
     restoreAsk?.let { copy ->
         dev.droidtop.shell.gamepad.ConfirmDialog(
@@ -840,7 +840,7 @@ private fun pcRootsOf(context: android.content.Context): List<String> =
 
 /**
  * One row per copy of a game on Versions (docs/SPEC.md 7i, "Which
- * copy", Droidtop/tracker#397 slice H): where it is from and how it is held,
+ * copy", mytop-project/tracker#397 slice H): where it is from and how it is held,
  * what A does to it (its own Install, Update or Play) and whether it is the one
  * the person chose. Only for a card of more than one copy, one of them a
  * store's row (a folder game's versions are its Version rows). Pure.
@@ -878,7 +878,7 @@ internal fun copyRows(
 }
 
 /**
- * One row per other version folder of the game on Versions (docs/SPEC.md 7i; Droidtop/tracker#624): its
+ * One row per other version folder of the game on Versions (docs/SPEC.md 7i; mytop-project/tracker#624): its
  * version and size, and Remove in two presses. The first arms it ([armed], the folder's path) and says what the second
  * does; the second removes it, its saves moved to the version kept first ([dev.droidtop.library.integrations.OldVersions]).
  * [status] is the last removal's line, on a heading row that stays after the folder's row is gone. Pure.
@@ -1002,7 +1002,7 @@ private fun pageRows(
     val marker = entry.pcInfo?.marker
     val markerStore = marker?.let { dev.droidtop.library.PcSource.Store(it.storeId).label() }
     // A source's newest release that is a store's own build ("Steam Build" on F95zone) of a game whose card holds
-    // that store's copy (docs/SPEC.md 7m, "A store's copy and a local copy", Droidtop/tracker#745): the person owns
+    // that store's copy (docs/SPEC.md 7m, "A store's copy and a local copy", mytop-project/tracker#745): the person owns
     // it, so the row points at that copy instead of a download from the source.
     val ownedCopy = entry.availableUpdate?.let { update -> siblings.firstOrNull { it.id != entry.id && it.isStoreRow() && namesStore(update, it) } }
     val ownedStore = ownedCopy?.let { dev.droidtop.library.PcSource.of(it)?.label() }
@@ -1086,7 +1086,7 @@ private fun pageRows(
     }
     // The play state's own line (a store game's "Downloads 590 MB", an install step) is the action band's
     // and is not a statement about the runner, so it is never drawn under this label; a store stage with
-    // no runner worked out leaves the row out (Droidtop/tracker#371).
+    // no runner worked out leaves the row out (mytop-project/tracker#371).
     if (runner != null || play.store == null) {
         add(
             PageFact(
@@ -1168,7 +1168,7 @@ private val MORE_ROWS = setOf("Store id", "Installed build", "Install location",
  */
 private val DETAILS_ORDER = listOf("Source", "Ownership", "Size", OFFLINE_ROW, "Cloud saves", "DLC")
 
-/** The Details row saying whether the game plays with no network (Droidtop/tracker#422). */
+/** The Details row saying whether the game plays with no network (mytop-project/tracker#422). */
 internal const val OFFLINE_ROW = "Offline"
 
 private fun detailsRank(title: String): Int = when (title) {
@@ -1267,7 +1267,7 @@ internal fun factsStrip(
 )
 
 /**
- * Play time over every device (Droidtop/tracker#469): the total, with where it was played under it when another device
+ * Play time over every device (mytop-project/tracker#469): the total, with where it was played under it when another device
  * played it ("Here 2 h · DESKTOP 10 h"). Only this device's time, as before, when no other device did. Pure.
  */
 internal fun playTimeFact(hereSeconds: Long, elsewhere: List<dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere>): StripFact? {
@@ -1287,7 +1287,7 @@ internal const val HERO_MIN_WIDTH_PX = 320
 internal fun isNarrowHeroArt(widthPx: Float): Boolean = widthPx > 0f && widthPx < HERO_MIN_WIDTH_PX
 
 /**
- * One Details row per kept copy of the game's saves (Droidtop/tracker#822): "Bring back saves from PC", when that copy's
+ * One Details row per kept copy of the game's saves (mytop-project/tracker#822): "Bring back saves from PC", when that copy's
  * newest file is from and how many files, and A asks before putting it back. The copy [restoring] reads as under way.
  * Pure.
  */
@@ -1319,7 +1319,7 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
 }
 
 /**
- * Activity's rows from droidtop's own record (docs/SPEC.md 7i, "The game page"; Droidtop/tracker#845): when it was
+ * Activity's rows from droidtop's own record (docs/SPEC.md 7i, "The game page"; mytop-project/tracker#845): when it was
  * last played, play time, and how many times, only the ones that exist, so a game never played shows Activity's
  * empty line. A store's or a service's achievements join them as their own row. [usedElsewhere] is a later use
  * droidtop did not start (Android's usage record of an app, read with Usage access); the later of the two is the
@@ -1336,8 +1336,8 @@ internal fun activityRows(
         listOfNotNull(entry.lastPlayedEpochMs, usedElsewhere).maxOrNull()?.let {
             PageFact("Last ${kind.done}", dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() }, tab = PageTab.ACTIVITY)
         },
-        // Play time is time; how many times is "Times played", said once (Droidtop/tracker#662). Over every device, with
-        // where it was played under it when another device played it (Droidtop/tracker#469).
+        // Play time is time; how many times is "Times played", said once (mytop-project/tracker#662). Over every device, with
+        // where it was played under it when another device played it (mytop-project/tracker#469).
         playTimeFact(entry.playtimeSeconds, playedElsewhere)?.let { PageFact(kind.timeTitle, it.value, subtitle = it.note, tab = PageTab.ACTIVITY) },
         entry.playCount.takeIf { it > 0 }?.let { PageFact("Times ${kind.done}", it.toString(), tab = PageTab.ACTIVITY) },
     )
@@ -1398,7 +1398,7 @@ internal fun updateSourceOf(sources: List<UpdateSources.Source>, links: GameLink
 }
 
 /**
- * The Activity tab's own-marks rows (Droidtop/tracker#722): My rating (A adds a star, past five back to none) and
+ * The Activity tab's own-marks rows (mytop-project/tracker#722): My rating (A adds a star, past five back to none) and
  * Status (A turns to the next one), each calling [onChange] with the new marks. Pure.
  */
 internal fun gameMarkRows(mark: dev.droidtop.library.settings.GameMark, onChange: (dev.droidtop.library.settings.GameMark) -> Unit): List<PageFact> = listOf(

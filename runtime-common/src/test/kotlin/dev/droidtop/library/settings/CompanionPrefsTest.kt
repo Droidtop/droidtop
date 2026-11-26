@@ -63,7 +63,7 @@ class CompanionPrefsTest {
         assertEquals(null, CompanionPrefs.panelOf("page:home/pins"))
     }
 
-    // Droidtop/tracker#786 S3: a saved bar keeps its reach when System, Network and Apps move under Device.
+    // mytop-project/tracker#786 S3: a saved bar keeps its reach when System, Network and Apps move under Device.
     @Test
     fun `the old System, Network and Apps tabs become Device and its pages`() {
         assertEquals(

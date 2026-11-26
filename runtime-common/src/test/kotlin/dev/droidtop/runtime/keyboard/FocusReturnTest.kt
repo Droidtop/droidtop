@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Handing the system's focus back to the app on the other screen (Droidtop/tracker#314). */
+/** Handing the system's focus back to the app on the other screen (mytop-project/tracker#314). */
 class FocusReturnTest {
     private fun app(pkg: String, display: Int, visible: Boolean = true) = RunningApp(pkg, pkg, display, taskId = 1, visible = visible)
 

@@ -62,7 +62,7 @@ internal object LaunchAlertOverlay {
         val wm = context.getSystemService(WindowManager::class.java) ?: return
         val density = context.resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
-        // droidtop's buttons, not the platform's (docs/DESIGN-LANGUAGE.md, Droidtop/tracker#750: the console drew
+        // droidtop's buttons, not the platform's (docs/DESIGN-LANGUAGE.md, mytop-project/tracker#750: the console drew
         // "DISMISS" and "BACK TO DROIDTOP"): sentence case in the Label style, 8 dp corners, the accent on the primary.
         fun button(label: String, primary: Boolean, onClick: () -> Unit) = Button(context, null, 0, 0).apply {
             text = label

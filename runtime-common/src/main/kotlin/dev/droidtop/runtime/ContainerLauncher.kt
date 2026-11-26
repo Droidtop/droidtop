@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * The library inside the desktop (docs/SPEC.md 2a, "The injection channel
- * and the launch helper", Droidtop/tracker#353): the one channel by which
+ * and the launch helper", mytop-project/tracker#353): the one channel by which
  * droidtop's library reaches the container's own launchers, panels and file
  * managers, and by which they ask droidtop to launch something.
  *
@@ -48,7 +48,7 @@ object ContainerLauncher {
     const val HELPER = "$IN_CONTAINER_DIR/bin/droidtop-open"
 
     /**
-     * The one word the helper takes besides a token: open droidtop's Start menu (Droidtop/tracker#683). The
+     * The one word the helper takes besides a token: open droidtop's Start menu (mytop-project/tracker#683). The
      * desktop's launcher key runs `droidtop-open start`, so the container has one launcher, droidtop's.
      */
     const val START = "start"
@@ -128,7 +128,7 @@ object ContainerLauncher {
         appendLine("mv -f \"${'$'}tmp\" \"${'$'}dir/${'$'}1.${'$'}${'$'}$REQUEST_SUFFIX\"")
     }
 
-    // ---- Open on Android (Droidtop/tracker#388) ----
+    // ---- Open on Android (mytop-project/tracker#388) ----
 
     /** The second helper: hands one http(s) link or shared-storage file to Android ([viewHelperScript]). */
     const val VIEW_HELPER = "$IN_CONTAINER_DIR/bin/droidtop-view"
@@ -196,7 +196,7 @@ object ContainerLauncher {
 
     /**
      * The helpers as commands on the desktop's `PATH`, written into [ContainerEnter.COMMANDS_DIR] with the exported
-     * commands (Droidtop/tracker#388: on the rig `droidtop-open` and `xdg-open` were "not found", the helpers living
+     * commands (mytop-project/tracker#388: on the rig `droidtop-open` and `xdg-open` were "not found", the helpers living
      * only at their full paths). `xdg-open` is for an image with none of its own: that directory is last on `PATH`,
      * so the distro's xdg-open wins once installed, and reaches Open on Android through [mimeApps] anyway.
      */
@@ -299,7 +299,7 @@ object DesktopLaunchRequests {
     private val viewFlow = MutableSharedFlow<android.content.Intent>(extraBufferCapacity = 4)
 
     /**
-     * Open on Android's checked intents ([ContainerLauncher.parseViewRequest], Droidtop/tracker#388): the showing
+     * Open on Android's checked intents ([ContainerLauncher.parseViewRequest], mytop-project/tracker#388): the showing
      * Desktop shell starts each from its own activity, the way Start starts an Android app.
      */
     val viewRequests: SharedFlow<android.content.Intent> = viewFlow.asSharedFlow()

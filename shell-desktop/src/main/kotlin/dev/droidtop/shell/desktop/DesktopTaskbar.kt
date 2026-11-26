@@ -128,11 +128,11 @@ import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 
-// Desktop mode's taskbar (Droidtop/tracker#764, split out of DesktopShell.kt): its buttons, window list, pins,
+// Desktop mode's taskbar (mytop-project/tracker#764, split out of DesktopShell.kt): its buttons, window list, pins,
 // Android tasks, tray and plugin items, and the system screens its buttons open.
 
 /**
- * The input mode the bar is sized for (Droidtop/tracker#690): [PadModality][dev.droidtop.shell.gamepad.input.PadModality]
+ * The input mode the bar is sized for (mytop-project/tracker#690): [PadModality][dev.droidtop.shell.gamepad.input.PadModality]
  * once it has held for [SETTLE_MS]. One value for every bar item, set by [Taskbar].
  */
 internal object BarInputMode {
@@ -157,7 +157,7 @@ internal fun BoxScope.Taskbar(
     screens: WindowScreens = WindowScreens.ONE,
 ) {
     val context = LocalContext.current
-    // The bar's size follows the input mode (Droidtop/tracker#690), settled for a second first: each change resizes the
+    // The bar's size follows the input mode (mytop-project/tracker#690), settled for a second first: each change resizes the
     // bar and with it the Linux desktop's output (#682), so a touch between pad presses doesn't make the desktop jump.
     val padDriving = dev.droidtop.shell.gamepad.input.PadModality.showsFocus
     LaunchedEffect(padDriving) {
@@ -191,11 +191,11 @@ internal fun BoxScope.Taskbar(
     val ownScreens by OwnScreens.open.collectAsState()
     // On a narrow screen the buttons alone fill the bar, and a Row gives its weighted child only what is left: the
     // window list had no width at all on a 411 dp phone, so foot, Enginehost and Settings were open and nowhere on
-    // the bar (Droidtop/tracker#750, rig 2638). When the bar's own items leave the window list less than
+    // the bar (mytop-project/tracker#750, rig 2638). When the bar's own items leave the window list less than
     // [WINDOW_LIST_MIN], the pins and windows take a strip of their own. That is worked out from what the items measure,
     // not from the screen's width: on the 2026-11-04 rig the AVD's bar was 639 dp at the canvas density, over the 600 dp
     // cut-off this replaced, and Start, Modes, Companion, Clipboard and the tray filled it, so with Foot and PCManFM open
-    // the bar had no window button (Droidtop/tracker#689, #686). Each item's width is the same in either layout, so the
+    // the bar had no window button (mytop-project/tracker#689, #686). Each item's width is the same in either layout, so the
     // choice does not flip back and forth.
     var startWidth by remember { mutableIntStateOf(0) }
     var pinsWidth by remember { mutableIntStateOf(0) }
@@ -246,8 +246,8 @@ internal fun BoxScope.Taskbar(
                     Text(stringResource(R.string.desktop_start_menu), maxLines = 1, softWrap = false)
                 }
                 Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-                // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
-                // and Settings are Start's System rows, and the clock is the tray's (Droidtop/tracker#691), so the
+                // What only Android can do stays on droidtop's bar (mytop-project/tracker#555 D4): Terminal, Containers
+                // and Settings are Start's System rows, and the clock is the tray's (mytop-project/tracker#691), so the
                 // screen has one. The mode switcher stays, by name: Desktop's only other route to the Android home or
                 // Gaming is a long-press of Back (SPEC 2c).
                 val extras: @Composable () -> Unit = {
@@ -272,7 +272,7 @@ internal fun BoxScope.Taskbar(
                 } else {
                     // On a narrow bar the buttons between Start and the tray take what is left and scroll, so the tray
                     // keeps its own width: last in the Row, it was given the remainder and "100%" wrapped one
-                    // character per line on a 411 dp phone with the Clipboard chip showing (Droidtop/tracker#691, rig
+                    // character per line on a 411 dp phone with the Clipboard chip showing (mytop-project/tracker#691, rig
                     // 2026-11-04).
                     Row(
                         modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
@@ -303,14 +303,14 @@ internal fun windowsFitBeside(barWidth: Dp, itemsWidth: Dp): Boolean = barWidth 
  * A taskbar button with the narrow padding a bar needs. The stock Button's
  * 24dp of content padding and 8dp of margin per side left the window list
  * (the weighted slot beside them) zero width on a 1080p tablet-class display,
- * so no window row could show even with windows open (Droidtop/tracker#94).
+ * so no window row could show even with windows open (mytop-project/tracker#94).
  */
 @Composable
 internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
+    // A flat chip in the Gaming palette, not Material's filled pill (mytop-project/tracker#555 D4).
     androidx.compose.material3.Surface(
         onClick = onClick,
-        // The bar follows the input mode (ShellWindow.barTarget, Droidtop/tracker#690): a finger's size after a touch,
+        // The bar follows the input mode (ShellWindow.barTarget, mytop-project/tracker#690): a finger's size after a touch,
         // the pad's denser size while the pad drives. Not a literal 48.dp: the shell lays out at the canvas density.
         modifier = modifier.padding(horizontal = 3.dp).heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving)),
         shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
@@ -325,7 +325,7 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
 
 /**
  * The taskbar's real cross-container task manager (docs/SPEC.md's Desktop
- * shell section, Droidtop/tracker#94): one row per toplevel host-bridge
+ * shell section, mytop-project/tracker#94): one row per toplevel host-bridge
  * reports over wlr-foreign-toplevel-management. Tap activates it (raises +
  * focuses, restoring it first when minimized); tapping the already-activated
  * one minimizes it instead, so a single action both switches windows and
@@ -336,8 +336,8 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
  *
  * Minimize and restore go through [DesktopWindows], which knows the
  * compositor: labwc honours the protocol's set_minimized, sway ignores it
- * (rig, fix2-t5.png in verify-2026-09-29, Droidtop/tracker#145) and gets its
- * scratchpad over IPC instead (Droidtop/tracker#391). A minimize the
+ * (rig, fix2-t5.png in verify-2026-09-29, mytop-project/tracker#145) and gets its
+ * scratchpad over IPC instead (mytop-project/tracker#391). A minimize the
  * compositor could not be asked for says so in a toast.
  *
  * Empty (no row shown at all, not even a placeholder) when [hostBridge] is
@@ -346,7 +346,7 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
  * to a user with nothing open, and this row isn't where either gets
  * explained.
  *
- * With the desktop on a second screen (Droidtop/tracker#908, step D4) each
+ * With the desktop on a second screen (mytop-project/tracker#908, step D4) each
  * bar is given only the windows on its own output (the caller filters by
  * [WindowScreens.onBar]), and a window's menu has "Move to <screen>" per
  * other screen, from [screens]. wlr-foreign-toplevel-management has no
@@ -411,7 +411,7 @@ internal fun TaskbarWindowList(
                 },
             )
         }
-        // The Android apps and games started from here, after the container's windows (Droidtop/tracker#352).
+        // The Android apps and games started from here, after the container's windows (mytop-project/tracker#352).
         items(androidApps, key = { "app:" + it.packageName + "/" + it.displayId }) { app ->
             TaskbarAppRow(
                 app = app,
@@ -419,7 +419,7 @@ internal fun TaskbarWindowList(
                 onClose = { scope.launch { closeAndroidApp(context, app) } },
             )
         }
-        // droidtop's own screens open in a task of their own: Settings, a place (Droidtop/tracker#750).
+        // droidtop's own screens open in a task of their own: Settings, a place (mytop-project/tracker#750).
         items(ownScreens, key = { "own:" + it.taskId }) { screen ->
             TaskbarOwnScreenRow(
                 screen = screen,
@@ -492,7 +492,7 @@ internal fun TaskbarWindowRow(
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     val anchor = rememberAnchor()
-    // The plugins with entries for this window (docs/plugin-api.md 1.12, Droidtop/tracker#221), read when its menu opens:
+    // The plugins with entries for this window (docs/plugin-api.md 1.12, mytop-project/tracker#221), read when its menu opens:
     // manifests and grants only, off the main thread, so the menu never waits on a plugin.
     val windowPlugins by produceState(emptyList<dev.droidtop.pluginhost.PluginRecord>(), menuOpen, toplevel.appId) {
         value = if (!menuOpen) emptyList() else withContext(Dispatchers.IO) {
@@ -531,7 +531,7 @@ internal fun TaskbarWindowRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            // The window's menu by a plain tap, not only by a long press (Droidtop/tracker#686, AVD rig 2936: a long
+            // The window's menu by a plain tap, not only by a long press (mytop-project/tracker#686, AVD rig 2936: a long
             // press on the window's button did nothing, and it was the one touch route to Maximize, Snap and Close).
             val menuLabel = stringResource(R.string.desktop_window_menu)
             Box(
@@ -551,17 +551,17 @@ internal fun TaskbarWindowRow(
             val snapRight = stringResource(R.string.desktop_snap_right)
             val restoreSize = stringResource(R.string.desktop_restore_size)
             val close = stringResource(R.string.desktop_close)
-            // The one sheet of choices, which a pad drives too (docs/SPEC.md 7k, Droidtop/tracker#690).
+            // The one sheet of choices, which a pad drives too (docs/SPEC.md 7k, mytop-project/tracker#690).
             val rows = buildList {
                 add(ActionRow(if (minimized) "Restore" else "Minimize", onSelect = { menuOpen = false; onMinimize() }))
-                // A title bar's buttons and an edge drag, which sway's windows do not have (Droidtop/tracker#686).
+                // A title bar's buttons and an edge drag, which sway's windows do not have (mytop-project/tracker#686).
                 if (onPlace != null && !minimized) {
                     add(ActionRow(maximize, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.MAXIMIZE) }))
                     add(ActionRow(snapLeft, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_LEFT) }))
                     add(ActionRow(snapRight, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_RIGHT) }))
                     if (placed) add(ActionRow(restoreSize, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.RESTORE) }))
                 }
-                // To another screen, one row per other screen, only while the desktop has one (Droidtop/tracker#908,
+                // To another screen, one row per other screen, only while the desktop has one (mytop-project/tracker#908,
                 // step D4). Not for a minimized window: it is in sway's scratchpad, on no screen.
                 if (onMove != null && !minimized) {
                     moveTargets.forEach { target ->
@@ -588,7 +588,7 @@ internal fun TaskbarWindowRow(
 }
 
 /**
- * The desktop's outputs as the bars and the window list read them (Droidtop/tracker#908, step D4): the compositor's
+ * The desktop's outputs as the bars and the window list read them (mytop-project/tracker#908, step D4): the compositor's
  * names, the primary's first, and each one's screen name ([dev.droidtop.runtime.ScreenNaming]). [ONE] is a desktop on
  * one screen, where every window is on the primary's bar and nothing offers a move.
  */
@@ -636,7 +636,7 @@ internal fun windowTitle(toplevel: Toplevel): String = toplevel.title.ifBlank { 
 
 /**
  * A press of a mouse's secondary button on a taskbar item runs [onOpen], the item's menu, as a long press does
- * (Droidtop/tracker#827). Seen ahead of the item's own click and consumed until its release, so it is not also a
+ * (mytop-project/tracker#827). Seen ahead of the item's own click and consumed until its release, so it is not also a
  * tap. Only droidtop's own bar has it; the container's surface gets its pointer untouched. [onOpen] only sets
  * remembered state, so the handler is installed once.
  */
@@ -660,7 +660,7 @@ private fun Modifier.onSecondaryClick(onOpen: () -> Unit): Modifier =
     }
 
 /**
- * What is pinned to the taskbar (docs/SPEC.md 2b, Droidtop/tracker#348): each pin as its picture, when it has
+ * What is pinned to the taskbar (docs/SPEC.md 2b, mytop-project/tracker#348): each pin as its picture, when it has
  * one, and its name, ahead of the window list. A tap starts it, a long press offers Unpin. The pins sit in
  * a row of their own that is capped, so a long list of them cannot take the window list's room.
  */
@@ -783,7 +783,7 @@ internal fun ClipboardNotice() {
  * [dev.droidtop.runtime.systemstatus.SystemStatus] core: the readout sits in the bar and the Quick Menu
  * is behind it. Volume, brightness, Do Not Disturb, the network and Bluetooth panels and the notification
  * list are that menu's sections, the same ones Gaming's R2 shows, so the tray keeps no control panel of
- * its own; the readout also counts the notifications waiting (Droidtop/tracker#352) (docs/SPEC.md 2b "Desktop chrome with a pad", Droidtop/tracker#350). Data shared, chrome per
+ * its own; the readout also counts the notifications waiting (mytop-project/tracker#352) (docs/SPEC.md 2b "Desktop chrome with a pad", mytop-project/tracker#350). Data shared, chrome per
  * surface, the same split the settings catalogs use.
  */
 @Composable
@@ -796,7 +796,7 @@ internal fun SystemTray(onClick: () -> Unit) {
     val waiting = NotificationsStore.items.collectAsState().value.count { it.clearable }
     TaskbarButton(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Gaming's status readout, the one component (Droidtop/tracker#691): the clock in Android's 12 or 24 hour
+            // Gaming's status readout, the one component (mytop-project/tracker#691): the clock in Android's 12 or 24 hour
             // format, the network and battery glyphs and the battery's percent. The desktop's only clock, shown with
             // or without a session and under either compositor.
             StatusCluster(showBatteryPercent = true, onClick = onClick)
@@ -848,7 +848,7 @@ internal fun openModes(context: Context) {
 }
 
 /**
- * Desktop's settings in droidtop's screen host, the chrome Containers and the places open in (Droidtop/tracker#692),
+ * Desktop's settings in droidtop's screen host, the chrome Containers and the places open in (mytop-project/tracker#692),
  * with Desktop's page first and the rest of Settings one row away at its end. It opened Launcher3's settings
  * activity, which drew the same catalog as stock Android preferences; that page stays Standard's.
  */
@@ -876,7 +876,7 @@ internal fun CompanionTaskbarItem() {
 }
 
 /**
- * "Keyboard" on the bar (docs/SPEC.md 6b "The on-screen keyboard", Droidtop/tracker#685): shows the on-screen keyboard
+ * "Keyboard" on the bar (docs/SPEC.md 6b "The on-screen keyboard", mytop-project/tracker#685): shows the on-screen keyboard
  * over the desktop, or hides it, and what is typed goes to the program with the focus. Absent while a hardware keyboard
  * is attached, since that keyboard already types into the desktop.
  */
@@ -892,7 +892,7 @@ internal fun KeyboardTaskbarItem() {
 }
 
 /**
- * The plugins' tray entries (`desktop.tray`, docs/plugin-api.md 1.12, Droidtop/tracker#221): one button per plugin, by
+ * The plugins' tray entries (`desktop.tray`, docs/plugin-api.md 1.12, mytop-project/tracker#221): one button per plugin, by
  * its name from its manifest, opening its tray facets drawn by droidtop. The bar never waits on a plugin to draw: the
  * plugin is asked only when its entry is opened. Rechecked as the Plugins button is.
  */

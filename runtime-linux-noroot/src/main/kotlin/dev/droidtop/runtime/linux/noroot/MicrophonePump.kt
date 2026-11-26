@@ -13,7 +13,7 @@ import kotlin.concurrent.thread
 
 /**
  * The device microphone as PulseAudio's `module-pipe-source` input
- * (docs/SPEC.md 3d Sockets row, Droidtop/tracker#80): [HostAudioServer]'s
+ * (docs/SPEC.md 3d Sockets row, mytop-project/tracker#80): [HostAudioServer]'s
  * PulseAudio reads raw PCM from the FIFO at [pipe], and this pumps
  * `AudioRecord` into it. Same server and socket as audio out, so a program
  * in a container sees an ordinary PulseAudio source (`droidtop_mic`, the
@@ -32,7 +32,7 @@ internal class MicrophonePump(private val pipe: File) {
     /**
      * Clears the way for PulseAudio's `module-pipe-source`, which makes the
      * FIFO itself and refuses to load when one is already there ("mkfifo:
-     * Unknown error 17", rig log of 1096, Droidtop/tracker#80). A leftover
+     * Unknown error 17", rig log of 1096, mytop-project/tracker#80). A leftover
      * from an earlier session is removed here; [openWriter] waits for the
      * module to create the new one.
      */

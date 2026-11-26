@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Downloads tab's rows: one per build and platform, the copy's build first (Droidtop/tracker#838). */
+/** The Downloads tab's rows: one per build and platform, the copy's build first (mytop-project/tracker#838). */
 class DownloadRowsTest {
     private val hosts = listOf("GOFILE", "MEGA", "MIXDROP", "PIXELDRAIN", "UPLOADHAVEN")
 
@@ -14,7 +14,7 @@ class DownloadRowsTest {
 
     private fun item(label: String, role: String) = UpdateSources.Download(if (role == "patch") "Patches" else "Extras", "MEGA", label, "", "https://mega.example/$label", role = role)
 
-    /** The thread in Droidtop/tracker#838: a default build for three platforms, a Steam build for one, patches and extras. */
+    /** The thread in mytop-project/tracker#838: a default build for three platforms, a Steam build for one, patches and extras. */
     private val thread = UpdateSources.Record(
         externalId = "1",
         title = "Game",
@@ -64,7 +64,7 @@ class DownloadRowsTest {
     }
     @Test
     fun `a build the source names is used, and the heading only when it names none`() {
-        // Droidtop/tracker#845: a source that names its builds needs no "Steam Build · " heading for droidtop to tell them apart.
+        // mytop-project/tracker#845: a source that names its builds needs no "Steam Build · " heading for droidtop to tell them apart.
         fun named(build: String?, host: String) =
             UpdateSources.Download("Win/Linux", host, host, "", "https://${host.lowercase()}.example/${build ?: "main"}", listOf("windows", "linux"), build = build)
         val record = UpdateSources.Record(

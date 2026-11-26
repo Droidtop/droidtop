@@ -8,7 +8,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * What plugins see of the devices paired with this one (docs/plugin-api.md D21, Droidtop/tracker#556, #553): every
+ * What plugins see of the devices paired with this one (docs/plugin-api.md D21, mytop-project/tracker#556, #553): every
  * paired computer and handheld ([Computers.devices]), and the small value each plugin announces to them through
  * droidtop-agent's `announce` (droidtop-agent docs/DESIGN.md section 5). A plugin only ever reads what the same plugin
  * id announced on another device, never another plugin's value, an address or a key.

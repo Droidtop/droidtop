@@ -40,7 +40,7 @@ class ScanPruneTest {
 
     @Test
     fun `the scraped-media tree is never games`() {
-        // Droidtop/tracker#297: Roms/downloaded_media/gba was listed as a second gba system.
+        // mytop-project/tracker#297: Roms/downloaded_media/gba was listed as a second gba system.
         assertEquals("it holds scraped media, not games", ScanPrune.skipReason(dir("Roms/downloaded_media")))
         assertFalse(ScanPrune.isScannableFolder(dir("ES-DE/downloaded_media")))
         assertTrue(ScanPrune.isScannableFolder(dir("Roms/gba")))

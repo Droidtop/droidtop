@@ -5,7 +5,7 @@ import dev.droidtop.library.LibraryEntryKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** A on a game card in Gaming opens it, never launches it (docs/SPEC.md 7i; owner, 2026-10-24, Droidtop/tracker#641). */
+/** A on a game card in Gaming opens it, never launches it (docs/SPEC.md 7i; owner, 2026-10-24, mytop-project/tracker#641). */
 class CardPressTest {
     @Test
     fun `A opens a PC game's page and a Retro game's details, and only an app opens itself`() {

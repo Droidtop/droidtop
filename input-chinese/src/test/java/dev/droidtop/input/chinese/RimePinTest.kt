@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Droidtop/tracker#903 H8b: the pin the build and the data download share, and the list of the data's files. */
+/** mytop-project/tracker#903 H8b: the pin the build and the data download share, and the list of the data's files. */
 class RimePinTest {
     private val good = """
         # a comment
@@ -26,8 +26,8 @@ class RimePinTest {
         assertEquals("21595d0426286163ff8c9a51f066e38494a7df5912e6db14f3530af0c620dfb0", pin.dataGzSha256)
         assertEquals("148e30e77df286d2312bdcc958d16c53288d1e443ec98aae46b4278113f9b0a0", pin.dataFilesSha256)
         assertEquals(14_802_733L, pin.dataSize)
-        assertEquals("https://github.com/Droidtop/droidtop/releases/download/rime-engine-56737cd2/rime-data-luna.tar.gz", pin.dataUrl)
-        assertEquals("https://github.com/Droidtop/droidtop/releases/download/rime-engine-56737cd2/rime-data-luna-sources.tar.gz", pin.sourcesUrl)
+        assertEquals("https://github.com/mytop-project/droidtop/releases/download/rime-engine-56737cd2/rime-data-luna.tar.gz", pin.dataUrl)
+        assertEquals("https://github.com/mytop-project/droidtop/releases/download/rime-engine-56737cd2/rime-data-luna-sources.tar.gz", pin.sourcesUrl)
     }
 
     @Test fun `the module's own pin parses and names the release H8a published`() {

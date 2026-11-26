@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.DpSize
  * covers, margins included, measured as it is drawn; zero while it is not
  * drawn. A row along the top edge (the view strip, [ViewStrip]) ends short
  * of it and shelves with no strip start under it, so nothing of the page
- * sits beneath the clock and battery (Droidtop/tracker#292). One cluster
+ * sits beneath the clock and battery (mytop-project/tracker#292). One cluster
  * per shell, so one value.
  */
 object StatusClusterRoom {

@@ -302,7 +302,7 @@ class TrackpadGestureEngineTest {
         )
     }
 
-    // ---- the companion's Trackpad settings (TrackpadConfig, Droidtop/tracker#414 slice C12) ----
+    // ---- the companion's Trackpad settings (TrackpadConfig, mytop-project/tracker#414 slice C12) ----
 
     @Test
     fun `with tap to click off a tap clicks nothing`() {

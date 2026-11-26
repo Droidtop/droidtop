@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The companion's trackpad as a Windows game's mouse (Droidtop/tracker#565): scale, carried fractions, buttons, wheel. */
+/** The companion's trackpad as a Windows game's mouse (mytop-project/tracker#565): scale, carried fractions, buttons, wheel. */
 class GamePointerTrackpadSinkTest {
     private class Recorder(override val widthPx: Int = 1600) : OwnGameScreens.Pointer {
         override val displayId: Int? = 0

@@ -10,7 +10,7 @@ import dev.droidtop.shared.trust.Sha256
 import java.io.File
 
 /**
- * What an APK file or an installed app is (docs/SPEC.md 10b "Installing apps", Droidtop/tracker#261): its package,
+ * What an APK file or an installed app is (docs/SPEC.md 10b "Installing apps", mytop-project/tracker#261): its package,
  * version code and signing certificates, read from Android's package manager, and the one rule for whether a
  * downloaded APK may be installed ([refusal]). Blocking reads: worker threads only.
  */

@@ -12,7 +12,7 @@ package dev.droidtop.runtime
  * shown under its name; [icon] is its `Icon` key, which is how an entry's
  * variants are recognised ([ContainerApplications.parseListing]).
  * [iconFile] is that icon as a file droidtop can draw, once [ContainerIcons]
- * has resolved it (Droidtop/tracker#689).
+ * has resolved it (mytop-project/tracker#689).
  */
 data class ContainerApp(
     val id: String,

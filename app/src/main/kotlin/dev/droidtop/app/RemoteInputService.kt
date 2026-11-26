@@ -21,7 +21,7 @@ import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * The foreground service that keeps "Type from another device" alive while the person is in another app (docs/SPEC.md,
- * "Type from another device", Droidtop/tracker#645): Android keeps the process, and so the listener, only for a reason
+ * "Type from another device", mytop-project/tracker#645): Android keeps the process, and so the listener, only for a reason
  * the person can see, and this is it, one notification that says what [RemoteInputs.state] says. The same
  * notification is the console when droidtop is not in front: Confirm and Refuse for the code, Close at every point.
  * The session lives and dies with the service, so no listener survives it: it stops itself when the session ends, and
@@ -46,7 +46,7 @@ class RemoteInputService : Service() {
             else -> if (watching == null) {
                 watching = scope.launch {
                     RemoteInputs.state.collect { state ->
-                        // The keyboard's own strip shows the session while a phone is paired (Droidtop/tracker#903).
+                        // The keyboard's own strip shows the session while a phone is paired (mytop-project/tracker#903).
                         RemoteTyping.strip.session(state is RemoteInputState.Paired)
                         if (state is RemoteInputState.Closed) {
                             stopSelf()

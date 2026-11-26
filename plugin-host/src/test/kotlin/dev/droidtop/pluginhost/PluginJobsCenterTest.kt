@@ -262,7 +262,7 @@ class PluginJobsCenterTest {
         assertTrue(restored.paused)
     }
 
-    // A job droidtop runs itself (Droidtop/tracker#174): same list, same checkpoint, pause and resume.
+    // A job droidtop runs itself (mytop-project/tracker#174): same list, same checkpoint, pause and resume.
 
     @Test
     fun nativeJobPausesAtItsCheckpointAndResumesFromIt() = runBlocking {
@@ -338,7 +338,7 @@ class PluginJobsCenterTest {
 
     @Test
     fun aRunThatSaysNothingIsStoppedWithAPlainReasonInsteadOfStayingCurrent() = runBlocking {
-        // Droidtop/tracker#842: "Download Bare Witness" stayed current for hours with nothing behind it.
+        // mytop-project/tracker#842: "Download Bare Witness" stayed current for hours with nothing behind it.
         PluginJobsCenter.nativeDispatcher = Dispatchers.Default
         val limit = PluginJobsCenter.stallMs
         val check = PluginJobsCenter.stallCheckMs
@@ -362,7 +362,7 @@ class PluginJobsCenterTest {
 
     @Test
     fun aDownloadKilledMidwayComesBackAndRunsAgainFromItsCheckpointByItself() = runBlocking {
-        // Droidtop/tracker#842: the process dies mid-download (a crash, droidtop updating itself, Android killing it).
+        // mytop-project/tracker#842: the process dies mid-download (a crash, droidtop updating itself, Android killing it).
         PluginJobsCenter.nativeDispatcher = Dispatchers.Default
         val starts = CopyOnWriteArrayList<String?>()
         val hold = CompletableDeferred<Unit>()
@@ -392,7 +392,7 @@ class PluginJobsCenterTest {
 
     @Test
     fun aJobThatCannotPauseComesBackFromARestartEndedSoItsKindRunsAgain() = runBlocking {
-        // Droidtop/tracker#837: the update check, running when a self-update restarted droidtop, came back paused with
+        // mytop-project/tracker#837: the update check, running when a self-update restarted droidtop, came back paused with
         // no Resume, and Check now joined it and waited for ever.
         PluginJobsCenter.nativeDispatcher = Dispatchers.Default
         val hold = CompletableDeferred<Unit>()
@@ -433,7 +433,7 @@ class PluginJobsCenterTest {
         assertNull(PluginJobsCenter.startNative(null, "test_native_unregistered", "Nobody runs this"))
     }
 
-    // Jobs and their results (Droidtop/tracker#577): a finished job and what it did outlive the toast and the restart.
+    // Jobs and their results (mytop-project/tracker#577): a finished job and what it did outlive the toast and the restart.
 
     @Test
     fun aFinishedJobComesBackAfterARestartWithItsResultAndReport() {

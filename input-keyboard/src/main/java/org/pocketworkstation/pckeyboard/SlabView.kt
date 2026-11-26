@@ -14,7 +14,7 @@ import android.view.View
 import kotlin.math.min
 
 /**
- * The text-entry slab drawn (docs/SPEC.md 4c, "The text-entry slab"; Droidtop/tracker#485 S7 slice 6): the keys of
+ * The text-entry slab drawn (docs/SPEC.md 4c, "The text-entry slab"; mytop-project/tracker#485 S7 slice 6): the keys of
  * [Slab]'s state, the pad's cursor on one of them, and each key's pad button as a keycap in its lower right. The pad
  * reaches it through [handleKey], which the host's window forwards (the slab is never a focus target, so the field
  * keeps focus and its caret); a tap on a key presses it the same way. Every press gives the same 80 ms flash and a
@@ -23,7 +23,7 @@ import kotlin.math.min
  * Colours come from the host's theme ([KeyboardColors]), and the pad buttons' printed names from its controller layout
  * ([capLabel]: on a Nintendo-layout pad the Backspace keycap reads Y), so the slab draws what is on the plastic.
  *
- * It lays out from its container's real size (Droidtop/tracker#567: the companion's keyboard "moves things around,
+ * It lays out from its container's real size (mytop-project/tracker#567: the companion's keyboard "moves things around,
  * doesn't scale properly, and gets cut off"): the rows share the height it is given, between [MIN_ROW_DP] and
  * [MAX_ROW_DP], sized for the tallest layer so a layer switch never resizes a key; the gaps, labels and keycaps
  * scale with the key they sit on. Given no height, it asks for its design height (38 dp
@@ -100,7 +100,7 @@ class SlabView(
      * so switching layers never resizes a key) with a gap of a sixth of a row (3 to 6 dp) between and around them, at
      * most [MAX_ROW_DP]. A container shorter than [minimumHeight] gets rows under [MIN_ROW_DP] rather than rows past
      * its edge: nothing is ever drawn outside the view, and a host that wants the minimum reserves it
-     * (Droidtop/tracker#567). The four-row Large keys form follows the font scale only: the symbols layer keeps its
+     * (mytop-project/tracker#567). The four-row Large keys form follows the font scale only: the symbols layer keeps its
      * digits row, so dropping the letters' number row would not make a row taller.
      */
     private fun relayout(height: Int) {
@@ -268,7 +268,7 @@ class SlabView(
     /**
      * A tap presses on release. On a whole keyboard ([Slab.State.extras]) a key that is a key press goes down on touch
      * and up on release, with what is latched held under it, as a real keyboard's does: a PC game sees an arrow or a
-     * letter held for as long as the finger is on it (Droidtop/tracker#567). Shift, Ctrl, Alt, Super and the layer
+     * letter held for as long as the finger is on it (mytop-project/tracker#567). Shift, Ctrl, Alt, Super and the layer
      * keys act on release.
      */
     @SuppressLint("ClickableViewAccessibility")

@@ -69,7 +69,7 @@ fun Modifier.padSelectable(
     // recomposes right as a step appears (focus retries, state
     // reads), so a first tap on a secondary button ("Continue without it")
     // was dropped and the same tap a moment later
-    // worked (Droidtop/tracker#42).
+    // worked (mytop-project/tracker#42).
     val currentPress by rememberUpdatedState(onPress)
     val currentFocus by rememberUpdatedState(onFocus)
     this

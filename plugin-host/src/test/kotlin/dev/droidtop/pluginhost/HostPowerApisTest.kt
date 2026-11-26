@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** D7, `power.state` (docs/plugin-api.md 3, Droidtop/tracker#553). */
+/** D7, `power.state` (docs/plugin-api.md 3, mytop-project/tracker#553). */
 class HostPowerApisTest {
     @Test
     fun `the battery reads as a level, charging and saver`() {

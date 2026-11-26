@@ -24,7 +24,7 @@ object SecondScreenWindowFlags {
  * naming CompanionActivity at 15:55:44). So while one of these activities is the top one it is
  * focusable, and it hands the pad straight back to the shell when the shell is in front on
  * another screen. When it stops being the top one it is touch-only again, so a tap on it never
- * moves the system's focused display away from the shell (Droidtop/tracker#186).
+ * moves the system's focused display away from the shell (mytop-project/tracker#186).
  */
 object TouchOnlySurfaceFocus {
     /**
@@ -42,7 +42,7 @@ object TouchOnlySurfaceFocus {
      * The display of a surface that became the top activity before any shell was in front to hand the pad to, or null.
      * At droidtop's start the companion is started beside the shell and can become the top activity first; with no
      * shell resumed yet the hand-back found nobody, and the pad stayed on the companion's display until a tap
-     * (Droidtop/tracker#820: "on launch, droidtop doesn't have anything focused by the pad"). [shellResumed] finishes it.
+     * (mytop-project/tracker#820: "on launch, droidtop doesn't have anything focused by the pad"). [shellResumed] finishes it.
      */
     @Volatile
     private var waitingFrom: Int? = null
@@ -77,7 +77,7 @@ object TouchOnlySurfaceFocus {
     /**
      * A key that reached the surface while it was the top activity. The shell gets it when there is
      * one. Otherwise every pad button, D-pad key, Enter and Back (which would finish it) is
-     * swallowed, so the controller never drives a companion surface (Droidtop/tracker#186: an A
+     * swallowed, so the controller never drives a companion surface (mytop-project/tracker#186: an A
      * meant for the game on the other screen must not press Quit or Play here); every other key
      * (volume, media, a keyboard's letters) is left to the system.
      */

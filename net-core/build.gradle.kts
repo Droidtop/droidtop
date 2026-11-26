@@ -24,12 +24,12 @@ android {
             // droidtop's native library for both ABIs (docs/SPEC.md 7o): native/, over the shared
             // libraries, built by build-scripts/build-agent-lib.sh.
             jniLibs.srcDir("agent/jniLibs")
-            // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/lib-net,
-            // docs/SPEC.md 12a, Droidtop/tracker#751): here and not in :runtime-common, which depends on this module.
-            java.srcDir("../vendor/lib-net/sitecheck/src/main/kotlin")
-            // The GitHub client droidtop and Enginehost share (vendor/lib-net :net, Droidtop/tracker#194): GitHubAuth, which
+            // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/mytop-net,
+            // docs/SPEC.md 12a, mytop-project/tracker#751): here and not in :runtime-common, which depends on this module.
+            java.srcDir("../vendor/mytop-net/sitecheck/src/main/kotlin")
+            // The GitHub client droidtop and Enginehost share (vendor/mytop-net :net, mytop-project/tracker#194): GitHubAuth, which
             // decides per hop where the person's token may go, is that module's; dev.droidtop.net.GitHubAuth calls it.
-            java.srcDir("../vendor/lib-net/net/src/main/kotlin")
+            java.srcDir("../vendor/mytop-net/net/src/main/kotlin")
         }
     }
 }

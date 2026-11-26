@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * "Update its software" for a container (docs/SPEC.md 3d, "Update its software"; Droidtop/tracker#757 slice 4): the
+ * "Update its software" for a container (docs/SPEC.md 3d, "Update its software"; mytop-project/tracker#757 slice 4): the
  * image's own package manager, found inside the container, upgrades what is installed. Each command is the manager's
  * upgrade of installed packages, not a distribution upgrade, so nothing the person did not have is installed where
  * the manager lets droidtop say so (apt's `upgrade` holds back what would need a new package; zypper's `update` and

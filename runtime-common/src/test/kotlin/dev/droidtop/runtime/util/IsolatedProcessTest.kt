@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which processes run none of droidtop's start (docs/SPEC.md 12a "Start order", Droidtop/tracker#775). */
+/** Which processes run none of droidtop's start (docs/SPEC.md 12a "Start order", mytop-project/tracker#775). */
 class IsolatedProcessTest {
     @Test
     fun `the full-access plugin slots are plugin processes, droidtop's own are not`() {

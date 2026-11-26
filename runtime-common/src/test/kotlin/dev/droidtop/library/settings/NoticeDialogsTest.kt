@@ -13,7 +13,7 @@ import org.junit.Test
 
 /**
  * The danger dialog's contract and the flash's Recent list (docs/SPEC.md 7k, "Asking before a change, and the
- * flash"; Droidtop/tracker#485, final design tests 15 and 18, the parts that hold without a screen): with no
+ * flash"; mytop-project/tracker#485, final design tests 15 and 18, the parts that hold without a screen): with no
  * surface to ask on the answer is Cancel; the surface on top draws; questions come one at a time; a flash lands
  * in Recent unless private, Recent keeps 50, and reading it clears the dot.
  */

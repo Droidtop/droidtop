@@ -14,7 +14,7 @@ object PartMarkers {
      * The words that name a part when they begin a folder's WHOLE name and
      * a number follows. `book` is here since 2026-10-01: a parent folder
      * with `book1`, `book2`, `book3` below it is one game whose title the
-     * parent gives (Droidtop/tracker#264). The words a games library
+     * parent gives (mytop-project/tracker#264). The words a games library
      * actually uses, not every word that could count a part.
      */
     private const val LEAF_WORDS = "chap(?:ter)?|chp|part|week|act|episode|ep|season|vol(?:ume)?|day|disc|disk|book|bk|pt"
@@ -72,7 +72,7 @@ object PartMarkers {
 
 /**
  * Folder names that are an ENGINE'S OWN LAYOUT and never a game's name
- * (docs/SPEC.md 7n; Droidtop/tracker#264): `game` is where Ren'Py keeps a
+ * (docs/SPEC.md 7n; mytop-project/tracker#264): `game` is where Ren'Py keeps a
  * game's scripts, `www` is RPG Maker MV's web root, `Contents` is a macOS
  * app bundle's. Such a folder is part of the game it sits in. The title is
  * taken from that game; a stand-alone one has no title at all, and the
@@ -151,7 +151,7 @@ data class ParsedTitle(
 
 /**
  * ONE deterministic parser from a folder or file name to a [ParsedTitle]
- * (docs/SPEC.md 7n; Droidtop/tracker#264). Pure: it reads names only, so a
+ * (docs/SPEC.md 7n; mytop-project/tracker#264). Pure: it reads names only, so a
  * table of names tests it and no list ever pays for it.
  *
  * It stands on [GameNaming.derive], which already reads a name's version,
@@ -173,7 +173,7 @@ object GameTitleParser {
      * (PcGameProvider.storeStamp), so the next slow pass walks every folder again instead of skipping those whose
      * mtime did not move, and the titles already in the index are made again by the new rules. Without it a parser
      * fix reached only folders that changed on disk (rig, build 1715: a run-together name stayed unsplit after
-     * the run-together rule landed, Droidtop/tracker#282).
+     * the run-together rule landed, mytop-project/tracker#282).
      */
     const val RULES_VERSION = 4L
 
@@ -371,7 +371,7 @@ object GameTitleParser {
     /**
      * A name [GameNaming.derive] gave, as the words a person reads: separators made spaces and a run-together
      * name split ([splitRunTogether]). What [parse] titles a folder, and what a card names a game
-     * ([GameGrouping.group]), so the two never differ (Droidtop/tracker#282).
+     * ([GameGrouping.group]), so the two never differ (mytop-project/tracker#282).
      */
     fun words(name: String): String = splitRunTogether(tidy(GameNaming.displayName(name)))
 
@@ -383,7 +383,7 @@ object GameTitleParser {
      * `3D Girl`, a number's own letter staying with it). Only a
      * name with no space in it: a spaced title is as its author wrote it, and a name
      * with no lower-case letter (`GTA`, `LUSTACADEMY`) has no word breaks to read
-     * (Droidtop/tracker#282).
+     * (mytop-project/tracker#282).
      */
     private fun splitRunTogether(title: String): String =
         if (title.contains(' ')) title else RUN_TOGETHER.replace(title, " ")

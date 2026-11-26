@@ -23,7 +23,7 @@ import dev.droidtop.shell.standard.HomeRolePrefs
  * otherwise. The rows and what they do are [BackButtonMenu.choices]. The activity goes when the sheet does.
  *
  * "Android" while droidtop's launcher is on but not Android's Home app does not switch: it asks, "Android mode
- * needs droidtop as Home", and Set requests the Home role (Droidtop/tracker#522). Another launcher
+ * needs droidtop as Home", and Set requests the Home role (mytop-project/tracker#522). Another launcher
  * would take a screen of a dual-screen device and leave droidtop's surfaces behind.
  */
 /** A mode's glyph in the switcher: the same marks Global settings' mode rows use. */
@@ -37,10 +37,10 @@ class ModeSwitcherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // The switcher is open: Mobile's "Press and hold Home" hint has done its job (Droidtop/tracker#829).
+        // The switcher is open: Mobile's "Press and hold Home" hint has done its job (mytop-project/tracker#829).
         val app = applicationContext
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.settings.Hints.markDone(app, dev.droidtop.library.settings.Hints.HOLD_HOME) }
-        // Over Gaming or Desktop, which hide Android's bars, the sheet hides them too (Droidtop/tracker#750); over
+        // Over Gaming or Desktop, which hide Android's bars, the sheet hides them too (mytop-project/tracker#750); over
         // Standard, Android's home screen, they stay.
         val immersive = dev.droidtop.library.settings.Modes.lastMode(this) != dev.droidtop.library.settings.Mode.LAUNCHER.id
         setContent {

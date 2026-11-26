@@ -13,7 +13,7 @@ import java.io.File
  * APK is about 130 MB and the folder otherwise keeps every one ever fetched, so this decides which
  * to delete: everything for a build that is installed or older, and, once a newer build is being
  * fetched, everything older than that one. A partial file of an older build is never resumed
- * (Droidtop/tracker#445: droidtop-1736.apk.part and 1744 resumed beside the build in hand).
+ * (mytop-project/tracker#445: droidtop-1736.apk.part and 1744 resumed beside the build in hand).
  */
 internal object UpdateFiles {
     private val NAME = Regex("^droidtop-(\\d+)\\.apk(\\.part(\\.meta)?)?$")

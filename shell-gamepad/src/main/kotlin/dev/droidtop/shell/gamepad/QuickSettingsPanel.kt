@@ -106,7 +106,7 @@ internal fun QuickSettingsPanel(
     // The live catalog, rebuilt after every change -- a few preference
     // and system reads, off the main thread because SystemStatus takes a
     // battery broadcast and a connectivity query.
-    // What is playing (Droidtop/tracker#716): the System tab is read again whenever the session changes.
+    // What is playing (mytop-project/tracker#716): the System tab is read again whenever the session changes.
     var mediaVersion by remember { mutableStateOf(0) }
     if (section == QuickSection.SYSTEM) {
         DisposableEffect(context) {

@@ -72,7 +72,7 @@ object PluginSourceKeys {
     }
 
     /**
-     * The superseded markers a source's key file carries (Droidtop/tracker#887): old key SHA-256 to its successor's,
+     * The superseded markers a source's key file carries (mytop-project/tracker#887): old key SHA-256 to its successor's,
      * read from the first of [keyUrlsFor] that answers. Empty when there are none or nothing answered.
      */
     fun fetchMarkers(

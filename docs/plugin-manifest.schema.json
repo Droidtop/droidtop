@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Droidtop/droidtop/docs/plugin-manifest.schema.json",
+  "$id": "https://github.com/mytop-project/droidtop/docs/plugin-manifest.schema.json",
   "title": "droidtop plugin manifest (contract 1 and 2)",
   "description": "The signed manifest.json inside a .droidplugin bundle (docs/SPEC.md 12a, docs/plugin-api.md 1.2). PluginManifest.fromJson and PluginBundleInstaller are the enforcement; this schema is for authors and CI. Ids inside provides, permissions and subscribes that a build does not know are kept and listed as not supported, never refused, so they are plain strings here. Unknown top-level fields are ignored by droidtop.",
   "type": "object",
@@ -87,7 +87,7 @@
           "paths": { "type": "array", "items": { "type": "string" }, "description": "files.shared.read / files.shared.write: folders relative to a storage volume, or \"*\" for all of it." },
           "scope": { "type": "string" },
           "signIn": { "type": "string", "description": "web.session only: the https sign-in page on one of its domains; droidtop's own Sign in opens it (docs/plugin-api.md G3)." },
-          "expiredText": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": "web.session only: the sentences the site's page shows for a download link that has expired; droidtop then asks the source for a current link (docs/plugin-api.md G3, Droidtop/tracker#783)." }
+          "expiredText": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": "web.session only: the sentences the site's page shows for a download link that has expired; droidtop then asks the source for a current link (docs/plugin-api.md G3, mytop-project/tracker#783)." }
         }
       }
     },
@@ -130,7 +130,7 @@
     "settings": {
       "type": "array",
       "maxItems": 40,
-      "description": "The plugin's settings, declared ahead and drawn by droidtop with no call to the plugin (docs/plugin-api.md 1.10 \"Declared settings\", Droidtop/tracker#880).",
+      "description": "The plugin's settings, declared ahead and drawn by droidtop with no call to the plugin (docs/plugin-api.md 1.10 \"Declared settings\", mytop-project/tracker#880).",
       "items": {
         "type": "object",
         "required": ["id", "kind", "label"],

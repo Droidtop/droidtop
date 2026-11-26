@@ -101,9 +101,9 @@ collection-ktx = "1.6.0-beta01"
 # own catalog, used by :app/:host-bridge/:shell-desktop/:shell-gamepad.
 lifecycleRuntimeKtx = "2.10.0"
 # The BOM whose Compose is the one the app ships: 1.11.4, the newest Compose that AGP 8 can build. Compose 1.12 and
-# later (1.13 is the line compose-native's Compose Multiplatform 1.13 is built on, Droidtop/tracker#958) declare
+# later (1.13 is the line compose-native's Compose Multiplatform 1.13 is built on, mytop-project/tracker#958) declare
 # minAndroidGradlePluginVersion 9.1.0 and compileSdk 37 in their aar-metadata, and AGP 9 needs shell-default's
-# library targetSdk removed. Every module compiles against it too (Droidtop/tracker#566; checkComposeVersions keeps it so).
+# library targetSdk removed. Every module compiles against it too (mytop-project/tracker#566; checkComposeVersions keeps it so).
 composeBom = "2026.06.01"
 media3 = "1.4.1"
 # okhttp 5 (Apache-2.0): :stores and the Windows runtime (:runtime-windows), with its DNS-over-HTTPS module.
@@ -115,7 +115,7 @@ zstd-jni = "1.5.7-5"
 # The version GameNative pinned, carried over with the stores.
 libarchive-android = "1.1.6"
 # JavaSteam (https://github.com/Longi94/JavaSteam, MIT), droidtop's Steam client in :stores, with its depot
-# downloader: built from source, droidtop's fork (vendor/javasteam, Droidtop/javasteam, branch droidtop) of
+# downloader: built from source, droidtop's fork (vendor/javasteam, mytop-project/javasteam, branch droidtop) of
 # GameNative's (https://github.com/joshuatam/JavaSteam/tree/gamenative-latest). settings.gradle.kts substitutes its
 # modules for these coordinates, so the version below is only the one the fork declares.
 javasteam = "1.8.0.1-26-SNAPSHOT"
@@ -258,13 +258,13 @@ javasteam = { group = "io.github.joshuatam", name = "javasteam", version.ref = "
 javasteam-depotdownloader = { group = "io.github.joshuatam", name = "javasteam-depotdownloader", version.ref = "javasteam" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 # Android's own APK signature verifier (Apache-2.0), released with the Android Gradle plugin: droidtop checks an app
-# interface plugin's app signature in process with it (docs/plugin-api.md 1.3, Droidtop/tracker#547).
+# interface plugin's app signature in process with it (docs/plugin-api.md 1.3, mytop-project/tracker#547).
 apksig = { module = "com.android.tools.build:apksig", version.ref = "agp" }
 bouncycastle-bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 # Test-only: Android's TLS/crypto provider, so certificate tests run against what a device uses (:test-pki).
 conscrypt-openjdk-uber = { group = "org.conscrypt", name = "conscrypt-openjdk-uber", version = "2.5.2" }
-# Wireless debugging as an elevated-access backend (docs/SPEC.md "Wireless debugging", Droidtop/tracker#816): the adb
+# Wireless debugging as an elevated-access backend (docs/SPEC.md "Wireless debugging", mytop-project/tracker#816): the adb
 # pairing and TLS client (GPL-3.0-or-later or Apache-2.0; its SPAKE2 dependency is LGPL), and the TLS it needs.
 libadb-android = { group = "com.github.MuntashirAkon", name = "libadb-android", version = "3.1.1" }
 conscrypt-android = { group = "org.conscrypt", name = "conscrypt-android", version = "2.5.3" }

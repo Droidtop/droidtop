@@ -18,7 +18,7 @@ enum class ScreensaverMode(val label: String, val idleSeconds: Int) {
     AFTER_10("After 10 minutes", 600),
 }
 
-/** What the screensaver shows (Droidtop/tracker#726), as ES-DE offers a choice of slideshow. */
+/** What the screensaver shows (mytop-project/tracker#726), as ES-DE offers a choice of slideshow. */
 enum class ScreensaverContent(val label: String) {
     COVERS("Game covers"),
     SCREENSHOTS("Screenshots"),

@@ -3,7 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The game menu's categories (docs/SPEC.md 7i, "The game menu"; Droidtop/tracker#610, Manage from #636). */
+/** The game menu's categories (docs/SPEC.md 7i, "The game menu"; mytop-project/tracker#610, Manage from #636). */
 class PcGameMenuCategoriesTest {
     @Test
     fun `the top page lists the owner's categories in order and never the top itself`() {

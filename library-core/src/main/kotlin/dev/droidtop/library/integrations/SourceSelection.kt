@@ -3,7 +3,7 @@ package dev.droidtop.library.integrations
 import android.content.Context
 
 /**
- * Get games' source filter (owner, 2026-10-30, Droidtop/tracker#825: "We want a single get games section, and a filter
+ * Get games' source filter (owner, 2026-10-30, mytop-project/tracker#825: "We want a single get games section, and a filter
  * to choose where it searches"): the sources the person turned off, kept across launches. What is kept is the ones
  * turned off, so a source installed later is searched until the person turns it off too. [UnifiedSearch.search] leaves
  * them out and lists them in [UnifiedState.off] for the filter to draw.

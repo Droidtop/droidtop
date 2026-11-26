@@ -58,7 +58,7 @@ data class GamingThemeColors(
 
     companion object {
         /**
-         * droidtop's own palette, from the approved visual language (owner, 2026-10-24, Droidtop/tracker#644,
+         * droidtop's own palette, from the approved visual language (owner, 2026-10-24, mytop-project/tracker#644,
          * coordination/design/proposals/2026-10-24-menus-and-visual-language.md 4.1 and 4.2): a blue-grey ground, never
          * pure black, and three surfaces one luminance step apart (cards, sheets, menus and dialogs); text that is not
          * pure white; one azure accent, used for focus, the primary button and what is chosen. It is the fallback: an
@@ -167,7 +167,7 @@ object GamingThemeMapping {
      * Whether the theme draws its own clock or system status in [view] (`system` or `gamelist`), docs/SPEC.md 7k2,
      * "Gaming theming". The shell's own floating status cluster yields to it there, so the two never overlap, and shows
      * on every other view: a theme with a clock only on its system view leaves the gamelist with droidtop's
-     * (Droidtop/tracker#658). The `all` view's elements count for a view the theme draws; a view it does not draw
+     * (mytop-project/tracker#658). The `all` view's elements count for a view the theme draws; a view it does not draw
      * (droidtop's own gamelist then) has no theme status. A `scope` that keeps the element out of a plain view
      * (`menu`, `none`) does not count: it would not be on screen to overlap.
      */
@@ -241,7 +241,7 @@ object GamingThemeMapping {
     }
 
     /**
-     * "Tint themes to my colours" (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#844): [colors] with only
+     * "Tint themes to my colours" (docs/SPEC.md 7k, "Colours outside Gaming"; mytop-project/tracker#844): [colors] with only
      * its accent and highlight swapped for [accent], the active colour source's: the accent (held to 4.5:1 on the
      * theme's own surfaces by lightness alone), the ink on it, and the focused row, which is the accent at 22 percent.
      * Every other role, the grounds, surfaces, text, the primary button, typefaces and texture, stays the theme's. Pure.
@@ -260,7 +260,7 @@ object GamingThemeMapping {
     }
 
     /**
-     * "Tint themes to my colours" in the theme's own views (Droidtop/tracker#844): [theme] with every colour it declares
+     * "Tint themes to my colours" in the theme's own views (mytop-project/tracker#844): [theme] with every colour it declares
      * in its accent swapped for [accent], so the themed gamelist and carousel, which draw the theme's own values rather
      * than droidtop's roles, change with the chrome. The theme's accent is the one [map] reads (the first declared colour
      * with real chroma); a colour is swapped when its red, green and blue are exactly that accent's, and keeps its own
@@ -312,7 +312,7 @@ object GamingThemeMapping {
 
     /**
      * The one mapping from Android's system palette to droidtop's roles (docs/SPEC.md 7k, "Colours outside Gaming";
-     * Droidtop/tracker#844), the way Material You lays it out for [light] or dark: the ground and the sheets from the
+     * mytop-project/tracker#844), the way Material You lays it out for [light] or dark: the ground and the sheets from the
      * neutral family (tone 50 and 100 light, 900 and 800 dark), the accent from the accent family (600 light, 200 dark),
      * and the focused row from the accent's container shade (100 light, 700 dark). Every other role is derived as a
      * theme's are ([build]): text held to 4.5:1 on every surface, the accent held by lightness alone. Pure.
@@ -483,7 +483,7 @@ object GamingThemeMapping {
         val sectionLabel = m.ensure(m.mix(muted, ground, 0.1), surfaces, TEXT_FLOOR)
         val disabled = m.ensure(m.mix(primary, overlay, 0.5), surfaces, DISABLED_FLOOR)
         // A theme that names no accent takes droidtop's azure, held to the text floor on its own surfaces by lightness
-        // alone (ColorMath.ensure mixes toward white or black, never another hue): owner, 2026-10-24, Droidtop/tracker#644,
+        // alone (ColorMath.ensure mixes toward white or black, never another hue): owner, 2026-10-24, mytop-project/tracker#644,
         // "do we still grant accents and stuff from the selected retro theme?" Its own accent, when it has one, wins.
         val accent = m.ensure(d.accent ?: base.accent, surfaces, TEXT_FLOOR)
 
@@ -522,7 +522,7 @@ object GamingThemeMapping {
             favourite = favourite,
             // Fills are the ink at low alpha, so they work on a light ground too.
             rowFill = m.withAlpha(ink, 0x0D),
-            // A focused row is the accent at 22 percent (Droidtop/tracker#644, 4.5 "Focus"): the theme's accent where it has one.
+            // A focused row is the accent at 22 percent (mytop-project/tracker#644, 4.5 "Focus"): the theme's accent where it has one.
             rowFillSelected = m.withAlpha(accent, 0x38),
             cardOutline = m.withAlpha(ink, 0x1F),
             hintPillOutline = m.withAlpha(ink, 0x33),

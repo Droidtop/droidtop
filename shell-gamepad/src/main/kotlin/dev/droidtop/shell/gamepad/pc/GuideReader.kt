@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A game's guides and droidtop's reader for them (docs/SPEC.md 7i "Guides", Droidtop/tracker#817): the walkthrough,
+ * A game's guides and droidtop's reader for them (docs/SPEC.md 7i "Guides", mytop-project/tracker#817): the walkthrough,
  * guide and readme files in the game's own folder, read in place, then the web searches of the resources rows.
  * Text and PDF open in the reader, a web page in the browser. The game's place is kept per guide ([GuidePlaces]): the
  * guide last opened, where each was left, and the person's bookmarks. Every file is read off the main thread.
@@ -84,7 +84,7 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
     var reading by remember(gameId) { mutableStateOf<Guide?>(null) }
     var editingNotes by remember(gameId) { mutableStateOf(false) }
     if (editingNotes) {
-        // The game's notes: one text, the shell's own text entry through a catalog row (Droidtop/tracker#817).
+        // The game's notes: one text, the shell's own text entry through a catalog row (mytop-project/tracker#817).
         val notesScreen = remember(gameId) {
             dev.droidtop.library.settings.CatalogScreen(
                 id = "guide_notes",
@@ -394,7 +394,7 @@ private val READER_HINTS = listOf(
     HintBinding(GamepadAction.B, "Close"),
 )
 
-// Back a page as well as on: each pill is a tap, and a person with no pad must be able to go back (Droidtop/tracker#839).
+// Back a page as well as on: each pill is a tap, and a person with no pad must be able to go back (mytop-project/tracker#839).
 private val PDF_HINTS = listOf(
     HintBinding(GamepadAction.LEFT, "Back a page"),
     HintBinding(GamepadAction.RIGHT, "Page"),

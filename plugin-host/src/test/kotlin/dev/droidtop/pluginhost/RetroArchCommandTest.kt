@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `retroarch.command` (docs/plugin-api.md 3 B, Droidtop/tracker#414 slice C10): RetroArch's network commands, sent by droidtop. */
+/** `retroarch.command` (docs/plugin-api.md 3 B, mytop-project/tracker#414 slice C10): RetroArch's network commands, sent by droidtop. */
 class RetroArchCommandTest {
     private fun request(args: JSONObject) = obj("api" to "retroarch", "version" to 1, "op" to "command", "args" to args).toString()
 

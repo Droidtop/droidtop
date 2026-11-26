@@ -12,7 +12,7 @@ import dev.droidtop.library.toLibraryEntryKind
 import java.io.File
 
 /**
- * Records what each source answered during a scrape as [MatchCalibration] lines (Droidtop/tracker#318 §3.3), with
+ * Records what each source answered during a scrape as [MatchCalibration] lines (mytop-project/tracker#318 §3.3), with
  * everything droidtop knew about the game and about every answer, so a reviewing agent can settle each line's truth
  * without a person (owner, 2026-10-24: "Provide all the information we have about the game, possible matches, and
  * etc. Have an agent review it and fix"). Off unless turned on in the Developer menu; the lines go to droidtop's

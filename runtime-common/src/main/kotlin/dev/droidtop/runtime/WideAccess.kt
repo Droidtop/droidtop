@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * Which folders are "wide" (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584): a folder that, mapped
+ * Which folders are "wide" (docs/SPEC.md 5a, "What a game can reach", 4; mytop-project/tracker#584): a folder that, mapped
  * into a game or container, lets it see far more than its own files. The owner, 2026-10-17: "Let's gate the root and
  * internal storage maps behind a permission toggle". A wide folder is reachable only through the matching toggle,
  * never as an ordinary share, so "my games folder is /storage/emulated/0" asks for the toggle instead of slipping past

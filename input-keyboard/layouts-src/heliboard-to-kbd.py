@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes a Hacker's Keyboard 4-row layout (res/xml-<locale>/kbd_qwerty.xml) from a HeliBoard simple layout.
 
-Droidtop/tracker#342, "more layouts". HeliBoard's simple format (heliboard/*.txt, see heliboard/NOTICE) is one key per
+mytop-project/tracker#342, "more layouts". HeliBoard's simple format (heliboard/*.txt, see heliboard/NOTICE) is one key per
 line, its label then its long-press keys separated by spaces, with a blank line between rows. Its three letter rows
 become the layout's three letter rows; the Shift and Delete keys and every bottom row are copied unchanged from an
 existing 4-row layout (the template), so a new language behaves as the others do. The top row's first ten keys also

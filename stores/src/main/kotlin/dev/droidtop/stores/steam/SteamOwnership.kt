@@ -4,7 +4,7 @@ import `in`.dragonbra.javasteam.enums.ELicenseFlags
 
 /**
  * Which apps the account itself owns, which it got free, and which it only
- * borrows, from its licences (docs/SPEC.md 7g, "Stores"; Droidtop/tracker#377).
+ * borrows, from its licences (docs/SPEC.md 7g, "Stores"; mytop-project/tracker#377).
  * Steam's own count of a person's games (the profile, Steam Web API
  * GetOwnedGames) is what their own live licences grant, with free games only
  * once played:

@@ -55,7 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Emulators (Droidtop/tracker#248): the three levels of the
+ * Settings > Emulators (mytop-project/tracker#248): the three levels of the
  * emulator choice in one place. The global default lives on the page
  * itself, each system's choice on its own screen, and a game's own choice
  * in that game's Edit metadata screen; [dev.droidtop.library.consoles.EmulatorResolution]
@@ -81,7 +81,7 @@ object EmulatorsCatalog {
         indexGroups = { context -> groups(context, forIndex = true) },
     )
 
-    // The row for an emulator that can launch from a plain path but lacks All files access (Droidtop/tracker#270).
+    // The row for an emulator that can launch from a plain path but lacks All files access (mytop-project/tracker#270).
     // With Risky actions > Give another app access on and a provider that can set an appop, droidtop gives it after an
     // explicit yes naming the app; otherwise it only opens Android's own screen for the package, as it always did.
     // Reads the helper's capabilities: build it off the main thread.
@@ -131,7 +131,7 @@ object EmulatorsCatalog {
         }
     }
 
-    // The RetroArch core a system launches with (Droidtop/tracker#271): installed, or installed
+    // The RetroArch core a system launches with (mytop-project/tracker#271): installed, or installed
     // here without opening RetroArch when a root helper can place it.
     private fun coreRow(context: Context, id: String, need: RetroArchCores.Need): AsyncActionItem {
         val state = RetroArchCores.state(need)
@@ -467,7 +467,7 @@ object EmulatorsCatalog {
     }
 
     /**
-     * Opens an installed emulator itself, for the settings only it can change (Droidtop/tracker#248
+     * Opens an installed emulator itself, for the settings only it can change (mytop-project/tracker#248
      * item 4: droidtop shows an emulator's own options only where it can set them from outside, and
      * otherwise opens the emulator). Through [LaunchDisplay.start], the one way droidtop starts an app.
      */
@@ -491,7 +491,7 @@ object EmulatorsCatalog {
     )
 
     /**
-     * The emulator setup helper for the emulator in use (docs/SPEC.md "Emulator setup helper", Droidtop/tracker#248):
+     * The emulator setup helper for the emulator in use (docs/SPEC.md "Emulator setup helper", mytop-project/tracker#248):
      * its BIOS files and the options droidtop can set in its own config, from [EmulatorSetup.specFor], the one source
      * of what an emulator needs. Where droidtop can reach the emulator's files (itself, or through Shizuku when the
      * person runs it) a row does the job; where it cannot, the same row says where to do it inside the emulator and
@@ -586,7 +586,7 @@ object EmulatorsCatalog {
                     },
                 )
             },
-            // Only while a plugin that supplies BIOS files is installed and allowed (emulator.bios, Droidtop/tracker#415).
+            // Only while a plugin that supplies BIOS files is installed and allowed (emulator.bios, mytop-project/tracker#415).
             dev.droidtop.library.integrations.PluginBios.row(context, system.id, system.displayName, bios, spec, folder, name, reach == EmulatorSetup.Reach.HELPER),
             DocumentPickItem(
                 id = "emulator_bios_add_${system.id}",
@@ -670,7 +670,7 @@ object EmulatorsCatalog {
     }
 
     /**
-     * The system's custom players (Droidtop/tracker#248 item 3): any installed app wired to the
+     * The system's custom players (mytop-project/tracker#248 item 3): any installed app wired to the
      * system by its launch command, for an emulator droidtop's database does not know or a launch it
      * gets wrong. Each opens its own screen to edit, check, test, share or remove it; new ones are
      * typed in or loaded from a shared file. They are offered in the Emulator choice above like any

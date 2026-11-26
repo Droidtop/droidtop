@@ -8,7 +8,7 @@ import org.junit.Test
 import kotlin.math.max
 
 /**
- * The gesture seam (Droidtop/tracker#903 H6): droidtop's classifier behind [GestureEngine] ranks every stroke exactly
+ * The gesture seam (mytop-project/tracker#903 H6): droidtop's classifier behind [GestureEngine] ranks every stroke exactly
  * as glide typing ranked it before (the classifier built with GlideTyping's old parameters and fed point by point),
  * and the library slot falls back to it while no library is set or a library declines.
  */

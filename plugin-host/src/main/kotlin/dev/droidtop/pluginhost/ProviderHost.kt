@@ -17,7 +17,7 @@ import java.util.Date
 import javax.security.auth.x500.X500Principal
 
 /**
- * The enhancement provider host (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): the one app that holds
+ * The enhancement provider host (docs/SPEC.md "Enhancement providers", mytop-project/tracker#852): the one app that holds
  * elevated access, so droidtop's own code holds none. droidtop carries it as an unsigned template
  * ([TEMPLATE_ASSET], built by :provider-host), signs it on the device with a key it made in Android's Keystore, and
  * installs it; the same key signs every later version, so each installs over the last. The key never leaves the

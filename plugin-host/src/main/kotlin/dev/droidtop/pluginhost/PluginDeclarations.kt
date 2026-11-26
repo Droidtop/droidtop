@@ -24,7 +24,7 @@ data class V2Declarations(
     val requires: List<RequiredApi> = emptyList(),
     /** The data kinds it can hand to, and take from, an equivalent plugin ([DataKind], docs/plugin-api.md 3 H3). */
     val dataKinds: List<DataKind> = emptyList(),
-    /** Its settings, declared ahead and drawn by droidtop with no call ([DeclaredSetting], Droidtop/tracker#880). */
+    /** Its settings, declared ahead and drawn by droidtop with no call ([DeclaredSetting], mytop-project/tracker#880). */
     val settings: List<DeclaredSetting> = emptyList(),
 ) {
     /** Writes the five arrays into [json], the same keys [fromJson] reads, so the manifest and [PluginRecord] share one mechanism. */
@@ -60,7 +60,7 @@ data class V2Declarations(
 }
 
 /**
- * A named, versioned kind of data a plugin can export and import (docs/plugin-api.md 3 H3, Droidtop/tracker#793):
+ * A named, versioned kind of data a plugin can export and import (docs/plugin-api.md 3 H3, mytop-project/tracker#793):
  * `syncthing.state` version 1 is a Syncthing node's identity, configuration and index. Plugins that declare the same
  * [kind] and [version] are equivalent for it, whether native or an app's. A data kind is a context of the plugin
  * (F8) whose copy carries files beside its records; droidtop moves a copy whole from one plugin to another.
@@ -84,7 +84,7 @@ data class DataKind(val kind: String, val version: Int, val export: Boolean, val
 }
 
 /**
- * One row of a plugin's settings, declared in its signed manifest and drawn by droidtop (Droidtop/tracker#880). The
+ * One row of a plugin's settings, declared in its signed manifest and drawn by droidtop (mytop-project/tracker#880). The
  * owner: "The plugin should have exposed a Settings facet, or exposed things in advance. It should not have to be
  * asked or loaded for any of it". Opening the page never starts or calls the plugin.
  *
@@ -196,7 +196,7 @@ data class ProvidedPoint(
     }
 
     /**
-     * How droidtop names this entry to the person (Droidtop/tracker#521 item 3): the point's own name, then the entry's
+     * How droidtop names this entry to the person (mytop-project/tracker#521 item 3): the point's own name, then the entry's
      * `label` when it has one ("Quick Menu tile: Save state"), cut at [LABEL_MAX]. The point's name always leads, so a
      * plugin's title can say which of its entries this is but never pose as a different point.
      */

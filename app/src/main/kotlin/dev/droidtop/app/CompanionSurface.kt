@@ -36,7 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The companion Home (docs/SPEC.md "The companion's tabs", Droidtop/tracker#285, #328): the second screen's
+ * The companion Home (docs/SPEC.md "The companion's tabs", mytop-project/tracker#285, #328): the second screen's
  * dashboard for whatever the main screen is doing, as ONE vertically scrolling page over the ground
  * ([CompanionContent]'s idle art). Nothing is laid over anything else; the rails scroll sideways inside it.
  *
@@ -112,7 +112,7 @@ fun CompanionSurface(
 }
 
 /**
- * The companion's way into the one search (docs/SPEC.md 12a "One search", Droidtop/tracker#12): the same
+ * The companion's way into the one search (docs/SPEC.md 12a "One search", mytop-project/tracker#12): the same
  * search window Standard's drawer opens, started on the screen the tap was on, so its rows, its sources
  * and its settings are the same ones. The companion draws no search of its own.
  */
@@ -132,7 +132,7 @@ private fun CompanionSearchPill() {
 }
 
 /**
- * "Today 45 min of 2 h · This week 3 h 10 min of 10 h" (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421),
+ * "Today 45 min of 2 h · This week 3 h 10 min of 10 h" (docs/SPEC.md 7f "Play-time limits", mytop-project/tracker#421),
  * under the status line, while a play-time limit is set. Read off the main thread, again every half minute.
  */
 @Composable

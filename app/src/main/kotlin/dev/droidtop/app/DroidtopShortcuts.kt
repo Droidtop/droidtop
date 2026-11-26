@@ -18,7 +18,7 @@ import dev.droidtop.shell.standard.ModeSwitcher
 import kotlinx.coroutines.launch
 
 /**
- * droidtop's dynamic app shortcuts (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): what a long press on
+ * droidtop's dynamic app shortcuts (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): what a long press on
  * droidtop's icon offers on any launcher, beside the static ones in `res/xml/shortcuts.xml` (Games, Social, Downloads,
  * Updates, SPEC 7j). Rebuilt whole by [refresh]:
  * - the last few games played, newest first, each playing through [GameLaunchActivity] as a pinned game does;

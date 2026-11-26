@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * The context sync ops (docs/plugin-api.md 3 F8): a plugin declares a context
  * with its fields and rules, publishes a whole copy of it and reads the current
- * copy back (protocol 2, syncable data, Droidtop/tracker#794), or changes its
+ * copy back (protocol 2, syncable data, mytop-project/tracker#794), or changes its
  * records one at a time (protocol 1), starts a sync with the paired computers
  * and settles the fields both sides changed.
  */

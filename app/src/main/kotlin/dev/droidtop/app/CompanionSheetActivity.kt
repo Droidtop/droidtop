@@ -41,7 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The companion on a device with one screen (docs/SPEC.md "The companion's tabs", One screen; Droidtop/tracker#414
+ * The companion on a device with one screen (docs/SPEC.md "The companion's tabs", One screen; mytop-project/tracker#414
  * slice C13): the same [CompanionTabs] every companion host draws, in a pull-down sheet from the top over Standard's
  * home screen, or ([CompanionSheet.EXTRA_TRAY]) a tray panel over Desktop's taskbar at the bottom right. A tap outside,
  * Back, or a pull on the sheet's handle closes it. The first time, a tip says how to open it again.
@@ -53,7 +53,7 @@ class CompanionSheetActivity : AppCompatActivity() {
         val mode = if (tray) SecondaryDisplayContent.Mode.DESKTOP else SecondaryDisplayContent.Mode.STANDARD
         setContent {
             // Desktop's tray panel wears the Gaming theme as Desktop's chrome does; Standard's pull-down sheet keeps
-            // the colours outside Gaming (Droidtop/tracker#524, docs/SPEC.md 2b "One bar, in droidtop's look").
+            // the colours outside Gaming (mytop-project/tracker#524, docs/SPEC.md 2b "One bar, in droidtop's look").
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = tray) {
                 val context = LocalContext.current
                 LaunchedEffect(Unit) { withContext(Dispatchers.IO) { CompanionPrefs.load(context.applicationContext) } }

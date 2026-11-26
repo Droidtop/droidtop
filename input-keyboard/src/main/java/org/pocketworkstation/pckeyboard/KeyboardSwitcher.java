@@ -60,7 +60,7 @@ public class KeyboardSwitcher implements
     public static final int KEYBOARDMODE_SYMBOLS_WITH_SETTINGS_KEY = R.id.mode_symbols_with_settings_key;
 
     // Modern, once "Follow light or dark" (KeyboardAppearance.FOLLOW), for anyone who never chose a theme
-    // (Droidtop/tracker#562, #903 H12b).
+    // (mytop-project/tracker#562, #903 H12b).
     public static final String DEFAULT_LAYOUT_ID = "8";
     public static final String PREF_KEYBOARD_LAYOUT = "pref_keyboard_layout";
     private static final int[] THEMES = new int[] {
@@ -92,7 +92,7 @@ public class KeyboardSwitcher implements
     private static final int KBD_FULL_FN = R.xml.kbd_full_fn;
     private static final int KBD_COMPACT = R.xml.kbd_compact;
     private static final int KBD_COMPACT_FN = R.xml.kbd_compact_fn;
-    // droidtop (Droidtop/tracker#903 H12c): the number and calculator pad mode's keys.
+    // droidtop (mytop-project/tracker#903 H12c): the number and calculator pad mode's keys.
     private static final int KBD_NUMPAD = R.xml.kbd_numpad;
 
     private LatinKeyboardView mInputView;
@@ -375,7 +375,7 @@ public class KeyboardSwitcher implements
 
     private KeyboardId getKeyboardId(int mode, int imeOptions, boolean isSymbols) {
         boolean hasVoice = hasVoiceButton(isSymbols);
-        // droidtop (Droidtop/tracker#903 H12c): the number pad mode takes the place of the letters in any field Hacker's
+        // droidtop (mytop-project/tracker#903 H12c): the number pad mode takes the place of the letters in any field Hacker's
         // gives letters; Hacker's own phone pad stays for phone, number and date fields. Normal gives the letters back.
         if (!isSymbols && mode != MODE_PHONE
                 && KeyboardModes.current(mInputMethodService) == KeyboardModes.Mode.NUMBER_PAD) {
@@ -635,7 +635,7 @@ public class KeyboardSwitcher implements
 
     /**
      * Draws the theme the stored choice means now: a modern theme changes with Light and dark (the
-     * setting, the host's or the system's; Droidtop/tracker#562, #903 H12b), and Dynamic with the
+     * setting, the host's or the system's; mytop-project/tracker#562, #903 H12b), and Dynamic with the
      * wallpaper's palette. Called as an editor starts and after a configuration change (a new
      * wallpaper's palette arrives as one); the view is built again only when the theme drawn or its
      * colours differ from what is on screen.

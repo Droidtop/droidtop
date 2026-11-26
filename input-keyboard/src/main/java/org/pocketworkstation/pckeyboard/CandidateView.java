@@ -89,11 +89,11 @@ public class CandidateView extends View {
     
     private final GestureDetector mGestureDetector;
 
-    // droidtop patch (Droidtop/tracker#903 H12a): new suggestions fade and rise into the strip (KeyMotion).
+    // droidtop patch (mytop-project/tracker#903 H12a): new suggestions fade and rise into the strip (KeyMotion).
     private long mArrivedAt;
     private boolean mArriving;
 
-    // droidtop patch (Droidtop/tracker#903 H6): the one candidate bar for every engine (CandidateBar is its model).
+    // droidtop patch (mytop-project/tracker#903 H6): the one candidate bar for every engine (CandidateBar is its model).
     // Hacker's suggestions are drawn exactly as before; a language's own engine adds small annotations, its chosen
     // candidate highlighted, and an expand button at the row's end that opens every candidate in a grid over the
     // keys. The grid is this same view, drawn in grid mode in a popup. The pad's ring (PadKeys) is drawn on the
@@ -110,7 +110,7 @@ public class CandidateView extends View {
     private CandidateView mGrid;
     private PopupWindow mGridPopup;
     private boolean mGridPaged;
-    // droidtop patch (Droidtop/tracker#903 H7a): an engine's composition mode on a button at the row's left end (its
+    // droidtop patch (mytop-project/tracker#903 H7a): an engine's composition mode on a button at the row's left end (its
     // width this frame, 0 with none), and a notice line in place of candidates while the engine gets ready.
     private int mModeWidth;
     private static final String EXPAND_GLYPH = "\u25BE";
@@ -420,7 +420,7 @@ public class CandidateView extends View {
     }
 
     /**
-     * droidtop patch (Droidtop/tracker#903 H6): a language's own engine's candidates, from the bar's model: the same
+     * droidtop patch (mytop-project/tracker#903 H6): a language's own engine's candidates, from the bar's model: the same
      * row, the same arrival motion, with each candidate's annotation drawn small, its chosen one highlighted, and the
      * expand button when the engine converts. The row holds the first MAX_SUGGESTIONS; the grid holds them all.
      */
@@ -651,7 +651,7 @@ public class CandidateView extends View {
         hideGrid();
     }
 
-    // droidtop patch (Droidtop/tracker#903 H6): the expand button, the grid, and the pad's route onto the bar.
+    // droidtop patch (mytop-project/tracker#903 H6): the expand button, the grid, and the pad's route onto the bar.
 
     private void drawRing(Canvas canvas, int x, int width, int height) {
         final float inset = mRingPaint.getStrokeWidth() / 2f;

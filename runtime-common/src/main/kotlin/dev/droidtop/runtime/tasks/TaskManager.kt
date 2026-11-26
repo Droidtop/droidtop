@@ -72,7 +72,7 @@ object TaskManager {
         if (packageName == context.packageName) return
         val display = LaunchLedger.entries().firstOrNull { it.packageName == packageName }?.displayId ?: return
         // Home on that screen, to the mode in use rather than the default one: ending a game from Desktop landed in
-        // Gaming (Droidtop/tracker#639). The Home activities still route a companion screen to the companion.
+        // Gaming (mytop-project/tracker#639). The Home activities still route a companion screen to the companion.
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra(dev.droidtop.library.settings.Modes.EXTRA_MODE_IN_USE, true)
         try {
@@ -89,7 +89,7 @@ object TaskManager {
     }
 
     /**
-     * Waits until Android records [packageName]'s activity as stopped after [sinceMs] (Droidtop/tracker#765), which is
+     * Waits until Android records [packageName]'s activity as stopped after [sinceMs] (mytop-project/tracker#765), which is
      * when the background kill can take it, and says whether it did; gives up after [BACKGROUND_SETTLE_MS]. The record
      * is Android's own app-event log ([UsageStatsManager.queryEvents]), readable with the usage access droidtop asks for;
      * without it the log reads empty and the wait is the whole limit, as it always was. Blocks: IO thread only.

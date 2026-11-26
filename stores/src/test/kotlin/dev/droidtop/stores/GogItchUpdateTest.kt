@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** How GOG and itch.io say a newer build exists (docs/SPEC.md 7g, "Where an update comes from"; Droidtop/tracker#222). */
+/** How GOG and itch.io say a newer build exists (docs/SPEC.md 7g, "Where an update comes from"; mytop-project/tracker#222). */
 class GogItchUpdateTest {
     private fun upload(updatedAt: String) =
         ItchUpload(7L, "game.zip", null, 1L, true, false, false, false, updatedAt)

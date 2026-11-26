@@ -23,7 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * The one in-place hint (docs/DESIGN-LANGUAGE.md, "Guidance"; Droidtop/tracker#829): one short line saying how to do
+ * The one in-place hint (docs/DESIGN-LANGUAGE.md, "Guidance"; mytop-project/tracker#829): one short line saying how to do
  * something, in a small pill where it is done, with "Got it" ([onDismiss]) as its one touch target. It never takes the
  * cursor or the screen: the rest of the surface works around it. Whether it shows is [dev.droidtop.library.settings.Hints]'.
  */

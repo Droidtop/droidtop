@@ -5,7 +5,7 @@ import android.preference.Preference
 import android.preference.PreferenceGroup
 
 /**
- * The rows a language's own engine adds to the keyboard's settings (Droidtop/tracker#903 H7c; docs/SPEC.md 6a, "The
+ * The rows a language's own engine adds to the keyboard's settings (mytop-project/tracker#903 H7c; docs/SPEC.md 6a, "The
  * engine seam"): one for each [InputEngines.SettingsRow] :app registered, at the end of the group that holds the
  * languages. What a row says is read off the main thread, since it may look at the engine's files.
  */

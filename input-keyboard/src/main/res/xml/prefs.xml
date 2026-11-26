@@ -19,7 +19,7 @@
         android:title="@string/english_ime_settings"
         android:key="english_ime_settings">
 
-    <!-- droidtop: pro mode and the reset (Droidtop/tracker#337). With pro mode off the screen is short; nothing is removed. -->
+    <!-- droidtop: pro mode and the reset (mytop-project/tracker#337). With pro mode off the screen is short; nothing is removed. -->
     <PreferenceCategory
             android:title="@string/title_droidtop_mode"
             android:key="droidtop_mode">
@@ -127,7 +127,7 @@
             android:defaultValue="@string/voice_mode_symbols"
             />
 
-    <!-- droidtop: offline voice typing, downloaded on request (Droidtop/tracker#343). -->
+    <!-- droidtop: offline voice typing, downloaded on request (mytop-project/tracker#343). -->
     <Preference
             android:key="pref_offline_voice"
             android:title="@string/title_offline_voice"
@@ -293,7 +293,7 @@
             android:title="@string/title_suggested_punctuation"
             android:defaultValue="@string/suggested_punctuations"
             />
-    <!-- droidtop: the keyboard's own dictionaries, converted from wordlists (Droidtop/tracker#339). -->
+    <!-- droidtop: the keyboard's own dictionaries, converted from wordlists (mytop-project/tracker#339). -->
     <Preference
             android:key="pref_dictionaries"
             android:title="@string/title_dictionaries"
@@ -368,7 +368,7 @@
             android:summary="@string/summary_tools_strip"
             />
 
-    <!-- One shape per orientation, as the keyboard's height and mode are (Droidtop/tracker#903 H1). -->
+    <!-- One shape per orientation, as the keyboard's height and mode are (mytop-project/tracker#903 H1). -->
     <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
             android:key="pref_keyboard_form"
             android:title="@string/title_keyboard_form"
@@ -387,7 +387,7 @@
             android:persistent="true"
             />
 
-    <!-- The input method's modes, one per orientation, also on the tool strip's Modes button (Droidtop/tracker#903 H12c). -->
+    <!-- The input method's modes, one per orientation, also on the tool strip's Modes button (mytop-project/tracker#903 H12c). -->
     <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
             android:key="pref_keyboard_view_mode"
             android:title="@string/title_keyboard_view_mode"
@@ -414,7 +414,7 @@
             android:summary="@string/summary_emoji"
             />
 
-    <!-- droidtop: the folders the emoji panel's GIFs and Stickers tabs read (Droidtop/tracker#903 H5). -->
+    <!-- droidtop: the folders the emoji panel's GIFs and Stickers tabs read (mytop-project/tracker#903 H5). -->
     <Preference
             android:key="pref_gif_folders"
             android:title="@string/title_gif_folders"
@@ -446,7 +446,7 @@
             android:summary="@string/summary_clipboard_history"
             />
 
-    <!-- How long unpinned clips stay (Droidtop/tracker#903 H12d). Until cleared is what the history did before. -->
+    <!-- How long unpinned clips stay (mytop-project/tracker#903 H12d). Until cleared is what the history did before. -->
     <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
             android:key="pref_clipboard_keep"
             android:title="@string/title_clipboard_keep"

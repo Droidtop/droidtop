@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 /**
- * Settings > Containers > Images (Droidtop/tracker#757): the images stored on this device, each with the containers
+ * Settings > Containers > Images (mytop-project/tracker#757): the images stored on this device, each with the containers
  * made from it, for a person to read and tidy. Pure.
  */
 object ImageListing {

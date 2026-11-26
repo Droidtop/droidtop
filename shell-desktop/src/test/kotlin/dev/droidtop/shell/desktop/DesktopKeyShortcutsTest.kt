@@ -5,7 +5,7 @@ import dev.droidtop.shell.desktop.DesktopPadRoutes.Route
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The keyboard's shortcuts to droidtop's chrome (docs/SPEC.md 6b "Where Meta goes", Droidtop/tracker#697). */
+/** The keyboard's shortcuts to droidtop's chrome (docs/SPEC.md 6b "Where Meta goes", mytop-project/tracker#697). */
 class DesktopKeyShortcutsTest {
     private val keys = DesktopPadRoutes.KeyShortcuts()
 

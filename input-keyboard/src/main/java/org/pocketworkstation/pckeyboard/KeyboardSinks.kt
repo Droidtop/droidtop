@@ -7,7 +7,7 @@ import android.view.KeyEvent
 import android.view.View
 
 /**
- * Where droidtop's keyboard types (docs/SPEC.md 4c, "Typing on the add-on display", Droidtop/tracker#314).
+ * Where droidtop's keyboard types (docs/SPEC.md 4c, "Typing on the add-on display", mytop-project/tracker#314).
  * Keys arrive on the hardware model [SecondScreenKeyboardListener] speaks: Android keycodes, pressed and
  * released, Shift as its own key around a capital. [text] carries what no key produces (an emoji from a
  * popup); a destination without a text channel (a compositor) sets [takesText] false.
@@ -30,7 +30,7 @@ interface KeyboardSink {
 
 /**
  * The meta state one hardware-style key stream implies, for a sink that builds its own key events or reads
- * characters (Droidtop/tracker#772: each sink tracked it by hand). A synthetic key event has no framework meta
+ * characters (mytop-project/tracker#772: each sink tracked it by hand). A synthetic key event has no framework meta
  * tracking behind it, so a capital is only reliably one when the letter's own event carries META_SHIFT_ON. Each sink
  * keeps its own tracker: two destinations never share a held Shift.
  */

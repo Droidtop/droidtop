@@ -82,12 +82,12 @@ class ShellWindowTest {
         // Never under 48dp of the layout.
         assertEquals(48f, touchTargetDp(xdpi = 100f, systemDensity = 1f, layoutDensity = 1f), 0.1f)
         // Never under Android's own 48dp of the display: a panel reporting 300 ppi at 2.25x is 90px at 0.3 inch, but 108px
-        // is Android's 48dp there, what the rig measures (Droidtop/tracker#690).
+        // is Android's 48dp there, what the rig measures (mytop-project/tracker#690).
         assertEquals(72f, touchTargetDp(xdpi = 300f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
     }
 
     @Test fun `the Desktop bar follows the input mode`() {
-        // Droidtop/tracker#690, owner 2026-11-05: a finger's size after a touch, the pad's dense size while it drives.
+        // mytop-project/tracker#690, owner 2026-11-05: a finger's size after a touch, the pad's dense size while it drives.
         val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
         assertEquals(consoleFinger, console.barTarget(padDriving = false))
         assertTrue(console.barTarget(padDriving = false).value * 1.5f >= 48f * 2.25f)
@@ -101,7 +101,7 @@ class ShellWindowTest {
 
     @Test
     fun `where the pad drives, a press target is the shell's 48dp, not a finger's`() {
-        // Droidtop/tracker#740: the finger size made the pad-driven Quick Menu sparse.
+        // mytop-project/tracker#740: the finger size made the pad-driven Quick Menu sparse.
         val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
         assertEquals(80f, consoleFinger.value, 0.5f)
         assertEquals(Measure.padTarget, console.pressTarget)
@@ -143,7 +143,7 @@ class ShellWindowTest {
 
     @Test
     fun `a pane's one-line rows are its press target, and a full screen keeps its roomier rows`() {
-        // DroidDeck's compact settings rows (Droidtop/tracker#363): a bodyLarge title is 24dp, so 12dp each side is 48dp.
+        // DroidDeck's compact settings rows (mytop-project/tracker#363): a bodyLarge title is 24dp, so 12dp each side is 48dp.
         val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
         val pane = console.pane(376)
         assertTrue(pane.inPane)

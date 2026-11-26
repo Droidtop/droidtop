@@ -11,7 +11,7 @@ import dev.droidtop.library.integrations.PluginWidgets
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The Plugin widget (docs/plugin-api.md 3 C10 and C2, Droidtop/tracker#563): one plugin's `ui.widget`, quick tile or
+ * The Plugin widget (docs/plugin-api.md 3 C10 and C2, mytop-project/tracker#563): one plugin's `ui.widget`, quick tile or
  * status tile on any launcher's page, drawn by droidtop's one renderer ([DroidtopWidgets.rows]) from the data
  * [PluginWidgets] asks of the plugin. The source is chosen in [PluginWidgetConfigureActivity] and kept in
  * [WidgetConfigs]. A tap is a [PluginWidgetActionReceiver] broadcast; after it the widget is drawn again with a fresh
@@ -90,7 +90,7 @@ class PluginWidgetProvider : AppWidgetProvider() {
             val whole = content.action?.let { PluginWidgetActionReceiver.intent(context, id, key, it) }
                 // Nothing of the plugin's own to press (a status tile, a snapshot with no action): the tap opens
                 // droidtop's Plugins place, where the plugin is, instead of falling to the launcher, which reopened
-                // the source chooser (RP5, build 2011, Droidtop/tracker#563).
+                // the source chooser (RP5, build 2011, mytop-project/tracker#563).
                 ?: if (rows.none { it.tap != null }) {
                     DroidtopWidgets.activity(
                         context,

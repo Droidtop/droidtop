@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `hostOpen`'s paths for a Flutter plugin (docs/plugin-api.md 5.3, Droidtop/tracker#375). */
+/** `hostOpen`'s paths for a Flutter plugin (docs/plugin-api.md 5.3, mytop-project/tracker#375). */
 class FlutterOpenFilesTest {
     @Test
     fun aSlotIsTakenOnceAndFreedByItsPath() {

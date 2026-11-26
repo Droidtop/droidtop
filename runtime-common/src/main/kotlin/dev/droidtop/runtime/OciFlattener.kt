@@ -145,7 +145,7 @@ object OciFlattener {
 
     /**
      * A layer blob as its uncompressed tar, by what its first bytes say: gzip, zstd (the OCI media type
-     * `tar+zstd`, which images now publish, Droidtop/tracker#950), or a plain tar. [sniff] must support mark.
+     * `tar+zstd`, which images now publish, mytop-project/tracker#950), or a plain tar. [sniff] must support mark.
      */
     internal fun uncompressed(sniff: BufferedInputStream): InputStream {
         sniff.mark(4)

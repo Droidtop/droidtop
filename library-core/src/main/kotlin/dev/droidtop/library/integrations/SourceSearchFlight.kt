@@ -10,7 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /**
- * At most one `search` per source in flight (docs/plugin-api.md "Fetchers answer in the one search", Droidtop/tracker#218):
+ * At most one `search` per source in flight (docs/plugin-api.md "Fetchers answer in the one search", mytop-project/tracker#218):
  * no kind can interrupt a plugin's call, so a search the person typed past is not cancelled at the plugin. Instead a
  * source is sent nothing more while its call runs; the call itself runs in [scope], apart from the search that asked,
  * so when that search is left (the query moved on) the source stays busy until it answers and its reply is dropped.

@@ -5,7 +5,7 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Words for a plain-JVM unit test (Droidtop/tracker#177): a row builder that now reads `words(R.string.x)` is tested
+ * Words for a plain-JVM unit test (mytop-project/tracker#177): a row builder that now reads `words(R.string.x)` is tested
  * without an Application, so [install] maps each module's R.string ids to their names by reflection and reads the
  * English from that module's own `src/main/res/values/strings.xml`, found from the repository root. A test sees the
  * same words a person reads; nothing here runs in the app.

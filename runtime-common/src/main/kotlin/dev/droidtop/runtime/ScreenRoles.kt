@@ -5,7 +5,7 @@ import android.view.Display
 import kotlin.math.sqrt
 
 /**
- * What the person said a screen is for (docs/SPEC.md 4c, "What each screen is for", Droidtop/tracker#776). The owner:
+ * What the person said a screen is for (docs/SPEC.md 4c, "What each screen is for", mytop-project/tracker#776). The owner:
  * "I don't want droidtop making assumptions based on MY device. I want us to design a system that works on any
  * display". No screen is assumed better: droidtop's main UI stays on the screen it started on until a screen is
  * answered [MAIN].
@@ -26,7 +26,7 @@ enum class ScreenRole(val label: String) {
 
 /**
  * What the person said Desktop does with a screen other than its own (docs/SPEC.md 4c and 2b, "The desktop on a second
- * screen", Droidtop/tracker#908 step D5): asked once per screen the first time Desktop runs with it, kept per screen
+ * screen", mytop-project/tracker#908 step D5): asked once per screen the first time Desktop runs with it, kept per screen
  * beside its [ScreenRole]. Unset until then: there is no default answer.
  */
 enum class DesktopScreenChoice(val label: String) {
@@ -239,7 +239,7 @@ object DisplayArrangement {
 }
 
 /**
- * The displays the running desktop is drawn on besides its own (Droidtop/tracker#908 step D5), published by `:app`'s
+ * The displays the running desktop is drawn on besides its own (mytop-project/tracker#908 step D5), published by `:app`'s
  * DesktopScreens: before it opens the desktop on a display, and only after it has closed it there. The second-screen
  * orchestration keeps the companion and the idle cover off these displays (SecondScreenPlan), so neither covers the
  * desktop whichever runs first.

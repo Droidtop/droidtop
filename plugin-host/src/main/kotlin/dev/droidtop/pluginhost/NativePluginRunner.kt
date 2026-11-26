@@ -123,7 +123,7 @@ class NativePluginRunner(
         val id = record.manifest.id
         loadFailures.remove(id)
         if (record.manifest.kind == PluginKind.APP_INTERFACE) return loadApp(record)
-        // Once per process, not once per call (Droidtop/tracker#884): a plugin already loaded in its live process is
+        // Once per process, not once per call (mytop-project/tracker#884): a plugin already loaded in its live process is
         // ready, and calls at the same time share one load ([LoadOnce]).
         return loads.load(id, "${tier.name}|${record.archiveDigest}", alive = { runtime -> stillLoaded(id, runtime) }) {
             if (loadFresh(record, installDir, tier)) runtimes[id] else null
@@ -148,7 +148,7 @@ class NativePluginRunner(
         // access included"): the contained loader with the network, and droidtop's relays for the system services it was allowed.
         val isolatedFull = tier == PluginTier.FULL_TRUST && PluginTiers.fullAccessRunsIsolated(PluginTiers.fullAccessIsolated())
         val isolated = isolatedNet || isolatedFull
-        // Each start's phases on one line (Droidtop/tracker#848): the process, then the plugin's own load in it.
+        // Each start's phases on one line (mytop-project/tracker#848): the process, then the plugin's own load in it.
         val startedAt = android.os.SystemClock.elapsedRealtime()
         val runtime = PluginProcesses.acquire(appContext, id, if (isolated) PluginTier.CONTAINED else tier, network = isolated)
             ?: return failLoad(id, if (tier == PluginTier.CONTAINED) "its contained process could not be started" else "the plugin process could not be started")

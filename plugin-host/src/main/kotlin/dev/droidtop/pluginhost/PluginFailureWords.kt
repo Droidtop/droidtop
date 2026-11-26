@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
 /**
- * A plugin's failure in droidtop's voice (Droidtop/tracker#852 part 2 slice 2, from #883 §3.7, approved 2026-11-05).
+ * A plugin's failure in droidtop's voice (mytop-project/tracker#852 part 2 slice 2, from #883 §3.7, approved 2026-11-05).
  * The owner: plugins "feel hacked on". Failures said who failed ("<label> ran into a problem it didn't explain", "It
  * could not do that", "Couldn't finish"), not what the person can do. Now every failure has a code from a fixed list,
  * and droidtop words it, with its one fix. The subject is the feature's own name, the one it has in Game sources

@@ -9,7 +9,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): one launch takes the choice, the saved Runs with stays. */
+/** "Run once with…" (docs/SPEC.md 7i, mytop-project/tracker#636): one launch takes the choice, the saved Runs with stays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class RunOnceTest {
@@ -34,7 +34,7 @@ class RunOnceTest {
 
     @Test
     fun `the step before the launch sees the run-once choice without taking it`() {
-        // Droidtop/tracker#752: resolveAndPlay weighed the saved Enginehost and ran its setup instead of Wine.
+        // mytop-project/tracker#752: resolveAndPlay weighed the saved Enginehost and ran its setup instead of Wine.
         LaunchStrategyOverridePrefs.set(context, "folder:BGI", GameLaunchStrategy.ENGINEHOST)
         LaunchStrategyOverridePrefs.runOnce("folder:BGI", GameLaunchStrategy.WINE_PREFIX)
 

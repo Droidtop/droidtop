@@ -37,8 +37,8 @@ import dev.droidtop.app.apps.ApkInstaller
  * checks are silent.
  */
 object AppSelfUpdate {
-    private const val DOWNLOADS = "https://github.com/Droidtop/droidtop/releases/download"
-    private const val API_RELEASES = "https://api.github.com/repos/Droidtop/droidtop/releases"
+    private const val DOWNLOADS = "https://github.com/mytop-project/droidtop/releases/download"
+    private const val API_RELEASES = "https://api.github.com/repos/mytop-project/droidtop/releases"
 
     // Every per-build history release's tag (build-scripts/release_channel.py
     // BASE_VERSION/BUILD_TAG_RE): "v" + versionName. testing/stable never
@@ -49,7 +49,7 @@ object AppSelfUpdate {
     private const val PREFS = "app_update_check"
     private const val KEY_CHECK_DAILY = "updates_check_daily"
     private const val KEY_FREQUENCY = "updates_frequency"
-    /** Retired: checks follow Download rules' network rule ([migrateUnmeteredOnly], Droidtop/tracker#833). */
+    /** Retired: checks follow Download rules' network rule ([migrateUnmeteredOnly], mytop-project/tracker#833). */
     private const val KEY_UNMETERED_ONLY = "updates_unmetered_only"
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
@@ -145,7 +145,7 @@ object AppSelfUpdate {
 
     /**
      * Whether checks stay off metered connections (mobile data, tethering): Download rules' network rule decides
-     * ([DownloadPolicy.checksOnMetered]), the one place for it (Droidtop/tracker#833). Reads preferences: not for the
+     * ([DownloadPolicy.checksOnMetered]), the one place for it (mytop-project/tracker#833). Reads preferences: not for the
      * main thread.
      */
     fun unmeteredOnly(context: Context): Boolean {
@@ -214,7 +214,7 @@ object AppSelfUpdate {
      * What a check saw, whichever check it was (the scheduled one, the Updates page's Check now, or Update now): the
      * newest build, so the Updates page lists droidtop while it is newer than this one. Only the scheduled pass used to
      * record it, and that runs when the process starts, which a launcher's seldom does, so the page said "Up to date"
-     * whatever Check now found (Droidtop/tracker#570).
+     * whatever Check now found (mytop-project/tracker#570).
      */
     fun recordSeen(context: Context, info: Info) {
         prefs(context.applicationContext).edit()
@@ -360,7 +360,7 @@ object AppSelfUpdate {
                 android.net.Uri.parse("package:" + context.packageName),
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             // In front (the Check now row) the screen opens. From the background (the UPDATE_NOW broadcast, the
-            // scheduled pass) Android refuses to start it, so a notification opens it instead (Droidtop/tracker#951).
+            // scheduled pass) Android refuses to start it, so a notification opens it instead (mytop-project/tracker#951).
             runCatching { dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, allow) }
             notifyAllowInstalls(context, allow)
             throw IllegalStateException(UNKNOWN_APPS_BLOCKED)
@@ -411,7 +411,7 @@ object AppSelfUpdate {
         require(apk.isFile) { "the downloaded APK is missing" }
         require(sha256(apk) == digest.uppercase()) { "the downloaded APK does not match the published digest" }
         // Installing ends this process. Every running job is written down first with its last checkpoint, so the new
-        // version runs it again from there instead of losing up to a second of it (Droidtop/tracker#842).
+        // version runs it again from there instead of losing up to a second of it (mytop-project/tracker#842).
         runCatching { kotlinx.coroutines.runBlocking { dev.droidtop.pluginhost.PluginJobsCenter.flushNow() } }
         return commitSession(context, apk, "$versionName (build $versionCode)")
     }

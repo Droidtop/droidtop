@@ -26,7 +26,7 @@ object AmazonManifest {
         val hashHex: String get() = hashBytes.joinToString("") { "%02x".format(it) }
 
         /**
-         * Whether [file] is this entry by its SHA-256, or true when the manifest gives no SHA-256 to check (Droidtop/tracker#766:
+         * Whether [file] is this entry by its SHA-256, or true when the manifest gives no SHA-256 to check (mytop-project/tracker#766:
          * one file hash, [dev.droidtop.shared.trust.Sha256.hex], for the download's check and verify's).
          */
         fun matches(file: java.io.File): Boolean =

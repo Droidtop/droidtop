@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.settings.JobLook
 
 /**
- * A job's bar for a View surface (Droidtop/tracker#643): Standard's settings are Preference rows, so a job's row there
+ * A job's bar for a View surface (mytop-project/tracker#643): Standard's settings are Preference rows, so a job's row there
  * uses [LAYOUT] and binds its bar through here, one ComposeView per row as [PageViews] hosts a page's pieces, the same
  * [JobProgress] Gaming and the companion draw, in the surface's own theme colours. A finished job's row draws its
  * [JobMark] instead.

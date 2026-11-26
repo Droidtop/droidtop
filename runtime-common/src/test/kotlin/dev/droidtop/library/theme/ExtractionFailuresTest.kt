@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** A bundled theme whose extraction failed is not tried again until Try again clears it (Droidtop/tracker#849). */
+/** A bundled theme whose extraction failed is not tried again until Try again clears it (mytop-project/tracker#849). */
 class ExtractionFailuresTest {
     @Before
     @After

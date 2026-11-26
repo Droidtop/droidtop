@@ -30,18 +30,18 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.ui.shared.JobRing
 
 /**
- * The status area's one contextual spot (docs/SPEC.md 7i "Home", Droidtop/tracker#742; the owner: "Have a contextual
+ * The status area's one contextual spot (docs/SPEC.md 7i "Home", mytop-project/tracker#742; the owner: "Have a contextual
  * spot that shows an icon for whatever's currently happening"): the icon of what is happening now ([HappeningNow]),
  * inside a ring that fills as it goes or turns while it does not know, and a small count when more than one thing
  * runs. Nothing is drawn while nothing runs. It lives on the status pill, so Home's band and the pill floating over
  * every other page carry the same spot. A tap opens where the jobs are ([onOpen], the Quick Menu's Downloads tab);
  * touch only, never a stop of the pad, as nothing in the top bar is. The companion's status line draws the same spot,
- * opening its droidtop > Downloads page (Droidtop/tracker#786 S5).
+ * opening its droidtop > Downloads page (mytop-project/tracker#786 S5).
  */
 @Composable
 fun ActivitySpot(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val jobs by remember { PluginJobsCenter.entries() }.collectAsState()
-    // One job on the spot while it runs, its fill only moving forward (Droidtop/tracker#834).
+    // One job on the spot while it runs, its fill only moving forward (mytop-project/tracker#834).
     val held = remember { HappeningNow.Held() }
     val now = remember(jobs) { held.next(jobs) } ?: return
     val colors = shellJobColors()

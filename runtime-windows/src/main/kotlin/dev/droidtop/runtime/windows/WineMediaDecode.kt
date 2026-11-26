@@ -10,7 +10,7 @@ import timber.log.Timber
 
 /**
  * Video in Wine games through droidtop's sandboxed decode server (docs/SPEC.md 9, "Video in Wine games";
- * Droidtop/tracker#601, the enginehost-ffmpeg handoff the owner chose on #906).
+ * mytop-project/tracker#601, the enginehost-ffmpeg handoff the owner chose on #906).
  *
  * Two pieces from the APK, both built in runtime-windows/native/mediadecode:
  * - `libdroidtopmediad.so`, the server, started per session by [MediaDecodeServerComponent]. It forks one process per

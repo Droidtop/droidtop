@@ -53,7 +53,7 @@ object PluginMainUi {
         val entry = declared(m) ?: return "${m.label} has no screen of its own"
         if (!record.runnable()) return "${m.label} is not approved and turned on"
         // The same per-item approval every other call honours (#164): the user may have unticked this one. Set to Ask
-        // first (or not answered yet), opening it is the first use, so the first-use sheet asks (Droidtop/tracker#59,
+        // first (or not answered yet), opening it is the first use, so the first-use sheet asks (mytop-project/tracker#59,
         // emulator rig: Ask first was refused like Blocked); Not now and Never leave it closed.
         when (PluginGrants.provideState(record, PluginGrants.forContext(context).read(m.id), POINT)) {
             GrantState.GRANTED -> Unit

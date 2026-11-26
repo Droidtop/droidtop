@@ -9,7 +9,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The Desktop-mode fixture (src/test/fixtures/desktop, docs/plugin-api.md 1.12, Droidtop/tracker#221) against
+ * The Desktop-mode fixture (src/test/fixtures/desktop, docs/plugin-api.md 1.12, mytop-project/tracker#221) against
  * droidtop's side of each hook: its manifest declares what each needs, its facets pass the guards of both Desktop
  * targets, and the host ops it calls answer it through the broker. desktop_fixture_check.py drives its plugin.py.
  */

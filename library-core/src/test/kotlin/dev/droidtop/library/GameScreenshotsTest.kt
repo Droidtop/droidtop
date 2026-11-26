@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/** A game's own screenshot folder name (Droidtop/tracker#596): one per game id, and safe on any file system. */
+/** A game's own screenshot folder name (mytop-project/tracker#596): one per game id, and safe on any file system. */
 class GameScreenshotsTest {
     @Test
     fun `a game id becomes a stable, file-safe folder name`() {

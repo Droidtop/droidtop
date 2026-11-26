@@ -195,7 +195,7 @@ object IgdbScraperClient {
 
     /**
      * The games IGDB lists as similar to each of [ids] (its `similar_games`), with what droidtop ranks them by: genre,
-     * developer, the critic-and-user `total_rating` (0..100) and how many ratings it rests on (Droidtop/tracker#52).
+     * developer, the critic-and-user `total_rating` (0..100) and how many ratings it rests on (mytop-project/tracker#52).
      * One query for up to [MAX_SIMILAR_IDS] games; the answer maps each asked id to its similar games.
      */
     fun similar(clientId: String, clientSecret: String, ids: List<Long>): ScrapeLookup<Map<Long, List<IgdbSimilar>>> {

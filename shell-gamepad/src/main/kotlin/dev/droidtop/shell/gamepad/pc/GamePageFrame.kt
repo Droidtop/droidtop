@@ -107,7 +107,7 @@ import dev.droidtop.ui.shared.Motion
 
 /**
  * The game page's frame, the one design every kind of game's page is drawn in (docs/SPEC.md 7i, "The page's
- * frame"; the owner, Droidtop/tracker#845: "One page for every kind of game"). The PC and store game page
+ * frame"; the owner, mytop-project/tracker#845: "One page for every kind of game"). The PC and store game page
  * ([PcGamePage]) and the console game's page ([dev.droidtop.shell.gamepad.EntryDetailScreen]) each work out their
  * own facts and hand them here; the frame draws them and moves the one cursor. From the top:
  *
@@ -126,7 +126,7 @@ import dev.droidtop.ui.shared.Motion
  *
  * Every word the frame draws itself (each tab's empty line, the status row's labels, the L2 hint, the shared Options
  * rows) names what the page is about by its [PageKind], read from the entry: "this game", or "this app" on an Android
- * app's page (the owner, Droidtop/tracker#845: "One page for every kind of game, apps and the source record").
+ * app's page (the owner, mytop-project/tracker#845: "One page for every kind of game, apps and the source record").
  *
  * The pad comes through one `onPad` handler on the frame's root, which moves ONE cursor through three zones (the
  * band's buttons, the tabs, the tab's rows): Up and Down between zones and rows, Left and Right along the buttons
@@ -336,7 +336,7 @@ internal fun GamePageFrame(
                         }
                     }
                     // X plays from anywhere on the page, as on the library tile; Y is Favourite
-                    // (owner decision, Droidtop/tracker#644 slice 4, proposal 6.C).
+                    // (owner decision, mytop-project/tracker#644 slice 4, proposal 6.C).
                     GamepadAction.X -> onPrimary()
                     GamepadAction.Y -> onToggleFavorite()
                     GamepadAction.L2 -> openGameMenu()
@@ -467,7 +467,7 @@ internal fun GamePageFrame(
                                 uniformHeight = true,
                                 // A row with no second line keeps no room for one, row by row as Settings' rows do
                                 // (CatalogNavigator): decided per tab, one subtitled row (Runner) left every Details row
-                                // a four-line box with one line in it (Droidtop/tracker#662, rig 2775).
+                                // a four-line box with one line in it (mytop-project/tracker#662, rig 2775).
                                 uniformSummaryLines = if (fact.subtitle != null) 2 else 0,
                                 ownScrollKeeping = true,
                                 onClick = {
@@ -475,7 +475,7 @@ internal fun GamePageFrame(
                                     row = index
                                     if (fact.typed != null) typingRow = index else fact.onActivate?.invoke()
                                 },
-                                // A copy's Options, Select's on a pad, is a long press by touch (Droidtop/tracker#839).
+                                // A copy's Options, Select's on a pad, is a long press by touch (mytop-project/tracker#839).
                                 onLongClick = fact.onOptions?.let { options ->
                                     {
                                         zone = PageZone.CONTENT
@@ -506,7 +506,7 @@ internal fun GamePageFrame(
             )
         }
     }
-    // Edit metadata and Options, each beside its button (the owner, Droidtop/tracker#845: "Keep "edit metadata" as a
+    // Edit metadata and Options, each beside its button (the owner, mytop-project/tracker#845: "Keep "edit metadata" as a
     // button, put "scrape" IN the edit metadata panel, and move the rest to an options menu").
     if (editOpen && editMetadataRows != null) {
         AnchoredMenu(
@@ -548,7 +548,7 @@ private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
 
 /**
  * What a page is about, and so the words the frame uses for it (docs/SPEC.md 7i, "Apps on the page"): a game, or an
- * Android app (the owner, Droidtop/tracker#845: "One page for every kind of game, apps and the source record"). The
+ * Android app (the owner, mytop-project/tracker#845: "One page for every kind of game, apps and the source record"). The
  * one place those words are chosen: the tabs' empty lines, the status row, Activity's rows, the L2 hint and Options'
  * shared rows all read them from here, so no page keeps its own copy. [noun] is "this game"'s word, [verb] the
  * primary action's ("Play", "Open"), [done] what Activity says was done with it.
@@ -574,11 +574,11 @@ internal enum class PageKind(val noun: String, val verb: String, val done: Strin
 internal enum class PageTab(val label: String) {
     OVERVIEW("Overview"),
     VERSIONS("Versions"),
-    // How the person has played it (the owner, Droidtop/tracker#845: an Activity tab).
+    // How the person has played it (the owner, mytop-project/tracker#845: an Activity tab).
     ACTIVITY("Activity"),
     EXTRAS("Extras"),
     DETAILS("Details"),
-    // The source's own thread (the owner, Droidtop/tracker#845: "put a "show thread" tab"); its first post comes later.
+    // The source's own thread (the owner, mytop-project/tracker#845: "put a "show thread" tab"); its first post comes later.
     THREAD("Show thread"),
     ;
 
@@ -603,18 +603,18 @@ internal data class PageFact(
     val tip: String? = null,
     /**
      * The tab this row lives on, said by every row that makes one: a row is never placed by matching its title,
-     * so renaming a row cannot move it, and a new row cannot land on a tab by accident (Droidtop/tracker#678).
+     * so renaming a row cannot move it, and a new row cannot land on a tab by accident (mytop-project/tracker#678).
      */
     val tab: PageTab,
     /** What Select does on this row (a copy's Options); null for a row that has none. */
     val onOptions: (() -> Unit)? = null,
-    /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
+    /** An on/off row's state, drawn as a switch (show, then say: mytop-project/tracker#738); null for any other row. */
     val on: Boolean? = null,
-    /** The value is a place: one line, cut in the middle so the folder at its end shows (Droidtop/tracker#672). */
+    /** The value is a place: one line, cut in the middle so the folder at its end shows (mytop-project/tracker#672). */
     val path: Boolean = false,
     /** A state drawn as its glyph beside the title (synced, offline, working); null for none. */
     val mark: dev.droidtop.library.settings.StatusMark? = null,
-    /** A value typed in the row itself (no editor, no panel: Droidtop/tracker#954 item 12); A puts the cursor in it. */
+    /** A value typed in the row itself (no editor, no panel: mytop-project/tracker#954 item 12); A puts the cursor in it. */
     val typed: Typed? = null,
 ) {
     /** What a typed fact starts from, its hint while blank, and what takes the text when the person is done. */
@@ -649,11 +649,11 @@ internal enum class PageButton { PRIMARY, EDIT_METADATA, OPTIONS, FAVOURITE }
 internal fun pageButtons(hasEditMetadata: Boolean): List<PageButton> =
     PageButton.values().filter { it != PageButton.EDIT_METADATA || hasEditMetadata }
 
-/** The two buttons beside the primary action, and the panels they open (Droidtop/tracker#845). */
+/** The two buttons beside the primary action, and the panels they open (mytop-project/tracker#845). */
 internal const val EDIT_METADATA = "Edit metadata"
 internal const val OPTIONS = "Options"
 
-/** Edit metadata's first row (the owner, Droidtop/tracker#845: "put "scrape" IN the edit metadata panel"). */
+/** Edit metadata's first row (the owner, mytop-project/tracker#845: "put "scrape" IN the edit metadata panel"). */
 internal const val SCRAPE_ROW = "Scrape"
 
 /** The Scrape row's line while a scrape it started runs. */
@@ -700,7 +700,7 @@ internal object PageOptionRows {
 /** The A hint on the action band: what the button under the cursor does. */
 /**
  * Whether the X hint names the primary verb: not while the cursor is on the primary action, where A already says it
- * (Droidtop/tracker#660: "A Play" and "X Play" side by side, one action named twice in a bar that runs short in
+ * (mytop-project/tracker#660: "A Play" and "X Play" side by side, one action named twice in a bar that runs short in
  * portrait). X still plays from there; the bar just names it once. Pure.
  */
 internal fun xNamesPlay(zone: PageZone, button: PageButton): Boolean = !(zone == PageZone.ACTIONS && button == PageButton.PRIMARY)
@@ -732,11 +732,11 @@ private fun PageHero(entry: LibraryEntry, height: Dp, statuses: List<PageStatus>
     var heroNarrow by remember(hero) { mutableStateOf(false) }
     // Only portrait art, or hero art too narrow for the band: it takes its own shape at the right and the name keeps
     // to the width left of it, wrapping, rather than running under the art with only the gradient between
-    // (Droidtop/tracker#666).
+    // (mytop-project/tracker#666).
     val coverArt = entry.artworkUri.takeIf { hero == null }
     val sideHero = hero.takeIf { heroNarrow }
     // With no art at all the band keeps its full height on a plain plate and the name stands where the logo goes, as
-    // Steam's page does (owner, 2026-11-05, Droidtop/tracker#666).
+    // Steam's page does (owner, 2026-11-05, mytop-project/tracker#666).
     Box(modifier = Modifier.fillMaxWidth().height(height).background(MenuTokens.Card)) {
         if (hero != null && !heroNarrow) {
             AsyncImage(
@@ -814,7 +814,7 @@ private const val COVER_ASPECT = 2f / 3f
  * The action band, one row as on Steam's page: the ONE large primary action
  * at the left, the quiet facts strip beside it, Edit metadata (when the page
  * has it), Options and a small Favourite button at the right edge
- * (Droidtop/tracker#845), and under them the one line saying why the primary
+ * (mytop-project/tracker#845), and under them the one line saying why the primary
  * action is what it is. [selectedButton] is the button the cursor is on, null
  * when the cursor is elsewhere. In portrait the strip sits under the buttons.
  */
@@ -890,7 +890,7 @@ private fun PageActionBand(
                 primary()
                 rest()
             }
-            // Why the button says what it says sits right under it, before the facts (Droidtop/tracker#657); a
+            // Why the button says what it says sits right under it, before the facts (mytop-project/tracker#657); a
             // download's line is its time left and stays under its bar.
             if (play.look == null) detail()
             if (strip.isNotEmpty()) PageFactsStrip(strip, Modifier.fillMaxWidth().padding(top = Space.Sm))
@@ -905,7 +905,7 @@ private fun PageActionBand(
                 rest()
             }
         }
-        // The download's bar: how far, seen rather than read (Droidtop/tracker#643); the line under it says the time left.
+        // The download's bar: how far, seen rather than read (mytop-project/tracker#643); the line under it says the time left.
         play.look?.let { look ->
             dev.droidtop.shell.gamepad.ShellProgressBar(
                 play.progress ?: -1f,
@@ -964,9 +964,9 @@ private fun PageFactsStrip(facts: List<StripFact>, modifier: Modifier = Modifier
 
 /**
  * The tab strip, L1 and R1 at its ends: while the page is open it owns
- * the shoulders. Every tab is drawn, an empty one too (the owner, Droidtop/tracker#845: "Empty tabs
+ * the shoulders. Every tab is drawn, an empty one too (the owner, mytop-project/tracker#845: "Empty tabs
  * shouldn't be hidden"). Where its names do not fit (a large text size, portrait) it scrolls sideways,
- * and the end it can scroll to fades, so a tab cut at the edge says there is more (Droidtop/tracker#661).
+ * and the end it can scroll to fades, so a tab cut at the edge says there is more (mytop-project/tracker#661).
  */
 @Composable
 private fun PageTabStrip(
@@ -1018,7 +1018,7 @@ internal data class PageStatus(
 )
 
 /**
- * The status row under the title (the owner, Droidtop/tracker#845: "a set of icons to indicate the status of each
+ * The status row under the title (the owner, mytop-project/tracker#845: "a set of icons to indicate the status of each
  * thing ... so we can confirm saves are synced, achievements are available, etc, visually"), from what the page
  * already knows, in this order: whether it is ready to play ([runsWith] what runs it: a runner, an emulator), an
  * update ([update]: the game's own, or the version an app catalog offers for an app), the store's cloud saves

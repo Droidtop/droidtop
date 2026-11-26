@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-/** The `.combined` wordlist reader (Droidtop/tracker#339). */
+/** The `.combined` wordlist reader (mytop-project/tracker#339). */
 class CombinedWordlistTest {
     private val text = """
         dictionary=main:en_us,locale=en_US,description=English (US),date=1414726273,version=54

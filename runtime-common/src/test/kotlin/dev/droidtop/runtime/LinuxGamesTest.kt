@@ -85,7 +85,7 @@ class LinuxGamesTest {
         val script = LinuxGames.installScript
         assertFalse(script.contains("@SHA"))
         assertFalse(script.contains("ppa.launchpadcontent.net"))
-        assertTrue(script.contains("https://github.com/Droidtop/FEX/releases/download/${LinuxGames.FEX_BUILD}/"))
+        assertTrue(script.contains("https://github.com/mytop-project/FEX/releases/download/${LinuxGames.FEX_BUILD}/"))
         for (level in listOf("armv8.0", "armv8.2", "armv8.4")) {
             assertTrue(level, Regex("$level\\) want=[0-9a-f]{64} ;;").containsMatchIn(script))
         }

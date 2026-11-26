@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * The shell's one confirmation (Droidtop/tracker#835; the owner: "if I hit something like "quit", I can't back out of
+ * The shell's one confirmation (mytop-project/tracker#835; the owner: "if I hit something like "quit", I can't back out of
  * it, all I can do is confirm it"). [question] over two choices: Cancel first and under the cursor, then [action] in the
  * danger tone. A on Cancel, B, or Back cancel ([onCancel]); only A on [action] runs [onConfirm]. It replaced every
  * "press A again" row, where a first A armed the row and only a second one, or leaving the whole menu, ended it.

@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A narrow pane's compact ladder (docs/SPEC.md 7k, "Narrow panes read the compact ladder"; Droidtop/tracker#739). */
+/** A narrow pane's compact ladder (docs/SPEC.md 7k, "Narrow panes read the compact ladder"; mytop-project/tracker#739). */
 class NarrowPaneTest {
     @Test
     fun `a pane under 600dp is narrow, a whole screen is not`() {

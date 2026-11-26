@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** apps.catalog@1 (docs/plugin-api.md 3 A12, Droidtop/tracker#261): what droidtop reads from a catalog plugin and decides itself. */
+/** apps.catalog@1 (docs/plugin-api.md 3 A12, mytop-project/tracker#261): what droidtop reads from a catalog plugin and decides itself. */
 class AppCatalogsTest {
     private val keyA = "aa".repeat(32)
     private val keyB = "bb".repeat(32)

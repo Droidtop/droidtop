@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The Apps tab's figures (AppsInsights.kt, Droidtop/tracker#414 slice C20). */
+/** The Apps tab's figures (AppsInsights.kt, mytop-project/tracker#414 slice C20). */
 class AppsInsightsTest {
     private fun app(pkg: String) = RunningApp(pkg, pkg, 0, null, true)
     private val apps = listOf(app("a.recent"), app("b.heavy"), app("c.light"))

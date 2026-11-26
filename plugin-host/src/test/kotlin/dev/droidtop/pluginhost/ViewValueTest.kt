@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Typed view values (docs/plugin-api.md 1.6 "Typed values", Droidtop/tracker#521 item 7) and `needs` (item 5). */
+/** Typed view values (docs/plugin-api.md 1.6 "Typed values", mytop-project/tracker#521 item 7) and `needs` (item 5). */
 class ViewValueTest {
     private fun info(value: Any?): String? {
         val node = JSONObject().put("type", "info").put("id", "v").put("title", "Value").put("value", value ?: JSONObject.NULL)

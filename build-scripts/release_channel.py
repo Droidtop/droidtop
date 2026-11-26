@@ -85,7 +85,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import changelog_commits  # noqa: E402  (beside this script; CI runs it by path)
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "Droidtop/droidtop")
+REPO = os.environ.get("GITHUB_REPOSITORY", "mytop-project/droidtop")
 
 # The single source for droidtop's current version base; app/build.gradle.kts
 # versionName and this script's own tag/versionName scheme both read from
@@ -447,7 +447,7 @@ def publish_build(outputs):
             sha256(os.path.join(outputs, ASSETS[1][1])) != info["debugApkSha256"]:
         sys.exit("The APKs do not match their release-info.json; refusing to publish")
 
-    # Every build's notes are its complete changelog (owner, Droidtop/tracker#727): the entry this build's APK
+    # Every build's notes are its complete changelog (owner, mytop-project/tracker#727): the entry this build's APK
     # carries, read from the same file, so the notes and the app's What's new cannot differ.
     changelog_path = os.path.join(outputs, CHANGELOG_ASSET)
     if not os.path.exists(changelog_path):

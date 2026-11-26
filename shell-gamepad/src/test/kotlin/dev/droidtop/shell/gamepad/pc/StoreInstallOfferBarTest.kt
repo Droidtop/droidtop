@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A game folder's row draws how full its partition is (show, then say: Droidtop/tracker#738). */
+/** A game folder's row draws how full its partition is (show, then say: mytop-project/tracker#738). */
 class StoreInstallOfferBarTest {
     private fun volume(free: Long, total: Long) = InstallVolume("Games", "/storage/Games", free, total)
 

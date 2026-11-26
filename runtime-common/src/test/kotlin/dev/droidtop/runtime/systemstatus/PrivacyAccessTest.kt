@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The Privacy card's reading of Android's own record (PrivacyAccess.kt, Droidtop/tracker#414 slice C17). */
+/** The Privacy card's reading of Android's own record (PrivacyAccess.kt, mytop-project/tracker#414 slice C17). */
 class PrivacyAccessTest {
     // The shape of `dumpsys appops --op FINE_LOCATION` on Android 13 (emulator-5566, 2026-10-09), names shortened.
     private val dump = """

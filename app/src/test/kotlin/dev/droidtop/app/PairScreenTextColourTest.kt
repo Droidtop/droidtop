@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * The pairing screens have no Surface, which is what gives a `Text` its colour; without one
- * the text is black on the ground's black (Droidtop/tracker#527). Compose draws no pixels in
+ * the text is black on the ground's black (mytop-project/tracker#527). Compose draws no pixels in
  * a JVM test, so this holds the line in the source: the screen sets the content colour from
  * the theme before it draws anything.
  */

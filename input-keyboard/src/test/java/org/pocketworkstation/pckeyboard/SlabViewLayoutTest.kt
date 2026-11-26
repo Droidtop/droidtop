@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The companion's Input keyboard at the sizes the RP5 gives it (Droidtop/tracker#567: it "moves things around, doesn't
+ * The companion's Input keyboard at the sizes the RP5 gives it (mytop-project/tracker#567: it "moves things around, doesn't
  * scale properly, and gets cut off"). The panel is 1080x1920; the tab leaves the keyboard part of that, in portrait and
  * turned to landscape, at small and large font scales. At every size no key leaves the view, a row is never under the
  * minimum when the host gave the minimum height, labels never go under their minimum, and switching to the symbols

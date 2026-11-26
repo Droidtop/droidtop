@@ -1,5 +1,5 @@
 # droidtop's native library, libdroidtop_agent.so (docs/SPEC.md 7o): droidtop's own scaffold over the shared
-# libraries (Droidtop/tracker#867, owner 2026-11-04: "each program to have its own scaffold, that can use as
+# libraries (mytop-project/tracker#867, owner 2026-11-04: "each program to have its own scaffold, that can use as
 # many shared libraries and stuff as possible"). It was droidtop-agent's crates/android, built and released by
 # that repository; it moved here as it was, and build-scripts/build-agent-lib.sh builds it for both ABIs.
 [package]
@@ -8,7 +8,7 @@ description = "droidtop's side of the agent protocol: the shared core behind one
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-only"
-repository = "https://github.com/Droidtop/droidtop"
+repository = "https://github.com/mytop-project/droidtop"
 rust-version = "1.91"
 publish = false
 
@@ -18,14 +18,14 @@ name = "droidtop_agent"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
+# Identity, pairing, the channel, the protocol and the sync rules: mytop-project/mytop-sync.
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
-# The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client. WebDAV, S3, SFTP and SMB (libsmb2,
-# built from lib-net's vendor/libsmb2 for both Android ABIs). SFTP's russh needs ed25519-dalek 3, which the mesh test's
+# The person's own shares (mytop-project/tracker#573): mytop-project/mytop-net's share client. WebDAV, S3, SFTP and SMB (libsmb2,
+# built from mytop-net's vendor/libsmb2 for both Android ABIs). SFTP's russh needs ed25519-dalek 3, which the mesh test's
 # droidtop-agent allows since it took windowcast's IronRDP on sspi 0.23.1 (fc52738).
 net-remote = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.6" }
-# KDE Connect, both ways (Droidtop/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
-# lib-kdeconnect's operation table.
+# KDE Connect, both ways (mytop-project/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
+# mytop-kdeconnect's operation table.
 kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.1" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
@@ -33,8 +33,8 @@ serde_json = "1"
 
 [dev-dependencies]
 # The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
-# droidtop-agent main c22cd63 (Droidtop/tracker#573): the agent on lib-sync 0.2, with lib-games 0.4, lib-saves
-# 0.3 and lib-plugins 0.3.
+# droidtop-agent main c22cd63 (mytop-project/tracker#573): the agent on mytop-sync 0.2, with mytop-games 0.4, mytop-saves
+# 0.3 and mytop-plugins 0.3.
 droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5" }
 droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
 

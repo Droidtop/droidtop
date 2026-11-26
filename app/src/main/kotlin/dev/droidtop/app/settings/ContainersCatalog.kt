@@ -115,17 +115,17 @@ object ContainersCatalog {
         id = SCREEN_ID,
         title = "Containers",
         groups = { context -> rootGroups(context) },
-        // Read again as each container's size becomes known (Droidtop/tracker#911).
+        // Read again as each container's size becomes known (mytop-project/tracker#911).
         live = ContainerSizes.changes,
         // Settings search reads the same rows, each container's page included, with nothing measured: no size, no
-        // memory and processor reading, no image store walk (Droidtop/tracker#911).
+        // memory and processor reading, no image store walk (mytop-project/tracker#911).
         indexGroups = { context -> rootGroups(context, measure = false) },
     )
 
     /**
      * Desktop mode, which starts the desktop session if none runs; where every terminal and container window appears.
      * Only the row that says it switches ("Open Desktop") calls it: no other row takes a person to another mode
-     * (Droidtop/tracker#639).
+     * (mytop-project/tracker#639).
      */
     private fun openDesktop(context: Context) {
         context.startActivity(
@@ -172,7 +172,7 @@ object ContainersCatalog {
                 list.sortedWith(compareBy({ it.container.role != ContainerRole.PRIMARY }, { it.displayName.lowercase() }))
                     .map { info ->
                         // Its size on disk beside its state: kept until it changes, measured off the main thread
-                        // (docs/SPEC.md 3d "The surface, precisely"; Droidtop/tracker#911).
+                        // (docs/SPEC.md 3d "The surface, precisely"; mytop-project/tracker#911).
                         val size = if (measure) ContainerSizes.label(runtime, info, isRunning(info)) else null
                         val state = listOfNotNull(stateLabel(info, runtime), size).joinToString(" · ")
                         NestedScreenItem(
@@ -210,7 +210,7 @@ object ContainersCatalog {
         )
     }
 
-    // ---- the image cache (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911) ----
+    // ---- the image cache (docs/SPEC.md 3, "Storage is checked before it is spent"; mytop-project/tracker#911) ----
 
     /**
      * Whether new downloads are kept, how much may be, and Clear. Read by both backends at each pull through
@@ -257,7 +257,7 @@ object ContainersCatalog {
         )
     }
 
-    // ---- images (Droidtop/tracker#757) ----
+    // ---- images (mytop-project/tracker#757) ----
 
     /** The images stored on this device, with how many ([count]) and what they take on disk ([bytes]). */
     private fun imagesItem(count: Int?, bytes: Long?): CatalogItem {
@@ -353,7 +353,7 @@ object ContainersCatalog {
             },
             confirmTitle = "Remove $name?",
             run = { ctx, _ ->
-                // The rule `rmi` follows (Droidtop/tracker#715); this page has already said who uses it.
+                // The rule `rmi` follows (mytop-project/tracker#715); this page has already said who uses it.
                 dev.droidtop.app.EngineActions.removeImages(ctx, containers, listOf(digest), force = true)
                 "Removed. Go back to Images."
             },
@@ -371,7 +371,7 @@ object ContainersCatalog {
         id = "container:$id",
         title = name,
         groups = { context -> containerGroups(context, id) },
-        // Settings search: the page's rows, with nothing measured (Droidtop/tracker#911).
+        // Settings search: the page's rows, with nothing measured (mytop-project/tracker#911).
         indexGroups = { context -> containerGroups(context, id, measure = false) },
     )
 
@@ -393,9 +393,9 @@ object ContainersCatalog {
         // buildList's block below isn't suspend, so anything that needs a
         // suspend call (the real disk-usage walk) is computed up front.
         // The settings search index reads this page with [measure] false:
-        // its rows, nothing measured (Droidtop/tracker#911).
+        // its rows, nothing measured (mytop-project/tracker#911).
         val diskUsage = if (measure) runCatching { runtime.diskUsage(container) } else null
-        // The list shows this answer too, so it does not walk the tree again (Droidtop/tracker#911).
+        // The list shows this answer too, so it does not walk the tree again (mytop-project/tracker#911).
         diskUsage?.let { ContainerSizes.record(info, running, it.getOrNull()) }
         val usage = if (running && measure) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
         val x11 = if (primary) null else readX11(runtime, info)
@@ -446,7 +446,7 @@ object ContainersCatalog {
                 )
             }
             // A sibling with no program of its own starts with the desktop from here; one with a program has the same
-            // switch beside its program (Droidtop/tracker#808).
+            // switch beside its program (mytop-project/tracker#808).
             if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart &&
                 runCatching { runtime.imageRunConfig(container) }.getOrNull()?.program().isNullOrEmpty()
             ) {
@@ -512,7 +512,7 @@ object ContainersCatalog {
 
     /**
      * Export and import of the container's own data, by hand, to a file the
-     * person picks (docs/SPEC.md 3d "Backup", Droidtop/tracker#81). Only
+     * person picks (docs/SPEC.md 3d "Backup", mytop-project/tracker#81). Only
      * offered while it is stopped, since a running container's files are
      * changing under the archive.
      */
@@ -572,7 +572,7 @@ object ContainersCatalog {
     }
 
     /**
-     * Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808): how often, where they go,
+     * Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808): how often, where they go,
      * and what the last run did. Shown whether or not it runs now: a running container is skipped, not stopped.
      */
     private suspend fun scheduleItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
@@ -695,7 +695,7 @@ object ContainersCatalog {
 
     /**
      * What the container can reach of the device, a line a kind (docs/SPEC.md 3d, "What it can reach";
-     * Droidtop/tracker#787 slice 1), read from the settings the rows below write ([ContainerReach]).
+     * mytop-project/tracker#787 slice 1), read from the settings the rows below write ([ContainerReach]).
      */
     private suspend fun reachItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo, mounts: EnvironmentMounts): List<CatalogItem> {
         val container = info.container
@@ -728,7 +728,7 @@ object ContainersCatalog {
     internal fun usageShare(percent: Double): String = if (percent > 0 && percent < 1) "under 1%" else "${percent.toInt()}%"
 
     /**
-     * Memory and processor use of a running container (docs/SPEC.md 3d, "Resource usage"; Droidtop/tracker#757 slice
+     * Memory and processor use of a running container (docs/SPEC.md 3d, "Resource usage"; mytop-project/tracker#757 slice
      * 3), read from its processes when the page opens; A reads it again.
      */
     private fun usageItem(runtime: ContainerRuntime, container: Container, usage: Result<ContainerUsage?>?): CatalogItem {
@@ -770,7 +770,7 @@ object ContainersCatalog {
                 ),
             )
             // The clipboard kept from this container's windows (docs/SPEC.md 3d "Clipboard per container",
-            // Droidtop/tracker#787 slice 2). The primary runs the compositor itself, so its own programs reach it directly.
+            // mytop-project/tracker#787 slice 2). The primary runs the compositor itself, so its own programs reach it directly.
             if (container.role == ContainerRole.PRIMARY) {
                 add(
                     ActionItem(
@@ -817,7 +817,7 @@ object ContainersCatalog {
     }
 
     /**
-     * Whether the container has the device's network (docs/SPEC.md 3d "Network", Droidtop/tracker#787 slice 3). Taking
+     * Whether the container has the device's network (docs/SPEC.md 3d "Network", mytop-project/tracker#787 slice 3). Taking
      * it away asks first and says what stops; giving it back does not. Either applies from the container's next start.
      * A backend that cannot take it away says why in its place.
      */
@@ -853,7 +853,7 @@ object ContainersCatalog {
     }
 
     /**
-     * How the container's programs look (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5): their size
+     * How the container's programs look (docs/SPEC.md 3d "Scale and theme", mytop-project/tracker#787 slice 5): their size
      * against the desktop's scale, and whether GTK follows droidtop's Light or dark. Both apply to programs started
      * after the change.
      */
@@ -886,7 +886,7 @@ object ContainersCatalog {
 
     /**
      * The layout a physical keyboard types in while one of the container's windows has the focus (docs/SPEC.md 3d
-     * "Keyboard", Droidtop/tracker#787 slice 6): the desktop's own by default, or one of the desktop's layouts. A
+     * "Keyboard", mytop-project/tracker#787 slice 6): the desktop's own by default, or one of the desktop's layouts. A
      * backend that cannot tell a window's container says why in its place.
      */
     private suspend fun keyboardItem(context: Context, runtime: ContainerRuntime, info: ContainerInfo): CatalogItem {
@@ -922,7 +922,7 @@ object ContainersCatalog {
     internal fun scaleLabel(scale: Float): String = if (scale == 1f) "As the desktop" else "${(scale * 100).toInt()}%"
 
     /**
-     * The device microphone as a source on the audio bridge (Droidtop/tracker#80).
+     * The device microphone as a source on the audio bridge (mytop-project/tracker#80).
      * One switch for the whole desktop, not per container: every container that
      * shares audio reaches the same PulseAudio server. Off by default, and the
      * row itself is the reason asked before Android's own prompt.
@@ -948,7 +948,7 @@ object ContainersCatalog {
         )
     }
 
-    // ---- the image's own program (docs/SPEC.md 3, "The image's own program", Droidtop/tracker#555 D6a) ----
+    // ---- the image's own program (docs/SPEC.md 3, "The image's own program", mytop-project/tracker#555 D6a) ----
 
     /**
      * What the image says it runs, read from its config and kept with the container, and droidtop running it: Start or
@@ -1041,7 +1041,7 @@ object ContainersCatalog {
         is ContainerPrograms.State.Failed -> "Couldn't start: ${state.message}"
     }
 
-    // ---- exported commands (docs/SPEC.md 3d "Exported commands", Droidtop/tracker#555 D5, D7) ----
+    // ---- exported commands (docs/SPEC.md 3d "Exported commands", mytop-project/tracker#555 D5, D7) ----
 
     /** Why the last command name typed on a container's page was not exported, by container id; shown once, under the field. */
     private val commandProblems = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -1103,7 +1103,7 @@ object ContainersCatalog {
         }
     }
 
-    // ---- exported apps (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5) ----
+    // ---- exported apps (docs/SPEC.md 3d "Exported apps", mytop-project/tracker#555 D5) ----
 
     /** One switch per app of this sibling: shown in the desktop's menus as "<app> (on <container>)", or not. */
     private suspend fun exportItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
@@ -1190,7 +1190,7 @@ object ContainersCatalog {
         val container = info.container
         val mounts = current.folders
         return buildList {
-            // docs/SPEC.md 5a, "What a game can reach", 4 (Droidtop/tracker#584): off unless allowed; without it only
+            // docs/SPEC.md 5a, "What a game can reach", 4 (mytop-project/tracker#584): off unless allowed; without it only
             // the person's games folders are shared, at the same paths.
             add(
                 ChoiceItem(
@@ -1253,7 +1253,7 @@ object ContainersCatalog {
     }
 
     /**
-     * "Update its software" (docs/SPEC.md 3d; Droidtop/tracker#757 slice 4): the container's own package manager,
+     * "Update its software" (docs/SPEC.md 3d; mytop-project/tracker#757 slice 4): the container's own package manager,
      * found inside it ([PackageUpgrade.FIND_SCRIPT]), refreshes and upgrades what is installed, as root, a step at a
      * time on the row; it ends with what was upgraded or what the manager said when it failed.
      */
@@ -1275,7 +1275,7 @@ object ContainersCatalog {
                 val manager = PackageUpgrade.byId(found.stdout)
                     ?: error("it has none droidtop knows (apk, apt, dnf, pacman or zypper)")
                 var last = ""
-                // What it upgraded changes its size, even when a step fails part way (Droidtop/tracker#911).
+                // What it upgraded changes its size, even when a step fails part way (mytop-project/tracker#911).
                 try {
                     for (step in manager.steps) {
                         onStatus("${step.line} (${manager.label})")
@@ -1291,7 +1291,7 @@ object ContainersCatalog {
         )
     }
 
-    // ---- X11 programs (Droidtop/tracker#910) ----
+    // ---- X11 programs (mytop-project/tracker#910) ----
 
     /** Where a sibling stands for X11 programs, as the page shows it. */
     private sealed interface X11Row {
@@ -1393,7 +1393,7 @@ object ContainersCatalog {
     }
 
     /**
-     * A container's terminal rows (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909). With the desktop
+     * A container's terminal rows (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909). With the desktop
      * up, Terminal opens foot on the desktop as before and Terminal here opens droidtop's own terminal on this screen;
      * with it off, Terminal opens droidtop's own.
      */
@@ -1413,13 +1413,13 @@ object ContainersCatalog {
             run = { ctx, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) runtime.start(container)
                 onStatus("Getting a terminal ready (the first time installs one)...")
-                // The first time installs a terminal into it, which changes its size (Droidtop/tracker#911).
+                // The first time installs a terminal into it, which changes its size (mytop-project/tracker#911).
                 ContainerTerminal.ensureInstalled(runtime, container).also { ContainerSizes.forget(container.id) }?.let { error(it) }
                 val started = DesktopSessionService.runInPrimary { sessionRuntime, _ ->
                     ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container, info.displayName))
                 }
                 check(started) { "the desktop stopped. Start it again, then open the terminal." }
-                // On the desktop, where it is; this row does not switch modes (Droidtop/tracker#639).
+                // On the desktop, where it is; this row does not switch modes (mytop-project/tracker#639).
                 "Opened on the desktop. Switch to Desktop to use it."
             },
         )
@@ -1453,7 +1453,7 @@ object ContainersCatalog {
         )
     }
 
-    // ---- copy (Droidtop/tracker#757) ----
+    // ---- copy (mytop-project/tracker#757) ----
 
     /** The name typed for a container's copy (by container id), until the copy is made. */
     private val copyNames = ConcurrentHashMap<String, String>()
@@ -1563,7 +1563,7 @@ object ContainersCatalog {
         }
     }
 
-    // ---- fonts (Droidtop/tracker#390) ----
+    // ---- fonts (mytop-project/tracker#390) ----
 
     private suspend fun fontItems(context: Context): List<CatalogItem> {
         val on = withContext(Dispatchers.IO) { DesktopSetupPrefs.allLanguageFonts(context) }

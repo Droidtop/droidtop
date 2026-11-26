@@ -5,7 +5,7 @@ import java.io.File
 /**
  * Stand-ins for the /proc files Android refuses an app (SELinux: /proc/stat, /proc/loadavg, /proc/uptime and
  * /proc/vmstat are not readable from an app's domain on Android 8 and later), bound over them in a proot container so
- * top, ps, uptime and the like run (Droidtop/tracker#909). Only a file this process cannot read gets one; a readable
+ * top, ps, uptime and the like run (mytop-project/tracker#909). Only a file this process cannot read gets one; a readable
  * one is the kernel's own. The contents are fixed and plausible, as Termux's proot-distro writes them: the container
  * sees an idle machine with this device's CPU count, not real load.
  */

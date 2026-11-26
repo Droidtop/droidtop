@@ -18,7 +18,7 @@ import org.json.JSONObject
 open class PluginRuntimeService : PluginProcessService() {
     override fun onCreate() {
         super.onCreate()
-        // Shizuku hands its binder to droidtop's main process (this module's manifest, Droidtop/tracker#775); a full-access
+        // Shizuku hands its binder to droidtop's main process (this module's manifest, mytop-project/tracker#775); a full-access
         // slot asks the main process for it.
         ShizukuTransport.ensureStarted()
     }

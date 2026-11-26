@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * A game the account no longer holds is still a game on the device
- * (docs/SPEC.md 7g, "Stores", Droidtop/tracker#397 slice B): ownership never
+ * (docs/SPEC.md 7g, "Stores", mytop-project/tracker#397 slice B): ownership never
  * turns an installed copy's Play into a store action.
  */
 class PcPlayStateTest {

@@ -3,7 +3,7 @@ package dev.droidtop.input.chinese
 import java.util.Locale
 
 /**
- * Which RIME schema and character forms an input language gets (Droidtop/tracker#903 H8b). rime-data-luna has three
+ * Which RIME schema and character forms an input language gets (mytop-project/tracker#903 H8b). rime-data-luna has three
  * schemas over one dictionary, luna_pinyin_simp, luna_pinyin and luna_pinyin_tw (build-data-luna.sh), and each offers
  * the same radio group of output forms, librime filters through OpenCC: `zh_hant` (傳統漢字, the dictionary's own
  * forms, no conversion), `zh_hans` (简化字, t2s), `zh_hant_hk` (香港字形, t2hk) and `zh_hant_tw` (臺灣字形, t2tw).

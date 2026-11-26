@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * D21 (docs/plugin-api.md 3, `devices`, Droidtop/tracker#556, #553): the computers and handhelds the person paired
+ * D21 (docs/plugin-api.md 3, `devices`, mytop-project/tracker#556, #553): the computers and handhelds the person paired
  * with droidtop, for a plugin that works with its own counterparts on them (the Syncthing plugin accepts exactly the
  * Syncthing devices its counterparts announce, so its own pairing is never shown). Under `devices.paired`. A plugin
  * sees, for each device, only what the same plugin id announced there; never an address, a key or another plugin's

@@ -116,7 +116,7 @@ fun SidePanelFrame(
         HideSystemBarsInThisDialog()
         Box(modifier = Modifier.fillMaxSize()) {
             // The dimmed page: tapping it closes, as B does. To a screen reader it is a "Close" button read after the
-            // panel, not an unlabelled first stop (Droidtop/tracker#87, rig 2026-11-04: TalkBack's focus opened on it).
+            // panel, not an unlabelled first stop (mytop-project/tracker#87, rig 2026-11-04: TalkBack's focus opened on it).
             Box(
                 modifier = Modifier
                     .fillMaxSize()

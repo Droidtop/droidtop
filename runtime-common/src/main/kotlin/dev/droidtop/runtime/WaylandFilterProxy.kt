@@ -13,7 +13,7 @@ import kotlin.concurrent.thread
 
 /**
  * A Wayland socket that reaches the compositor with the clipboard kept out (docs/SPEC.md 3d "Clipboard per container",
- * Droidtop/tracker#787 slice 2). It listens on [listen]; each client that connects gets its own connection to the
+ * mytop-project/tracker#787 slice 2). It listens on [listen]; each client that connects gets its own connection to the
  * compositor's socket ([upstream], looked up per client, since the compositor names it when it starts), and every
  * message both ways goes through that client's [WaylandClipboardFilter]. File descriptors (a buffer's memory, a
  * keymap) travel with the bytes they came with, so each still arrives no later than the message that uses it.

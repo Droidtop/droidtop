@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A plugin's achievements (docs/plugin-api.md 3 A8, Droidtop/tracker#143): what it is told and what is shown. */
+/** A plugin's achievements (docs/plugin-api.md 3 A8, mytop-project/tracker#143): what it is told and what is shown. */
 class PluginAchievementsTest {
     @Test
     fun setAndProgressBecomeOneListAndBadEntriesAreLeftOut() {

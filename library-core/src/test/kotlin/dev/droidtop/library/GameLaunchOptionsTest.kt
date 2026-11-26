@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What a person types as a game's launch options and environment (docs/SPEC.md 7i, "Game properties"; Droidtop/tracker#228). */
+/** What a person types as a game's launch options and environment (docs/SPEC.md 7i, "Game properties"; mytop-project/tracker#228). */
 class GameLaunchOptionsTest {
 
     @Test

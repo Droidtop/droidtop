@@ -20,7 +20,7 @@ data class PluginView(
     val sections: List<ViewSection>,
     /**
      * The plugin's one sentence for a view with nothing in it ("Saves you make appear here"), shown in droidtop's own
-     * "Nothing here yet" notice (Droidtop/tracker#521 item 6); null for droidtop's words alone.
+     * "Nothing here yet" notice (mytop-project/tracker#521 item 6); null for droidtop's words alone.
      */
     val empty: String? = null,
 ) {
@@ -42,7 +42,7 @@ data class PluginView(
      * this view still has that input and the value still fits it (a choice still offered, a slider value in range, a
      * toggle's true or false). Used when the same page is read again with nothing changed by the person's action (a
      * failed action, Open the site, Sign in, Refresh), so a mirror the person picked is not put back to the plugin's
-     * first one (Droidtop/tracker#846). Pure.
+     * first one (mytop-project/tracker#846). Pure.
      */
     fun valuesKeeping(previous: Map<String, String>, chosen: Set<String>): Map<String, String> {
         val values = initialValues().toMutableMap()
@@ -143,7 +143,7 @@ data class PluginView(
 
 /**
  * One section of a view. [needs] maps a node's id to the permission it declared with `needs` (docs/plugin-api.md 1.6,
- * Droidtop/tracker#521 item 5): while the person has that permission turned off, droidtop draws the node as an inert
+ * mytop-project/tracker#521 item 5): while the person has that permission turned off, droidtop draws the node as an inert
  * row saying so instead of the node, and the rest of the page is untouched.
  */
 data class ViewSection(val id: String, val title: String?, val nodes: List<ViewNode>, val needs: Map<String, String> = emptyMap())
@@ -189,7 +189,7 @@ sealed interface ViewNode {
 
     /**
      * [state] is a status facet's state (`busy`, `warning`, `error`, ...), drawn as the host's status glyph beside the
-     * title (Droidtop/tracker#644); null for a plain fact.
+     * title (mytop-project/tracker#644); null for a plain fact.
      */
     data class Info(override val id: String, override val title: String, override val subtitle: String?, val value: String?, val state: String? = null) : ViewNode
 
@@ -246,7 +246,7 @@ sealed interface ViewNode {
 
     /**
      * A plugin's notice (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): [tone] is `info`, `caution` or `danger`
-     * (danger since 2026-10-15, Droidtop/tracker#521 item 1), [banner] puts it under the page header, [details] is what Info shows, and [action] has the shape
+     * (danger since 2026-10-15, mytop-project/tracker#521 item 1), [banner] puts it under the page header, [details] is what Info shows, and [action] has the shape
      * of a row's. Drawn by droidtop as its own notice card with "from <plugin>".
      */
     data class Notice(
@@ -407,7 +407,7 @@ object PluginViewCall {
      */
     fun errorNotice(reply: PluginReply, declared: Set<String>, fallbackTitle: String, messages: MutableList<String>? = null): ViewNode.Notice {
         val title = (reply.title ?: fallbackTitle).cut(PluginViewLimits.length("noticeTitle"))
-        // droidtop's words for a shared code, the plugin's only for FAILED and only when plain (Droidtop/tracker#784).
+        // droidtop's words for a shared code, the plugin's only for FAILED and only when plain (mytop-project/tracker#784).
         val sentence = SourceFailures.forCode(reply.code, reply.message)
         val body = (reply.subtitle ?: sentence?.takeIf { reply.title == null })?.cut(PluginViewLimits.length("noticeSubtitle"))
         var opensPermissions = false
@@ -427,7 +427,7 @@ object PluginViewCall {
             }
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
             // A failure whose words are a sign-in or a browser check offers that, whatever code the plugin gave it: a
-            // plugin that wraps droidtop's own refusal in FAILED still gets Open the site (Droidtop/tracker#881).
+            // plugin that wraps droidtop's own refusal in FAILED still gets Open the site (mytop-project/tracker#881).
             else -> when (sentence) {
                 SourceFailures.SIGN_IN -> opensAccount = PluginWebAccount.Need.SIGN_IN
                 SourceFailures.NEEDS_BROWSER_CHECK -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
@@ -455,7 +455,7 @@ object PluginViewCall {
  * One result a `library.sources` `search` returned in the contract 2 shape (docs/plugin-api.md
  * 1.6): `{id, title, subtitle?, columns?, badges?, platform?, ref?, version?, size?, get?}`. [refJson] is handed back
  * unread in `detail` and `acquire`; droidtop never parses it (12a checklist point 5). [version], [sizeBytes] and [get]
- * are the one search's ("Fetchers answer in the one search", Droidtop/tracker#218).
+ * are the one search's ("Fetchers answer in the one search", mytop-project/tracker#218).
  */
 data class SourceResultRow(
     val id: String,

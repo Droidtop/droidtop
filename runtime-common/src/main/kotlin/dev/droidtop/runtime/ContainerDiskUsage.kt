@@ -6,7 +6,7 @@ import java.nio.file.Files
 
 /**
  * A container's size on disk, for [ContainerRuntime.diskUsage] (docs/SPEC.md 3d "Storage used"): the one
- * measurement the container's page and its row in the Containers list both show (Droidtop/tracker#911).
+ * measurement the container's page and its row in the Containers list both show (mytop-project/tracker#911).
  * [complete] is false when part of the tree could not be read, so [bytes] is a floor ("at least 1.2 GB").
  */
 data class DiskUsage(val bytes: Long, val complete: Boolean = true) {

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Onboarding's Desktop check, said plainly (Droidtop/tracker#555). */
+/** Onboarding's Desktop check, said plainly (mytop-project/tracker#555). */
 class DesktopCheckMessageTest {
     @Test
     fun `a kernel that refuses ptrace names root through Shizuku as the way`() {

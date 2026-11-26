@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The one empty state of a games place (Retro Games, PC Games, Home; docs/SPEC.md 7i, "An empty library";
- * Droidtop/tracker#533): a glyph, one line, and the two things that fill it, centred, the place's own action first
+ * mytop-project/tracker#533): a glyph, one line, and the two things that fill it, centred, the place's own action first
  * and Get games beside it. Neither button is drawn filled: with a filled primary and the focus ring on the other,
  * two buttons looked chosen at once. The cursor starts on the first; the ring is the only highlight.
  */

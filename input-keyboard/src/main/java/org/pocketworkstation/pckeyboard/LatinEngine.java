@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * droidtop (Droidtop/tracker#903 H6; docs/SPEC.md 6a, "The engine seam"): Hacker's Keyboard's own Latin typing as the
+ * droidtop (mytop-project/tracker#903 H6; docs/SPEC.md 6a, "The engine seam"): Hacker's Keyboard's own Latin typing as the
  * first {@link InputEngine}. It wraps what was already there and rewrites none of it: the word being typed
  * ({@link WordComposer} and the composing text), whether a word is being composed, and the dictionaries' suggestions
  * ({@link Suggest}, through {@link Lexicon}). The decisions moved here from LatinIME are kept word for word

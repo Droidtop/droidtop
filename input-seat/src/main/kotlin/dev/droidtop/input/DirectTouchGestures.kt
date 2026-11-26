@@ -4,7 +4,7 @@ import kotlin.math.hypot
 
 /**
  * Touch on the desktop surface itself, where the finger is the pointer (docs/SPEC.md 6b "Touch on the desktop",
- * Droidtop/tracker#684). Pure: positions in view pixels, time in milliseconds, so every rule is tested without a
+ * mytop-project/tracker#684). Pure: positions in view pixels, time in milliseconds, so every rule is tested without a
  * screen.
  *
  * - A finger that lifts without moving past [slopPx] is a left click where it was.

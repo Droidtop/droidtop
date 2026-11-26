@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The companion's navigation preferences (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): which tabs
+ * The companion's navigation preferences (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): which tabs
  * sit on the bar in each mode, which tab it opens on, and what it does when a game starts. They are rows of the
  * Companion group of the catalog; there is no companion-only settings screen. Read once with [load] off the main
  * thread, then kept in [settings] so the companion and Settings follow each other live.
@@ -137,7 +137,7 @@ object CompanionPrefs {
     const val PLUGIN_PREFIX = "plugin:"
 
     /**
-     * A Device or droidtop page chosen as its own tab (Droidtop/tracker#786 plan 4.2): `page:<parent>/<page>`, the
+     * A Device or droidtop page chosen as its own tab (mytop-project/tracker#786 plan 4.2): `page:<parent>/<page>`, the
      * parent panel's id first, so a mode that denies the panel denies the page with it ([panelOf]).
      */
     const val PAGE_PREFIX = "page:"
@@ -146,7 +146,7 @@ object CompanionPrefs {
     fun pageId(parent: ControlPanel, page: String): String = PAGE_PREFIX + id(parent) + "/" + page
 
     /**
-     * The pages S3 gives Device and droidtop (Droidtop/tracker#786): the tabs System, Network and Apps became Device's
+     * The pages S3 gives Device and droidtop (mytop-project/tracker#786): the tabs System, Network and Apps became Device's
      * pages, Android's own pages fold under one row of Device, and the companion's settings are droidtop's first page.
      */
     val DEVICE_SYSTEM: String = pageId(ControlPanel.DEVICE, "system")
@@ -176,7 +176,7 @@ object CompanionPrefs {
     }
 
     /**
-     * Defaults (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 plan 4.2): Home, Device, droidtop and Social
+     * Defaults (docs/SPEC.md "The companion's tabs", mytop-project/tracker#786 plan 4.2): Home, Device, droidtop and Social
      * in Gaming and Mobile; Input, Home, Device and droidtop in Desktop.
      */
     fun defaultChosen(mode: String): List<String> = if (mode == "DESKTOP") {
@@ -190,7 +190,7 @@ object CompanionPrefs {
 
     /**
      * A stored tab id as today's, so a saved bar keeps its reach: the Tasks tab became Apps, and since S3
-     * (Droidtop/tracker#786 plan 4.2) System is Device, and Network and Apps are Device's pages. Anything else unknown
+     * (mytop-project/tracker#786 plan 4.2) System is Device, and Network and Apps are Device's pages. Anything else unknown
      * is dropped by the caller, so a value from another version never names a tab that is not there.
      */
     fun currentId(stored: String): String = when (stored) {

@@ -7,8 +7,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * A plugin's side of a site that checks the browser first (docs/SPEC.md 12a, Droidtop/tracker#600, #751). Telling a check
- * from a page, the clearance cookies and the pass test are lib-net's `:sitecheck`, with their own tests.
+ * A plugin's side of a site that checks the browser first (docs/SPEC.md 12a, mytop-project/tracker#600, #751). Telling a check
+ * from a page, the clearance cookies and the pass test are mytop-net's `:sitecheck`, with their own tests.
  */
 class SiteChecksTest {
     @Test

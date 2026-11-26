@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 
 /**
  * The notice colours over every theme droidtop bundles, in every colour scheme each declares
- * (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485, final design tests 1 and 2): what the person sees
+ * (docs/SPEC.md 7k, "Notices"; mytop-project/tracker#485, final design tests 1 and 2): what the person sees
  * on a fresh install is held to the same contrast, hue and separation rules as droidtop's own palette.
  * Robolectric, because the theme parser reads XML through Android's pull parser.
  */

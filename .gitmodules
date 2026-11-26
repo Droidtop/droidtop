@@ -21,10 +21,10 @@
 	url = https://github.com/libffi/libffi.git
 [submodule "vendor/droidtop-platforms"]
 	path = vendor/droidtop-platforms
-	url = https://github.com/Droidtop/droidtop-platforms.git
+	url = https://github.com/mytop-project/droidtop-platforms.git
 [submodule "vendor/proot"]
 	path = vendor/proot
-	url = https://github.com/Droidtop/proot.git
+	url = https://github.com/mytop-project/proot.git
 	branch = droidtop
 [submodule "vendor/hev-socks5-tunnel"]
 	path = vendor/hev-socks5-tunnel
@@ -35,7 +35,7 @@
 	shallow = true
 [submodule "vendor/pulseaudio"]
 	path = vendor/pulseaudio
-	url = https://github.com/Droidtop/pulseaudio
+	url = https://github.com/mytop-project/pulseaudio
 	shallow = true
 	branch = droidtop
 [submodule "vendor/libsndfile"]
@@ -47,20 +47,20 @@
 	url = https://github.com/bi0shacker001/fibrewall
 [submodule "vendor/javasteam"]
 	path = vendor/javasteam
-	url = https://github.com/Droidtop/javasteam
+	url = https://github.com/mytop-project/javasteam
 	branch = droidtop
 [submodule "vendor/libadrenotools"]
 	path = vendor/libadrenotools
 	url = https://github.com/Pipetto-crypto/libadrenotools.git
-[submodule "vendor/lib-input"]
-	path = vendor/lib-input
-	url = https://github.com/Droidtop/lib-input
-[submodule "vendor/lib-plugins"]
-	path = vendor/lib-plugins
-	url = https://github.com/Droidtop/lib-plugins
-[submodule "vendor/lib-net"]
-	path = vendor/lib-net
-	url = https://github.com/Droidtop/lib-net
+[submodule "vendor/mytop-input"]
+	path = vendor/mytop-input
+	url = https://github.com/mytop-project/mytop-input
+[submodule "vendor/mytop-plugins"]
+	path = vendor/mytop-plugins
+	url = https://github.com/mytop-project/mytop-plugins
+[submodule "vendor/mytop-net"]
+	path = vendor/mytop-net
+	url = https://github.com/mytop-project/mytop-net
 [submodule "vendor/mimalloc"]
 	path = vendor/mimalloc
 	url = https://github.com/microsoft/mimalloc
@@ -73,43 +73,43 @@
 	path = vendor/glib
 	url = https://gitlab.gnome.org/GNOME/glib.git
 	shallow = true
-[submodule "vendor/lib-ui"]
-	path = vendor/lib-ui
-	url = https://github.com/Droidtop/lib-ui
+[submodule "vendor/mytop-ui"]
+	path = vendor/mytop-ui
+	url = https://github.com/mytop-project/mytop-ui
 [submodule "vendor/termux-app"]
 	path = vendor/termux-app
 	url = https://github.com/termux/termux-app
 [submodule "vendor/mesa-venus"]
 	path = vendor/mesa-venus
-	url = https://github.com/Droidtop/mesa
+	url = https://github.com/mytop-project/mesa
 	branch = droidtop-venus
 	shallow = true
 	update = none
 [submodule "vendor/mesa-lavapipe"]
 	path = vendor/mesa-lavapipe
-	url = https://github.com/Droidtop/mesa
+	url = https://github.com/mytop-project/mesa
 	branch = droidtop-lavapipe
 	shallow = true
 	update = none
 [submodule "vendor/virglrenderer"]
 	path = vendor/virglrenderer
-	url = https://github.com/Droidtop/virglrenderer
+	url = https://github.com/mytop-project/virglrenderer
 	branch = droidtop
 	shallow = true
 	update = none
 [submodule "vendor/libepoxy"]
 	path = vendor/libepoxy
-	url = https://github.com/Droidtop/libepoxy
+	url = https://github.com/mytop-project/libepoxy
 	branch = droidtop
 	shallow = true
 	update = none
 [submodule "shell-default"]
 	path = shell-default
-	url = https://github.com/Droidtop/murine-launcher
+	url = https://github.com/mytop-project/murine-launcher
 	branch = droidtop
-[submodule "vendor/lib-containers"]
-	path = vendor/lib-containers
-	url = https://github.com/Droidtop/lib-containers
-[submodule "vendor/lib-runners"]
-	path = vendor/lib-runners
-	url = https://github.com/Droidtop/lib-runners
+[submodule "vendor/mytop-containers"]
+	path = vendor/mytop-containers
+	url = https://github.com/mytop-project/mytop-containers
+[submodule "vendor/mytop-runners"]
+	path = vendor/mytop-runners
+	url = https://github.com/mytop-project/mytop-runners

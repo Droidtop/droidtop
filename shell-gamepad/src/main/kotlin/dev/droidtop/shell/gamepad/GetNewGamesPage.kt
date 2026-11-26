@@ -23,7 +23,7 @@ import dev.droidtop.library.settings.TextBlockItem
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * Get new games, a page of Updates (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, Droidtop/tracker#612: "It
+ * Get new games, a page of Updates (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, mytop-project/tracker#612: "It
  * should open to a recommendations list, with the ability to search at the top"). It opens on a list, never on a
  * blank search bar: Search first, a row like the rest, then what each source features under its name, with its box
  * art, then the person's games a source names a newer version of (each opens Updates, where updates live), then what

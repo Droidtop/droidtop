@@ -9,7 +9,7 @@ import android.net.Uri
 import android.widget.RemoteViews
 
 /**
- * The Shelf widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): a shelf of games the person chose in
+ * The Shelf widget (docs/SPEC.md, "Widgets on any launcher"; mytop-project/tracker#563): a shelf of games the person chose in
  * its maker ([ShelfConfigureActivity]): recently played, recently added, favourites, a collection or a system, as a
  * list of names (the shared rows) or a grid of art ([ShelfWidgetService]). A tap plays through [GameLaunchActivity].
  */

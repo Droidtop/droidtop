@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The Windows components on this device (docs/SPEC.md 5a "Components on this device", Droidtop/tracker#233): every Wine,
+ * The Windows components on this device (docs/SPEC.md 5a "Components on this device", mytop-project/tracker#233): every Wine,
  * Proton, DXVK, VKD3D, driver, Box64 and FEXCore build the runtime's contents store holds, with its size and whether
  * anything uses it, and Remove for one nothing uses.
  *

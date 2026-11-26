@@ -64,7 +64,7 @@ private fun relativeLabel(file: File, scannedFolder: File): String {
  * ([GameTitleParser], docs/SPEC.md 7n), so the engine walk's entries read
  * like the PC walk's. The rig showed the textlist drawing `12.0-SCRAPPY`,
  * `Eternum-0.9.5-pc` and `Name_ver1.1-eng` because the entry stored the
- * folder name as it is on disk (Droidtop/tracker#174, #282); the raw name
+ * folder name as it is on disk (mytop-project/tracker#174, #282); the raw name
  * stays on the game page and in the entry id.
  *
  * The one shape a folder name is not a title is an episode folder. Seen on

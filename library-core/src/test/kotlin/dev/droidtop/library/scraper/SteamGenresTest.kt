@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Steam's content descriptors are not genres (Droidtop/tracker#756: a card read "Sexual Content, Visua..."). */
+/** Steam's content descriptors are not genres (mytop-project/tracker#756: a card read "Sexual Content, Visua..."). */
 class SteamGenresTest {
     @Test
     fun `Steam's content descriptors are left out of a game's genres`() {

@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * The panel inside the shared sway desktop (docs/SPEC.md 2a "The desktop
- * panel", Droidtop/tracker#353, #683). The default is none: droidtop's bar is
+ * panel", mytop-project/tracker#353, #683). The default is none: droidtop's bar is
  * the desktop's one bar, with the launcher, the window list and the clock, so
  * sway runs droidtop's config without a bar of its own. Waybar, a stock
  * program from the distro's packages started by sway and never part of an
@@ -25,7 +25,7 @@ enum class DesktopPanel(val id: String, val label: String, val about: String) {
 
     companion object {
         /**
-         * One bar on screen (Droidtop/tracker#683, rig 2026-11-04: with Waybar the default, the desktop still showed
+         * One bar on screen (mytop-project/tracker#683, rig 2026-11-04: with Waybar the default, the desktop still showed
          * Waybar's strip above droidtop's bar). A person who chose Waybar keeps it.
          */
         val DEFAULT = NONE
@@ -39,7 +39,7 @@ enum class DesktopPanel(val id: String, val label: String, val about: String) {
 
         /**
          * The background picture's file name in [hostDir], a PNG droidtop wrote from the image the person chose
-         * (Droidtop/tracker#694); [BACKGROUND_PICTURE] is where the container sees it.
+         * (mytop-project/tracker#694); [BACKGROUND_PICTURE] is where the container sees it.
          */
         const val BACKGROUND_PICTURE_FILE = "background.png"
         const val BACKGROUND_PICTURE = "$IN_CONTAINER_DIR/$BACKGROUND_PICTURE_FILE"
@@ -60,11 +60,11 @@ enum class DesktopPanel(val id: String, val label: String, val about: String) {
          * key asks droidtop for its Start menu ([ContainerLauncher.START]),
          * so a keyboard's Super+D opens the same menu as the bar's Start.
          *
-         * `floating_modifier $mod normal` always (Droidtop/tracker#910): droidtop's resize band around a window presses
+         * `floating_modifier $mod normal` always (mytop-project/tracker#910): droidtop's resize band around a window presses
          * Super and the right button for sway to resize it (DesktopInputRouter), so the modifier and the button are
          * not left to the distro's config.
          *
-         * Windows float unless [tileWindows] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): a new
+         * Windows float unless [tileWindows] (docs/SPEC.md 2b "Window controls", mytop-project/tracker#686): a new
          * window opens at its own size instead of halving the others, a finger moves it by its title bar and
          * resizes it by its border, and droidtop's bar maximizes and snaps it.
          *
@@ -84,7 +84,7 @@ enum class DesktopPanel(val id: String, val label: String, val about: String) {
             if (panel == WAYBAR) appendLine("exec waybar -c $WAYBAR_CONFIG")
             appendLine("bindsym --no-warn ${'$'}mod+d exec sh ${ContainerLauncher.HELPER} ${ContainerLauncher.START}")
             // Super with the left button moves a window and with the right button resizes it, floating or tiled, as the
-            // stock config already has it: droidtop's resize band starts sway's resize that way (Droidtop/tracker#910),
+            // stock config already has it: droidtop's resize band starts sway's resize that way (mytop-project/tracker#910),
             // so it is said here rather than left to whatever /etc/sway/config holds.
             appendLine("floating_modifier ${'$'}mod normal")
             if (!tileWindows) {
@@ -108,9 +108,9 @@ enum class DesktopPanel(val id: String, val label: String, val about: String) {
          * Waybar along the top, a status strip: the workspaces and the tray
          * of the Linux programs. No launcher and no window title: droidtop's
          * bar has Start and the window list, and two of each was two ways to
-         * do one thing (Droidtop/tracker#683). No clock either: droidtop's
+         * do one thing (mytop-project/tracker#683). No clock either: droidtop's
          * tray shows the one clock, in Android's 12 or 24 hour format, with
-         * or without a session (Droidtop/tracker#691).
+         * or without a session (mytop-project/tracker#691).
          */
         fun waybarConfig(): String =
             """

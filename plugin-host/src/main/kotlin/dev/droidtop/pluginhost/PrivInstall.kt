@@ -8,7 +8,7 @@ import java.io.File
 data class ApkInfo(val packageName: String, val label: String, val versionName: String?, val versionCode: Long)
 
 /**
- * `priv.packages install` (docs/plugin-api.md 2.7, Droidtop/tracker#130): droidtop's half, run by the broker after the
+ * `priv.packages install` (docs/plugin-api.md 2.7, mytop-project/tracker#130): droidtop's half, run by the broker after the
  * caller's own grant and before the call reaches the provider. The caller names an APK in its own `data` folder;
  * droidtop reads it, refuses an app it never replaces, asks the person by the app's own name, and copies the file to
  * its private staging folder. The provider is handed only `{staged: {path, size, sha256, package}}`, which droidtop

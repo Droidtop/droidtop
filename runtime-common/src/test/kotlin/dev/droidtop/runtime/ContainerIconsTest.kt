@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The container's app icons in droidtop's chrome (docs/SPEC.md 2b "Linux app icons", Droidtop/tracker#689). */
+/** The container's app icons in droidtop's chrome (docs/SPEC.md 2b "Linux app icons", mytop-project/tracker#689). */
 class ContainerIconsTest {
     @Test
     fun `only a theme name or an absolute PNG or SVG path is looked for`() {

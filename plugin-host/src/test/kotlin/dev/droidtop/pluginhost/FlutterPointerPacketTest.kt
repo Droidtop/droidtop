@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A plugin screen's touches packed without the input service (Droidtop/tracker#511): the engine's layout, field for field. */
+/** A plugin screen's touches packed without the input service (mytop-project/tracker#511): the engine's layout, field for field. */
 class FlutterPointerPacketTest {
     private val stride = P.FIELD_COUNT * P.BYTES_PER_FIELD
 

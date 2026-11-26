@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *
  * Reached two ways, both through [start]: the "Check now" row on Settings > Software updates
  * ([startAndAwait]), and the UPDATE_NOW broadcast (dev.droidtop.app.UpdateNowReceiver). The APK is
- * fetched by droidtop's own downloader as a job in Downloads ([UpdateDownload], Droidtop/tracker#226) and
+ * fetched by droidtop's own downloader as a job in Downloads ([UpdateDownload], mytop-project/tracker#226) and
  * installed by that job's post step; the pass narrates the job and ends with it.
  */
 object UpdateNow {

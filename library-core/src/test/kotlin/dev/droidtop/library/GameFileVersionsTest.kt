@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The version a game's own files declare (Droidtop/tracker#406). */
+/** The version a game's own files declare (mytop-project/tracker#406). */
 class GameFileVersionsTest {
     @Test
     fun `Ren'Py's config version is read, comments and other defines aside`() {

@@ -8,7 +8,7 @@ import dev.droidtop.pluginhost.PluginProcessService
 import java.io.File
 
 /**
- * The enhancement provider host's one service (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): droidtop
+ * The enhancement provider host's one service (docs/SPEC.md "Enhancement providers", mytop-project/tracker#852): droidtop
  * binds it as an app interface plugin (docs/plugin-api.md 1.3) and drives it with the same [dev.droidtop.pluginhost.IPluginRuntime]
  * as any plugin process. It answers droidtop alone: the caller must be droidtop's user id, droidtop must be the app that
  * installed this host, and the first droidtop process to bind it is the only one it serves until every binding is gone.

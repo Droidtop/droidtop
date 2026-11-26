@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 import android.content.Context
 
 /**
- * Icon packs (Droidtop/tracker#508), as the one settings catalog offers them. Gaming's Apps tiles and Standard's
+ * Icon packs (mytop-project/tracker#508), as the one settings catalog offers them. Gaming's Apps tiles and Standard's
  * drawer draw from the same icon cache, which applies the pack Standard's launcher picks (`IconPackManager`), so there
  * is one choice and one mechanism: this hook lets the catalog's Appearance group show and change that choice. The
  * launcher registers [source] at start; with none, the row is not shown.

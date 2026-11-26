@@ -3,7 +3,7 @@
 //! as `{"error": "..."}` in words the screens can show; a computer that
 //! could not be reached as `{"unreachable": "..."}`; a computer that answered
 //! as itself and no longer knows this device as `{"error": "...", "code":
-//! "not_paired"}` (Droidtop/tracker#531).
+//! "not_paired"}` (mytop-project/tracker#531).
 
 use droidtop_agent_core::sync::LockExt;
 use std::io::{Read, Write};
@@ -78,8 +78,8 @@ pub fn call(op: &str, args: &str) -> String {
         "remote_list" => remote_list(&args),
         "remote_put" => remote_put(&args),
         "remote_get" => remote_get(&args),
-        // KDE Connect (Droidtop/tracker#645, docs/SPEC.md 7q "KDE Connect"): kdeconnect_<op> is
-        // lib-kdeconnect's operation <op>, passed through as it is.
+        // KDE Connect (mytop-project/tracker#645, docs/SPEC.md 7q "KDE Connect"): kdeconnect_<op> is
+        // mytop-kdeconnect's operation <op>, passed through as it is.
         op if op.starts_with("kdeconnect_") => return kdeconnect_service::ops::call(&op["kdeconnect_".len()..], &args).to_string(),
         other => Err(Failure::Error(format!("unknown operation {other}"))),
     };
@@ -428,11 +428,11 @@ fn sync_saves(args: &Value) -> Outcome {
     Ok(v)
 }
 
-/// The copies of a game's saves this device keeps (Droidtop/tracker#822), for the game page's rows: each
+/// The copies of a game's saves this device keeps (mytop-project/tracker#822), for the game page's rows: each
 /// device's newest copy, kept when its saves were replaced. Arguments: `archive` (the game's archive folder,
 /// as `sync_saves` and `restore_saves` take it). The reply: `[{device, files, newest_ms}]`, newest first;
 /// `device` is what `restore_saves` takes to bring that copy back, `files` how many save files it holds, and
-/// `newest_ms` its newest file's time. The layout is lib-sync's: the folder is `savesync::copy_dir`'s, and
+/// `newest_ms` its newest file's time. The layout is mytop-sync's: the folder is `savesync::copy_dir`'s, and
 /// the files `savesync::copy_files` (which leaves out a copy's bookkeeping). A game with none answers `[]`.
 fn kept_saves(args: &Value) -> Outcome {
     let archive = args["archive"].as_str().map(PathBuf::from).ok_or_else(|| Failure::Error("no archive folder was given".into()))?;
@@ -460,7 +460,7 @@ fn kept_saves(args: &Value) -> Outcome {
 }
 
 /// Puts a kept copy of a game's saves back on this device
-/// (Droidtop/tracker#822): after "Saves differ" was settled, the side that
+/// (mytop-project/tracker#822): after "Saves differ" was settled, the side that
 /// was replaced kept its set as its device's copy (`savesync::copy_dir`),
 /// and this brings it back. Needs no computer.
 ///
@@ -656,7 +656,7 @@ fn sync_library(args: &Value) -> Outcome {
     // it: it lost its library (a restore, a reinstall). What this device
     // sent before is gone from it, so send everything again and take
     // everything it has; both are applied newest-wins, so nothing is
-    // doubled (Droidtop/tracker#531).
+    // doubled (mytop-project/tracker#531).
     if their < cursor.pulled {
         let (everything, _) = lib.changes_since(0);
         pushed = everything.len();
@@ -739,8 +739,8 @@ fn share_post_saves(args: &Value) -> Outcome {
 
 // Shares --------------------------------------------------------------------
 //
-// The person's own shares that droidtop reaches itself, through lib-net's share
-// client (Droidtop/tracker#573), named in `share`:
+// The person's own shares that droidtop reaches itself, through mytop-net's share
+// client (mytop-project/tracker#573), named in `share`:
 // - `{"kind": "webdav", "url", "user", "password", "allow_plain_http"}`;
 // - `{"kind": "s3", "endpoint", "bucket", "region", "access_key", "secret_key", "folder", "path_style",
 //   "allow_plain_http"}`;
@@ -851,7 +851,7 @@ fn remote_list(args: &Value) -> Outcome {
 }
 
 /// Sealed with this device's own key: what droidtop writes to a share the person keeps locked
-/// (Droidtop/tracker#573, owner 2026-11-05: "Encryption should probably be toggleable"). The agent's
+/// (mytop-project/tracker#573, owner 2026-11-05: "Encryption should probably be toggleable"). The agent's
 /// sealing (`mailbox::seal`), addressed to this device itself, so only this device opens it.
 fn seal_to_self(args: &Value, bytes: &[u8]) -> Result<Vec<u8>, Failure> {
     let key = key_of(args)?;
@@ -1022,7 +1022,7 @@ fn announce(args: &Value) -> Outcome {
 
 /// A handheld serving the handhelds paired with it: what it answers.
 /// Announcements now; save sync between handhelds follows
-/// (Droidtop/tracker#546).
+/// (mytop-project/tracker#546).
 struct HandheldHost {
     name: String,
     values: Announcements,
@@ -1648,7 +1648,7 @@ mod tests {
     }
 }
 
-// The share operations through droidtop's own JSON interface (Droidtop/tracker#573): what each kind refuses before
+// The share operations through droidtop's own JSON interface (mytop-project/tracker#573): what each kind refuses before
 // connecting, and that a server which doesn't answer is "unreachable" for every kind. Nothing here needs a server.
 #[cfg(test)]
 mod share_tests {

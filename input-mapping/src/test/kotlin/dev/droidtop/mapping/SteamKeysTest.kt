@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Steam's key names as Android key codes (Droidtop/tracker#383); the expected codes are Android's KEYCODE_* values. */
+/** Steam's key names as Android key codes (mytop-project/tracker#383); the expected codes are Android's KEYCODE_* values. */
 class SteamKeysTest {
     @Test
     fun `letters, digits and function keys are themselves`() {

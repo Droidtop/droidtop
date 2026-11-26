@@ -9,7 +9,7 @@ import java.util.concurrent.Executors
 
 /**
  * The rule that no file, database, image or network work runs on the main thread (docs/SPEC.md 10c, "Main-thread
- * work"), enforced in debuggable builds (Droidtop/tracker#729): StrictMode watches the main thread for disk reads,
+ * work"), enforced in debuggable builds (mytop-project/tracker#729): StrictMode watches the main thread for disk reads,
  * disk writes and network, and a violation that comes from droidtop's own code is logged under [TAG] with the frame
  * of ours it points at. A rig run fails on a [TAG] line, so a regression shows up there and not as a handheld that
  * feels slow. Code of the libraries droidtop is built on is not reported: it is not ours to fix here.
@@ -26,10 +26,10 @@ object DebugStrictMode {
         // commit(): the crash count has to survive the crash that is about to happen.
         "dev.droidtop.library.diagnostics.CrashRecovery",
         // Two existence checks, first thing in Application.onCreate: a restore the person staged must be in place before
-        // anything opens a database (Droidtop/tracker#625), so this one cannot move off the main thread.
+        // anything opens a database (mytop-project/tracker#625), so this one cannot move off the main thread.
         "dev.droidtop.app.settings.DroidtopBackup#finishPendingRestore",
         // One statfs, no write: whether storage is too full to start has to be known before the first screen is drawn
-        // (docs/SPEC.md 10c, "Storage full", Droidtop/tracker#849).
+        // (docs/SPEC.md 10c, "Storage full", mytop-project/tracker#849).
         "dev.droidtop.runtime.StorageGuard",
     )
 

@@ -8,7 +8,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** The one size measurement, for a container's page and its row in the list (docs/SPEC.md 3d; Droidtop/tracker#911). */
+/** The one size measurement, for a container's page and its row in the list (docs/SPEC.md 3d; mytop-project/tracker#911). */
 class ContainerDiskUsageTest {
     private val scratch: File = Files.createTempDirectory("disk-usage-test").toFile()
 

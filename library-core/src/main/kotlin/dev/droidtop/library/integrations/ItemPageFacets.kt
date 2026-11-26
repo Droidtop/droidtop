@@ -69,7 +69,7 @@ object ItemPageFacets {
             updatedEpochMs = meta?.updated?.takeIf { it > 0 },
             cover = (images.firstOrNull { it.role == "cover" } ?: images.firstOrNull())?.url,
             overview = about?.overview,
-            // A changelog the source gives only as a named section is still the changelog (Droidtop/tracker#845).
+            // A changelog the source gives only as a named section is still the changelog (mytop-project/tracker#845).
             changelog = about?.changelog ?: about?.sections?.firstOrNull { RecordSections.isChangelog(it.title) }?.body,
             sections = about?.sections.orEmpty()
                 .filterNot { RecordSections.isChangelog(it.title) && about?.changelog == null }
@@ -89,7 +89,7 @@ object ItemPageFacets {
     }
 
     /**
-     * [downloads] with each mirror once (Droidtop/tracker#838; the owner: "links are duplicated. Links that are marked
+     * [downloads] with each mirror once (mytop-project/tracker#838; the owner: "links are duplicated. Links that are marked
      * 'windows/linux' are presented twice under that title"). A download is one link however many systems it covers:
      * entries with the same address, or with no address and the same section, host and token, are one, holding every
      * system any of them named. The first keeps its place. Pure.

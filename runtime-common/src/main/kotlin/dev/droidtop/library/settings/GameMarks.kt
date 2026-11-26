@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 import org.json.JSONObject
 
-/** Where a person is with a game (Droidtop/tracker#722), as Playnite, LaunchBox and Steam let one say. */
+/** Where a person is with a game (mytop-project/tracker#722), as Playnite, LaunchBox and Steam let one say. */
 enum class PlayStatus(val id: String, val label: String) {
     NONE("", "Not set"),
     PLAYING("playing", "Playing"),
@@ -27,7 +27,7 @@ data class GameMark(val stars: Int = 0, val status: PlayStatus = PlayStatus.NONE
 }
 
 /**
- * The person's own marks per game (Droidtop/tracker#722): kept apart from the scraped fields (a scrape never touches
+ * The person's own marks per game (mytop-project/tracker#722): kept apart from the scraped fields (a scrape never touches
  * them, and the scraped rating stays the scraped one), in a file of droidtop's own that the backup carries
  * (`DroidtopBackup.FILES`). Pure parse and format; the store's reads and writes are small, off the main thread.
  */
@@ -56,7 +56,7 @@ object GameMarks {
     private fun file(context: Context) = File(context.filesDir, FILE)
 
     /**
-     * The marks in memory, for the lists' filters and sorts (Droidtop/tracker#722), so a list never reads the file while
+     * The marks in memory, for the lists' filters and sorts (mytop-project/tracker#722), so a list never reads the file while
      * it filters: [warm]ed once off the main thread at start and kept current by [set].
      */
     @Volatile private var cache: Map<String, GameMark> = emptyMap()

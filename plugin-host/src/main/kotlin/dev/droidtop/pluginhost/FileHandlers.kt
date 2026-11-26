@@ -3,7 +3,7 @@ package dev.droidtop.pluginhost
 import org.json.JSONObject
 
 /**
- * Open with, for plugins (docs/plugin-api.md 1.12 and catalogue E4, Droidtop/tracker#221): a `files.handler` entry
+ * Open with, for plugins (docs/plugin-api.md 1.12 and catalogue E4, mytop-project/tracker#221): a `files.handler` entry
  * lists the files it opens, `"associations": [{"ext": "AppImage", "mime": "application/vnd.appimage", "label":
  * "Inspect with Acme"}]`, and droidtop's own Open with offers the plugin for a file one of them matches. The plugin is
  * handed the file only when the person picks it there: as a read-only token (`files.open {token}`, D4), never a path.

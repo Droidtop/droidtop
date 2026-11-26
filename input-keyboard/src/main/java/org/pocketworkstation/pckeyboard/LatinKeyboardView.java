@@ -166,7 +166,7 @@ public class LatinKeyboardView extends LatinKeyboardBaseView {
             mPreviewPopup.setContentView(mPreviewText);
             mPreviewPopup.setBackgroundDrawable(null);
             mPreviewPopup.setTouchable(false);
-            // droidtop patch (Droidtop/tracker#903 H12a): no window animation; the preview grows out of its key
+            // droidtop patch (mytop-project/tracker#903 H12a): no window animation; the preview grows out of its key
             // (PopupMotion), under the keyboard's own reduce-motion rule.
             mPreviewPopup.setAnimationStyle(0);
             mPreviewPopup.setClippingEnabled(clippingEnabled);
@@ -242,7 +242,7 @@ public class LatinKeyboardView extends LatinKeyboardBaseView {
             // Long pressing on 0 in phone number keypad gives you a '+'.
             return invokeOnKey('+');
         } else if (SwitchKeyboard.INSTANCE.longPressCode(primaryCode) != null) {
-            // A long press on space switches to the next keyboard (Droidtop/tracker#717).
+            // A long press on space switches to the next keyboard (mytop-project/tracker#717).
             return invokeOnKey(SwitchKeyboard.CODE);
         } else {
             return super.onLongPress(key);

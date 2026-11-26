@@ -3,7 +3,7 @@ package dev.droidtop.library.theme
 import dev.droidtop.notices.ColorMath
 
 /**
- * The focus ring's two inks (docs/SPEC.md 7k, "The focus ring"; Droidtop/tracker#485 F2a): a 3dp outer
+ * The focus ring's two inks (docs/SPEC.md 7k, "The focus ring"; mytop-project/tracker#485 F2a): a 3dp outer
  * edge in the theme's accent and a 1dp inner edge in whichever of black and white is farther from the
  * accent, both opaque. Whatever the ring lands on (capsule art that is pure white, pure black, or the
  * accent's own colour), one of the two edges stands out from it by at least 3:1, which one accent ring

@@ -13,12 +13,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Per-game memory of the performance overlay's level and the companion screen's brightness (docs/SPEC.md, the Quick
- * Menu's sections, "Each game remembers its own"; Droidtop/tracker#423). What the person changes while a game runs is
+ * Menu's sections, "Each game remembers its own"; mytop-project/tracker#423). What the person changes while a game runs is
  * kept for that game, put back when it starts again, and the values from before the game are restored when it ends,
  * so one game's dim companion or full overlay does not follow the person into the next.
  *
  * Only what changed during a session is kept: a game the person never adjusted keeps following the global values.
- * Android's performance mode is not kept here: the power policy (Droidtop/tracker#841, its rules and its journal) is
+ * Android's performance mode is not kept here: the power policy (mytop-project/tracker#841, its rules and its journal) is
  * the one mechanism for it.
  */
 object GameMemory {

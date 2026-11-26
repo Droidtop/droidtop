@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
-/** Droidtop/tracker#766: one way to replace a file whole. */
+/** mytop-project/tracker#766: one way to replace a file whole. */
 class AtomicWriteTest {
     private val dir: File = Files.createTempDirectory("atomic").toFile()
 

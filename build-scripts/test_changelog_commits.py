@@ -24,7 +24,7 @@ class Convention(unittest.TestCase):
             cc.check("Subject\n\nOnboarding:")
 
     def test_a_required_trailer(self):
-        # Commit hygiene requires one: a subject is a developer's words, not a person's (Droidtop/tracker#954 item 9).
+        # Commit hygiene requires one: a subject is a developer's words, not a person's (mytop-project/tracker#954 item 9).
         cc.check("Subject\n\nWhy.\n\nChangelog: none", require=True)
         cc.check("Subject\n\nWhy.\n\nChangelog: Fixed: Search answers at once", require=True)
         with self.assertRaises(cc.ConventionError):
@@ -53,7 +53,7 @@ class Lines(unittest.TestCase):
             self.assertIsNone(cc.section_for(internal), internal)
 
     def test_a_subject_loses_its_tracker_reference(self):
-        self.assertEqual("Downloads pick the next mirror", cc.plain("downloads pick the next mirror (Droidtop/tracker#862)."))
+        self.assertEqual("Downloads pick the next mirror", cc.plain("downloads pick the next mirror (mytop-project/tracker#862)."))
 
 
 class Entry(unittest.TestCase):

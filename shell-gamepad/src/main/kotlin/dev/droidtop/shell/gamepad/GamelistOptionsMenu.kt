@@ -41,13 +41,13 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 /** The one label for the PC/engine scrape action, shared by the list that offers it and the handler that runs it. */
 private const val SCRAPE_PC_GAMES = "Get artwork and details"
 
-/** The library-wide run over every PC and engine game, a job like "Scrape all systems" (Droidtop/tracker#374). */
+/** The library-wide run over every PC and engine game, a job like "Scrape all systems" (mytop-project/tracker#374). */
 private const val SCRAPE_ALL_PC = "Scrape PC and engine games"
 // Renamed from "Stores and folders" (uisources agent, 2026-09-28): the
 // settings screen it opens now holds only Game folders, Windows games
 // and Downloads -- store accounts moved to the "Accounts and sources"
 // settings area.
-// Opens the Game sources place (Droidtop/tracker#571 row 4: the "PC setup" screen of links is gone).
+// Opens the Game sources place (mytop-project/tracker#571 row 4: the "PC setup" screen of links is gone).
 private const val PC_SETUP = "Game sources"
 private const val SORT_BY = "Sort by"
 private const val FILTER = "Filter"
@@ -143,7 +143,7 @@ internal fun GamelistOptionsMenu(
         else -> "Search: ${searchText.trim()}"
     }
     var searchOpen by remember { mutableStateOf(false) }
-    // Review Matches (docs/SPEC.md 7h; Droidtop/tracker#318 §5): the games a scrape did not take a match for, offered
+    // Review Matches (docs/SPEC.md 7h; mytop-project/tracker#318 §5): the games a scrape did not take a match for, offered
     // where the PC scrape is: the PC Games tab and the library's own options. Counted when the menu opens, and again
     // when the queue closes.
     val offersChooseMatches = libraryScope || systemId == PC_SYSTEM_ID
@@ -158,7 +158,7 @@ internal fun GamelistOptionsMenu(
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings. Getting new games is the left menu's place and
-            // search's own section, not a menu row (owner, 2026-10-23, Droidtop/tracker#612).
+            // search's own section, not a menu row (owner, 2026-10-23, mytop-project/tracker#612).
             add("Rescan library")
             add("Scrape all systems")
             add(SCRAPE_ALL_PC)
@@ -169,7 +169,7 @@ internal fun GamelistOptionsMenu(
             // Sort and filter are the one shared query model's sheets
             // (dev.droidtop.shell.gamepad.query, docs/SPEC.md 7j), the PC
             // Games tab's among them. A list never passes its own rows by these
-            // names: this case catches them first (Droidtop/tracker#954 15b).
+            // names: this case catches them first (mytop-project/tracker#954 15b).
             if (onOpenSort != null) add(SORT_BY)
             if (onOpenFilter != null) add(FILTER)
             if (onSearchTextChange != null && systemId != PC_SYSTEM_ID) add(searchRowLabel)
@@ -180,7 +180,7 @@ internal fun GamelistOptionsMenu(
             // A console system's own rows. The PC Games tab is not a console
             // system (docs/SPEC.md 7i): its games have no system folder to
             // import a gamelist.xml from or a Console systems page to open,
-            // and its scrape is the PC one below (Droidtop/tracker#175).
+            // and its scrape is the PC one below (mytop-project/tracker#175).
             if (systemId != null && systemId != PC_SYSTEM_ID) {
                 add("Open games on: " + (systemLaunchScreen?.label ?: "Ask each time"))
                 add(SYSTEM_SETTINGS)
@@ -470,7 +470,7 @@ internal fun GamelistOptionsMenu(
                     val option = listOptions.firstOrNull { it.label == label }
                     MenuRow(
                         title = if (label == ORPHANS_DELETE) "$label: ${PressWords.again}" else label,
-                        // Show, then say (Droidtop/tracker#738): an on/off option is a switch, a choice its value.
+                        // Show, then say (mytop-project/tracker#738): an on/off option is a switch, a choice its value.
                         value = option?.value,
                         switchOn = option?.on,
                         selected = index == focusIndex,

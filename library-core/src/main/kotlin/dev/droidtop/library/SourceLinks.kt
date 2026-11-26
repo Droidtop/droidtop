@@ -72,9 +72,9 @@ interface UpdateSources {
 
     /**
      * One link of a record's Downloads tab: the source's heading, the file host, what the link says, and either the
-     * address droidtop opens itself in its web view ([url], Droidtop/tracker#599) or the token the source's `download`
+     * address droidtop opens itself in its web view ([url], mytop-project/tracker#599) or the token the source's `download`
      * job takes ([link]). [systems] are the systems it is for (dev.droidtop.pluginhost.DownloadSystems), empty for
-     * any: the Downloads tab shows the picked system's links (Droidtop/tracker#617).
+     * any: the Downloads tab shows the picked system's links (mytop-project/tracker#617).
      */
     data class Download(
         val section: String,
@@ -85,11 +85,11 @@ interface UpdateSources {
         val systems: List<String> = emptyList(),
         /** A split release's pieces (docs/plugin-api.md 1.10, `download` `parts`): one row, fetched as one job. */
         val parts: List<Part> = emptyList(),
-        /** `build`, `patch` or `extra` (Droidtop/tracker#838): droidtop's own pick takes only a build. */
+        /** `build`, `patch` or `extra` (mytop-project/tracker#838): droidtop's own pick takes only a build. */
         val role: String = "build",
         /** False for an item the source marks unofficial. */
         val official: Boolean = true,
-        /** The build it is for, as the source names it ("Steam Build", Droidtop/tracker#845); null for the default build. */
+        /** The build it is for, as the source names it ("Steam Build", mytop-project/tracker#845); null for the default build. */
         val build: String? = null,
     ) {
         /** One piece: its page ([url]) or the source's token ([link]), and its size when the source knows it. */
@@ -118,7 +118,7 @@ interface UpdateSources {
         val cover: String? = null,
         val overview: String? = null,
         val changelog: String? = null,
-        /** The source's other named texts ("Installation", "Developer notes"), in its order (Droidtop/tracker#845). */
+        /** The source's other named texts ("Installation", "Developer notes"), in its order (mytop-project/tracker#845). */
         val sections: List<Section> = emptyList(),
         /** The source page's main text as it reads, for the game page's Show thread; null when the source gives none. */
         val thread: String? = null,
@@ -198,7 +198,7 @@ interface UpdateSources {
 
     /**
      * Opens the record's own page (a forum thread) in droidtop's web view with the source's session; whatever the person
-     * starts there is placed as [openDownload] places it (Droidtop/tracker#862, Open thread). Returns the last line.
+     * starts there is placed as [openDownload] places it (mytop-project/tracker#862, Open thread). Returns the last line.
      */
     suspend fun openThread(
         source: String,

@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Droidtop/tracker#790: a plugin job's line is a plain sentence; a runtime's words go behind it as Details. */
+/** mytop-project/tracker#790: a plugin job's line is a plain sentence; a runtime's words go behind it as Details. */
 class JobFailureLineTest {
     @Test
     fun `the console's class loader message becomes a plain line, and its words the details`() {

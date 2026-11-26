@@ -23,7 +23,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Ubisoft Connect's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", Droidtop/tracker#335), after Lutris's
+ * Ubisoft Connect's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after Lutris's
  * Ubisoft service (GPL-3.0, `lutris/services/ubisoft.py`, `lutris/util/ubisoft/client.py` and `consts.py`, itself from
  * the Galaxy integration by Rasmus Luund): the person signs in on Ubisoft's own page, which keeps the session in the
  * page's storage (`localStorage` `PRODloginData`: ticket, session id, remember-me ticket); the session is renewed as

@@ -7,7 +7,7 @@ import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * Opens the guided key setup for a service (the screen behind Settings > Accounts and sources), from anywhere in
- * droidtop: a game page's "Sign in to RetroAchievements" row opens it in place (Droidtop/tracker#143). The screen is
+ * droidtop: a game page's "Sign in to RetroAchievements" row opens it in place (mytop-project/tracker#143). The screen is
  * the app's, so :app sets [open] at start; until it does, nothing opens.
  */
 object ScraperKeySetupLink {
@@ -110,7 +110,7 @@ enum class ScraperKeyService(
             KeyField("api_key", "Web API Key", secret = true, storeKey = CredentialStore.RETROACHIEVEMENTS_API_KEY),
         ),
     ),
-    // Debrid services (Droidtop/tracker#638): a torrent job asks them first. droidtop ships no key of its own.
+    // Debrid services (mytop-project/tracker#638): a torrent job asks them first. droidtop ships no key of its own.
     TORBOX(
         title = "TorBox",
         url = "https://torbox.app/settings",
@@ -142,7 +142,7 @@ enum class ScraperKeyService(
             KeyField("api_token", "API token", secret = true, storeKey = CredentialStore.REALDEBRID_TOKEN),
         ),
     ),
-    // A file host's own account (Droidtop/tracker#638): its premium downloads come first. droidtop ships no key of its own.
+    // A file host's own account (mytop-project/tracker#638): its premium downloads come first. droidtop ships no key of its own.
     PIXELDRAIN(
         title = "PixelDrain",
         url = "https://pixeldrain.com/user/api_keys",
@@ -159,7 +159,7 @@ enum class ScraperKeyService(
             KeyField("api_key", "API key", secret = true, storeKey = CredentialStore.PIXELDRAIN_API_KEY),
         ),
     ),
-    // GoFile lists a folder through its API for a Premium account's token only (Droidtop/tracker#638).
+    // GoFile lists a folder through its API for a Premium account's token only (mytop-project/tracker#638).
     GOFILE(
         title = "GoFile",
         url = "https://gofile.io/myprofile",

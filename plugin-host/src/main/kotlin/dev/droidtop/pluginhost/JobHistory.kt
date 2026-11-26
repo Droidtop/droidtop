@@ -7,7 +7,7 @@ import java.io.File
 import org.json.JSONArray
 
 /**
- * Finished jobs older than the newest [PluginJobsCenter.FINISHED_KEPT] (owner, 2026-11-15, Droidtop/tracker#940: "why does
+ * Finished jobs older than the newest [PluginJobsCenter.FINISHED_KEPT] (owner, 2026-11-15, mytop-project/tracker#940: "why does
  * our downloads history seem to be capped at 200? And can we provide filters for that download history"). The newest
  * stay in [PluginJobsCenter]'s live list, which the Downloads page reads on every report; the ones pushed out of it come
  * here, one row each, written once, instead of being forgotten. One SQLite file in droidtop's own storage. Kept until

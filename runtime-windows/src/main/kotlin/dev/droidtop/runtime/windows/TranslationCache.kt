@@ -7,7 +7,7 @@ import dev.droidtop.shared.trust.Sha256
 import java.io.File
 
 /**
- * The translators' code caches, one per game (docs/SPEC.md 9, "Translation cache"; Droidtop/tracker#865).
+ * The translators' code caches, one per game (docs/SPEC.md 9, "Translation cache"; mytop-project/tracker#865).
  *
  * Box64 keeps the native code it generated on disk from 0.3.8 (DynaCache: `BOX64_DYNACACHE`, `_FOLDER`, `_LIMIT`), FEX
  * from 2609 (DiskCache: `FEX_DISKCACHE`, `FEX_DISKCACHEPATH`), in its Windows ARM64EC and WOW64 modules too. Older

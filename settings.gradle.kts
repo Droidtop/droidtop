@@ -48,7 +48,7 @@ dependencyResolutionManagement {
             filter { includeGroup("io.github.bi0shacker001") }
         }
         // Needed by :app (docs/SPEC.md 7a, "Remote streaming is windowcast's library"): windowcast's Android library,
-        // attached to each Droidtop/windowcast release and put here, checked against app/windowcast.pin, by
+        // attached to each mytop-project/windowcast release and put here, checked against app/windowcast.pin, by
         // build-scripts/fetch-windowcast-lib.sh (CI runs it before Gradle). A local repository that holds only that group.
         exclusiveContent {
             forRepository { maven { url = uri(File(settingsDir, "app/windowcast-lib/repo")) } }
@@ -114,7 +114,7 @@ include(":library-core")
 // The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Epic, GOG,
 // Amazon Games and itch.io, lifted out of GameNative behind
 // library-core's StoreLibrary.
-// :stores' Steam client is JavaSteam, built from source: droidtop's fork (vendor/javasteam, Droidtop/javasteam,
+// :stores' Steam client is JavaSteam, built from source: droidtop's fork (vendor/javasteam, mytop-project/javasteam,
 // branch droidtop, from GameNative's JavaSteam), which hands depot chunks, web files and Workshop files to droidtop's
 // download engine (its Fetcher; docs/SPEC.md 12a, "Everything moves"). Its two modules stand in for the coordinates
 // :stores names.
@@ -132,10 +132,10 @@ include(":stores")
 // contract (IPluginRuntime). No dependency on :library-core or :app --
 // a plugin call site hands it plain values, never a database handle.
 include(":plugin-host")
-// The enhancement provider host template (Droidtop/tracker#852): built unsigned, carried in droidtop's assets.
+// The enhancement provider host template (mytop-project/tracker#852): built unsigned, carried in droidtop's assets.
 include(":provider-host")
 
-// The sandbox library's program-tree binding (docs/SPEC.md 5b, Droidtop/tracker#584): the broker listener Wine's
+// The sandbox library's program-tree binding (docs/SPEC.md 5b, mytop-project/tracker#584): the broker listener Wine's
 // processes attach to, with libsbx_child.so and sbx-exec. No dependency on droidtop's other modules.
 include(":sandbox-host")
 
@@ -165,7 +165,7 @@ include(":display")
 // root Gradle project) is included here rather than flattened, to keep future
 // upstream syncing tractable.
 include(":shell-default")
-// droidtop's implementations of the Murine launcher's hooks (shell-default-hooks/build.gradle.kts, Droidtop/tracker#921).
+// droidtop's implementations of the Murine launcher's hooks (shell-default-hooks/build.gradle.kts, mytop-project/tracker#921).
 include(":shell-default-hooks")
 
 include(":IconLoader")
@@ -250,11 +250,11 @@ project(":terminal-view").projectDir = file("termux-terminal/terminal-view")
 // build.gradle.kts).
 include(":input-keyboard")
 
-// Japanese typing through Google's Mozc (docs/SPEC.md 6a, "The engine seam"; Droidtop/tracker#903 H7c): an engine
+// Japanese typing through Google's Mozc (docs/SPEC.md 6a, "The engine seam"; mytop-project/tracker#903 H7c): an engine
 // behind :input-keyboard's seam. :app depends on it and registers it at start; :input-keyboard does not depend on it.
 include(":input-japanese")
 
-// Chinese typing through RIME (docs/SPEC.md 6a, "Chinese through RIME"; Droidtop/tracker#903 H8b): an engine behind
+// Chinese typing through RIME (docs/SPEC.md 6a, "Chinese through RIME"; mytop-project/tracker#903 H8b): an engine behind
 // :input-keyboard's seam, as :input-japanese is. :app depends on it and registers it at start.
 include(":input-chinese")
 

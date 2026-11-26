@@ -8,7 +8,7 @@ import org.junit.Test
 class AcquireSystemHintTest {
     @Test
     fun `a new system folder goes beside most of the person's system folders, else in the first games root`() {
-        // A DOS zip from Abandonware was refused with "there is no games folder for dos" (Droidtop/tracker#846).
+        // A DOS zip from Abandonware was refused with "there is no games folder for dos" (mytop-project/tracker#846).
         val roots = listOf(File("/sd/Games"), File("/sd"))
         val folders = listOf(File("/sd/Roms/nsw"), File("/sd/Roms/snes"), File("/sd/Games/psx"))
         assertEquals(File("/sd/Roms"), AcquireSystemHint.placeFor(folders, roots))

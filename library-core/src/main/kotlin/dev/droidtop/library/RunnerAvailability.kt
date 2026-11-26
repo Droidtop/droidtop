@@ -52,7 +52,7 @@ data class RunnerOption(
     val caveat: String? = null,
     /**
      * The words on the button that takes [action]: what it gets, never a bare verb, so a runner's install can never
-     * read like the game's own Install (Droidtop/tracker#657). Null where the action has a fixed name.
+     * read like the game's own Install (mytop-project/tracker#657). Null where the action has a fixed name.
      */
     val actionLabel: String? = null,
 ) {
@@ -97,7 +97,7 @@ data class RunnerFacts(
     val enginehostBundleCovers: Boolean? = null,
     /**
      * The name Enginehost gives the core it can install for this game (its `engines.cores` list,
-     * Droidtop/tracker#752), for the "Get … support" action; null names the engine instead.
+     * mytop-project/tracker#752), for the "Get … support" action; null names the engine instead.
      */
     val enginehostCoreLabel: String? = null,
     val kirikiroid2Installed: Boolean = false,
@@ -145,7 +145,7 @@ object RunnerAvailability {
     /**
      * Every runner's state for one game, ordered: the engine's own runners
      * first whenever they can be chosen at all, Ready or one setup step
-     * away (Droidtop/tracker#752); then the rows the user can act on
+     * away (mytop-project/tracker#752); then the rows the user can act on
      * (READY, then NEEDS_SETUP), each group in the database's declared
      * priority, then the dimmed device rows, then the hidden game rows.
      *
@@ -264,7 +264,7 @@ object RunnerAvailability {
                 strategy,
                 RunnerState.NEEDS_SETUP,
                 // Not the action's own name: the button and the menu row already say "Set up Windows games",
-                // and a reason repeating it told the person nothing (Droidtop/tracker#367).
+                // and a reason repeating it told the person nothing (mytop-project/tracker#367).
                 "The Windows environment is not set up yet",
                 RunnerAction.SET_UP_WINDOWS_GAMES,
             )
@@ -359,7 +359,7 @@ fun GameLaunchStrategy.displayName(engine: GameEngine?): String =
 
 /** How an engine is named to a person, in ONE place. */
 /**
- * What "Get … support" names (Droidtop/tracker#837; the owner, dev.2778: "The "get support" button should list a
+ * What "Get … support" names (mytop-project/tracker#837; the owner, dev.2778: "The "get support" button should list a
  * version. Otherwise, users might get confused about some renpy games needing it"): the core's own label when it
  * already carries a version ("Ren'Py 8.3"), otherwise the engine with the version that will be installed, as
  * major.minor: the version Enginehost offers, else the game's own. Just the name when no version is known. Pure.

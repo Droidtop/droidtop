@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The `systems` a `library.sources` entry declares and how a Get games page reads it (docs/plugin-api.md 1.6, Droidtop/tracker#543). */
+/** The `systems` a `library.sources` entry declares and how a Get games page reads it (docs/plugin-api.md 1.6, mytop-project/tracker#543). */
 class SourceSystemsTest {
     private fun entry(systems: Any?): ProvidedPoint {
         val json = JSONObject().put("point", "library.sources").put("version", 1)

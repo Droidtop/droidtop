@@ -22,7 +22,7 @@ object SaveLines {
     private fun files(count: Int) = if (count == 1) "1 file" else "$count files"
 
     /**
-     * A folder the way a person names it (Droidtop/tracker#672): the internal storage's prefix becomes "Internal
+     * A folder the way a person names it (mytop-project/tracker#672): the internal storage's prefix becomes "Internal
      * storage", and a removable volume's `/storage/<id>/` becomes its name from [volumes] (Android's own description,
      * keyed by the volume's id, from [StorageVolumeNames]) or "SD card", never the raw id. [short] keeps the first
      * folder and the last two with "…" between, for a line under a row; the details page shows the whole path.

@@ -5,7 +5,7 @@ import java.text.Normalizer
 import java.util.UUID
 
 /**
- * The one fold of a game's title (Droidtop/tracker#870; the owner, 2026-11-05: "letters and digits only, but with
+ * The one fold of a game's title (mytop-project/tracker#870; the owner, 2026-11-05: "letters and digits only, but with
  * space-to-hyphen conversion. Lutris's standard"). Before it, droidtop had four (GameNaming.nameKey, the computer
  * key's word join, StoreIdentity's fold, GameFolderIds'), and the handheld's merge key and the cross-device key
  * disagreed, so a merge made on one device did not carry to another.

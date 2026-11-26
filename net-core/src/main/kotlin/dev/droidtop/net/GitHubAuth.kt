@@ -15,7 +15,7 @@ import java.net.HttpURLConnection
  * unauthenticated request it always was.
  */
 object GitHubAuth {
-    // One mechanism (Droidtop/tracker#194): lib-net's :net decides, and Enginehost uses the same code. These calls keep
+    // One mechanism (mytop-project/tracker#194): mytop-net's :net decides, and Enginehost uses the same code. These calls keep
     // droidtop's call sites as they were.
     private val shared = SharedGitHubAuth.DEFAULT
 

@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Plugin actions (docs/plugin-api.md 3 C4, Droidtop/tracker#67) in Gaming's menus on one game or app: the PC game
+ * Plugin actions (docs/plugin-api.md 3 C4, mytop-project/tracker#67) in Gaming's menus on one game or app: the PC game
  * menu (Y) and an app's Select menu. The same page Standard's and Desktop's menus open
  * ([PluginContextActions.screen]), shown in the menu's own sheet; a row says "Plugin actions" only when a plugin's
  * static filter matches, read off the main thread from manifests alone.

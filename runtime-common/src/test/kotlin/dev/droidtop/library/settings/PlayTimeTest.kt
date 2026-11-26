@@ -103,7 +103,7 @@ class PlayTimeTest {
         assertTrue(e.step(30_000, 100) is PlayStep.None)
     }
 
-    // Droidtop/tracker#721: the session timers outside Kid mode.
+    // mytop-project/tracker#721: the session timers outside Kid mode.
     @Test
     fun `a reminder is due once per whole interval of the session`() {
         val timers = SessionTimers(remindMinutes = 30)

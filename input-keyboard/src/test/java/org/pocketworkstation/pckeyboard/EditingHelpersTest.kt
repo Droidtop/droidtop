@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The keyboard's editing helpers as pure logic (Droidtop/tracker#340). */
+/** The keyboard's editing helpers as pure logic (mytop-project/tracker#340). */
 class EditingHelpersTest {
     // --- clipboard history ---
 

@@ -315,8 +315,8 @@ echo "=== proot ($ABI) ==="
     "$TOOLCHAIN_BIN/llvm-ar" rcs "$PROOT_WORK/talloc/libtalloc.a" "$PROOT_WORK/talloc/talloc.o"
     # Out-of-tree copy: the GNUmakefile writes objects and build.h beside
     # the sources, and the vendored submodule stays untouched. droidtop's
-    # changes to Termux's proot are commits on Droidtop/proot's droidtop
-    # branch, which vendor/proot pins (Droidtop/tracker#921); nothing is
+    # changes to Termux's proot are commits on mytop-project/proot's droidtop
+    # branch, which vendor/proot pins (mytop-project/tracker#921); nothing is
     # patched here.
     cp -r "$VENDOR/proot/src" "$PROOT_WORK/src"
     cd "$PROOT_WORK/src"
@@ -376,16 +376,16 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 # libsndfile, libltdl, the daemon as libpulseaudio.so; modules and pactl in
 # an asset): the ABI picker compares names, and PulseAudioComponent execs
 # nativeLibraryDir/libpulseaudio.so. arm64 was GameNative's prebuilt set
-# until Droidtop/tracker#857 took droidtop off its GameNative fork.
+# until mytop-project/tracker#857 took droidtop off its GameNative fork.
 #
 #   libltdl      the standalone libltdl tree libltdl-dev installs under
 #                /usr/share/libtool (already on the apt list).
 #   libsndfile   vendor/libsndfile at 1.0.28, the version in the arm64 set.
-#   PulseAudio   vendor/pulseaudio: Droidtop/pulseaudio's droidtop branch,
+#   PulseAudio   vendor/pulseaudio: mytop-project/pulseaudio's droidtop branch,
 #                v13.0 with Termux's Android changes of its 13.0 package
 #                and its module-aaudio-sink.c (the sink extended with the
 #                arguments GameNative passes) as commits
-#                (Droidtop/tracker#921); the file names carry 13.0.
+#                (mytop-project/tracker#921); the file names carry 13.0.
 #                Configured as GameNative's arm64 set was: no speex or
 #                soxr (its libpulsecore has no speex resampler), no memfd.
 #                ac_cv_header_glob_h=no: bionic has glob() only from
@@ -404,7 +404,7 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 # and runtime-windows/src/main/assets/pulseaudio-gamenative-$ABI.tzst
 # (modules/ and pactl, laid out like GameNative's arm64 asset, plus
 # module-pipe-source, which the Desktop microphone loads,
-# Droidtop/tracker#132).
+# mytop-project/tracker#132).
 (
     export PATH="$TOOLCHAIN_BIN:$PATH"
     export CC CXX AR=llvm-ar RANLIB=llvm-ranlib STRIP=llvm-strip NM=llvm-nm

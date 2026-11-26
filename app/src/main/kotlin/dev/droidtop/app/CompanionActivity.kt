@@ -110,7 +110,7 @@ class CompanionActivity : AppCompatActivity() {
 
     /**
      * The companion is never the only droidtop screen and never on the main screen (docs/SPEC.md 4c, "The companion
-     * never runs without the shell", Droidtop/tracker#786 S0c, #788). When droidtop died with both screens up, Android
+     * never runs without the shell", mytop-project/tracker#786 S0c, #788). When droidtop died with both screens up, Android
      * kept this activity and, on the next Home, resumed only it: MainActivity, which places the screens and owns their
      * reinit, never started, and the other screen mirrored this one. So each time it comes to the front it asks
      * [DualScreenOrchestration.companionCheck]: with no live shell while Gaming or Desktop is the mode in use, it starts
@@ -173,7 +173,7 @@ class CompanionActivity : AppCompatActivity() {
         if (isTopResumedActivity) dev.droidtop.runtime.HomeDisplays.used(displayIdCompat())
     }
 
-    // Touch only (Droidtop/tracker#186): a pad key that still reaches this window goes to the shell
+    // Touch only (mytop-project/tracker#186): a pad key that still reaches this window goes to the shell
     // or nowhere, never to the companion's own controls.
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
         CompanionConfirm.cancelByKey(event) ||

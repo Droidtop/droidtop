@@ -208,7 +208,7 @@ object PythonRuntimeManager {
             while (entry != null) {
                 val name = entry.name.removePrefix("./")
                 if (!entry.isDirectory && name.startsWith("prefix/lib/") && !name.startsWith("prefix/lib/pkgconfig/")) {
-                    // No `..`, and strictly inside the install folder (Droidtop/tracker#874).
+                    // No `..`, and strictly inside the install folder (mytop-project/tracker#874).
                     val target = RuntimeArtifactInstaller.entryTarget(installDir, name.removePrefix("prefix/"))
                     if (target == null) {
                         android.util.Log.w("droidtop.plugin", "the Python runtime archive's entry $name points outside its folder; skipped")

@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * A copy a store installed outside droidtop is one card with the account's
- * row of the same game (docs/SPEC.md 7g, "Store markers", Droidtop/tracker#397
+ * row of the same game (docs/SPEC.md 7g, "Store markers", mytop-project/tracker#397
  * slice F): by the store id its marker names, never by its title.
  */
 class MarkerMergeTest {

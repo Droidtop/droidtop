@@ -7,7 +7,7 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * File-hoster links through the person's debrid accounts (Droidtop/tracker#638): a source's download link on a hoster
+ * File-hoster links through the person's debrid accounts (mytop-project/tracker#638): a source's download link on a hoster
  * the account lists (Pixeldrain, Mega, 1fichier and so on, asked of the account, never kept by droidtop) comes back as
  * the service's own direct downloads, so the hoster's page, its limits and its captcha are skipped. Asked before
  * droidtop's web view opens a link for a download (`PluginWebAccount.openForDownloads`, `web.session open_in_session`);
@@ -35,7 +35,7 @@ object DebridLinks {
 
     /**
      * [link]'s files from the first account that serves its hoster, or null when none does (the page opens then).
-     * [skipped] is told, in the person's words, each time an account is passed over and why (Droidtop/tracker#638:
+     * [skipped] is told, in the person's words, each time an account is passed over and why (mytop-project/tracker#638:
      * with TorBox signed in, the console log had no debrid line at all), and every decision is logged under
      * [TAG]. A hoster link an account has not fetched yet is fetched: there is no one else to download it from, so
      * "Wait for the service", which is about torrents, does not apply here.
@@ -88,7 +88,7 @@ object DebridLinks {
 
     /**
      * Whether a connected account is known to serve the host a source names ("GOFILE", "Pixeldrain"): a masked forum
-     * link carries only that name until it is opened, so droidtop's pick ranks such mirrors by it (Droidtop/tracker#838).
+     * link carries only that name until it is opened, so droidtop's pick ranks such mirrors by it (mytop-project/tracker#838).
      * From the lists already fetched; no request.
      */
     fun servesName(name: String): Boolean {

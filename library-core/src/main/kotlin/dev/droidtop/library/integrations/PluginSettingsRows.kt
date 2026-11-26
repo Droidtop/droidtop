@@ -25,7 +25,7 @@ import org.json.JSONObject
  * Settings, Plugins, and a source's search). droidtop draws it in its own settings style (docs/SPEC.md 12a: "rows
  * rendered in droidtop's own settings style ... never a plugin-drawn UI").
  *
- * Declared settings (Droidtop/tracker#880, docs/plugin-api.md 1.10). The owner: "The plugin should have exposed a
+ * Declared settings (mytop-project/tracker#880, docs/plugin-api.md 1.10). The owner: "The plugin should have exposed a
  * Settings facet, or exposed things in advance. It should not have to be asked or loaded for any of it". The page is
  * drawn from the manifest's `settings` and droidtop's own store ([PluginSettings]), so opening it never starts or
  * calls the plugin. A value the person sets is kept by droidtop and told to the plugin the next time it runs; an
@@ -40,7 +40,7 @@ object PluginSettingsRows {
 
     /**
      * True when [record] has a settings page: declared settings, a `settings.page` facet, or an older `ui.settings`
-     * view. The facet counts too (Droidtop/tracker#880: F95zone 0.8.1 moved its settings to a `settings.page` facet,
+     * view. The facet counts too (mytop-project/tracker#880: F95zone 0.8.1 moved its settings to a `settings.page` facet,
      * and its Quick Menu panel lost its Settings row, while Settings > Plugins still drew the page).
      */
     fun has(record: PluginRecord): Boolean =

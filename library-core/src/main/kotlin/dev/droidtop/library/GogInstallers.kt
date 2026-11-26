@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * A GOG offline installer found in a games folder, not yet installed (docs/SPEC.md 7g, "Installers in a games
- * folder", Droidtop/tracker#405): the folder's row is an Install row, and Install takes the game out of [file]
+ * folder", mytop-project/tracker#405): the folder's row is an Install row, and Install takes the game out of [file]
  * without running it.
  */
 @Serializable

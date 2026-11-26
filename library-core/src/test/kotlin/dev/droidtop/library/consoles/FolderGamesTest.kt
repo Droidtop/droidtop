@@ -6,7 +6,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** Droidtop/tracker#931: an unpacked DOS game is one entry for its folder, not one per file. */
+/** mytop-project/tracker#931: an unpacked DOS game is one entry for its folder, not one per file. */
 class FolderGamesTest {
 
     @get:Rule

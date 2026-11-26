@@ -10,7 +10,7 @@ import timber.log.Timber
 import java.io.File
 
 /**
- * The one downloader for the runtime's component files (Droidtop/tracker#765): core drivers (Adreno, SD8Elite), Wine
+ * The one downloader for the runtime's component files (mytop-project/tracker#765): core drivers (Adreno, SD8Elite), Wine
  * components, DX wrappers (DXVK, VKD3D, D8VK) and graphics drivers (Turnip, Zink, Virgl, Vortek, Adrenotools,
  * wrappers). Each [Kind] has its own manifest in the runtime's assets and its own cache folder; a component is
  * fetched once from the component server ([RuntimeDownloads]) and taken from the cache after that.

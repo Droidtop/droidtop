@@ -9,7 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** docs/SPEC.md 3d "Exported apps" (Droidtop/tracker#555 D5): a sibling's apps in the desktop's menus. */
+/** docs/SPEC.md 3d "Exported apps" (mytop-project/tracker#555 D5): a sibling's apps in the desktop's menus. */
 class ContainerExportsTest {
     @get:Rule val tmp = TemporaryFolder()
 

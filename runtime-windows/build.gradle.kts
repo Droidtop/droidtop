@@ -37,7 +37,7 @@ android {
 
         // Android refuses exec() of an extracted binary above targetSdk 28,
         // so the runtime only has GameNative's "modern" path (its legacy
-        // branches are deleted, Droidtop/tracker#765): every guest process
+        // branches are deleted, mytop-project/tracker#765): every guest process
         // runs through /system/bin/linker64 and LD_PRELOADs the W^X redirect
         // library that ImageFsInstaller copies out of the assets
         // (PRELOAD_BIONIC_SO).
@@ -51,7 +51,7 @@ android {
             // and libkgslshim (no source exists) and the asset payloads
             // (Box64, FEXCore and WowBox64 builds, the input DLLs, the
             // redirect libraries). Re-hosted unmodified in
-            // Droidtop/droidtop-components and fetched by
+            // mytop-project/droidtop-components and fetched by
             // build-scripts/fetch-windows-runtime-components.sh against
             // components.pin (docs/SPEC.md 9).
             jniLibs.srcDir("components/jniLibs")
@@ -85,7 +85,7 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
     implementation(project(":net-core"))
-    // Wine's process tree under the sandbox broker (docs/SPEC.md 5b, Droidtop/tracker#584).
+    // Wine's process tree under the sandbox broker (docs/SPEC.md 5b, mytop-project/tracker#584).
     implementation(project(":sandbox-host"))
     // PcGameProvider's LibraryProvider and the store rows of PcLibrary.
     implementation(project(":library-core"))

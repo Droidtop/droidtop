@@ -51,7 +51,7 @@ object ContainerRuntimeFactory {
         val app = context.applicationContext
         val store = OciImageStore.of(app)
         // Settings > Containers' image cache rows, read at each pull so a change applies without a new runtime
-        // (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911).
+        // (docs/SPEC.md 3, "Storage is checked before it is spent"; mytop-project/tracker#911).
         val policy: () -> ImageCachePolicy = { DesktopSetupPrefs.imageCachePolicy(app) }
         val root = if (waitForRoot) rootAccess() else RootProcess.access(waitMs = 0)
         return if (root.available) {
@@ -64,7 +64,7 @@ object ContainerRuntimeFactory {
             ProotRuntime(
                 app, store, policy,
                 microphoneEnabled = { DesktopSetupPrefs.microphone(app) },
-                // The games folders a container sees without "All internal storage" (Droidtop/tracker#584).
+                // The games folders a container sees without "All internal storage" (mytop-project/tracker#584).
                 sharedFolders = { dev.droidtop.library.GamesRoots.current(app).map { it.absolutePath } },
             )
         }

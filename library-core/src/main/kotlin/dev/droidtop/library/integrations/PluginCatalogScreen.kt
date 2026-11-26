@@ -68,7 +68,7 @@ object PluginCatalogScreen {
     private const val ALL_KINDS = "all"
 
     /**
-     * What the last Install all or Update all of a catalog did (Droidtop/tracker#517), by catalog id: its row goes once
+     * What the last Install all or Update all of a catalog did (mytop-project/tracker#517), by catalog id: its row goes once
      * nothing is left to do, so the result is a notice in its place, where the cursor already is, until dismissed.
      */
     private val lastBulk = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -89,7 +89,7 @@ object PluginCatalogScreen {
     }
 
     /**
-     * The Plugins page's search over the catalogs (Droidtop/tracker#513): every plugin a catalog lists, as last fetched
+     * The Plugins page's search over the catalogs (mytop-project/tracker#513): every plugin a catalog lists, as last fetched
      * (never a network call), that answers [query] and is not installed, each the same row its catalog shows. The
      * installed ones are the page's own cards. Disk; call off the main thread.
      */
@@ -306,7 +306,7 @@ object PluginCatalogScreen {
     }
 
     /**
-     * A catalog's notice (its `disclaimer`, Droidtop/tracker#521 item 10): droidtop's own caution card titled
+     * A catalog's notice (its `disclaimer`, mytop-project/tracker#521 item 10): droidtop's own caution card titled
      * [NOTICE_TITLE] and marked as from [catalogName], then the text shown whole, a paragraph per row (the pad steps
      * through them), the last one marking the end of the text for [gate]. The card says the condition in droidtop's
      * words; the text is the catalog's own, which a plugin never repeats ([NOTICE_TITLE] is reserved).
@@ -601,7 +601,7 @@ object PluginCatalogScreen {
     private fun chipFor(source: PluginCatalogSource): dev.droidtop.library.settings.RowTag? = if (source.official) null else UNOFFICIAL
 
     /**
-     * One plugin of a catalog (Droidtop/tracker#514): its name, its one-line summary and what pressing on would do, and
+     * One plugin of a catalog (mytop-project/tracker#514): its name, its one-line summary and what pressing on would do, and
      * a page of its own with the whole description, who makes it and which catalog lists it, then the action. Nothing is
      * stitched onto the summary: the maker and the catalog are fields of the page, and the description is never a tooltip.
      */

@@ -23,7 +23,7 @@ import org.junit.Test
 
 /**
  * Every store is treated alike by the PC surface (docs/SPEC.md 7g "Stores",
- * 7j "Filters", Droidtop/tracker#397 slice A): the same checks, run for every
+ * 7j "Filters", mytop-project/tracker#397 slice A): the same checks, run for every
  * store in the registry, built in or plugged in. A store that needed a line of
  * its own anywhere in the PC surface would fail here.
  */

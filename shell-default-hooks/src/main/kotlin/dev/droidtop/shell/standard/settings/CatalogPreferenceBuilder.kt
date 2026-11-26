@@ -117,7 +117,7 @@ class CatalogPreferenceNavigator(
     private val rootTitle: String = "",
     /**
      * The fragment's saved instance state, so the recreate a Text size
-     * change triggers (AccessibilityPrefs, Droidtop/tracker#139)
+     * change triggers (AccessibilityPrefs, mytop-project/tracker#139)
      * restores this navigator's place instead of rebuilding it from the
      * root: the pushed screen stack, saved as its screens' registry ids,
      * and the focused row's key, refocused on the rebuilt screen.
@@ -225,7 +225,7 @@ class CatalogPreferenceNavigator(
         // The recreate restore: pushed screens come back as their registry
         // ids, resolved through the same registry that resolves pushes,
         // stopping at the first id nothing registers (the same rule the
-        // Gaming shell's saver applies, Droidtop/tracker#87) so the
+        // Gaming shell's saver applies, mytop-project/tracker#87) so the
         // restore ends at the last screen that still resolves rather
         // than dropping the stack.
         savedState?.getStringArray(KEY_STACK)?.let { ids ->
@@ -242,7 +242,7 @@ class CatalogPreferenceNavigator(
 
     /**
      * Saves this navigator's place for the recreate the Text size
-     * setting triggers (Droidtop/tracker#139): the pushed screens as
+     * setting triggers (mytop-project/tracker#139): the pushed screens as
      * their registry ids, and the row to refocus -- the focused row, or
      * in touch mode (where a tapped row holds no focus) the row last
      * activated. Colour vision needs none of this: it recolours the live
@@ -648,7 +648,7 @@ class CatalogPreferenceNavigator(
         } else {
             isIconSpaceReserved = iconFile != null
         }
-        // A picture in place of the glyph (a store's cached mark, Droidtop/tracker#503): decoded off the main thread,
+        // A picture in place of the glyph (a store's cached mark, mytop-project/tracker#503): decoded off the main thread,
         // then swapped in; the glyph shows until then and stays if the file cannot be read.
         if (iconFile != null) {
             val preference = this
@@ -665,7 +665,7 @@ class CatalogPreferenceNavigator(
 
     /**
      * A plain row, or for a job's row (CatalogItem.progressLook) the shared job bar under its title, the same Gaming and
-     * the companion draw (Droidtop/tracker#643: "Standard's settings rows get the same bar: one mechanism everywhere").
+     * the companion draw (mytop-project/tracker#643: "Standard's settings rows get the same bar: one mechanism everywhere").
      */
     private fun rowFor(context: Context, item: CatalogItem): Preference {
         val look = item.progressLook ?: return Preference(context)
@@ -695,7 +695,7 @@ class CatalogPreferenceNavigator(
                 .ifBlank { null }
                 ?.let { text ->
                     // A state with a tone (a plugin's Ask first, Blocked) is its tone's colour, in bold
-                    // (Droidtop/tracker#519).
+                    // (mytop-project/tracker#519).
                     val tone = item.currentTone()
                     val label = item.currentLabel()
                     if (tone == null || label.isNullOrBlank() || !text.startsWith(label)) {
@@ -710,7 +710,7 @@ class CatalogPreferenceNavigator(
                 }
             // Remember the row was used: picking a value from this row's
             // dialog is the one catalog action that recreates the
-            // foreground activity (Text size, Droidtop/tracker#139), and
+            // foreground activity (Text size, mytop-project/tracker#139), and
             // in touch mode the row holds no focus for the save to read,
             // so the activated row is what the restore refocuses.
             // Returning false lets the framework open the dialog.

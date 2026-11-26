@@ -42,7 +42,7 @@ android {
         // that deflate to 100% of their size, and packaging deflated them
         // in memory once per APK (three ABI splits, two build types): the
         // frame CI's packaging OutOfMemoryError dies in is that deflate
-        // (zipflinger Compressor.deflate, Droidtop/tracker#283). The APK
+        // (zipflinger Compressor.deflate, mytop-project/tracker#283). The APK
         // is the same size either way.
         noCompress += listOf("tzst", "txz", "zst", "xz")
     }
@@ -58,7 +58,7 @@ android {
         versionCode = versionRevision.toIntOrNull()?.coerceAtLeast(1) ?: 1
         versionName = "0.2.0-dev.$versionRevision"
         // On-device checks run by hand on a console with `am instrument` (app/src/androidTest; the first is the
-        // priv.packages rig check, Droidtop/tracker#130). CI builds the test APK; nothing runs it there.
+        // priv.packages rig check, mytop-project/tracker#130). CI builds the test APK; nothing runs it there.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The ABIs droidtop ships (arm64-v8a for real hardware, x86_64 for
         // x86 devices and emulators) are set by `splits` below and the
@@ -125,7 +125,7 @@ android {
         // Signed with the same key, so it installs over a debug "latest".
         // Code shrinking is on (R8, SPEC 10b): the release APK carried 114 MB
         // of unshrunk dex and packaging it ran the daemon out of heap
-        // (Droidtop/tracker#283). It shrinks and does not obfuscate or
+        // (mytop-project/tracker#283). It shrinks and does not obfuscate or
         // optimise, see app/proguard-rules.pro. Resource shrinking stays off:
         // resources are a small part of the APK (the assets are not touched by
         // it) and the launcher and gamenative look some up by name. Debug
@@ -195,7 +195,7 @@ android {
      */
     lint {
         checkOnly += listOf("NewApi", "InlinedApi")
-        // Droidtop/tracker#734: two more questions, asked as warnings first so that the gate does not fail on code
+        // mytop-project/tracker#734: two more questions, asked as warnings first so that the gate does not fail on code
         // nobody has looked at yet. ContentDescription is a control a screen reader cannot name, UnsafeIntentLaunch an
         // exported component that starts whatever Intent it is handed. .github/workflows/android-checks.yml prints
         // what they find (scripts/lint-summary.py); each becomes an error, with a baseline for what is accepted, in
@@ -269,9 +269,9 @@ dependencies {
     implementation(project(":runtime-linux-noroot"))
     implementation(project(":input-seat"))
     implementation(project(":input-keyboard"))
-    // Japanese typing (Mozc), registered with the keyboard's engine seam in Seams.kt (Droidtop/tracker#903 H7c).
+    // Japanese typing (Mozc), registered with the keyboard's engine seam in Seams.kt (mytop-project/tracker#903 H7c).
     implementation(project(":input-japanese"))
-    // Chinese typing (RIME), registered the same way (Droidtop/tracker#903 H8b).
+    // Chinese typing (RIME), registered the same way (mytop-project/tracker#903 H8b).
     implementation(project(":input-chinese"))
     // The terminal into a container on Android (docs/SPEC.md 3d, "A terminal on Android"): Termux's vendored view and emulator.
     implementation(project(":terminal-view"))
@@ -340,7 +340,7 @@ dependencies {
 
 // CI builds both variants in one invocation, and AGP then packages the
 // release and debug APKs side by side in the one daemon heap: the
-// packaging OutOfMemoryError of Droidtop/tracker#283 hit both splitter
+// packaging OutOfMemoryError of mytop-project/tracker#283 hit both splitter
 // runs at once ("both IncrementalSplitterRunnable actions failed
 // together"). Only the two packaging tasks are ordered; everything before
 // them still runs in parallel.
@@ -352,7 +352,7 @@ tasks.matching { it.name == "packageDebug" }.configureEach {
 // before Gradle runs: What's new reads it from the APK's assets. A local build has none and shows an empty history.
 android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
 
-// The enhancement provider host (Droidtop/tracker#852): :provider-host's unsigned release APK, carried as an asset of
+// The enhancement provider host (mytop-project/tracker#852): :provider-host's unsigned release APK, carried as an asset of
 // droidtop itself. droidtop signs it on the device with its own Keystore key and installs it (ProviderHostSetup); the
 // template is the same for every device, the key is each device's own.
 abstract class CopyProviderHost : DefaultTask() {
@@ -380,7 +380,7 @@ androidComponents {
     }
 }
 
-// The throwaway app the priv.packages rig check installs (Droidtop/tracker#130): built by :rigtest-throwaway and
+// The throwaway app the priv.packages rig check installs (mytop-project/tracker#130): built by :rigtest-throwaway and
 // carried as an asset of the androidTest APK only, never of droidtop itself.
 val rigThrowawayAssets = layout.buildDirectory.dir("generated/rigThrowaway")
 val copyRigThrowaway by tasks.registering(Copy::class) {

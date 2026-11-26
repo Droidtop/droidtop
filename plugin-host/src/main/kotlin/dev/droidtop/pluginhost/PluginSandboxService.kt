@@ -57,7 +57,7 @@ open class PluginSandboxService : PluginProcessService() {
         // except where a device does not enforce them (the BlueStacks rig runs with SELinux disabled and let an isolated UID
         // open a socket, rig, v0.2.0-dev.1649). In both it is also what answers the plugin's own files at their virtual
         // paths and turns droidtop's private folder into the plugin's own ([SandboxBroker]), so a process that cannot take
-        // it does not run the plugin. Where it cannot be installed nothing is silently best-effort (Droidtop/tracker#481):
+        // it does not run the plugin. Where it cannot be installed nothing is silently best-effort (mytop-project/tracker#481):
         // for the isolated sandbox droidtop asks the person in red whether to run it this time anyway.
         // The first native call of the process, which loads droidtop's own libdroidtoppy.so; timed in logcat because on the
         // BlueStacks rig that first library load waits 10 s inside its native bridge (docs/plugin-api.md 5.3, "The rigs").
@@ -244,7 +244,7 @@ internal object PluginSyscallFilter {
 
     /**
      * Device files a process with the `gpu.render` hole opens itself before the lockdown: the kernel ties binder and some GPU drivers'
-     * state to the process that opened them, so the broker's descriptor would not do (Droidtop/tracker#26, the
+     * state to the process that opened them, so the broker's descriptor would not do (mytop-project/tracker#26, the
      * Enginehost lockdown on emulator-5560: a broker-opened /dev/hwbinder failed to map).
      */
     private val OWN_OPENS = arrayOf("/dev/hwbinder", "/dev/kgsl-3d0", "/dev/mali0", "/dev/dri/renderD128")
@@ -287,7 +287,7 @@ internal object ContainedDex {
     }
 
     /**
-     * Whether [loader] finds the native library at [path] as the plugin's `System.loadLibrary` will (Droidtop/tracker#790):
+     * Whether [loader] finds the native library at [path] as the plugin's `System.loadLibrary` will (mytop-project/tracker#790):
      * on the console Syncthing's `loadLibrary("syncthing")` found no `libsyncthing.so` in the virtual folder its class
      * loader names. Logged under `droidtop.plugin` with what an access and a stat of the virtual path answer in this
      * process, so a device's log says which step failed. Nothing changes for the plugin.
@@ -303,7 +303,7 @@ internal object ContainedDex {
         val access = runCatching { android.system.Os.access(path, android.system.OsConstants.R_OK); "ok" }.getOrElse { it.message ?: "failed" }
         val stat = runCatching { "${android.system.Os.stat(path).st_size} bytes" }.getOrElse { it.message ?: "failed" }
         // The class loader decides by opening the file read only (IoUtils.canOpenReadOnly), so that is the call to see
-        // (Droidtop/tracker#926: access and stat succeed while findLibrary answers nothing).
+        // (mytop-project/tracker#926: access and stat succeed while findLibrary answers nothing).
         val open = runCatching {
             val fd = android.system.Os.open(path, android.system.OsConstants.O_RDONLY, 0)
             android.system.Os.close(fd)

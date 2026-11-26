@@ -1,6 +1,6 @@
 /*
  * The wire between Wine's GStreamer element (gstdroidtopff.c) and droidtop's media decode server (mediad.c):
- * Droidtop/tracker#601, the enginehost-ffmpeg handoff for Wine games.
+ * mytop-project/tracker#601, the enginehost-ffmpeg handoff for Wine games.
  *
  * One SOCK_SEQPACKET connection per stream; each message is one packet, little-endian, starting with a uint32 type.
  * The server forks one process per connection, so a crash or kill ends only that stream.

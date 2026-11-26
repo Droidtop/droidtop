@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A Windows game's own language and pad layout (docs/SPEC.md 7i, "Game properties"; Droidtop/tracker#228). */
+/** A Windows game's own language and pad layout (docs/SPEC.md 7i, "Game properties"; mytop-project/tracker#228). */
 class GameLanguageTest {
 
     @Test

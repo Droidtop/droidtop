@@ -15,7 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The taskbar's pins and the one way to change them (docs/SPEC.md 2b, Droidtop/tracker#348). */
+/** The taskbar's pins and the one way to change them (docs/SPEC.md 2b, mytop-project/tracker#348). */
 internal class Pins(val list: List<TaskbarPin>, val toggle: (TaskbarPin) -> Unit)
 
 /**

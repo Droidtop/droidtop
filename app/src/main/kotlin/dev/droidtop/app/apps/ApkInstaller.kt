@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The one way droidtop installs an APK (docs/SPEC.md 10b "Installing apps", Droidtop/tracker#261): droidtop's own
+ * The one way droidtop installs an APK (docs/SPEC.md 10b "Installing apps", mytop-project/tracker#261): droidtop's own
  * update ([dev.droidtop.app.update.AppSelfUpdate]) and every app an app catalog offers ([AppCatalogs]) go through
  * one PackageInstaller session here, and Android's verdict comes back to [ApkInstallStatusReceiver].
  *
@@ -63,7 +63,7 @@ object ApkInstaller {
      * are the APK's `assets/dexopt/baseline.prof` and `.profm`), or null when the APK carries none. Given with the APK,
      * Android compiles the profiled code at install, as it does for an app from a store that sends one. Without it a
      * sideloaded or self-updated droidtop ran at `[status=verify]` until idle maintenance, which is what the console's
-     * 2-4 s per key press (Droidtop/tracker#925) and a 27 s ANR on BlueStacks right after updating to 3257 came from.
+     * 2-4 s per key press (mytop-project/tracker#925) and a 27 s ANR on BlueStacks right after updating to 3257 came from.
      */
     internal fun dexMetadata(apk: File): ByteArray? = runCatching {
         java.util.zip.ZipFile(apk).use { zip ->

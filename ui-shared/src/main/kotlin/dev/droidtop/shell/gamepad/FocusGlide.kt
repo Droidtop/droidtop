@@ -319,7 +319,7 @@ fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable () -> Uni
                         scope.launch { alpha.animateTo(1f, Motion.tw(120)) }
                         // How far apart the two controls are, edge to edge, not centre to centre: from a
                         // wide card to the small one beside it the centres are far apart while the cards
-                        // touch, and the ring dropped and flew there instead of sliding (Droidtop/tracker#632).
+                        // touch, and the ring dropped and flew there instead of sliding (mytop-project/tracker#632).
                         val from = Rect(edges[0].value, edges[1].value, edges[2].value, edges[3].value)
                         dropped = glideIsFar(isHeld, glideGap(from, b) / density.density)
                         if (dropped) {

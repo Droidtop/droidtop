@@ -32,7 +32,7 @@ object ReadingPrefs {
 
     /**
      * Sentence case for the labels themes draw in capitals (section labels, tabs, chips, eyebrows): all caps is
-     * harder to read. The owner's question 4 on Droidtop/tracker#485, answered with the coordinator's default
+     * harder to read. The owner's question 4 on mytop-project/tracker#485, answered with the coordinator's default
      * (off, on under High contrast); this constant is the one place to flip it.
      */
     const val KEY_SENTENCE_CASE = "pref_global_sentence_case"

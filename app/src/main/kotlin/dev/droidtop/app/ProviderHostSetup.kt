@@ -10,7 +10,7 @@ import dev.droidtop.pluginhost.AppInterfaces
 import dev.droidtop.pluginhost.ProviderHost
 
 /**
- * Setting up the enhancement provider host (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): the one app
+ * Setting up the enhancement provider host (docs/SPEC.md "Enhancement providers", mytop-project/tracker#852): the one app
  * that may hold elevated access, so droidtop's own code holds none. droidtop signs the template it carries with its own
  * Keystore key ([ProviderHost.signed]) and installs it through the one installer ([ApkInstaller]). The first install is
  * the person's choice and Android asks once; later versions install over it without asking where Android allows that

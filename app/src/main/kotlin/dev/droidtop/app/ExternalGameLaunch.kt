@@ -14,7 +14,7 @@ import dev.droidtop.pluginhost.PluginRefusals
 import java.io.File
 
 /**
- * Other apps asking droidtop to start a game (Droidtop/tracker#124; docs/SPEC.md 7 "Other apps that start games").
+ * Other apps asking droidtop to start a game (mytop-project/tracker#124; docs/SPEC.md 7 "Other apps that start games").
  *
  * Each calling app holds one permission, [PERMISSION], in the plugin API's grant model (docs/plugin-api.md 4.3): the same
  * [PluginGrants] store (in its own folder, so an app is never mistaken for a plugin of the same id), the same three
@@ -74,7 +74,7 @@ object ExternalGameLaunch {
         val key = refusalKey(packageName)
         return when (decide(stateOf(context, packageName), PluginRefusals.isNotNow(key, PERMISSION))) {
             Decision.LAUNCH -> true
-            // The screen that changes it opens from the notice, not a path to look for (Droidtop/tracker#759).
+            // The screen that changes it opens from the notice, not a path to look for (mytop-project/tracker#759).
             Decision.BLOCKED -> refuse(context, "$name may not start your games. Open Apps that start games to change it") {
                 dev.droidtop.app.settings.AppSettingsCatalogs.externalLaunchScreen()
             }

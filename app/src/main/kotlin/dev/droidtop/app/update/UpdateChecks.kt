@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * What each kind of update does once a check finds one (docs/SPEC.md 10b "The Updates page", Droidtop/tracker#570; the
+ * What each kind of update does once a check finds one (docs/SPEC.md 10b "The Updates page", mytop-project/tracker#570; the
  * owner, 2026-10-16: "WE don't have an option to ask the user if they want to install an update (that's an issue)").
  * Ask before installing lists it in Updates and says so in one notification; Install automatically installs it after
  * the scheduled check. Plugins and store games keep the settings they already had ("Update plugins from these
@@ -67,7 +67,7 @@ object UpdateKinds {
 }
 
 /**
- * The one check of every kind of update (Droidtop/tracker#570): the Updates page's Check now runs it, and so does a job
+ * The one check of every kind of update (mytop-project/tracker#570): the Updates page's Check now runs it, and so does a job
  * on droidtop's own schedule ("Check for updates": every day by default), which replaced the check that ran only when
  * droidtop's process started, seldom for a launcher. After a scheduled check each kind does what [UpdateKinds] says.
  */
@@ -95,7 +95,7 @@ object UpdateChecks {
     }
 
     /**
-     * The check, as a job (Droidtop/tracker#742): starts it, or follows the one already running, telling [onStatus] its
+     * The check, as a job (mytop-project/tracker#742): starts it, or follows the one already running, telling [onStatus] its
      * line, and returns how it ended. Both the Updates page's Check now and the scheduled pass run it this way.
      */
     suspend fun checkAll(context: Context, onStatus: (String) -> Unit): String {
@@ -139,7 +139,7 @@ object UpdateChecks {
 
     /**
      * Checks now when the last check is older than [STALE_MS], for a place that shows what can update: the Updates
-     * list, Settings > About and a plugin's page (Droidtop/tracker#792). The list read what the last scheduled check
+     * list, Settings > About and a plugin's page (mytop-project/tracker#792). The list read what the last scheduled check
      * had fetched, so a plugin published since (F95zone 0.7.1 on the console, a day after the daily check) did not show,
      * and the owner found "no plugin, or DROIDTOP even, update path in the UI". Looking is asking: the check starts as
      * the place opens and the place redraws as it ends. Not on a metered network when the person asked for Wi-Fi only.
@@ -183,7 +183,7 @@ object UpdateChecks {
         if (!due) return@withContext
         checkAll(app) {}
         // The sources that publish their whole list refresh their index weekly, as automatic downloads the policy holds
-        // to Wi-Fi and to when no game runs (Droidtop/tracker#937: "bulk refresh on by default").
+        // to Wi-Fi and to when no game runs (mytop-project/tracker#937: "bulk refresh on by default").
         runCatching { dev.droidtop.library.integrations.SourceIndexRefresh.startDue(app) }
         notifyAsking(app, applyPolicies(app, includeDroidtop = true))
     }
@@ -193,10 +193,10 @@ object UpdateChecks {
      * background, and the rest is counted to be asked about, which is returned. A plugin update that asks for new
      * access installs, and that access stays off until the person approves it on the plugin's page ("Wants new
      * access"). droidtop itself only with [includeDroidtop], and never while a game runs: its install ends in
-     * Android's own confirmation, which would cover the game (Droidtop/tracker#792).
+     * Android's own confirmation, which would cover the game (mytop-project/tracker#792).
      */
     private suspend fun applyPolicies(app: Context, includeDroidtop: Boolean): Int {
-        // Nothing installs by itself while a game runs (DroidDeck's "when idle", Droidtop/tracker#363): a plugin or app
+        // Nothing installs by itself while a game runs (DroidDeck's "when idle", mytop-project/tracker#363): a plugin or app
         // replaced under a game can stop what the game uses. The same step runs again when the game ends.
         if (dev.droidtop.library.LaunchDisplay.running.value != null) {
             afterTheGame(app, includeDroidtop)

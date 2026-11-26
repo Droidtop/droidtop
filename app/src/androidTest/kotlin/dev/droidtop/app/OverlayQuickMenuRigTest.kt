@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Every Quick Menu tab drawn in the in-game overlay's host, a window with no activity (Droidtop/tracker#788: the
+ * Every Quick Menu tab drawn in the in-game overlay's host, a window with no activity (mytop-project/tracker#788: the
  * Downloads tab over RetroArch crashed droidtop with "No ActivityResultRegistryOwner"). Each tab is composed through
  * [InGameOverlays.overlayView], the host the HOME chords use, in a draw-over-apps window on the main screen, and left
  * up for a moment; a tab that throws while composing kills this process and fails the run. Run by hand with

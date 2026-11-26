@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Each source's own index of what it has (owner, 2026-11-12, Droidtop/tracker#937: "per-source indexes that are built
+ * Each source's own index of what it has (owner, 2026-11-12, mytop-project/tracker#937: "per-source indexes that are built
  * dynamically from searches", "indexes are per-source. This is because sources can be individually toggled"). Typing
  * searches these and the library only; the live sources are asked on a press. Every live search and featured list a
  * source answers is added to that source's index, and a source that publishes a whole list fills it in bulk on its

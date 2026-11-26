@@ -130,7 +130,7 @@ internal class ShellBackStack(initialSection: GamingSection) {
      * Opening a group also records it as the entry focused in the section
      * it sits in, by id, so B back to the section lands on the system the
      * person came from (and a rescan that reorders the cards cannot move
-     * it). Droidtop/tracker#642.
+     * it). mytop-project/tracker#642.
      */
     fun openGroup(key: String?) {
         if (key != null) focus[ShellPlace.Section(section).key] = key
@@ -179,7 +179,7 @@ internal class ShellBackStack(initialSection: GamingSection) {
         /**
          * The whole back stack as one savable value, so the Activity
          * recreate the Text size setting triggers (AccessibilityPrefs;
-         * Droidtop/tracker#87) restores the user's place instead of
+         * mytop-project/tracker#87) restores the user's place instead of
          * rebuilding it from the default section, which dropped whoever
          * changed the setting on the Games tab with their whole place
          * in the shell gone. Flat non-null strings and booleans only:

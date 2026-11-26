@@ -127,7 +127,7 @@ internal fun capsuleWidthFor(widthDp: Float, size: CardSize = CardSize.STANDARD)
 
 /**
  * How big the games' capsules are (List options > Card size, docs/SPEC.md 7i; DroidDeck's library Display menu,
- * Droidtop/tracker#363): a step on the window's tier width, so smaller fits more games on a screen and larger shows
+ * mytop-project/tracker#363): a step on the window's tier width, so smaller fits more games on a screen and larger shows
  * more of each one's art.
  */
 enum class CardSize(val label: String, val scale: Float) {
@@ -217,7 +217,7 @@ internal fun PcCapsule(
     // The art's shape; a hero card widening or narrowing passes its width over the capsules' height on the way.
     aspect: Float = if (hero) HERO_ASPECT else CAPSULE_ASPECT,
     badge: KindBadge? = null,
-    // The name under the art (PC Games' "Show names under images", docs/SPEC.md 7i, Droidtop/tracker#578). A card
+    // The name under the art (PC Games' "Show names under images", docs/SPEC.md 7i, mytop-project/tracker#578). A card
     // with no art carries its name on its plate whatever this says; a hero card has its own name under it.
     nameUnder: Boolean = false,
 ) {
@@ -264,7 +264,7 @@ internal fun PcCapsule(
                 rest = MenuTokens.Card,
                 restOutline = MenuTokens.CardOutline,
                 // Opaque, as at rest: the selection's translucent fill let the raised card's own shadow show through
-                // a card with no art, as a dark band round a lighter box (UI review, Droidtop/tracker#954 item 2).
+                // a card with no art, as a dark band round a lighter box (UI review, mytop-project/tracker#954 item 2).
                 selectedFill = MenuTokens.CardFocused,
                 art = true,
             )
@@ -298,7 +298,7 @@ internal fun PcCapsule(
                 AsyncImage(
                     model = boxOverBlur,
                     contentDescription = null,
-                    // Whole, at its own shape (owner, Droidtop/tracker#632): never cropped.
+                    // Whole, at its own shape (owner, mytop-project/tracker#632): never cropped.
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(Corners.Tile),
                 )
@@ -310,7 +310,7 @@ internal fun PcCapsule(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    // Breaks between run-together words, never inside one (Droidtop/tracker#942).
+                    // Breaks between run-together words, never inside one (mytop-project/tracker#942).
                     val heroName = rememberCardTitle(title, max = 3)
                     Text(
                         heroName.text,
@@ -330,13 +330,13 @@ internal fun PcCapsule(
             // off by the footer until it is scrolled to, and a name on
             // the bottom edge left those plates looking empty; the bottom
             // corner marks (source, copies) also sat on its second line
-            // (console, build 1397, Droidtop/tracker#273).
+            // (console, build 1397, mytop-project/tracker#273).
             Column(
                 modifier = Modifier.fillMaxSize().padding(Space.Md),
                 verticalArrangement = Arrangement.Center,
             ) {
                 // The plate's name breaks between run-together words, never inside one: "RP BetaRunner" read "RP",
-                // "BetaRunn", "er" on Home (rig, AVD dev.3365, Droidtop/tracker#942).
+                // "BetaRunn", "er" on Home (rig, AVD dev.3365, mytop-project/tracker#942).
                 val plateName = rememberCardTitle(title, max = 3)
                 Text(
                     plateName.text,
@@ -371,7 +371,7 @@ internal fun PcCapsule(
         // display the icon". Two lines held for every card, so a row of capsules keeps one height.
         val name = rememberCardTitle(title)
         Text(
-            // Breaks between run-together words, never inside one (Droidtop/tracker#942).
+            // Breaks between run-together words, never inside one (mytop-project/tracker#942).
             name.text,
             color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
             // Body size, not the supporting role's: read from across the room on a handheld.
@@ -471,7 +471,7 @@ internal fun capsuleStatusWord(status: CapsuleStatus): String = when (status) {
 
 /**
  * The top-left badge: the game's [CapsuleStatus] as a glyph on a chip that stays legible over any art (show, then say:
- * Droidtop/tracker#738; the owner: "visual indicators instead of words whenever possible"). Each state has its own
+ * mytop-project/tracker#738; the owner: "visual indicators instead of words whenever possible"). Each state has its own
  * shape, so its tone is never the only signal, and its word ([capsuleStatusWord]) is the badge's accessible label. How
  * far a download is, is the bar along the capsule's foot; the badge names the state and never counts (#643).
  */

@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The rooted backend's pure decisions (Droidtop/tracker#731): its config text, its delete guard, its sockets file. */
+/** The rooted backend's pure decisions (mytop-project/tracker#731): its config text, its delete guard, its sockets file. */
 class RootBackendTest {
     private val rootfs = "/data/user/0/dev.droidtop.app/files/droidspaces/rootfs/box"
 

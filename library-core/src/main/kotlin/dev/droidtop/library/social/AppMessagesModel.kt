@@ -2,7 +2,7 @@ package dev.droidtop.library.social
 
 /*
  * Conversations from other apps' notifications (docs/SPEC.md "Social: messages from your apps",
- * Droidtop/tracker#329). Everything here is plain data and pure rules, so the notification parsing
+ * mytop-project/tracker#329). Everything here is plain data and pure rules, so the notification parsing
  * and the choice of which action replies are tested without a device. The Android side that fills
  * these from a notification is [AppMessageExtractor]; the provider that holds the result is [AppMessages].
  */

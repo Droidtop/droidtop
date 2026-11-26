@@ -15,7 +15,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * "Back up droidtop" to one of the person's shares, and restore from one (docs/SPEC.md 7p, Droidtop/tracker#573). The
+ * "Back up droidtop" to one of the person's shares, and restore from one (docs/SPEC.md 7p, mytop-project/tracker#573). The
  * archive is [DroidtopBackup]'s, unchanged; this only carries it. On the share each device keeps its own folder,
  * `droidtop/backups/<device>/`, and every backup is a new file there: droidtop never deletes one.
  *

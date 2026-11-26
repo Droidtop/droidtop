@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The taskbar's window actions for the session's compositor: raise, minimize and restore, one place for both
- * compositors droidtop starts (Droidtop/tracker#145, #391).
+ * compositors droidtop starts (mytop-project/tracker#145, #391).
  *
  * labwc implements wlr-foreign-toplevel-management's set_minimized (its wlr-foreign.c
  * handle_request_minimize), so there minimize and restore are that request. sway ignores it, so under sway
@@ -37,14 +37,14 @@ import java.util.concurrent.atomic.AtomicReference
  * `floating disable` for a window that was tiled, so it comes back into the layout rather than floating
  * (sway's `floating disable` also takes it out of the scratchpad, container_set_floating). The protocol has
  * no request that names a sway container, so the window is found in sway's tree by the app id and title the
- * protocol reported, among the windows on the output it reported first (Droidtop/tracker#908, step D4); with two
+ * protocol reported, among the windows on the output it reported first (mytop-project/tracker#908, step D4); with two
  * windows alike there too, the window is raised first and the focused one is taken.
  *
  * sway reports a scratchpad window to the protocol only as not activated, so the windows this minimized
  * are kept in [hidden], which the taskbar reads as minimized; a window that comes back to the front by any
  * route (sway's own scratchpad key, a click in the desktop) leaves it ([forget]).
  *
- * The title-bar buttons droidtop draws over sway's windows (docs/SPEC.md 2b "Window controls", Droidtop/tracker#910)
+ * The title-bar buttons droidtop draws over sway's windows (docs/SPEC.md 2b "Window controls", mytop-project/tracker#910)
  * take the same actions by the window's container id, which sway's tree gives them ([frames], [close], [minimize],
  * [toggleMaximize]); the bar, which knows a window only by the protocol, still finds it with [findWindow].
  */
@@ -64,7 +64,7 @@ class DesktopWindows(
     private val _placed = MutableStateFlow<Map<Long, SwayWindow>>(emptyMap())
 
     /**
-     * The windows this maximized or snapped, by toplevel id, each with where it was before (Droidtop/tracker#686),
+     * The windows this maximized or snapped, by toplevel id, each with where it was before (mytop-project/tracker#686),
      * so the bar offers Restore size. Always empty under labwc, whose windows have their own title-bar buttons.
      */
     val placed: StateFlow<Map<Long, SwayWindow>> = _placed.asStateFlow()
@@ -74,12 +74,12 @@ class DesktopWindows(
 
     /**
      * Whether a window can be moved to another screen: sway only, the one compositor droidtop gives a second output
-     * (Droidtop/tracker#908, step D2). The action is offered only while a second output exists ([WindowOutputs]).
+     * (mytop-project/tracker#908, step D2). The action is offered only while a second output exists ([WindowOutputs]).
      */
     val canMove: Boolean get() = sway
 
     /**
-     * Moves [toplevel] to the compositor output [outputName] (Droidtop/tracker#908, step D4): sway's
+     * Moves [toplevel] to the compositor output [outputName] (mytop-project/tracker#908, step D4): sway's
      * `move container to output`, which puts it on that output's visible workspace, tiled or floating as it was.
      * Nothing about the focus is asked: it stays where sway leaves it. False under labwc, for a name that is not an
      * output's, or when sway could not be asked or found no such window.
@@ -96,7 +96,7 @@ class DesktopWindows(
     }
 
     /**
-     * Maximizes, snaps or restores [toplevel] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): what a
+     * Maximizes, snaps or restores [toplevel] (docs/SPEC.md 2b "Window controls", mytop-project/tracker#686): what a
      * title bar's buttons and an edge drag do on DeX or Android's desktop windowing, which sway's title bars do not
      * have. The window floats for it, so it can be put anywhere; [Placement.RESTORE] puts it back where it was,
      * tiled again when it was tiled. False when sway could not be asked.
@@ -141,7 +141,7 @@ class DesktopWindows(
 
     /**
      * Where sway shows each window, read from its tree off the main thread while anything collects it (the desktop's
-     * surfaces, for their title-bar buttons and resize bands, Droidtop/tracker#910). Read again on every window,
+     * surfaces, for their title-bar buttons and resize bands, mytop-project/tracker#910). Read again on every window,
      * workspace and output event sway sends, on [refreshFrames], and every [FRAMES_POLL_MS] for what sway sends no
      * event for (a window dragged or resized by the pointer, or resizing itself). Always [SwayFrames.NONE] under
      * labwc, which draws its own title-bar buttons.
@@ -299,7 +299,7 @@ class DesktopWindows(
 
     /**
      * Switches to the next or previous workspace on the focused output (sway's `workspace next_on_output`), for the
-     * trackpad's three-finger swipe (Droidtop/tracker#426). False under labwc, which takes no command from outside,
+     * trackpad's three-finger swipe (mytop-project/tracker#426). False under labwc, which takes no command from outside,
      * or when sway could not be asked.
      */
     suspend fun switchWorkspace(next: Boolean): Boolean {

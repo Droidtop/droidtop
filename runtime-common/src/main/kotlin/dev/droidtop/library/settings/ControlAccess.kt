@@ -2,7 +2,7 @@ package dev.droidtop.library.settings
 
 /**
  * The one restriction model for every surface that shows controls (docs/SPEC.md "UI modes and
- * ControlAccess", Droidtop/tracker#414). It takes the UI mode as a value and answers, for the
+ * ControlAccess", mytop-project/tracker#414). It takes the UI mode as a value and answers, for the
  * companion and for the Quick Menu alike, which panels show, which rows show inside them, and whether
  * the extras (long-press, Open on the companion screen, the provider line) exist. Nothing else gates
  * Kid or Kiosk: [UiMode.hidesSettings] and [UiMode.kidGamesOnly] read from here too.
@@ -21,11 +21,11 @@ enum class ControlSurface { COMPANION, QUICK_MENU }
 enum class ControlPanel {
     HOME, GAME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, PLUGINS, NOTIFICATIONS, AUDIO, DISPLAY, DOWNLOADS, CONNECTIONS,
 
-    /** The person's own name and picture (Droidtop/tracker#586): the owner's, so the restricted modes leave it out. */
+    /** The person's own name and picture (mytop-project/tracker#586): the owner's, so the restricted modes leave it out. */
     PROFILE,
 
     /**
-     * The companion's two management tabs (Droidtop/tracker#786 plan 4.2, owner decision 1 of 2026-10-30): Device
+     * The companion's two management tabs (mytop-project/tracker#786 plan 4.2, owner decision 1 of 2026-10-30): Device
      * (Display, Sound, Network, Battery, Storage, Apps, Privacy...) and droidtop (Mode, Look, Library, Plugins,
      * Backup...). Companion-only: the Quick Menu has its own sections. Default-deny: only Full lists them.
      */
@@ -86,7 +86,7 @@ object ControlAccess {
     val COMPANION_ONLY: Set<ControlPanel> = setOf(ControlPanel.DEVICE, ControlPanel.DROIDTOP)
 
     /**
-     * Tabs that never move into More when the bar is short of room (Droidtop/tracker#786 plan 4.2): Home and Device,
+     * Tabs that never move into More when the bar is short of room (mytop-project/tracker#786 plan 4.2): Home and Device,
      * the companion's two always-there places. The others move in from the right end as before.
      */
     val NEVER_IN_MORE: Set<ControlPanel> = setOf(ControlPanel.HOME, ControlPanel.DEVICE)
@@ -136,11 +136,11 @@ object ControlAccess {
         hiddenGroupIds = setOf(GROUP_COMPANION),
     )
 
-    /** Kid: the restricted set over kid-friendly games, with the play-time line on Home (Droidtop/tracker#421). */
+    /** Kid: the restricted set over kid-friendly games, with the play-time line on Home (mytop-project/tracker#421). */
     private val KID = RESTRICTED.copy(kidGamesOnly = true, rows = RESTRICTED.rows + ControlRow.PLAY_TIME)
 
     /**
-     * Guest (Droidtop/tracker#420): the handheld handed to somebody who is not the owner, with the owner's
+     * Guest (mytop-project/tracker#420): the handheld handed to somebody who is not the owner, with the owner's
      * library to play. Kid's limits (no Settings, stores, downloads, accounts or plugin installs, nothing
      * that stops or overwrites without asking) but all of the library rather than the kid-friendly part,
      * and none of Kid's own parts: no volume cap, no play-time limit. The owner's private panels go too: the

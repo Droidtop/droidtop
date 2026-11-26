@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The first D-pad press is handled everywhere in Gaming (Droidtop/tracker#820). On the console a D-pad press on the
+ * The first D-pad press is handled everywhere in Gaming (mytop-project/tracker#820). On the console a D-pad press on the
  * Apps grid, in the Quick Menu (R2) and over a game (HOME + L2) was dropped as "unhandled" until A was pressed: the
  * gate delivers the D-pad keys it makes from the hat into the window directly, and a window left in touch mode by a
  * touch (the companion's screen) gave them no focused view. This puts the window in touch mode first, the state the

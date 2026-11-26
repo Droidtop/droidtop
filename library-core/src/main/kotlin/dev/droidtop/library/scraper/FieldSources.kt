@@ -115,7 +115,7 @@ object FieldSources {
      * The editable fields [source] wrote and no longer stands behind, because a fresh lookup of the
      * same game at [source] answered "no match" (not a refusal): its earlier answer was another
      * game. A TheGamesDB name search used to take the API's first result, so "Pokemon - Crystal
-     * Version" kept a fan game's description and date (Droidtop/tracker#251); the search was fixed,
+     * Version" kept a fan game's description and date (mytop-project/tracker#251); the search was fixed,
      * but nothing took the old values back, and the console on build 1386 still showed them.
      * Fields the person edited are never in here (their source is [EDITED]).
      */
@@ -131,7 +131,7 @@ object FieldSources {
      * source predates this record (9359390c, 2026-09-25) and was written by a scrape, because the
      * editor has recorded [EDITED] since the same commit. The caller removes the fields the match
      * itself supplies; the rest are cleared rather than left holding an earlier source's answer,
-     * which may have been another game (Droidtop/tracker#251).
+     * which may have been another game (mytop-project/tracker#251).
      */
     fun superseded(existing: String?, filled: Set<String>, source: String): Set<String> {
         val from = decode(existing)
@@ -178,7 +178,7 @@ object FieldSources {
     }
 
     /**
-     * How strongly a row's match says which game it is, from its `scrape_confidence` (Droidtop/tracker#318 §7.1):
+     * How strongly a row's match says which game it is, from its `scrape_confidence` (mytop-project/tracker#318 §7.1):
      * the person's pick, then a name they picked before, then a store id or a hash, then a name. Anything else, a row
      * waiting for a pick or one never matched, ranks lowest.
      */

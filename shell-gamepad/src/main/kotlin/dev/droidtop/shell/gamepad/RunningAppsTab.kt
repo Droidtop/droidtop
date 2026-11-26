@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The Quick Menu's Apps tab: what is running, across both screens, with the three things a task manager
- * does (docs/SPEC.md "The task manager", Droidtop/tracker#252). The list is [TaskManager.snapshot], the one
+ * does (docs/SPEC.md "The task manager", mytop-project/tracker#252). The list is [TaskManager.snapshot], the one
  * shared source the companion and Standard's home read too; it is refreshed only while this tab is
  * composed ([TaskManager.watch]), so nothing polls with the sheet closed or another tab showing.
  *
@@ -75,7 +75,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
     val index = focusIndex.coerceIn(0, apps.size)
 
     // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
-    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    // and the first D-pad press only gave the section focus (mytop-project/tracker#820).
     LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Running apps") }
     LaunchedEffect(Unit) { TaskManager.watch(context) }
 
@@ -98,7 +98,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                         scope.launch {
                             val targets = TaskManager.clearAllTargets(context)
                             if (targets.isEmpty()) {
-                                // Every listed app is protected: say so, not "Nothing to close" (Droidtop/tracker#252).
+                                // Every listed app is protected: say so, not "Nothing to close" (mytop-project/tracker#252).
                                 clearAllArmed = false
                                 message = TaskManager.clearAllKeptLine(context)
                             } else if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
@@ -147,7 +147,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             if (snapshot == null) {
                 Text(stringResource(R.string.reading), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else if (apps.isEmpty()) {
-                // A list the system only partly gave us cannot promise nothing is running (Droidtop/tracker#367).
+                // A list the system only partly gave us cannot promise nothing is running (mytop-project/tracker#367).
                 Text(
                     if (snapshot?.note != null) "Nothing seen (limited list)" else "Nothing running",
                     color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium,
@@ -223,7 +223,7 @@ fun SharedRunningAppsList(
                 }
                 // A tap on the row switches to the app; this asks for it on the other screen.
                 if (displays.any { it != app.displayId }) SharedTaskAction("Move", false) { onMove(i, app) }
-                // Kept from Clear all, or not (Droidtop/tracker#252).
+                // Kept from Clear all, or not (mytop-project/tracker#252).
                 if (onProtect != null) {
                     SharedTaskAction(if (app.packageName in protectedPackages) "Protected" else "Protect", false) { onProtect(i, app) }
                 }

@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The in-place hint for a View surface (Mobile is the forked Launcher3; docs/DESIGN-LANGUAGE.md "Guidance",
- * Droidtop/tracker#829): [show] puts [InPlaceHint] at the foot of [activity]'s content, above the navigation bar, in the
+ * mytop-project/tracker#829): [show] puts [InPlaceHint] at the foot of [activity]'s content, above the navigation bar, in the
  * colours outside Gaming, unless [id] is already done. It goes when the person taps Got it (which marks it done) or the
  * moment something else marks it done ([Hints.changes]). One at a time per window; asking again while it shows does
  * nothing.
@@ -68,7 +68,7 @@ object HintViews {
     }
 
     /**
-     * The pad's hint row for a View surface (Mobile's home, Droidtop/tracker#699): the shared [HintRow] over exactly
+     * The pad's hint row for a View surface (Mobile's home, mytop-project/tracker#699): the shared [HintRow] over exactly
      * [bindings] whose conditions hold, at the foot of [activity]'s content above the dock, drawn only while a pad is
      * what the person last used ([PadModality]) and gone at the first touch. Its pills sit on their own small plates
      * over the wallpaper, and a tap on one is that button's press. Once per window; asking again does nothing.

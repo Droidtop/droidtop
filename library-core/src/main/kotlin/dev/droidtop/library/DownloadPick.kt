@@ -3,7 +3,7 @@ package dev.droidtop.library
 import android.content.Context
 
 /**
- * droidtop's own pick among a record's downloads (Droidtop/tracker#838; the owner: "Downloads still don't auto-pick
+ * droidtop's own pick among a record's downloads (mytop-project/tracker#838; the owner: "Downloads still don't auto-pick
  * links"): the mirrors to try, in the order to try them, so an update starts with no link pressed by hand. The person
  * can still pick any row themselves on the record page.
  *
@@ -23,7 +23,7 @@ object DownloadPick {
     /**
      * What a mirror the source could not get comes back as: its job failed before naming any file ("The thread page has
      * no PIXELDRAIN link now"). It is a mirror that brought nothing, so the pick tries the next one, as for
-     * [NOTHING_STARTED] (Droidtop/tracker#862: the job stopped at the first mirror). [why] is the source's reason.
+     * [NOTHING_STARTED] (mytop-project/tracker#862: the job stopped at the first mirror). [why] is the source's reason.
      */
     fun broughtNothing(why: String): String = BROUGHT_NOTHING + why
 
@@ -69,14 +69,14 @@ object DownloadPick {
     /** A link droidtop serves without a page first, then the person's [order], then the hosts it does not name. */
     private fun hostRank(d: UpdateSources.Download, order: List<String>, served: (UpdateSources.Download) -> Boolean): Int {
         if (served(d)) return -1
-        // By the host's one name, so BZZHR ranks as BuzzHeavier (HostNames, Droidtop/tracker#859).
+        // By the host's one name, so BZZHR ranks as BuzzHeavier (HostNames, mytop-project/tracker#859).
         val host = HostNames.key(d.host)
         return order.indexOfFirst { host.contains(HostNames.key(it)) }.let { if (it < 0) order.size else it }
     }
 }
 
 /**
- * The person's host order for droidtop's pick (Droidtop/tracker#838): host names, most wanted first, matched against a
+ * The person's host order for droidtop's pick (mytop-project/tracker#838): host names, most wanted first, matched against a
  * link's host by name. A link droidtop serves without a page always comes first, whatever the order says.
  */
 object HostOrder {

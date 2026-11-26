@@ -1,7 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 /**
- * The input method's side of the engine seam for an engine other than Hacker's Latin one (Droidtop/tracker#903 H6 and
+ * The input method's side of the engine seam for an engine other than Hacker's Latin one (mytop-project/tracker#903 H6 and
  * H7a; docs/SPEC.md 6a, "The engine seam"): keys go to [engine], and after each one, and each pick, the session reads
  * its composing text and candidates again and writes them through [editor]: the composing text to the field with the
  * caret where the engine has it, the candidates to the candidate bar's model ([bar]). LatinIME makes one when

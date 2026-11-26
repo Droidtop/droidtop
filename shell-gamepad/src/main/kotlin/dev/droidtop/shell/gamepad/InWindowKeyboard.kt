@@ -18,9 +18,9 @@ import java.util.WeakHashMap
 
 /**
  * droidtop's keyboard for every text field in a droidtop activity (docs/SPEC.md 4c, "Typing on the add-on display",
- * Droidtop/tracker#314): store sign-in pages, onboarding, settings, any screen outside the Gaming shell's own fields.
+ * mytop-project/tracker#314): store sign-in pages, onboarding, settings, any screen outside the Gaming shell's own fields.
  * Wherever droidtop's keyboard serves the field ([KeyboardTargets.servesField]: a display Android draws no keyboard
- * on, or any display while a companion takes the typing, Droidtop/tracker#612), while the window's focused
+ * on, or any display while a companion takes the typing, mytop-project/tracker#612), while the window's focused
  * view is a text editor (`View.onCheckIsTextEditor`: an EditText, a Compose text field, an editable web page field)
  * and the person chose to type in it (a tap on it, A or Enter on it, or a key typed; or at once, on one touch-only
  * screen, [KeyboardTargets.raisesOnOwnFocus]),
@@ -146,7 +146,7 @@ object InWindowKeyboard {
             }
         }
 
-        /** A key on the focused field: A, Enter or a typed character is the person choosing to type (Droidtop/tracker#612). */
+        /** A key on the focused field: A, Enter or a typed character is the person choosing to type (mytop-project/tracker#612). */
         fun keyed(event: android.view.KeyEvent) {
             if (picked) return
             val focused = decor.findFocus() ?: return

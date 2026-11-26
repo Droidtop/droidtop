@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Where Steam Auto-Cloud says a game keeps its saves (docs/SPEC.md 7g,
- * "Stores", Droidtop/tracker#313): the `ufs` section of the game's product
+ * "Stores", mytop-project/tracker#313): the `ufs` section of the game's product
  * info, read the way GameNative read it (KeyValueUtils.generateSteamApp,
  * PathType.from; GPL-3.0). Only Windows entries are kept: droidtop runs a
  * Steam game through Wine.

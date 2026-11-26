@@ -13,7 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** The one decision every store's cloud save sync makes (docs/SPEC.md 7g, "Stores", Droidtop/tracker#224). */
+/** The one decision every store's cloud save sync makes (docs/SPEC.md 7g, "Stores", mytop-project/tracker#224). */
 class CloudSavePlanTest {
     @get:Rule
     val temp = TemporaryFolder()

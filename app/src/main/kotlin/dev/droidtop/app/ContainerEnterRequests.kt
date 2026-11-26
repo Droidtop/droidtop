@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The host side of the enter path (docs/SPEC.md 3d "Entering another container", Droidtop/tracker#555 D7): one
+ * The host side of the enter path (docs/SPEC.md 3d "Entering another container", mytop-project/tracker#555 D7): one
  * request directory from [ContainerEnter.helperScript] is checked and run in its sibling, and the helper is told
  * how it ended. Off the main thread; one coroutine per request, so a long command does not hold up the next.
  *
@@ -131,7 +131,7 @@ internal object ContainerEnterRequests {
     }
 
     /**
-     * Answers a `docker` or `podman` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c, D11) from droidtop's own
+     * Answers a `docker` or `podman` request (docs/SPEC.md 3d "The docker command", mytop-project/tracker#555 D6c, D11) from droidtop's own
      * state: the containers, their programs and the image store. Containers are named by their name or their id.
      */
     private suspend fun engine(
@@ -406,7 +406,7 @@ internal object ContainerEnterRequests {
     }
 
     /**
-     * `logs -f` (Droidtop/tracker#715): the [tail] lines, then what the program writes next, read the way an attached
+     * `logs -f` (mytop-project/tracker#715): the [tail] lines, then what the program writes next, read the way an attached
      * run reads it, until the program is no longer running, as Docker's and Podman's follow end with their container.
      * The helper's own end (Ctrl+C) closes the FIFO, and the next write ends this. With [untilMs] it ends then too.
      */

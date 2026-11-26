@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Which copy of a game its button acts on (docs/SPEC.md 7i, "Which copy",
- * Droidtop/tracker#397 slice H). A card can stand for several copies (a
+ * mytop-project/tracker#397 slice H). A card can stand for several copies (a
  * Steam row and a GOG row of one game, a GOG offline install and the GOG
  * account's row); highest first, the button acts on:
  *  1. an installed copy, the chosen one when it is installed;

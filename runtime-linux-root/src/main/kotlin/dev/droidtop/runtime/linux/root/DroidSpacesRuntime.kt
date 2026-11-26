@@ -304,7 +304,7 @@ class DroidSpacesRuntime(
      * The tree is root's (closed folders such as /root included), so the app's own walk would leave part of it out.
      * It is measured as root through the same root shell [usage] and [exec] use (Shizuku or Sui): `du -sxk` of the
      * rootfs on the device's side, staying on its filesystem, whether or not the container runs (docs/SPEC.md 3d
-     * "Storage used"; Droidtop/tracker#911). Without the root shell this throws, and the page says why.
+     * "Storage used"; mytop-project/tracker#911). Without the root shell this throws, and the page says why.
      */
     override suspend fun diskUsage(container: Container): dev.droidtop.runtime.DiskUsage {
         val result = RootProcess.run("/system/bin/du", "-sxk", container.rootfsPath)
@@ -392,7 +392,7 @@ class DroidSpacesRuntime(
         env: Map<String, String>,
         user: ContainerUser.Spec?,
     ): ContainerExecResult {
-        // Another user (Droidtop/tracker#715): real root switches with the image's own `su`, at the end of droidtop's
+        // Another user (mytop-project/tracker#715): real root switches with the image's own `su`, at the end of droidtop's
         // script (ContainerUser.EXEC_TAIL), after its redirections. `su` takes a name and gives that user's own group.
         // The tree is root's, so its two files are read inside the container, where its own root applies.
         val switchTo = user?.takeUnless { it.isRoot }?.let { spec ->
@@ -442,7 +442,7 @@ class DroidSpacesRuntime(
     }
 
     /**
-     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910): the display [exec]
+     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", mytop-project/tracker#910): the display [exec]
      * starts it on, detached inside the container, where its init keeps it, when the package is there and it is not
      * running; DISPLAY only once its socket is ([SiblingX11.detachedPrefix]). Only for a sibling sharing Wayland, and
      * never when [env] asks for no server. The tree is root's, so whether the package is there is asked inside it.
@@ -460,7 +460,7 @@ class DroidSpacesRuntime(
     override val interactiveShellUnavailableReason: String? = null
 
     /**
-     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909): [exec]'s own command
+     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; mytop-project/tracker#909): [exec]'s own command
      * ([runArgv]), as root, run through the elevated helper. droidspaces' `run` makes a terminal only when its own
      * input is one, and the helper's process has pipes, so the terminal is made in the container
      * ([ContainerTerminal.onContainerTerminal]) and droidtop relays the bytes.
@@ -477,7 +477,7 @@ class DroidSpacesRuntime(
     override val dataBackupUnavailableReason: String? = null
 
     /**
-     * The container's whole tree as a tar archive, written as root (docs/SPEC.md 3d "Backup"; Droidtop/tracker#758):
+     * The container's whole tree as a tar archive, written as root (docs/SPEC.md 3d "Backup"; mytop-project/tracker#758):
      * it is stopped first, as on proot, so nothing changes under tar.
      */
     override suspend fun exportData(container: Container, out: java.io.OutputStream) {
@@ -533,7 +533,7 @@ class DroidSpacesRuntime(
     override val cloneUnavailableReason: String? = null
 
     /**
-     * A copy of a stopped container (docs/SPEC.md 3d "Copy"; Droidtop/tracker#758): its tree copied as root with
+     * A copy of a stopped container (docs/SPEC.md 3d "Copy"; mytop-project/tracker#758): its tree copied as root with
      * owners and modes kept, and its settings files (image, run settings, home and folders, sockets, devices). The copy
      * is always a sibling: a copy of the desktop's own gets a sibling's init and no provisioning plan. A copy that fails
      * part-way is deleted whole.
@@ -769,7 +769,7 @@ class DroidSpacesRuntime(
     companion object {
         /**
          * A `<name>.sockets` file's lines as the container's sockets: `key=value`, each on unless it says exactly
-         * `false`, so a missing or unreadable line keeps the default. Pure (Droidtop/tracker#731).
+         * `false`, so a missing or unreadable line keeps the default. Pure (mytop-project/tracker#731).
          */
         internal fun parseSockets(lines: List<String>): ContainerSockets {
             val values = lines.associate { line ->

@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** Android 12's phantom process limit (docs/SPEC.md "Child processes and Android's limit", Droidtop/tracker#816). */
+/** Android 12's phantom process limit (docs/SPEC.md "Child processes and Android's limit", mytop-project/tracker#816). */
 class PhantomProcessesTest {
     private val proc: File = Files.createTempDirectory("proc").toFile()
 

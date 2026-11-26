@@ -183,7 +183,7 @@ internal fun ControllerStep(
             )
         }
 
-        // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (Droidtop/tracker#740).
+        // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (mytop-project/tracker#740).
         StepSectionLabel("HOME button combos")
         val scope = rememberCoroutineScope()
         var chords by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
@@ -246,7 +246,7 @@ internal fun ControllerStep(
             )
         }
 
-        // The stick, live (Droidtop/tracker#723): where it rests and how far it leans, against the dead zone set in
+        // The stick, live (mytop-project/tracker#723): where it rests and how far it leans, against the dead zone set in
         // Settings > Controls, so drift shows as a number that never settles at zero.
         StepSectionLabel("Test your stick")
         val stick by dev.droidtop.shell.gamepad.input.PadGateCore.lastStick.collectAsState()
@@ -262,7 +262,7 @@ internal fun ControllerStep(
 }
 
 /**
- * The stick test's line (Droidtop/tracker#723): the position, then whether that lean moves the menus at the dead zone
+ * The stick test's line (mytop-project/tracker#723): the position, then whether that lean moves the menus at the dead zone
  * set now ([press] and [release] from `StickDeadZone`). Pure.
  */
 internal fun stickLine(x: Float, y: Float, lean: Float, press: Float, release: Float): String {

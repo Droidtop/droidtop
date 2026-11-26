@@ -10,7 +10,7 @@ import android.view.View
 import androidx.annotation.RequiresApi
 
 /**
- * Plays a key press's haptic in the input method (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
+ * Plays a key press's haptic in the input method (mytop-project/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"):
  * the effect [KeyHaptics] gives the key's class at the "Vibration strength" chosen. Each class's effect is built once
  * when the strength is set, never per press, ported from Unexpected Keyboard's `VibratorCompat`
  * (https://github.com/Julow/Unexpected-Keyboard at 0695efdc, GPL-3.0), which keeps its predefined tick the same way: a

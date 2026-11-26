@@ -11,7 +11,7 @@ import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.ui.shared.HintViews
 
 /**
- * Mobile's pad hint row (Droidtop/tracker#699, option 1): the [app.murinelauncher.home.PadKeys] buttons named above the dock while a pad
+ * Mobile's pad hint row (mytop-project/tracker#699, option 1): the [app.murinelauncher.home.PadKeys] buttons named above the dock while a pad
  * is what the person last used, as Gaming and Desktop teach the pad from their own rows. Each pill is bound only while
  * its press does something: the page buttons with more than one home page, the item menu while an item has the focus.
  */

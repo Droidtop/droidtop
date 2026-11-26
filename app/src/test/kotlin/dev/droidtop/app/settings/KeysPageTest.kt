@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Keys and accounts (Droidtop/tracker#12): one row per key, grouped by kind, each with where it is used and Remove. */
+/** Keys and accounts (mytop-project/tracker#12): one row per key, grouped by kind, each with where it is used and Remove. */
 class KeysPageTest {
     private fun key(id: String, title: String) = HeldKey(id, title, "used for $title") { "removed $title" }
 

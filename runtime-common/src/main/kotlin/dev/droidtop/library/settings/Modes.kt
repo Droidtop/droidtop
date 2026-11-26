@@ -57,7 +57,7 @@ enum class ModePiece(vararg owners: Mode) {
     /**
      * droidtop's own notification listener. Every mode reads it: the Quick Menu's Notifications section (Gaming and
      * Desktop), and the companion's Notifications tab and Now playing card, which Mobile has too. Owned by Gaming
-     * alone, it left those empty with Gaming off (Droidtop/tracker#828).
+     * alone, it left those empty with Gaming off (mytop-project/tracker#828).
      */
     NOTIFICATION_LISTENER(Mode.GAMING, Mode.DESKTOP, Mode.LAUNCHER),
 
@@ -158,7 +158,7 @@ object ModeGate {
     }
 
     /**
-     * Whether choosing "Android" in the switcher first asks to make droidtop the Home app (Droidtop/tracker#522): the
+     * Whether choosing "Android" in the switcher first asks to make droidtop the Home app (mytop-project/tracker#522): the
      * person has droidtop's launcher on ([launcherOn]) but Android's Home opens another app, so "Android" would hand a
      * screen of a dual-screen device to that launcher and leave droidtop's surfaces behind. With no droidtop launcher
      * there is nothing to ask for: "Android" is then the other launcher, as chosen.
@@ -180,7 +180,7 @@ object ModeGate {
 
     /**
      * Desktop, while the person is in it: the last mode is Desktop and its session runs (docs/SPEC.md 2c, "Back to a
-     * running desktop", Droidtop/tracker#352). An Android app opened from Desktop's Start menu covers the desktop; a
+     * running desktop", mytop-project/tracker#352). An Android app opened from Desktop's Start menu covers the desktop; a
      * Home press, or droidtop's icon, over it goes back to that desktop rather than to the default mode, which would
      * be a jump between modes (#639).
      */
@@ -326,7 +326,7 @@ object Modes {
     /**
      * On a Home intent droidtop sends itself (taking an ended app off the screen): go to the mode in use, not the
      * default one, so droidtop never opens another mode over the one the person is in (docs/SPEC.md 2c, "A mode never
-     * opens another"; Droidtop/tracker#639). A Home press by the person carries none and goes to [homeTarget].
+     * opens another"; mytop-project/tracker#639). A Home press by the person carries none and goes to [homeTarget].
      */
     const val EXTRA_MODE_IN_USE = "dev.droidtop.extra.MODE_IN_USE"
 

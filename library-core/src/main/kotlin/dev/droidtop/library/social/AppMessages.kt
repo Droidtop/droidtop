@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
- * "Messages from your apps" (docs/SPEC.md "Social: messages from your apps", Droidtop/tracker#329): the
+ * "Messages from your apps" (docs/SPEC.md "Social: messages from your apps", mytop-project/tracker#329): the
  * conversations other apps expose through their notifications, as one more social provider. droidtop's
  * notification listener ([NotificationsStore]'s source) hands every change of the active notifications to
  * [onPosted]; the conversations are read from what the notifications carry ([AppMessageExtractor]), merged

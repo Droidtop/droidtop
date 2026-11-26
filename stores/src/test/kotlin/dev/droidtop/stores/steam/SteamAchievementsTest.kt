@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Steam's achievement blocks as droidtop shows them (Droidtop/tracker#230). */
+/** Steam's achievement blocks as droidtop shows them (mytop-project/tracker#230). */
 class SteamAchievementsTest {
     @Test
     fun earnedOnesCarryTheirTimeAndIconAndLockedOnesTheGrayIcon() {

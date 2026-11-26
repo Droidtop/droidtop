@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The filtering Wayland sockets of containers whose clipboard is off (docs/SPEC.md 3d "Clipboard per container",
- * Droidtop/tracker#787 slice 2), one per container, started the first time that container's programs need one and
+ * mytop-project/tracker#787 slice 2), one per container, started the first time that container's programs need one and
  * kept while droidtop runs: a container's processes come and go, its socket stays where they were told to look.
  *
  * Each backend binds [socketFor] over the compositor's socket name in that container's view of

@@ -2,7 +2,7 @@
 
 `protocol/` holds four files of google/mozc's `src/protocol`, copied unchanged (their BSD-3 headers intact) from commit
 `0136c35782536cb43d710575c311cd4185982738` (Mozc 3.35.6354), the commit `libmozc.so` was built from
-(`../../../mozc-engine.pin`, Droidtop/tracker#903 H7b):
+(`../../../mozc-engine.pin`, mytop-project/tracker#903 H7b):
 
 | File | Git blob at that commit | Why |
 | --- | --- | --- |

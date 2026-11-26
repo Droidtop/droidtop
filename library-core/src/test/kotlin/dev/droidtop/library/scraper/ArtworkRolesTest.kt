@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A picture's role by its shape (docs/SPEC.md 7h, "Artwork roles", Droidtop/tracker#585), at Steam's own sizes. */
+/** A picture's role by its shape (docs/SPEC.md 7h, "Artwork roles", mytop-project/tracker#585), at Steam's own sizes. */
 class ArtworkRolesTest {
     @Test
     fun `box art is a capsule, portrait or square`() {

@@ -4,7 +4,7 @@ import com.winlator.core.WineRegistryEditor
 import java.io.File
 
 /**
- * The "installed" record of the Visual C++ 2015-2022 runtime in a prefix (Droidtop/tracker#899).
+ * The "installed" record of the Visual C++ 2015-2022 runtime in a prefix (mytop-project/tracker#899).
  *
  * Wine ships its own vcruntime140 and msvcp140 (system32 and syswow64 hold them), but not the registry record the
  * Microsoft redistributable writes, `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\<arch>`. Unreal's

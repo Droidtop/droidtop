@@ -140,7 +140,7 @@ object PluginGameSections {
         val action: RowAction,
         val viewAction: ViewAction? = null,
         val confirm: String? = null,
-        /** An on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738). */
+        /** An on/off row's state, drawn as a switch rather than said (show, then say: mytop-project/tracker#738). */
         val on: Boolean? = null,
     )
 

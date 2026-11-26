@@ -24,7 +24,7 @@ import dev.droidtop.library.settings.WordsForTests
 
 /** The record page's tabs (docs/SPEC.md 7g, "Getting an update"). */
 class SourceRecordPageTest {
-    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (mytop-project/tracker#177).
     @Before
     fun installWords() = WordsForTests.install()
 
@@ -49,9 +49,9 @@ class SourceRecordPageTest {
         val order = groupedDownloads(record.downloads).map { "${it.section}|${it.host}|${it.label}" }
         assertEquals(listOf("Win/Linux|MEGA|MEGA", "Win/Linux|mega|Mirror", "Win/Linux|PIXELDRAIN|Part 1", "Mac|MEGA|MEGA"), order)
         val all = recordRows(record, RecordTab.DOWNLOADS) { "" }
-        // droidtop's own pick leads (Droidtop/tracker#838); the links follow for picking by hand.
+        // droidtop's own pick leads (mytop-project/tracker#838); the links follow for picking by hand.
         assertEquals(RecordAction.GetBest, all.first().action)
-        // One row per heading (Droidtop/tracker#838): Win/Linux's three links tried in turn, Mac's one link as itself.
+        // One row per heading (mytop-project/tracker#838): Win/Linux's three links tried in turn, Mac's one link as itself.
         val rows = all.drop(1)
         assertEquals(listOf("Win/Linux", "MEGA", OPEN_THREAD), rows.map { it.title })
         assertEquals("MEGA, PIXELDRAIN", rows.first().subtitle)
@@ -68,7 +68,7 @@ class SourceRecordPageTest {
                 s("Walkthrough", "WALKTHROUGH"), s("Compressed", "MIXDROP"),
             ),
         )
-        // The thread's own groupings (Droidtop/tracker#845): Win/Linux is one choice, not two.
+        // The thread's own groupings (mytop-project/tracker#845): Win/Linux is one choice, not two.
         assertEquals(listOf("windows+linux", "mac", "android"), downloadSystems(tagged))
         // Windows first; the links for it and the ones for any system.
         val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }.also { assertEquals(RecordAction.GetBest, it.first().action) }.drop(1)
@@ -118,7 +118,7 @@ class SourceRecordPageTest {
         assertEquals(feed to "9", updateSourceOf(listOf(forum, feed), links, "0.6"))
         assertNull(updateSourceOf(listOf(forum, feed), links, "0.7"))
         assertNull(updateSourceOf(listOf(forum, feed), links, null))
-        // The rig's row (Droidtop/tracker#577): the badge said "v0.37.dv" and the source wrote it otherwise.
+        // The rig's row (mytop-project/tracker#577): the badge said "v0.37.dv" and the source wrote it otherwise.
         val f95 = GameLinks(sources = listOf(SourceLink("forum", "18978", SourceAnswer("0.37.DV", 0L))))
         assertEquals(forum to "18978", updateSourceOf(listOf(forum, feed), f95, "v0.37.dv"))
         // The only linked source named the update, whatever it wrote.
@@ -128,7 +128,7 @@ class SourceRecordPageTest {
 
     @Test
     fun `signed out with links that have no address, Downloads starts with the source's sign-in`() {
-        // Droidtop/tracker#599: F95zone gives download links to members only; "no link now" was all a guest got.
+        // mytop-project/tracker#599: F95zone gives download links to members only; "no link now" was all a guest got.
         val row = signInRow("F95zone", record, signedOut = true)
         assertEquals(RecordRow("Sign in to F95zone", subtitle = "to get download links", action = RecordAction.SignIn), row)
         assertNull("signed in, no row", signInRow("F95zone", record, signedOut = false))
@@ -138,7 +138,7 @@ class SourceRecordPageTest {
 
     @Test
     fun `a site waiting for its browser check says so first, with the check as its action`() {
-        // Droidtop/tracker#600: F95zone's Cloudflare check, passed in droidtop's web view.
+        // mytop-project/tracker#600: F95zone's Cloudflare check, passed in droidtop's web view.
         assertEquals(RecordRow("Open F95zone to pass its check", subtitle = "The site checks the browser first", action = RecordAction.PassCheck), checkRow("F95zone"))
     }
 
@@ -175,7 +175,7 @@ class SourceRecordPageTest {
 
     @Test
     fun theDownloadsEndWithOpenThreadWhenTheRecordHasAPage() {
-        // Droidtop/tracker#862: the person's way past a mirror droidtop cannot get, on every Downloads tab with a page.
+        // mytop-project/tracker#862: the person's way past a mirror droidtop cannot get, on every Downloads tab with a page.
         val rows = recordRows(record, RecordTab.DOWNLOADS) { "" }
         assertEquals(RecordRow(OPEN_THREAD, subtitle = rows.last().subtitle, action = RecordAction.OpenThread), rows.last())
         // A record with no page has nothing to open; one with no links still offers its page.
@@ -186,7 +186,7 @@ class SourceRecordPageTest {
 
     @Test
     fun aMirrorTheSourceCouldNotGetGivesWayToTheNext() {
-        // Droidtop/tracker#862: the source's job failing ("no PIXELDRAIN link now") is a mirror that brought nothing.
+        // mytop-project/tracker#862: the source's job failing ("no PIXELDRAIN link now") is a mirror that brought nothing.
         assertTrue(DownloadPick.startedNothing(DownloadPick.NOTHING_STARTED))
         val failed = DownloadPick.broughtNothing("F95zone: The thread page has no PIXELDRAIN link now; try another mirror")
         assertTrue(DownloadPick.startedNothing(failed))

@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The clipboard bridge for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): read and set, each its own permission. */
+/** The clipboard bridge for plugins (docs/plugin-api.md 1.12, mytop-project/tracker#221): read and set, each its own permission. */
 class HostClipboardApisTest {
     private class Bridge(var current: String?) : DesktopClipboard {
         val set = mutableListOf<String>()

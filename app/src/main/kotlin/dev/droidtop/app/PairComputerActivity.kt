@@ -64,7 +64,7 @@ import org.json.JSONObject
  * on the local network; the code works once, and three wrong ones end the
  * attempt. Opened from Settings > Accounts and sources > Computers.
  *
- * The same screen pairs two handhelds running droidtop ([EXTRA_HANDHELD], Droidtop/tracker#556): one shows its code
+ * The same screen pairs two handhelds running droidtop ([EXTRA_HANDHELD], mytop-project/tracker#556): one shows its code
  * and its address, the other types both under "Use a code from the other handheld". The agent core runs the same
  * pairing either way and says which kind of device answered.
  */
@@ -76,7 +76,7 @@ class PairComputerActivity : AppCompatActivity() {
         setContent {
             DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 // This screen has no Surface, whose job is to set the text colour: without it every Text is
-                // black, on the ground's black (Droidtop/tracker#527).
+                // black, on the ground's black (mytop-project/tracker#527).
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().groundBackground()) {
                         Box(Modifier.weight(1f)) {
@@ -119,7 +119,7 @@ class PairComputerActivity : AppCompatActivity() {
 
     companion object {
         /** The page where droidtop-agent's builds are. */
-        const val AGENT_RELEASES = "https://github.com/Droidtop/droidtop-agent/releases/latest"
+        const val AGENT_RELEASES = "https://github.com/mytop-project/droidtop-agent/releases/latest"
 
         /** Pairing another handheld running droidtop rather than a computer: the same pairing, worded for it. */
         const val EXTRA_HANDHELD = "dev.droidtop.extra.PAIR_HANDHELD"
@@ -195,7 +195,7 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                         Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
-                                "No droidtop-agent yet? It is at github.com/Droidtop/droidtop-agent.",
+                                "No droidtop-agent yet? It is at github.com/mytop-project/droidtop-agent.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }

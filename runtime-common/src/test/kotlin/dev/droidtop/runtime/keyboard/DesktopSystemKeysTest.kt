@@ -5,7 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Which keys Android keeps are passed to a Desktop session in front (Droidtop/tracker#697). */
+/** Which keys Android keeps are passed to a Desktop session in front (mytop-project/tracker#697). */
 class DesktopSystemKeysTest {
     private val meta = KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
     private val alt = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON

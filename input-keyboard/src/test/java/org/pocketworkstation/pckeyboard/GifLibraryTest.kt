@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The pure parts of the GIF and sticker library (Droidtop/tracker#903 H5): names, formats, search, the index file. */
+/** The pure parts of the GIF and sticker library (mytop-project/tracker#903 H5): names, formats, search, the index file. */
 class GifLibraryTest {
     private fun item(file: String, folder: String = "Reactions", kind: GifKind = GifKind.GIF) = GifItem(
         uri = "content://tree/$folder/$file",

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** `priv.packages install`'s droidtop half (docs/plugin-api.md 2.7, Droidtop/tracker#130): read, refuse, confirm, stage. */
+/** `priv.packages install`'s droidtop half (docs/plugin-api.md 2.7, mytop-project/tracker#130): read, refuse, confirm, stage. */
 class PrivInstallTest {
     private fun provider(fullTrust: Boolean = true) = TestPlugins.record(
         TestPlugins.manifest(id = "droidtop.shizuku-bridge", origin = "droidtop", label = "Shizuku") {

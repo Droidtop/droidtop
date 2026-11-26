@@ -20,9 +20,9 @@ what it learned last.
 - Ship no unbound controls, no empty states without a next action, no status shown
   without its reason.
 - Status is shown, not read: a job's state is its bar's motion (one `JobProgress` everywhere), and text explains on
-  demand; no figure on a row changes with every report (owner, 2026-10-24, Droidtop/tracker#643). Waiting with no
+  demand; no figure on a row changes with every report (owner, 2026-10-24, mytop-project/tracker#643). Waiting with no
   measure (a list being built, a source being asked) is that bar's checking shimmer (`ShellLoading`), never a stock
-  spinner (Droidtop/tracker#671). The one ring is Home's Downloads button, a job's progress drawn in a 32 dp button.
+  spinner (mytop-project/tracker#671). The one ring is Home's Downloads button, a job's progress drawn in a 32 dp button.
 
 ## Layout
 - Never a single narrow centred column with large margins; content fills the window
@@ -35,10 +35,10 @@ what it learned last.
 
 ## Interaction
 - Capture-style mapping: pick the action, then press the input; explicit Unbind.
-- Confirm in one question (Droidtop/tracker#835): the question, Cancel first and under the
+- Confirm in one question (mytop-project/tracker#835): the question, Cancel first and under the
   cursor, the action in the danger tone; B, Back or a tap on Cancel backs out. It replaced the
   two-step "press A again" confirm, which could only be confirmed or left with the whole page.
-- Never assume a gamepad (the owner, 2026-10-30, Droidtop/tracker#839: "we can't ASSUME
+- Never assume a gamepad (the owner, 2026-10-30, mytop-project/tracker#839: "we can't ASSUME
   gamepad presence"): every action, menu and screen has a touch route and a pointer route as
   well as its pad route, in every mode, Gaming included. A chord or D-pad focus is never the
   only way in. Over another app the touch route to droidtop's menus is Android's
@@ -49,12 +49,12 @@ what it learned last.
   pad and touch (droidtop Quick Menu, 2026-09-11; the user called it "amazing").
 - Every "press X again" or hold gesture has a visible affordance on touch.
 
-- Modals: the safe choice comes first (left) and has the focus, so a mashed A cancels; a danger dialog has no second-press arm (Steam's shape: Cancel left and focused, the risky button right in the danger fill). The two-step confirm above is for rows in a list, not for dialogs (droidtop, Droidtop/tracker#485).
+- Modals: the safe choice comes first (left) and has the focus, so a mashed A cancels; a danger dialog has no second-press arm (Steam's shape: Cancel left and focused, the risky button right in the danger fill). The two-step confirm above is for rows in a list, not for dialogs (droidtop, mytop-project/tracker#485).
 
 ## Copy
 - Labels are three words or fewer: verbs for actions, nouns for settings.
 - One verb per meaning on A: "Open" wherever A goes into something (a system, a game's page, a place), "Play"
-  where A starts a game, "Select" only where A chooses or toggles (Droidtop/tracker#681). A themed Retro view's own
+  where A starts a game, "Select" only where A chooses or toggles (mytop-project/tracker#681). A themed Retro view's own
   help row keeps ES-DE's words (SELECT on the system carousel, LAUNCH in a game list), as the original draws them
   (owner, 2026-11-05).
 - A warning is a notice: a tone, a title (40 characters or fewer, the condition, never "Warning:"), a body (90 or fewer, the outcome, not the mechanism), one action, and details in Info (Y). Not a grey paragraph, not a "(high risk)" suffix, not a red banner.
@@ -66,8 +66,8 @@ what it learned last.
 - Acknowledgements are past tense with no period ("Saved", "Copied").
 - Something missing is said as what does not work yet ("Brightness can't change yet"), never "Needs …" and never a
   permission's name; a granted one is a noun ("Your game folders"); the exact name is in Info (SPEC "Permissions",
-  Droidtop/tracker#830).
-- One job per string (owner, 2026-11-15, Droidtop/tracker#153). A string says what happens. The mechanism (Android's
+  mytop-project/tracker#830).
+- One job per string (owner, 2026-11-15, mytop-project/tracker#153). A string says what happens. The mechanism (Android's
   names for things, limits) goes in Info (Y), and the undo is the row's own state, so a question does not repeat it.
   A fact the person consents to (every app is affected, a service is turned on) stays in the question.
 - Errors are active, the same in droidtop and Enginehost: "Couldn't X." then the reason when it is known, then the
@@ -82,7 +82,7 @@ what it learned last.
 - State from code and rigs, not from status tables; verify on an emulator or the real
   device, both orientations, and on the oldest supported Android.
 
-## The approved design (owner, 2026-10-24, Droidtop/tracker#644)
+## The approved design (owner, 2026-10-24, mytop-project/tracker#644)
 
 The owner approved the menus and visual-language proposal as recommended ("I guess I'll approve them"); it is
 `coordination/design/proposals/2026-10-24-menus-and-visual-language.md` in the tracker (dda41db), and this section is
@@ -111,17 +111,17 @@ no). The screen beneath stays visible under a scrim and keeps its focus; one ove
 restores the exact item and scroll position; the hint bar stays and shows the overlay's hints. Depth: left menu, item
 menu and Select sheet one level; Quick Menu section then panel; Settings category then pane; the game page one page with
 tabs, the same page for every kind of game (`GamePageFrame`: a PC or store game, a console game, an app;
-Droidtop/tracker#845), whose own words name what it is about ("this game", "this app": `PageKind`).
+mytop-project/tracker#845), whose own words name what it is about ("this game", "this app": `PageKind`).
 
-The anchored menu is `AnchoredMenu` in `:ui-shared` (`ui-shared/.../gamepad/AnchoredMenu.kt`, Droidtop/tracker#827):
+The anchored menu is `AnchoredMenu` in `:ui-shared` (`ui-shared/.../gamepad/AnchoredMenu.kt`, mytop-project/tracker#827):
 the sheet of choices' body placed below the item, or above it where there is no room, held inside the window's
 gutter, about eight rows before it scrolls, closed by a tap outside it. A centred `ActionSheet` is the same menu with
 no item to stand beside. Gaming's app and game menus, the game page's Edit metadata and Options
-(Droidtop/tracker#845, on every game's page), Desktop's taskbar menus and Mobile's own menus (a folder's options, a
+(mytop-project/tracker#845, on every game's page), Desktop's taskbar menus and Mobile's own menus (a folder's options, a
 drawer tab's, Drawer tabs) use it; an option a row turns on or off is a switch on the row. On Desktop a right-click on
 one of droidtop's own items (the taskbar's) opens that item's menu, as a long press does.
 
-### Names (Droidtop/tracker#827 F0, 2026-10-30)
+### Names (mytop-project/tracker#827 F0, 2026-10-30)
 One name per thing, the same in every mode:
 - **Mobile**: the home-screen mode (owner: "We're renaming "standard" to "mobile""). Never "Standard", and "Android"
   only for the operating system. Its stored id stays `standard`.
@@ -180,7 +180,7 @@ chips. 8 dp grid, 32 dp safe margin, 16 dp between tiles.
   theme's colours.
 - Outside Gaming (Mobile, Desktop, the taskbar, the shared menus) droidtop wears one colour source: the device's own
   palette (the default on Android 12+), the Gaming theme's colours (the default before it), or a Custom droidtop theme
-  in one chosen accent; an opt-in tint gives Gaming themes that accent too (owner, 2026-10-30, Droidtop/tracker#827, #844).
+  in one chosen accent; an opt-in tint gives Gaming themes that accent too (owner, 2026-10-30, mytop-project/tracker#827, #844).
 
 ### Type and focus
 | Role | Size | Use |

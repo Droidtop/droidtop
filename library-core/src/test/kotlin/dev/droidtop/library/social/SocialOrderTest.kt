@@ -8,7 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The lists, the merge across providers and the conversation rules (docs/SPEC.md "Social", Droidtop/tracker#327). */
+/** The lists, the merge across providers and the conversation rules (docs/SPEC.md "Social", mytop-project/tracker#327). */
 class SocialOrderTest {
     private fun friend(name: String, state: SocialState, unread: Int = 0, activity: String? = null, last: Long = 0L, id: String = name) =
         SocialFriend(id = id, name = name, state = state, activity = activity, unread = unread, lastMessageMs = last)

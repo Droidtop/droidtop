@@ -3,7 +3,7 @@ package dev.droidtop.runtime
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Incremental backups (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808). */
+/** Incremental backups (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808). */
 class BackupIncrementsTest {
     @Test
     fun `find's paths become tar member names, the root left out`() {

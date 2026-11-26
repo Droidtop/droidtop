@@ -6,7 +6,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * The input method's modes (docs/SPEC.md 6a, "Modes", Droidtop/tracker#903 H12c): presentations of the same keyboard,
+ * The input method's modes (docs/SPEC.md 6a, "Modes", mytop-project/tracker#903 H12c): presentations of the same keyboard,
  * chosen from the tool strip's Modes button or by the pad, one per orientation. Every Hacker's layout (4-row, 5-row,
  * full) and setting stays as chosen; a mode changes where and how big the keys are drawn, or, for the number pad, which
  * keys. Only the input method has modes: the keyboards droidtop embeds ([KeyboardPanel]) keep the key grid shape and
@@ -279,7 +279,7 @@ object KeyboardModes {
 
     /**
      * A finger's press target, in inches: Android's 48dp at its 160 dpi, the finger size `ShellWindow.pressTarget` gives
-     * a touch-first press target (Droidtop/tracker#740). The compact keyboard never makes a row shorter.
+     * a touch-first press target (mytop-project/tracker#740). The compact keyboard never makes a row shorter.
      */
     const val FINGER_INCHES = 0.3f
 

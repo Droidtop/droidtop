@@ -4,7 +4,7 @@ package dev.droidtop.display
  * The display the companion Activity was paused on by something else (an
  * app launched or opened over it) and has not resumed on since, the
  * companion's counterpart of [SecondaryDisplayActivity.coveredDisplayId]
- * (Droidtop/tracker#265). The orchestration reads it through
+ * (mytop-project/tracker#265). The orchestration reads it through
  * [dev.droidtop.runtime.CompanionScreenGuard] so it never starts the
  * companion again over an app the user is using.
  */

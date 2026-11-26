@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * A `native_bundle` plugin's host without a device (docs/plugin-api.md 3 I2, Droidtop/tracker#71). The plugin's class
+ * A `native_bundle` plugin's host without a device (docs/plugin-api.md 3 I2, mytop-project/tracker#71). The plugin's class
  * runs in this JVM; its [PluginContext] calls go through droidtop's own broker ([BrokerCore]) over [FakeEnv]'s
  * in-memory droidtop, so a grant, a refusal or an op's checks are the real ones. The test sets grants on [env].
  */
@@ -43,7 +43,7 @@ class FakeHost(
     }
 
     /**
-     * Installs and loads a provider beside the plugin (docs/plugin-api.md 2.4 and 2.6, Droidtop/tracker#129): the
+     * Installs and loads a provider beside the plugin (docs/plugin-api.md 2.4 and 2.6, mytop-project/tracker#129): the
      * plugin's calls to an API [manifest] exports reach [plugin]'s `handle` through the broker, as `api:<id>` calls.
      * The provider's own host calls are not served; it answers from what the call carries.
      */

@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A plugin download's job row title (Droidtop/tracker#739). */
+/** A plugin download's job row title (mytop-project/tracker#739). */
 class DownloadTitleTest {
     @Test
     fun `a hash-named file in the plugin's data reads as data, with no path`() {

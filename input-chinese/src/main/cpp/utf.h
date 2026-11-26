@@ -1,4 +1,4 @@
-// UTF-8 and UTF-16, for droidtop's JNI over librime (rime_jni.cc; Droidtop/tracker#903 H8b). librime's offsets count
+// UTF-8 and UTF-16, for droidtop's JNI over librime (rime_jni.cc; mytop-project/tracker#903 H8b). librime's offsets count
 // UTF-8 bytes and Android's count UTF-16 chars. Malformed UTF-8 decodes one byte at a time as U+FFFD, so a bad byte
 // never swallows what follows it, and an offset inside a character counts that whole character.
 

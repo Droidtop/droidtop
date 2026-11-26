@@ -87,12 +87,12 @@ data class ExtraMount(val hostPath: String, val name: String) {
  * container is deliberately isolated from one.
  *
  * [clipboardShared] false keeps the clipboard from a sibling's windows (docs/SPEC.md 3d "Clipboard per container",
- * Droidtop/tracker#787 slice 2): it reaches the compositor through [ClipboardFilters]' socket instead of the real one.
+ * mytop-project/tracker#787 slice 2): it reaches the compositor through [ClipboardFilters]' socket instead of the real one.
  */
 data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: Boolean = true, val clipboardShared: Boolean = true)
 
 /**
- * How a container's programs look (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5): [scale] is their
+ * How a container's programs look (docs/SPEC.md 3d "Scale and theme", mytop-project/tracker#787 slice 5): [scale] is their
  * size against the desktop's own scale (1 is the same; the desktop's scale is the compositor's and applies to every
  * window already), and [followTheme] whether GTK takes droidtop's Light or dark ([DesktopAppearance]) or the image's own
  * look. Read when a program starts, so a change applies to the programs started after it.
@@ -102,7 +102,7 @@ data class ContainerLook(
     val followTheme: Boolean = true,
     /**
      * The layout a physical keyboard types in while one of its windows has the focus, as a [KeyboardLayouts.XkbLayout]
-     * id; null is the desktop's own (docs/SPEC.md 3d "Keyboard", Droidtop/tracker#787 slice 6).
+     * id; null is the desktop's own (docs/SPEC.md 3d "Keyboard", mytop-project/tracker#787 slice 6).
      */
     val keyboardLayout: String? = null,
 ) {
@@ -225,7 +225,7 @@ interface ContainerRuntime {
     /**
      * Real size on disk -- the container manager's "Storage used" row
      * (docs/SPEC.md 3d), and the Containers list's size per row, cached
-     * (`ContainerSizes` in :app; Droidtop/tracker#911). The rootfs tree is
+     * (`ContainerSizes` in :app; mytop-project/tracker#911). The rootfs tree is
      * the overwhelming majority of it for every backend. The default is
      * the app's own walk ([ContainerDiskUsage.measure]), which a tree the
      * app owns (proot's) needs; a folder it cannot list makes the answer a
@@ -260,7 +260,7 @@ interface ContainerRuntime {
     suspend fun setLook(container: Container, look: ContainerLook): Unit = error("This backend keeps no look for its containers")
 
     /**
-     * Why this backend cannot take a container's network away (docs/SPEC.md 3d "Network", Droidtop/tracker#787 slice
+     * Why this backend cannot take a container's network away (docs/SPEC.md 3d "Network", mytop-project/tracker#787 slice
      * 3); null when it can.
      */
     val networkUnavailableReason: String? get() = "This backend cannot take a container's network away"
@@ -285,7 +285,7 @@ interface ContainerRuntime {
 
     /**
      * Why this backend cannot bridge the device microphone into a container;
-     * null when it can (docs/SPEC.md 3d Sockets row, Droidtop/tracker#80).
+     * null when it can (docs/SPEC.md 3d Sockets row, mytop-project/tracker#80).
      * The proot backend can, as a source on the same PulseAudio server that
      * carries audio out; droidspaces' own bridge is droidspaces' to extend.
      */
@@ -294,7 +294,7 @@ interface ContainerRuntime {
 
     /**
      * Why this backend cannot export and import a container's data; null
-     * when it can (docs/SPEC.md 3d "Backup", Droidtop/tracker#81, #758). proot
+     * when it can (docs/SPEC.md 3d "Backup", mytop-project/tracker#81, #758). proot
      * archives its rootfs directory as the app, droidspaces as root.
      */
     val dataBackupUnavailableReason: String?
@@ -318,7 +318,7 @@ interface ContainerRuntime {
         error(dataBackupUnavailableReason ?: "not supported")
 
     /**
-     * An increment of [container]'s data (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808): the entries
+     * An increment of [container]'s data (docs/SPEC.md 3d "Backups on a schedule", mytop-project/tracker#808): the entries
      * changed in the last [minutes] to [archive], and the manifest of every path to [manifest]. Stopped containers only.
      */
     suspend fun exportIncrement(container: Container, minutes: Long, archive: java.io.OutputStream, manifest: java.io.OutputStream): Unit =
@@ -333,7 +333,7 @@ interface ContainerRuntime {
         error(dataBackupUnavailableReason ?: "not supported")
 
     /**
-     * Why this backend cannot copy a container; null when it can (Droidtop/tracker#757, #758). proot copies its
+     * Why this backend cannot copy a container; null when it can (mytop-project/tracker#757, #758). proot copies its
      * rootfs directory as the app, droidspaces as root.
      */
     val cloneUnavailableReason: String?
@@ -349,7 +349,7 @@ interface ContainerRuntime {
 
     /**
      * Why this backend cannot tell what a running container uses; null when it can (docs/SPEC.md 3d, "Resource
-     * usage"; Droidtop/tracker#757 slice 3).
+     * usage"; mytop-project/tracker#757 slice 3).
      */
     val usageUnavailableReason: String?
         get() = "This kind of container can't report what it uses"
@@ -414,7 +414,7 @@ interface ContainerRuntime {
 
     /**
      * How to run an interactive login shell in [container] on droidtop's own terminal ([InteractiveShell]),
-     * Droidtop/tracker#909. [container] must be running, as for [exec]; it runs as root, as [exec] does with no user.
+     * mytop-project/tracker#909. [container] must be running, as for [exec]; it runs as root, as [exec] does with no user.
      * Prepares what [exec] prepares first, so disk work: never on the main thread.
      */
     suspend fun interactiveShell(container: Container): InteractiveShell =

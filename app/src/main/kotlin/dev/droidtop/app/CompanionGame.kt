@@ -91,7 +91,7 @@ internal fun runnerOf(entry: LibraryEntry?): GameRunner =
 
 /**
  * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs", slice C8; dense since
- * Droidtop/tracker#835 part 2): the header (art, name, this session's play time), then one list of [GameActionRow]s
+ * mytop-project/tracker#835 part 2): the header (art, name, this session's play time), then one list of [GameActionRow]s
  * from the rows [GameControls] gives for the mode and the runner: Resume (the one filled row), Pause the game for a
  * console game, the emulator, the overlay level, the performance mode and Screenshot, values on the right; Mouse mode,
  * Controls and Report a problem for a game in droidtop's own screen; Guides ([CompanionGuides]); rows from plugins
@@ -170,7 +170,7 @@ internal fun CompanionGameTab() {
                 run()
             }
         }
-        // One dense list (Droidtop/tracker#835 part 2): Resume the one filled row, then what the game can be told or
+        // One dense list (mytop-project/tracker#835 part 2): Resume the one filled row, then what the game can be told or
         // set, then the ending rows together at the bottom in the danger tone. The same set as the running game's L2
         // sheet (Pause, Mouse mode, Controls, Report a problem), plus what only the companion has; nothing removed.
         val rows = GameControls.rows(uiMode, runner)
@@ -297,7 +297,7 @@ private fun CompanionScreenshotRow(label: String) {
 private enum class RowTone { PRIMARY, PLAIN, DANGER }
 
 /**
- * The Game page's one row (Droidtop/tracker#835 part 2): 48dp, the label on the left and its [value] on the right, so
+ * The Game page's one row (mytop-project/tracker#835 part 2): 48dp, the label on the left and its [value] on the right, so
  * a setting reads at a glance without a second line. [tone] fills Resume and draws the ending rows in the danger tone.
  */
 @Composable

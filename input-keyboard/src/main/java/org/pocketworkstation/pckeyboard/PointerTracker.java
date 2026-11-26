@@ -72,7 +72,7 @@ public class PointerTracker {
     // true if this pointer is in sliding key input
     private boolean mIsInSlidingKeyInput;
 
-    // droidtop patch (Droidtop/tracker#340): non-null while a touch that began on the space key may become a cursor
+    // droidtop patch (mytop-project/tracker#340): non-null while a touch that began on the space key may become a cursor
     // drag; thresholds are 24dp to start and 14dp per step.
     private SpaceDrag mSpaceDrag;
     private final int mSpaceDragActivatePx;
@@ -369,7 +369,7 @@ public class PointerTracker {
     }
     
     /**
-     * droidtop patch (Droidtop/tracker#340): a sideways drag that started on the space key moves the cursor instead
+     * droidtop patch (mytop-project/tracker#340): a sideways drag that started on the space key moves the cursor instead
      * of typing a space. Returns true while the touch is a cursor drag.
      */
     private boolean handleSpaceDrag(int x, int y) {

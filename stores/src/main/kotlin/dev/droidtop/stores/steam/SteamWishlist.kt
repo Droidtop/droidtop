@@ -11,7 +11,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * Steam's wishlist (docs/SPEC.md 7g, "Wishlist", Droidtop/tracker#134): the app ids Steam keeps for the signed-in
+ * Steam's wishlist (docs/SPEC.md 7g, "Wishlist", mytop-project/tracker#134): the app ids Steam keeps for the signed-in
  * account, from the Web API's `IWishlistService/GetWishlist` with the account's own access token (so a private
  * wishlist reads too), in Steam's own order. A name for each id droidtop has not seen before comes from the
  * storefront's keyless `appdetails` ([SteamStoreClient], paced to Steam's limit), at most [NEW_PER_SYNC] a sync so a

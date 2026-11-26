@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Get games names every source a merged game came from (Droidtop/tracker#825). */
+/** Get games names every source a merged game came from (mytop-project/tracker#825). */
 class GetGamesLinesTest {
 
     @Test

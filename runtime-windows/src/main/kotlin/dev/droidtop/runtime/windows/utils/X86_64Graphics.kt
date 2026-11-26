@@ -14,14 +14,14 @@ import org.json.JSONObject
  * - [LAVAPIPE]: Mesa's software Vulkan driver with the Khronos loader, so DXVK
  *   and VKD3D get a device that presents to the app's X server, and Mesa's
  *   xlib OpenGL (llvmpipe), so WineD3D's OpenGL renderer gets a context too
- *   (Droidtop/tracker#309). Both render on the CPU: slow, but they run on
+ *   (mytop-project/tracker#309). Both render on the CPU: slow, but they run on
  *   every x86_64 device. Built by `build-scripts/x86_64-lavapipe` in this
  *   repository's CI from Termux's x86_64 packages and recipe and downloaded
  *   when a container first uses it.
  * - [VENUS]: Mesa's virtio Vulkan driver (Venus) from the same archive, whose
  *   commands a vtest server ([VtestServerComponent], `libvirgl_vtest.so` in the
  *   APK) replays on Android's own Vulkan, i.e. the device's GPU
- *   (docs/SPEC.md 10b, "A real GPU on x86_64: Venus"; Droidtop/tracker#608).
+ *   (docs/SPEC.md 10b, "A real GPU on x86_64: Venus"; mytop-project/tracker#608).
  *   Offered where the device's Vulkan qualifies ([venusQualifies]); not the
  *   default until a rig has run it (owner to confirm).
  * - [NONE]: no Vulkan driver in the guest. Wine still draws 2D and GDI through
@@ -55,7 +55,7 @@ object X86_64Graphics {
     @JvmField
     val LABELS: List<String> = DRIVERS.map(::label)
 
-    /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
+    /** Release of mytop-project/droidtop that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
     const val LAVAPIPE_TAG = "x86_64-lavapipe-20261105-c93b1003"
     const val LAVAPIPE_SHA256 = "610fe7d1728c38d5bda45ae3d24248d7351d9dede8a05bbffee20f6082b4cbc4"
     private val lavapipe = PinnedReleaseAsset(
@@ -121,13 +121,13 @@ object X86_64Graphics {
             envVars.put("XLIB_NO_SHM", "1")
         }
         envVars.put("MESA_SHADER_CACHE_DIR", File(root, "cache").apply { mkdirs() }.path)
-        // Lavapipe compiles inside the guest's own allocator (Droidtop/tracker#894); Venus compiles in the host driver.
+        // Lavapipe compiles inside the guest's own allocator (mytop-project/tracker#894); Venus compiles in the host driver.
         if (driver == LAVAPIPE) envVars.put("DXVK_CONFIG", withOneCompilerThread(envVars.get("DXVK_CONFIG")))
     }
 
     /**
      * [config] (a `DXVK_CONFIG` value) with `dxvk.numCompilerThreads = 1` added, unless it already names a count
-     * (Droidtop/tracker#894; built to the recommendation, owner to confirm). On lavapipe, LLVM compiles each
+     * (mytop-project/tracker#894; built to the recommendation, owner to confirm). On lavapipe, LLVM compiles each
      * pipeline on DXVK's compiler threads, and with one thread per core the many 32 and 64 KB blocks it holds fill
      * Scudo's fixed 256 MB per size class: malloc fails and vkCreateGraphicsPipelines asserts (Slime Rancher on
      * BlueStacks, 79 s in). One thread keeps fewer compiles in flight. That only delays the cap, so it is a stopgap
@@ -150,7 +150,7 @@ object X86_64Graphics {
      * Whether [container]'s session draws OpenGL through Mesa's xlib `libGL.so.1` from this archive: an x86_64 device
      * on lavapipe or Venus (whose OpenGL is the same xlib libGL) with the archive installed. That libGL does GLX on
      * the client side, so the session's X server advertises the GLX name (`XServer.advertiseClientSideGlx`,
-     * Droidtop/tracker#309) for the Wine builds that ask the server before they look at `WINE_X11FORCEGLX`. Disk read.
+     * mytop-project/tracker#309) for the Wine builds that ask the server before they look at `WINE_X11FORCEGLX`. Disk read.
      */
     @JvmStatic
     fun clientSideGlx(context: Context, container: Container): Boolean =

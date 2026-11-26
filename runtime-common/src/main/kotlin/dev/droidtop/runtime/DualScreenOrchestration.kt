@@ -62,7 +62,7 @@ object DualScreenOrchestration {
      * A detached display leaves one authoritative shell destination. Only a display Android has removed counts as
      * detached ([shellDisplayGone]): while a screen is being attached it can drop out of the presentation-display
      * list for a moment, and reading that as a detach relaunched the shell on every display event, a dozen times a
-     * second (Droidtop/tracker#785).
+     * second (mytop-project/tracker#785).
      */
     fun disconnectedShellDestination(
         shellDisplayId: Int,
@@ -108,7 +108,7 @@ object DualScreenOrchestration {
 
     /**
      * The companion is never the only droidtop screen and never on the main screen (docs/SPEC.md 4c, "The companion
-     * never runs without the shell", Droidtop/tracker#786 S0c, #788). Pure. [shellMode] is whether the mode in use has a
+     * never runs without the shell", mytop-project/tracker#786 S0c, #788). Pure. [shellMode] is whether the mode in use has a
      * shell activity (Gaming or Desktop, set up); [shellDisplayId] is where a live shell is, null when none is alive.
      * A shell on the companion's own screen is not decided here: the companion, covered, finishes by itself.
      */
@@ -205,7 +205,7 @@ object DualScreenOrchestration {
     }
     /**
      * Chooser candidates ordered by role (docs/SPEC.md 4c, "What each
-     * screen is for", Droidtop/tracker#776): the main screen first, so the
+     * screen is for", mytop-project/tracker#776): the main screen first, so the
      * default-highlighted row is the screen the person made main, then the
      * companion's screen, then every other connected screen once by id, so
      * a device with three or more screens offers each of them. No screen is
@@ -215,7 +215,7 @@ object DualScreenOrchestration {
      * own name) and says which one the person is looking at: "(this one)"
      * for the shell's screen and, with exactly two, "(the other one)" for
      * the other ("This screen (add-on)" read as a riddle to a newcomer,
-     * console build 1386; section 4c, Droidtop/tracker#162). The default
+     * console build 1386; section 4c, mytop-project/tracker#162). The default
      * display's candidate has a null id, the launch's "default display".
      * Only the default display and [secondDisplayId] can be remembered:
      * the remembered choice is a role (built-in or second), not a display.

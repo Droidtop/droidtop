@@ -18,7 +18,7 @@ import org.json.JSONObject
 import timber.log.Timber
 
 /**
- * The person's Steam collections (docs/SPEC.md 7g, "Stores"; Droidtop/tracker#232):
+ * The person's Steam collections (docs/SPEC.md 7g, "Stores"; mytop-project/tracker#232):
  * the "Handheld friendly" and "Backlog" groupings Steam keeps in its cloud
  * config store, namespace 1 ("user-collections.<id>" entries). Read on each
  * library sync with the connection the sync already holds, and kept in one
@@ -39,13 +39,13 @@ internal object SteamCollections {
     /** Steam's own hidden-games list, not a grouping the person made. */
     const val ID_HIDDEN = "hidden"
 
-    /** Steam's own favourites, which droidtop keeps as its favourites rather than as a collection (Droidtop/tracker#756). */
+    /** Steam's own favourites, which droidtop keeps as its favourites rather than as a collection (mytop-project/tracker#756). */
     const val ID_FAVOURITES = "favorite"
 
     data class Collection(val id: String, val name: String, val appIds: Set<Int>)
 
     /**
-     * A dynamic collection: Steam's filters instead of a list of games (Droidtop/tracker#403). Kept as Steam wrote them
+     * A dynamic collection: Steam's filters instead of a list of games (mytop-project/tracker#403). Kept as Steam wrote them
      * ([filterSpec], the raw JSON) until droidtop can map them onto its own filters as a saved view; the mapping needs
      * Steam's filter groups checked against real collections, which these copies (and the scan log) provide.
      */

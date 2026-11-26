@@ -61,7 +61,7 @@ import kotlinx.coroutines.withContext
  * made on the store's site, and Steam signs in step by step on droidtop's
  * own screen (a QR code, or a password Steam checks and droidtop does not keep).
  *
- * A plugin's store (docs/plugin-api.md 3 A13, Droidtop/tracker#220) is one more: it is registered in
+ * A plugin's store (docs/plugin-api.md 3 A13, mytop-project/tracker#220) is one more: it is registered in
  * [StoreLibraries] while its plugin runs, and [entries] lists it after droidtop's own, with the same
  * row and page. Its sign-in is the plugin's own site account, opened like a web sign-in.
  */
@@ -115,7 +115,7 @@ internal data class PcStore(val key: String) {
 
     /**
      * Reads the store's library again through the one sync every store has
-     * ([StoreSyncs], docs/SPEC.md 7g and 7j, Droidtop/tracker#225) and says
+     * ([StoreSyncs], docs/SPEC.md 7g and 7j, mytop-project/tracker#225) and says
      * how many games it holds, or why it could not. Returns the outcome line.
      */
     suspend fun requestSync(context: Context): String {
@@ -191,7 +191,7 @@ internal fun syncedAgo(nowMs: Long, thenMs: Long?): String {
 }
 
 /**
- * The Stores place (docs/SPEC.md 7j "Places", Droidtop/tracker#258): one
+ * The Stores place (docs/SPEC.md 7j "Places", mytop-project/tracker#258): one
  * page per store with who is signed in, its library (a count, a way into
  * it, a sync and when it last ran) and its downloads. A catalog screen
  * like the other management screens, so the Gaming shell draws it in
@@ -216,7 +216,7 @@ internal object StoresCatalog {
         title = "Game sources",
         groups = { context -> rootGroups(context) },
         // Settings search wants the rows, not the counts: counting every store's games, every folder's and the
-        // imports took this page 7.3 s of the index's 12.9 s on BlueStacks with 216 games (Droidtop/tracker#954 item 14).
+        // imports took this page 7.3 s of the index's 12.9 s on BlueStacks with 216 games (mytop-project/tracker#954 item 14).
         indexGroups = { context -> rootGroups(context, counted = false) },
         live = storeJobChanges,
     )
@@ -263,7 +263,7 @@ internal object StoresCatalog {
                     CatalogChip("$installing downloading").takeIf { installing > 0 },
                 ),
                 // Signed-in stores first, then the person's game folders, then the stores to sign in to,
-                // then imports once a game came through a launcher (docs/SPEC.md 7j "Places", Droidtop/tracker#397 slice E).
+                // then imports once a game came through a launcher (docs/SPEC.md 7j "Places", mytop-project/tracker#397 slice E).
                 items = buildList<CatalogItem> {
                     signedInStores.forEach { add(storeRow(it)) }
                     add(
@@ -355,7 +355,7 @@ internal object StoresCatalog {
             id = id,
             title = store.label,
             // How to sign in is only worth saying while the person is not signed in; the value column
-            // already says "Signed in" (Droidtop/tracker#367).
+            // already says "Signed in" (mytop-project/tracker#367).
             subtitle = if (signedIn) null else store.signInNote,
             inline = storePage(store),
             valueLabel = { sourceValue(signedIn, games) },
@@ -364,7 +364,7 @@ internal object StoresCatalog {
             iconFile = store.own?.let { dev.droidtop.library.stores.StoreMarks.cached(context, it.id)?.path },
             // A status row says it with the glyph alone; the bar is Game sources'.
             progress = busy.takeIf { !mark },
-            // Signed in or not is drawn too, beside the words (show, then say: Droidtop/tracker#738).
+            // Signed in or not is drawn too, beside the words (show, then say: mytop-project/tracker#738).
             statusMark = when {
                 mark && busy != null -> StatusMark.WORKING
                 signedIn -> StatusMark.SIGNED_IN
@@ -374,8 +374,8 @@ internal object StoresCatalog {
     }
 
     /**
-     * Downloads and Updates' Get games, after its Updates row (Droidtop/tracker#644 slice 3): one Get games row, the one
-     * search over every source at once with its source filter (owner, 2026-10-30, Droidtop/tracker#825: "Why do we have
+     * Downloads and Updates' Get games, after its Updates row (mytop-project/tracker#644 slice 3): one Get games row, the one
+     * search over every source at once with its source filter (owner, 2026-10-30, mytop-project/tracker#825: "Why do we have
      * plugin-specific searches? We want a single get games section, and a filter to choose where it searches"). It
      * replaced a row per source plugin, each opening that plugin's form, which drew as "Search · not set". With no
      * source installed the search itself says so and leads to Plugins. Then Add a game. Off the main thread.
@@ -405,7 +405,7 @@ internal object StoresCatalog {
                         icon = CatalogIcon.LIBRARY,
                     ),
                     // Get new games and Get apps were Updates' rows; updates have their own page, and getting things is
-                    // this place's (owner, 2026-10-29, Droidtop/tracker#749).
+                    // this place's (owner, 2026-10-29, mytop-project/tracker#749).
                     UpdatesPage.getNewGamesRow(context),
                     NestedScreenItem(
                         id = "updates_get_apps",
@@ -419,7 +419,7 @@ internal object StoresCatalog {
 
     /**
      * Downloads and Updates' Sources: where games come from, one row each with one status glyph and nothing to set up
-     * (Droidtop/tracker#644 slice 3). The signed-in stores (a turning ring while one installs), then each game folder
+     * (mytop-project/tracker#644 slice 3). The signed-in stores (a turning ring while one installs), then each game folder
      * ("Not available", with the circled "!", when it cannot be read: a card that is out). Setting a source up is
      * Game sources, its last row, the page Settings > Accounts and sources opens. Off the main thread.
      */
@@ -468,7 +468,7 @@ internal object StoresCatalog {
     private var linkNote: String? = null
 
     /**
-     * "Add a game" (docs/SPEC.md 7g, "Adding a game by hand", Droidtop/tracker#407): a game already on the device,
+     * "Add a game" (docs/SPEC.md 7g, "Adding a game by hand", mytop-project/tracker#407): a game already on the device,
      * picked with the system's own picker and listed where it is ([AddGame]; nothing is copied or moved), or a game
      * from a store, through that store's own pages ([StoreWeb]), where getting it makes it a library row.
      */
@@ -543,7 +543,7 @@ internal object StoresCatalog {
 
     /**
      * Outside the Gaming shell, which opens PC Games filtered by the row's id, a library row opens Standard's games
-     * screen, in Standard only: Desktop has its own Start menu, and a row never opens another mode (Droidtop/tracker#639).
+     * screen, in Standard only: Desktop has its own Start menu, and a row never opens another mode (mytop-project/tracker#639).
      */
     private fun openGames(context: Context) {
         if (dev.droidtop.library.settings.Modes.lastMode(context) != dev.droidtop.library.settings.Mode.LAUNCHER.id) {
@@ -706,7 +706,7 @@ internal object StoresCatalog {
                 chips = pageChips(context, store, signedIn, jobs),
             ),
             CatalogGroup(id = "store_${store.key}_settings_group", title = "Settings", items = own).takeIf { own.isNotEmpty() },
-            // A plugin's store: the plugin that provides it, where it is approved, turned on and allowed (Droidtop/tracker#805).
+            // A plugin's store: the plugin that provides it, where it is approved, turned on and allowed (mytop-project/tracker#805).
             (store.own as? dev.droidtop.library.integrations.PluginStoreLibrary)?.let { plugin ->
                 CatalogGroup(
                     id = "store_${store.key}_plugin_group",
@@ -781,7 +781,7 @@ internal object StoresCatalog {
                 id = "store_${store.key}_signin",
                 title = "Sign in",
                 subtitle = store.signInNote,
-                // A store this build has no sign-in for says so rather than doing nothing (Droidtop/tracker#571 row 22).
+                // A store this build has no sign-in for says so rather than doing nothing (mytop-project/tracker#571 row 22).
                 run = { ctx ->
                     store.signInIntent(ctx)?.let(ctx::startActivity)
                         ?: dev.droidtop.library.settings.Notices.flash(

@@ -59,7 +59,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Notifications on the companion (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): one row model for
+ * Notifications on the companion (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): one row model for
  * Home's group and Social's messages. Each row offers Reply where the app takes a typed reply (droidtop's own
  * keyboard in the companion window, the app's reply action filled directly: [NotificationsStore.Controller.reply]),
  * Open (a button and a long-press; the app opens on the companion's screen), and Dismiss (a button and a swipe).
@@ -82,7 +82,7 @@ internal fun CompanionNotificationsSection(open: Boolean, onToggle: () -> Unit) 
             if (items.any { it.clearable }) {
                 Row { CompanionPill("Clear all") { NotificationsStore.controller?.clearAll() } }
             }
-            // Past the first rows, a pill shows the rest in place (Droidtop/tracker#571 row 28: "+N more" led nowhere).
+            // Past the first rows, a pill shows the rest in place (mytop-project/tracker#571 row 28: "+N more" led nowhere).
             var all by remember { mutableStateOf(false) }
             CompanionNotificationList(if (all) items else items.take(MAX_ROWS))
             if (items.size > MAX_ROWS) {

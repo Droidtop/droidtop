@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Superseded keys (Droidtop/tracker#887). The owner, 2026-11-05: "Every key is superceded by the current key. It's a
+ * Superseded keys (mytop-project/tracker#887). The owner, 2026-11-05: "Every key is superceded by the current key. It's a
  * simple check: if it's marked as "superceded", then trust the key it's superceded by, which'll be denoted. We still
  * tell the user the key is changing, of course, but we don't have to carry an entire history, and we can still mark
  * superceded per repo, per root, and etc, so different trust sources can mark them differently", and "the place that

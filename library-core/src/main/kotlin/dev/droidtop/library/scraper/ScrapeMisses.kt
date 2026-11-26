@@ -2,7 +2,7 @@ package dev.droidtop.library.scraper
 
 /**
  * The games a scrape pass did not fill, by name (docs/SPEC.md 7h, "A scrape names what it
- * missed", Droidtop/tracker#374). A count of "no match for 2" cannot be followed up; the
+ * missed", mytop-project/tracker#374). A count of "no match for 2" cannot be followed up; the
  * titles and the source's reason can. The sentence a person reads names up to [MAX_NAMED] per
  * bucket and says how many more there are; scan.log has one `scrape:` line for every game.
  * Pure, so the wording is unit-tested rather than only observable on hardware.

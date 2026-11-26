@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The controls pinned to the companion's Home (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): stored by
+ * The controls pinned to the companion's Home (docs/SPEC.md "The companion's tabs", mytop-project/tracker#414): stored by
  * catalog id, plugin tile ([TILE_PREFIX], slice C9) or live stat (later also an app or a shortcut), surface-neutral, so
  * any surface that draws catalog items can draw them. Read once with [load] off the main thread, then kept in [pins].
  */

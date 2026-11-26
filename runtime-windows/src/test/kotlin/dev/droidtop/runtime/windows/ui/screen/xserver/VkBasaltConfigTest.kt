@@ -3,7 +3,7 @@ package dev.droidtop.runtime.windows.ui.screen.xserver
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The vkBasalt sharpening a prefix's setting writes (Droidtop/tracker#731). */
+/** The vkBasalt sharpening a prefix's setting writes (mytop-project/tracker#731). */
 class VkBasaltConfigTest {
     @Test
     fun `cas and dls carry their strengths as fractions, clamped`() {

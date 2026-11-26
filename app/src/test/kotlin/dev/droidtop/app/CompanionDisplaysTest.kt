@@ -12,7 +12,7 @@ class CompanionDisplaysTest {
         assertEquals(DisplayRole.OTHER, displayRole(11, mainDisplayId = 0, companionDisplayId = 9))
     }
 
-    // Droidtop/tracker#786 S7: Android's brightness is on the built-in screen's card in every arrangement.
+    // mytop-project/tracker#786 S7: Android's brightness is on the built-in screen's card in every arrangement.
     @Test fun `the built-in screen always has Android's brightness`() {
         // Built-in is Main, companion on an add-on screen.
         assertEquals(listOf(BrightnessRow.ANDROID), brightnessRows(0, ownDisplay = 9, builtInId = 0))

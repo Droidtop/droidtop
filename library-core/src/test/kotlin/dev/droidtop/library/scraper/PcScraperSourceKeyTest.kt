@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** What a stored PC source choice names, which "Rescrape with…" passes the same way (Droidtop/tracker#67). */
+/** What a stored PC source choice names, which "Rescrape with…" passes the same way (mytop-project/tracker#67). */
 class PcScraperSourceKeyTest {
     @Test fun `a built-in key names its source, and anything else is Lutris`() {
         assertEquals(PcScraperSource.IGDB, PcScraperSourcePrefs.builtin("igdb"))

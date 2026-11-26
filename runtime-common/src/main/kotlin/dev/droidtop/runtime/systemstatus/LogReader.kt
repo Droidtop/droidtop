@@ -3,7 +3,7 @@ package dev.droidtop.runtime.systemstatus
 import dev.droidtop.runtime.tasks.TaskManager
 
 /**
- * Performance > Logs (docs/SPEC.md "The companion's tabs", Logs; Droidtop/tracker#414 slice C18): Android's log through
+ * Performance > Logs (docs/SPEC.md "The companion's tabs", Logs; mytop-project/tracker#414 slice C18): Android's log through
  * the helper app (`logcat -d -v threadtime`, then only what is newer while the page shows), or without it droidtop's
  * own (`logcat --pid` of droidtop, which needs no permission). Filtered by level, tag and app, with one tap for the
  * running game's process only. Reads are shell work: off the main thread.

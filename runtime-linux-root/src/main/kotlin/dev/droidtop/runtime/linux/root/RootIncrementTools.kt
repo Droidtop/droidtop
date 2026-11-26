@@ -10,7 +10,7 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * Toybox run as root through the root shell over a droidspaces tree, for incremental backups (docs/SPEC.md 3d
- * "Backups on a schedule", Droidtop/tracker#808): its files are root's and other users'. Called on an IO thread by
+ * "Backups on a schedule", mytop-project/tracker#808): its files are root's and other users'. Called on an IO thread by
  * [dev.droidtop.runtime.IncrementalArchiver]; each call waits for the root shell.
  */
 internal class RootIncrementTools(private val scratchDir: File) : IncrementTools {
