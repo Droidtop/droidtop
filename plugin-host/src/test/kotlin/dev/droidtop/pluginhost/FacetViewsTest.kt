@@ -31,7 +31,7 @@ class FacetViewsTest {
         assertEquals(ViewAction.Kind.JOB, update.action.kind)
         assertEquals("updateIndex", update.action.op)
         assertNull("no confirm unless asked", update.confirm)
-        assertEquals("Clear cache", (main[3] as ViewNode.Button).confirm)
+        assertEquals("a danger confirm names what is lost", "Clear cache? The index is fetched again", (main[3] as ViewNode.Button).confirm)
         val storage = view.sections[1]
         assertEquals("Storage", storage.title)
         // A meter is the host's bar with its figures under it, not words alone.
