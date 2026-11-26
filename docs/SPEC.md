@@ -26457,9 +26457,10 @@ Advanced.
   person had not answered and was never asked, so Syncthing ran with no
   sockets and failed every 30 s. Now, before the tier is chosen, a start the
   person made asks once per such hole on the first-use sheet (Allow and Never
-  are kept, Not now lasts the run as below); any other start notes it as
-  wanted, which the permission's row says ("It tried to use this but could
-  not ask you first"). A plugin with full access granted is not asked
+  are kept, Not now lasts the run as below); any other start leaves it alone
+  and flags nothing (2026-11-26: Ask first is the person's choice, and the
+  "It tried to use this" line it used to leave stayed for good). A plugin
+  with full access granted is not asked
   (`PluginCrashPolicy.askUnansweredHoles`).
 - **Declining one permission costs only what needs it** (2026-10-16,
   Droidtop/tracker#518). Not now on the first-use sheet lasts the run of
