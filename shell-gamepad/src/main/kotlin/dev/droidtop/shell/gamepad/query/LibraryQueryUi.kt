@@ -848,8 +848,21 @@ internal fun LibrarySearchDialog(
                         },
                     )
                 }
+                // A source whose only lack is the point (left off at approval) asks in place on a press, as a waiting one
+                // does; anything else (denied, off, stopped) opens its page.
                 state.unavailable.filter { !it.waitingForApproval }.forEach { off ->
-                    add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = words(R.string.gamepad_open_its_page)) { openPlugin(off.pluginId) })
+                    if (off.askable) {
+                        add(
+                            SearchLine.Entry("off:${off.pluginId}", "${off.label} can't get games yet", subtitle = "Allow") {
+                                coroutineScope.launch {
+                                    if (AcquireContentSources.askSource(context, off)) searchTick++
+                                    else statusLine = "${off.label} is still not allowed to get games"
+                                }
+                            },
+                        )
+                    } else {
+                        add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = words(R.string.gamepad_open_its_page)) { openPlugin(off.pluginId) })
+                    }
                 }
                 // A source's own search options (docs/plugin-api.md 1.10, search.filter): its page, then the search again.
                 state.sources.forEach { status ->
