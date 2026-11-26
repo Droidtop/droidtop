@@ -606,7 +606,7 @@ private class PluginPage(
             subtitle = what?.let { "Needs $it" },
             value = "Off",
             run = { context, _ ->
-                // Full access is only ever allowed through its red dialog (Droidtop/tracker#481, D1), never the first-use sheet.
+                // Full access is only ever allowed through its red dialog (mytop-project/tracker#481, D1), never the first-use sheet.
                 val on = if (permission == dev.droidtop.pluginhost.PluginTiers.FULL_TRUST) {
                     dev.droidtop.pluginhost.PluginDangers.askFullAccess(record, update = false) &&
                         withContext(Dispatchers.IO) { PluginGrants.forContext(context).set(record.manifest.id, permission, GrantState.GRANTED); true }
