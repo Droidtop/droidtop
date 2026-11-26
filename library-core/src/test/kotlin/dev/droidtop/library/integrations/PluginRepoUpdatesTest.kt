@@ -68,7 +68,7 @@ class PluginRepoUpdatesTest {
         assertEquals("Updated Tool to 1.2.0.", PluginRepoUpdates.describe(RepoUpdateOutcome.Updated("Tool", "1.2.0", PermissionDiff(emptyList(), emptyList(), emptyList()))))
         assertTrue(
             PluginRepoUpdates.describe(RepoUpdateOutcome.Updated("Tool", "1.2.0", PermissionDiff(listOf("net.any"), emptyList(), emptyList())))
-                .contains("asks for new access"),
+                .contains("new access to review"),
         )
         assertTrue(PluginRepoUpdates.describe(RepoUpdateOutcome.NeedsApproval("Tool", "1.2.0")).contains("approve"))
         assertTrue(PluginRepoUpdates.describe(RepoUpdateOutcome.Refused("Tool", "its signature does not verify")).contains("not installed"))
