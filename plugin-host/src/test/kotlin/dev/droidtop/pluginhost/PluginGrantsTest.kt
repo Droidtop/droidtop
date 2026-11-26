@@ -208,7 +208,7 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `Not now is an answer: an update's new item stops being new and stays Ask first`() {
+    fun `Not now is an answer, so an update's new item stops being new and stays Ask first`() {
         val old = plugin(2, "acme.tool", obj("id" to "net.state"))
         grants.initialiseOnApproval(old)
         val new = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "clipboard.read"), obj("id" to "net.any"))
