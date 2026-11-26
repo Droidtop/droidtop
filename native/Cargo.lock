@@ -1302,7 +1302,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "droidtop-agent-relay"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5#c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5"
+source = "git+https://github.com/mytop-project/droidtop-agent?rev=87355dfb83aac2c620c1764b428bdae5f2421baa#87355dfb83aac2c620c1764b428bdae5f2421baa"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -1312,7 +1312,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5#c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5"
+source = "git+https://github.com/mytop-project/droidtop-agent?rev=87355dfb83aac2c620c1764b428bdae5f2421baa#87355dfb83aac2c620c1764b428bdae5f2421baa"
 dependencies = [
  "dirs",
  "droidtop-agent-relay",
@@ -1337,7 +1337,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-stream"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5#c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5"
+source = "git+https://github.com/mytop-project/droidtop-agent?rev=87355dfb83aac2c620c1764b428bdae5f2421baa#87355dfb83aac2c620c1764b428bdae5f2421baa"
 dependencies = [
  "bytes",
  "tokio",
@@ -1492,7 +1492,7 @@ dependencies = [
 [[package]]
 name = "engines-detect"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-engines?tag=v0.1.1#72d7346dc36a8d4439f1b212a6dbd7b870d891eb"
+source = "git+https://github.com/mytop-project/mytop-engines?tag=v0.1.1#72d7346dc36a8d4439f1b212a6dbd7b870d891eb"
 dependencies = [
  "regex",
  "serde_json",
@@ -1811,8 +1811,8 @@ dependencies = [
 
 [[package]]
 name = "games-scan"
-version = "0.4.0"
-source = "git+https://github.com/Droidtop/lib-games?tag=v0.4.0#e142335ac34d605eb072565e8278bc3a32afe46c"
+version = "0.4.1"
+source = "git+https://github.com/mytop-project/mytop-games?tag=v0.4.1#606a51e45468cde4b50a7e923feb1dd8b74aeb24"
 dependencies = [
  "dirs",
  "engines-detect",
@@ -3098,7 +3098,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-link"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/mytop-project/mytop-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "kdeconnect-proto",
  "mdns-sd",
@@ -3113,7 +3113,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-proto"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/mytop-project/mytop-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "serde",
  "serde_json",
@@ -3125,7 +3125,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-service"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/mytop-project/mytop-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "base64 0.22.1",
  "kdeconnect-link",
@@ -3453,7 +3453,7 @@ dependencies = [
 [[package]]
 name = "net-remote"
 version = "0.2.6"
-source = "git+https://github.com/Droidtop/lib-net?tag=v0.2.6#faae29765f469f4117a8cb49b7f209021f6a894c"
+source = "git+https://github.com/mytop-project/mytop-net?tag=v0.2.6#faae29765f469f4117a8cb49b7f209021f6a894c"
 dependencies = [
  "base64 0.22.1",
  "cc",
@@ -4126,8 +4126,8 @@ dependencies = [
 
 [[package]]
 name = "plugins-contexts"
-version = "0.3.0"
-source = "git+https://github.com/Droidtop/lib-plugins?tag=v0.3.0#fd6dec87d5de7650ddff0a325b89b9fb1c7c7e94"
+version = "0.3.1"
+source = "git+https://github.com/mytop-project/mytop-plugins?tag=v0.3.1#a801f3be2c3f167dc423ea46cb8990e91a42c2a4"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -5285,8 +5285,8 @@ checksum = "c62751faa8bc286982334a082fe125184a29fc89d17775766e4f891b7d726980"
 
 [[package]]
 name = "saves-locate"
-version = "0.3.0"
-source = "git+https://github.com/Droidtop/lib-saves?tag=v0.3.0#61af4353e9b02e5ea433a9c0d486f0205d643543"
+version = "0.3.1"
+source = "git+https://github.com/mytop-project/mytop-saves?tag=v0.3.1#68aaa9a984fdca8db79eae3a88faa60309abd077"
 dependencies = [
  "dirs",
  "flate2",
@@ -5974,8 +5974,8 @@ dependencies = [
 
 [[package]]
 name = "sync-core"
-version = "0.2.1"
-source = "git+https://github.com/Droidtop/lib-sync?tag=v0.2.1#b6ccd80c15fdb3d9145f22475818677dffe1f0cb"
+version = "0.2.2"
+source = "git+https://github.com/mytop-project/mytop-sync?tag=v0.2.2#e54f899730cd15d26601ff6e3a08ef3c78dea1e2"
 dependencies = [
  "age",
  "boringtun",
@@ -5999,11 +5999,12 @@ dependencies = [
 
 [[package]]
 name = "sync-store"
-version = "0.2.1"
-source = "git+https://github.com/Droidtop/lib-sync?tag=v0.2.1#b6ccd80c15fdb3d9145f22475818677dffe1f0cb"
+version = "0.2.2"
+source = "git+https://github.com/mytop-project/mytop-sync?tag=v0.2.2#e54f899730cd15d26601ff6e3a08ef3c78dea1e2"
 dependencies = [
  "dirs",
  "gethostname",
+ "libc",
  "serde",
  "serde_json",
  "sync-core",
@@ -6713,7 +6714,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "windowcast-accounts"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "argon2 0.5.3",
  "base64 0.22.1",
@@ -6738,7 +6739,7 @@ dependencies = [
 [[package]]
 name = "windowcast-agent-windows"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "tokio",
  "vigem-client",
@@ -6754,7 +6755,7 @@ dependencies = [
 [[package]]
 name = "windowcast-discovery"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "thiserror 1.0.69",
 ]
@@ -6762,7 +6763,7 @@ dependencies = [
 [[package]]
 name = "windowcast-host"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "async-trait",
  "audiopus_sys",
@@ -6786,7 +6787,7 @@ dependencies = [
 [[package]]
 name = "windowcast-identity"
 version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+source = "git+https://github.com/mytop-project/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -6796,7 +6797,7 @@ dependencies = [
 [[package]]
 name = "windowcast-identity"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -6806,7 +6807,7 @@ dependencies = [
 [[package]]
 name = "windowcast-pairing"
 version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+source = "git+https://github.com/mytop-project/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
 dependencies = [
  "hkdf 0.12.4",
  "hmac 0.12.1",
@@ -6821,7 +6822,7 @@ dependencies = [
 [[package]]
 name = "windowcast-pairing"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "hkdf 0.12.4",
  "hmac 0.12.1",
@@ -6836,7 +6837,7 @@ dependencies = [
 [[package]]
 name = "windowcast-protocol"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "bincode",
  "serde",
@@ -6846,7 +6847,7 @@ dependencies = [
 [[package]]
 name = "windowcast-pty"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "portable-pty",
 ]
@@ -6854,7 +6855,7 @@ dependencies = [
 [[package]]
 name = "windowcast-rdp"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6884,7 +6885,7 @@ dependencies = [
 [[package]]
 name = "windowcast-rendezvous"
 version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+source = "git+https://github.com/mytop-project/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -6900,7 +6901,7 @@ dependencies = [
 [[package]]
 name = "windowcast-rendezvous"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -6916,7 +6917,7 @@ dependencies = [
 [[package]]
 name = "windowcast-secure-helper"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "bincode",
  "serde",
@@ -6927,7 +6928,7 @@ dependencies = [
 [[package]]
 name = "windowcast-transport"
 version = "0.38.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+source = "git+https://github.com/mytop-project/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "async-trait",
  "bytes",
