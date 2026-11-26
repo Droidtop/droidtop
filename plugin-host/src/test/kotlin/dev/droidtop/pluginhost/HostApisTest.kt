@@ -62,7 +62,7 @@ class HostApisTest {
         val withAny = FakeEnv(TestPlugins.record(TestPlugins.manifest(id = "acme.net") { it.put("permissions", JSONArray(listOf(domains, obj("id" to "net.any")))) }))
         val background = call(withAny, "net", "http", obj("url" to "https://evil.example/"))
         assertEquals("dangerous and not answered: refused in the background", PluginErrorCode.PERMISSION_DENIED, background.code)
-        assertEquals(listOf("acme.net" to "net.any"), withAny.wanted)
+        assertTrue(withAny.prompts.isEmpty())
         withAny.user = true
         assertTrue(call(withAny, "net", "http", obj("url" to "https://evil.example/")).ok)
         assertEquals(1, withAny.prompts.size)

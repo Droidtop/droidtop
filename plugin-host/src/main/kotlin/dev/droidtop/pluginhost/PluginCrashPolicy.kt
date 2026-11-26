@@ -44,22 +44,25 @@ class PluginCrashPolicy(
         val refusal = PluginTiers.refusal(record, grants) ?: return@withContext PluginTiers.of(record, grants) to null
         val state = PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST)
         if (state == GrantState.ASK && userInitiated) {
-            // The red dialog, not the first-use sheet (mytop-project/tracker#481): Cancel leaves it unanswered, to be asked again.
+            // The red dialog, not the first-use sheet (mytop-project/tracker#481): Cancel leaves it at Ask first, to be asked again
+            // on the next start the person makes, but it is an answer, so an update's flag for it goes.
             val update = PluginTiers.FULL_TRUST in grants.fresh
-            if (PluginDangers.askFullAccess(record, update)) store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
+            if (PluginDangers.askFullAccess(record, update)) {
+                store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
+            } else {
+                store.putOff(record.manifest.id, PluginTiers.FULL_TRUST)
+            }
             grants = store.read(record.manifest.id)
             PluginTiers.refusal(record, grants)?.let { return@withContext null to it }
             return@withContext PluginTiers.of(record, grants) to null
         }
-        if (state == GrantState.ASK) store.noteWanted(record.manifest.id, PluginTiers.FULL_TRUST)
         null to refusal
     }
 
     /**
      * The hole permissions ([PluginTiers.HOLES]) [record] declares and the person has not answered (Ask first), asked at
      * the point of use (#830): on a start the person made, once each on the first-use sheet, where Allow and Never are
-     * kept and Not now holds for the rest of this run ([PluginRefusals]); on any other start, noted as wanted, which its
-     * permission row says. A plugin left at Ask first used to be started without the hole and never asked: Syncthing,
+     * kept and Not now holds for the rest of this run ([PluginGrants.putOff]); any other start leaves it alone. A plugin left at Ask first used to be started without the hole and never asked: Syncthing,
      * whose network is such a hole, ran with no sockets and failed every 30 s (rig, AVD dev.3354,
      * mytop-project/tracker#926). True when an answer changed its grants. Blocks while the sheet is up: on [Dispatchers.IO].
      */
@@ -73,15 +76,10 @@ class PluginCrashPolicy(
         if (PluginTiers.declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST) == GrantState.GRANTED) return false
         var changed = false
         unanswered.forEach { hole ->
-            when {
-                !userInitiated -> PluginGrants.forContext(context).noteWanted(id, hole)
-                PluginRefusals.isNotNow(id, hole) -> Unit
-                else -> {
-                    PluginGrants.askPermission(context, record, hole)
-                    val now = PluginGrants.stateOf(record, PluginGrants.forContext(context).read(id), hole)
-                    if (now == GrantState.ASK) PluginRefusals.rememberNotNow(id, hole) else changed = true
-                }
-            }
+            if (!userInitiated || PluginRefusals.isNotNow(id, hole)) return@forEach
+            // askPermission keeps Allow and Never, and puts a Not now off for this run.
+            PluginGrants.askPermission(context, record, hole)
+            if (PluginGrants.stateOf(record, PluginGrants.forContext(context).read(id), hole) != GrantState.ASK) changed = true
         }
         return changed
     }
@@ -278,7 +276,7 @@ class PluginCrashPolicy(
      * Why a call to [point] must not be made ([PluginGrants.pointRefusal]), or null when it may. A point set to Ask first
      * (or not answered yet) is asked about on the first-use sheet during a call the person started, and the answer is
      * kept: Allow turns it on, Never blocks it, Not now leaves it to be asked again (mytop-project/tracker#270). From the
-     * background it stays refused, with a note that the plugin wanted it.
+     * background it stays refused.
      */
     private suspend fun pointGate(record: PluginRecord, point: String, userInitiated: Boolean): String? = withContext(Dispatchers.IO) {
         val id = record.manifest.id
@@ -287,10 +285,7 @@ class PluginCrashPolicy(
         val refusal = PluginGrants.pointRefusal(record, snapshot, point) ?: return@withContext null
         if (!ExtensionPoints.declares(record.manifest, point)) return@withContext refusal
         if (PluginGrants.provideState(record, snapshot, point) != GrantState.ASK) return@withContext refusal
-        if (!userInitiated) {
-            store.noteWanted(id, PluginPermissions.PROVIDE_PREFIX + point)
-            return@withContext refusal
-        }
+        if (!userInitiated) return@withContext refusal
         if (PluginGrants.askPoint(context, record, point)) PluginGrants.pointRefusal(record, store.read(id), point) else refusal
     }
 
