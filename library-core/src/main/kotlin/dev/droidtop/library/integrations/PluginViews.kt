@@ -589,19 +589,37 @@ private class PluginPage(
     @Volatile private var missingApp: PluginManagedApp.App? = null
 
     /**
-     * A node whose permission is turned off (#521 item 5): its own title, droidtop's sentence instead of what it does,
-     * and pressing it opens the plugin's Permissions. Only this node changes; the page and its other nodes stay.
+     * A node whose permission is turned off (#521 item 5): its own title, "Off" as its value, and pressing it asks on the
+     * first-use sheet in place ([PluginGrants.askPermission]: the person pressed it, so it is the moment of use), then
+     * the page reads again. It used to open the plugin's Permissions page, a redirect to reach a facet (docs/plugin-api.md
+     * 1.10, "Facets go where they fit"), and named the permission by its id when no label was known. Only this node
+     * changes; the page and its other nodes stay.
      */
     private fun turnedOffItem(screenId: String, node: ViewNode, permission: String): CatalogItem {
         missingApp?.takeIf { permission == PluginManagedApp.NEEDS }?.let { app ->
             return ActionItem(id = "pv_${screenId}_${node.id}_no_app", title = node.title, subtitle = PluginManagedApp.reason(app))
         }
-        val what = PluginPermissions.labelFor(permission) ?: permission
-        return NestedScreenItem(
+        val what = PluginPermissions.labelFor(permission)
+        return AsyncActionItem(
             id = "pv_${screenId}_${node.id}_off",
             title = node.title,
-            subtitle = "Off: turn on \"$what\" in its Permissions to use this",
-            inline = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, AcquireContentSources.permissionsLink(record.manifest.id)),
+            subtitle = what?.let { "Needs $it" },
+            value = "Off",
+            run = { context, _ ->
+                // Full access is only ever allowed through its red dialog (Droidtop/tracker#481, D1), never the first-use sheet.
+                val on = if (permission == dev.droidtop.pluginhost.PluginTiers.FULL_TRUST) {
+                    dev.droidtop.pluginhost.PluginDangers.askFullAccess(record, update = false) &&
+                        withContext(Dispatchers.IO) { PluginGrants.forContext(context).set(record.manifest.id, permission, GrantState.GRANTED); true }
+                } else {
+                    withContext(Dispatchers.IO) { PluginGrants.askPermission(context, record, permission) }
+                }
+                if (on) {
+                    stale = true
+                    "Allowed"
+                } else {
+                    "Still off"
+                }
+            },
         )
     }
 
