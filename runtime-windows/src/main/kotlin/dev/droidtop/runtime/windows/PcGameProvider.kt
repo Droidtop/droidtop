@@ -498,7 +498,7 @@ class PcGameProvider(
                 dev.droidtop.library.computers.ComputerSaves.rememberBase(entry.id, gameRoot)
                 dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, entry.id, GameNaming.displayName(entry.title))
                     ?.let { Log.i("droidtop.PcGameProvider", it) }
-                runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments, entry.id)
+                runtime.launchWindows(windows.executable, gameRoot, windows.workingDir, windows.arguments, entry.id, windows.environment)
             }
             // An engine this provider does not own (see
             // notOwnedByAnEngine) cannot resolve here; saying so beats

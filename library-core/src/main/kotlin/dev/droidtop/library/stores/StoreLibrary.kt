@@ -243,7 +243,13 @@ data class StoreCollection(
 data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)
 
 /** How a store itself starts one of its games, when its own data says. */
-data class StoreLaunch(val executable: File, val workingDir: File, val arguments: List<String> = emptyList())
+data class StoreLaunch(
+    val executable: File,
+    val workingDir: File,
+    val arguments: List<String> = emptyList(),
+    /** This launch only; account tokens are never written into a saved Wine prefix or shown in command previews. */
+    val environment: Map<String, String> = emptyMap(),
+)
 
 /**
  * A way to play one game that a store offers beside running its files here

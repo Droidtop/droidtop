@@ -17436,6 +17436,12 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   version, content ids, registry paths and touchup command; parent paths, escaping symlinks and XML declarations
   cannot escape the game's folder. EA activation, the local LSX service and Wine touchup/registry preparation are
   the following launch batch, not evidence supplied by a successful download.
+- **Store launch environment.** A `StoreLaunch` may carry variables for that invocation, preserved by
+  `WindowsLaunchResolver` even when the person selects the executable. The PC provider, engine-game path and
+  first-launch preparation carry them into the same Windows runtime. Wine uses its own literal environment
+  encoding, never a shell command, and no variable is saved to the prefix or displayed in command previews.
+  Names that alter the host loader, path or prefix, and values with control characters, are refused. A store's
+  launch error is reported; it never silently falls back to another executable or a launch without its credentials.
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 

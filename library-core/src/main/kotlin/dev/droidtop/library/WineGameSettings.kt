@@ -162,7 +162,7 @@ object WineSettingsScreen {
 }
 
 /** What a Windows launch of one game runs: the program, where it starts, and its arguments. */
-data class WindowsLaunch(val executable: File, val workingDir: File, val arguments: List<String>)
+data class WindowsLaunch(val executable: File, val workingDir: File, val arguments: List<String>, val environment: Map<String, String> = emptyMap())
 
 /**
  * The one answer to "what does this game run under Wine", for every
@@ -211,16 +211,19 @@ object WindowsLaunchResolver {
     suspend fun forEntry(context: Context, entryId: String, gameRoot: File): WindowsLaunch? =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val picked = WineGameSettingsPrefs.get(context, entryId)
-            val storeLaunch = if (picked?.executable == null) {
-                dev.droidtop.library.stores.StoreLibraries.forKey(entryId)
-                    ?.let { store -> runCatching { store.launch(context, entryId.substringAfter(':')) }.getOrNull() }
-                    ?.takeIf { it.executable.isFile }
-            } else {
-                null
-            }
-            storeLaunch?.let { withUserOptions(WindowsLaunch(it.executable, it.workingDir, it.arguments), picked) }
-                ?: resolve(picked, gameRoot)
+            val storeLaunch = dev.droidtop.library.stores.StoreLibraries.forKey(entryId)
+                ?.launch(context, entryId.substringAfter(':'))
+            select(picked, gameRoot, storeLaunch)
         }
+
+    /** A manually chosen executable keeps its store's required launch environment. Store failures are never a fallback. */
+    internal fun select(settings: WineGameSettings?, gameRoot: File, store: dev.droidtop.library.stores.StoreLaunch?): WindowsLaunch? {
+        if (settings?.executable == null && store != null) {
+            check(store.executable.isFile) { "The store's program is missing. Verify or reinstall this game." }
+            return withUserOptions(WindowsLaunch(store.executable, store.workingDir, store.arguments, store.environment), settings)
+        }
+        return resolve(settings, gameRoot)?.let { it.copy(environment = store?.environment.orEmpty() + it.environment) }
+    }
 
     fun resolve(context: Context, entryId: String, gameRoot: File): WindowsLaunch? =
         resolve(WineGameSettingsPrefs.get(context, entryId), gameRoot)
