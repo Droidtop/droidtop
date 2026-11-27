@@ -63,4 +63,31 @@ class WhatsNewTest {
         assertEquals(true, WhatsNew.mayOpen(screenAlive = true, isShell = false, settled = false))
         assertEquals(false, WhatsNew.mayOpen(screenAlive = false, isShell = true, settled = true))
     }
+
+    @Test
+    fun `quiet builds in a row are one entry with the generic line, and old wording reads it too`() {
+        val builds = WhatsNew.parse(
+            """
+            {"formatVersion": 1, "builds": [
+              {"versionCode": 2306, "versionName": "0.2.0-dev.2306", "sections": {"Changed": ["Various bug fixes and performance improvements"]}},
+              {"versionCode": 2305, "versionName": "0.2.0-dev.2305", "sections": {"Changed": ["Internal changes: 3. Nothing looks different"]}},
+              {"versionCode": 2304, "versionName": "0.2.0-dev.2304", "sections": {}},
+              {"versionCode": 2303, "versionName": "0.2.0-dev.2303", "sections": {"Fixed": ["A fix"], "Changed": ["Internal changes: 2. Nothing looks different"]}},
+              {"versionCode": 2302, "versionName": "0.2.0-dev.2302", "sections": {"Changed": ["Internal changes (1); nothing looks different"]}}
+            ]}
+            """.trimIndent(),
+        )
+        val shown = WhatsNew.condense(builds)
+        assertEquals(listOf("0.2.0-dev.2304 to 0.2.0-dev.2306", "0.2.0-dev.2303", "0.2.0-dev.2302"), shown.map { it.versionName })
+        assertEquals(listOf("Changed" to listOf(WhatsNew.QUIET_LINE)), shown[0].sections)
+        assertEquals(listOf("Changed" to listOf(WhatsNew.QUIET_LINE), "Fixed" to listOf("A fix")), shown[1].sections)
+        assertEquals(listOf("Changed" to listOf(WhatsNew.QUIET_LINE)), shown[2].sections)
+    }
+
+    @Test
+    fun `a quiet build with something to do after it keeps its own entry`() {
+        val quiet = ChangelogBuild(2, "b", listOf("Changed" to listOf(WhatsNew.QUIET_LINE)), onboarding = listOf("Sign in again"))
+        val other = ChangelogBuild(1, "a", listOf("Changed" to listOf(WhatsNew.QUIET_LINE)))
+        assertEquals(listOf("b", "a"), WhatsNew.condense(listOf(quiet, other)).map { it.versionName })
+    }
 }

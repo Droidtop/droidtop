@@ -91,14 +91,17 @@ class WhatsNewActivity : AppCompatActivity() {
                     LaunchedEffect(Unit) {
                         builds = withContext(Dispatchers.IO) {
                             val bundled = WhatsNew.builds(applicationContext)
-                            if (all) {
-                                bundled
-                            } else if (from != null) {
-                                // Settings' "Changes since your last update": the range, read again any time.
-                                WhatsNew.since(bundled, from, AppSelfUpdate.installedVersionCode(applicationContext))
-                            } else {
-                                WhatsNew.since(bundled, WhatsNew.lastSeen(applicationContext), AppSelfUpdate.installedVersionCode(applicationContext))
-                            }
+                            // Quiet builds in a row are one entry with the one generic line (WhatsNew.condense).
+                            WhatsNew.condense(
+                                if (all) {
+                                    bundled
+                                } else if (from != null) {
+                                    // Settings' "Changes since your last update": the range, read again any time.
+                                    WhatsNew.since(bundled, from, AppSelfUpdate.installedVersionCode(applicationContext))
+                                } else {
+                                    WhatsNew.since(bundled, WhatsNew.lastSeen(applicationContext), AppSelfUpdate.installedVersionCode(applicationContext))
+                                },
+                            )
                         }
                     }
                     BackHandler { close(all || from != null) }
