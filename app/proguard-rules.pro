@@ -30,11 +30,14 @@
 #   plugin-host           PythonCallException (droidtoppy_jni.c) and the bridge
 #   TunnelNative          hev-socks5-tunnel's JNI surface
 #   pckeyboard            BinaryDictionary registers its natives by class name
+#   com.droiddeck.launcher.stores  DroidDeck's store engines: their JNI names and the
+#                         listeners they call back (onProgress, onComplete...) by name
 -keep class com.winlator.** { *; }
 -keep class dev.droidtop.hostbridge.** { *; }
 -keep class dev.droidtop.pluginhost.** { *; }
 -keep class dev.droidtop.app.vpn.TunnelNative { *; }
 -keep class org.pocketworkstation.pckeyboard.** { *; }
+-keep class com.droiddeck.launcher.stores.** { *; }
 # apksig checks the signature of an app that carries a plugin (AppInterfaces). Its
 # ASN.1 reader fills certificate and signer classes field by field through
 # reflection, so a field nothing in its code writes is not unused.

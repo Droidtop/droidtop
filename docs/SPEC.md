@@ -17399,6 +17399,25 @@ follows:
   GameNative's host). Since the runtime lift (2026-10-08, §9) GameNative's
   `SteamService` is not compiled at all.
 
+
+**Store engines from DroidDeck (decided 2026-11-27, mytop-project/tracker#335).** The owner, answering Q53: "pull
+everything we can replace gamenative's with, preferring without an external client". DroidDeck
+(https://github.com/Droid-Deck/DroidDeck, GPL-3.0) downloads and installs Steam, Epic, GOG, Amazon, EA and Ubisoft
+games with one Rust crate, `app/src/main/rust/stores` (its JNI library `libdroiddeckstores`), and starts EA, Ubisoft
+and Rockstar games without their own launchers. droidtop takes it as follows:
+- **The crate, unchanged.** `vendor/droiddeck` is a submodule at a pinned commit, `update = none`: DroidDeck's tip is a
+  300 MB tree, so a recursive checkout skips it and `build-scripts/build-store-engines.sh` fetches only the crate's
+  folder of the pinned commit, shallow and sparse, and builds it for arm64-v8a and x86_64 into `stores/engines/jniLibs`
+  (CI: `android-setup`, cached on the pin). The crate's JNI functions are named for DroidDeck's classes, so the classes
+  that declare them sit under `com.droiddeck.launcher.stores` in `:stores` and hold only the bindings
+  (`StoresNative`, the loader); droidtop's stores call them. No patch is carried; a change the crate needs goes upstream
+  first, and only a change upstream will not take makes a fork of our own.
+- **The Kotlin that drives it, ported** into droidtop's `StoreLibrary` stores, with each file naming its DroidDeck
+  source, and launch rewritten for droidtop's Windows runtime (DroidDeck launches through its own Linux userland).
+- **No external client where there is a way without one.** EA and Ubisoft games install and start without the EA app
+  or Ubisoft Connect; Epic and GOG keep droidtop's own direct installs rather than Epic's launcher or Galaxy.
+- **One mechanism per job.** Each store moved onto the engines deletes the GameNative code it replaces.
+
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 
 How the account holds a store row is `PcInfo.holding` (`StoreHolding`), the

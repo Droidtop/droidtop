@@ -71,3 +71,6 @@ Thumbs.db
 # Editor backup files
 *~
 __pycache__/
+
+# DroidDeck store engines, built by build-scripts/build-store-engines.sh (not source).
+stores/engines/
