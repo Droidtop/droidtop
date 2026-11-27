@@ -209,7 +209,7 @@ public abstract class ProcessHelper {
             command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing with output: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d("ProcessHelper", "Executing with output: " + Arrays.toString(splitCommand(command)) + ", " + (envp == null ? 0 : envp.length) + " environment variables" + ", " + workingDir);
             }
 
             ProcessBuilder pb = new ProcessBuilder(splitCommand(command));
@@ -309,7 +309,7 @@ public abstract class ProcessHelper {
             command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + (envp == null ? 0 : envp.length) + " environment variables" + ", " + workingDir);
             }
 
             process = Runtime.getRuntime().exec(splitCommand(command), envp, workingDir);
@@ -342,7 +342,7 @@ public abstract class ProcessHelper {
             command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + (envp == null ? 0 : envp.length) + " environment variables" + ", " + workingDir);
             }
 
             java.lang.Process process = Runtime.getRuntime().exec(splitCommand(command), envp, workingDir);
