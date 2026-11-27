@@ -49,6 +49,15 @@ were opened on 2026-11-27. Live application and device testing is paused.
 
 ## Scope filter
 
+Follow-up counterevidence from the handoff's colour proposal: current
+`runtime-common/.../GamingThemeMapping.kt` already derives surfaces and fits
+primary, secondary, placeholder, section and accent text against the surface set
+with `ColorMath.ensure(..., TEXT_FLOOR)`. Its declarations and mapping are not
+evidence of a missing contrast algorithm. The shared default palette explicitly
+preserves the owner's blue-grey ground. An optional true-black theme remains a
+design proposal; this review does not replace the approved default or certify
+contrast over textured/rendered backgrounds from source alone.
+
 Discarded retailer rankings, screenshot aesthetics and generic redesign recipes.
 WCAG is used as a design reference, not a native conformance declaration. Its
 24-CSS-pixel pointer minimum is not substituted for Android's 48dp touch guidance.
