@@ -41,6 +41,18 @@ class ScraperKeySetupTest {
         assertTrue(dev.droidtop.library.credentials.CredentialStore.KEYS.containsAll(keys))
     }
 
+    /**
+     * Keys and accounts lists held keys by these services, so every key the store holds must belong to one: a new key
+     * with no service would be held and never shown. Real-Debrid's device sign-in follows its token (it is written
+     * with it and dropped when the token is cleared, DebridAccounts.forgetStaleSignIn), so it needs no field.
+     */
+    @Test
+    fun `every stored key belongs to a service`() {
+        val store = dev.droidtop.library.credentials.CredentialStore
+        val keys = ScraperKeyService.entries.flatMap { s -> s.fields.map { it.storeKey } }.toSet()
+        assertEquals(store.KEYS - store.REALDEBRID_SIGNIN, keys)
+    }
+
     @Test
     fun `state is Not set, Not tested or Connected`() {
         assertEquals("Not set", ScraperKeyState.label(configured = false, verified = true))

@@ -1023,8 +1023,6 @@ object AppSettingsCatalogs {
                     GitHubAccountCatalog.accountRow(context),
                     // Every key droidtop holds, in one place (mytop-project/tracker#12, the owner's choice (b), 2026-10-28).
                     keysAndAccountsRow(keysHeld),
-                    // Every key and sign-in droidtop holds, in one list (mytop-project/tracker#12, the owner's 2026-10-28 choice).
-                    KeysAndAccountsCatalog.linkRow(),
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
                         id = "accounts_stores_link",
@@ -1107,7 +1105,7 @@ object AppSettingsCatalogs {
             CatalogGroup(
                 id = "internet_browser",
                 title = "Browser",
-                items = listOf(browserRow(context), webEngineRow(context)),
+                items = listOf(browserRow(context)),
             ),
             // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", mytop-project/tracker#648).
             CatalogGroup(
@@ -1150,36 +1148,24 @@ object AppSettingsCatalogs {
 
     /**
      * droidtop Browser (docs/SPEC.md 12a, `BrowserInstall`): droidtop installs and updates it, so its sign-in, check and
-     * download pages run on a current engine. Pressing it gets the newest release; the value is the version installed.
+     * download pages run on a current engine. Pressing it gets the newest release. Its value is the version, and says
+     * when web pages do not open in it (its plugin not approved or not allowed, docs/plugin-api.md G3a): then they open
+     * in the device's WebView. One row for both facts: "Web pages open in" was a second row saying the same thing
+     * (mytop-project/tracker#964). Reads the plugin store and the browser's APK: off the main thread.
      */
     private fun browserRow(context: Context): CatalogItem {
         val installed = dev.droidtop.library.integrations.BrowserInstall.installedVersion(context)
+        val inUse = runCatching { dev.droidtop.pluginhost.WebViewProviders.provider(context) }.getOrNull() != null
         return AsyncActionItem(
             id = "accounts_droidtop_browser",
             title = dev.droidtop.library.integrations.BrowserInstall.LABEL,
             subtitle = "Shows sites' sign-in and check pages on a current browser engine",
-            value = installed ?: "Install",
-            run = { ctx, onStatus -> dev.droidtop.library.integrations.BrowserInstall.install(ctx, onStatus) },
-        )
-    }
-
-    /**
-     * Which engine droidtop's web pages open in now (docs/plugin-api.md G3a): droidtop Browser when its plugin is approved
-     * and allowed, otherwise the device's WebView, named with its version, since an old one is why a site's check fails.
-     * Reads the plugin store and the browser's APK: off the main thread.
-     */
-    private fun webEngineRow(context: Context): CatalogItem {
-        val browser = runCatching { dev.droidtop.pluginhost.WebViewProviders.provider(context) }.getOrNull()
-        val webView = if (android.os.Build.VERSION.SDK_INT >= 26) android.webkit.WebView.getCurrentWebViewPackage()?.versionName else null
-        return ActionItem(
-            id = "internet_web_engine",
-            title = "Web pages open in",
-            subtitle = "Sign-ins, site checks and download pages",
             value = when {
-                browser != null -> dev.droidtop.library.integrations.BrowserInstall.LABEL
-                webView != null -> "Android WebView ${webView.substringBefore('.')}"
-                else -> "Android WebView"
+                installed == null -> "Install"
+                inUse -> installed
+                else -> "$installed, not in use"
             },
+            run = { ctx, onStatus -> dev.droidtop.library.integrations.BrowserInstall.install(ctx, onStatus) },
         )
     }
 
@@ -1658,47 +1644,6 @@ object AppSettingsCatalogs {
                             subtitle = "Turns wide boxes upright",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setMiximageRotateHorizontalBoxes(ctx, value) },
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    // ScreenScraper/TheGamesDB/IGDB/SteamGridDB account
-                    // fields moved to Settings > Accounts and sources,
-                    // with every other account droidtop has (docs/SPEC.md
-                    // settings architecture): a scraper's credentials are
-                    // a source's detail, not this screen's own -- this
-                    // screen is scrape BEHAVIOR (which source, what to
-                    // fetch), not accounts.
-                    id = "scraper_accounts_link",
-                    title = null,
-                    items = listOf(
-                        NestedScreenItem(
-                            id = "scraper_accounts_link_row",
-                            title = "Accounts and sources",
-                            registryId = SCREEN_ACCOUNTS_AND_SOURCES,
-                            icon = CatalogIcon.GLOBAL,
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    id = "scraper_config_transfer",
-                    title = "Moving credentials between devices",
-                    items = listOf(
-                        ActionItem(
-                            id = "scraper_backup_pointer",
-                            title = "Back up / restore settings",
-                            subtitle = "The settings backup in Settings includes everything here, " +
-                                "credentials included — one file restores a working configuration",
-                            run = { ctx ->
-                                // Component by name, same as OnboardingActivity's
-                                // own launch of this screen.
-                                ctx.startActivity(
-                                    android.content.Intent().apply {
-                                        component = android.content.ComponentName(ctx.packageName, "com.android.launcher3.settings.SettingsActivity")
-                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    },
-                                )
-                            },
                         ),
                     ),
                 ),

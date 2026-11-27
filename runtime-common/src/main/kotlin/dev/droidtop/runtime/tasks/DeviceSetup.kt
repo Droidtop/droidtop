@@ -173,6 +173,9 @@ object DeviceSetup {
      * Allows restricted settings for droidtop (Android 13+) and adds its service to Android's enabled list, keeping
      * every service already there. Records what it found, for [turnOffButtonPresses]. Blocking: IO only.
      */
+    /** Whether droidtop itself turned button presses on (and so can put back what it found). */
+    internal fun buttonPressesByDroidtop(context: Context): Boolean = doneByDroidtop(context, "button_presses")
+
     internal fun turnOnButtonPresses(context: Context, shell: PrivilegedShell): Boolean {
         if (!canRun(shell)) return false
         val edit = prefs(context).edit()

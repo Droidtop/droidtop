@@ -102,6 +102,22 @@ object AccessibilityKeyboard {
         return "Turn on droidtop in the list Android opened"
     }
 
+    /**
+     * Turns the HOME combos off: when droidtop turned them on itself it puts back what it found, through the shell (the
+     * device-setup item's undo); otherwise only Android's own list can, so that opens. Blocking: IO only.
+     */
+    fun turnOff(context: Context): String {
+        if (!isActive(context)) return "Off"
+        val shell = dev.droidtop.runtime.tasks.TaskManager.shell
+        if (dev.droidtop.runtime.tasks.DeviceSetup.buttonPressesByDroidtop(context) &&
+            dev.droidtop.runtime.tasks.DeviceSetup.turnOffButtonPresses(context, shell)
+        ) {
+            return "Off"
+        }
+        openSettings(context)
+        return "Turn it off in Android's list"
+    }
+
     /** The one command that lifts Android's restricted-settings block from a computer with adb. */
     fun restrictedSettingsCommand(context: Context): String =
         "adb shell appops set ${context.packageName} ACCESS_RESTRICTED_SETTINGS allow"

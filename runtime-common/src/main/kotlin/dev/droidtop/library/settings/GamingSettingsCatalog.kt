@@ -560,12 +560,15 @@ object GamingSettingsCatalog {
                         subtitle = chordsLine,
                         value = if (chordsOn) "On" else "Off",
                         statusMark = if (chordsOn) null else StatusMark.ATTENTION,
+                        // The one row for this (mytop-project/tracker#964): on and off both go through the device-setup
+                        // item's shell way when it can, so what droidtop changed is put back by the same row.
                         run = { ctx, _ ->
-                            if (chordsOn) {
-                                dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx)
-                                "Turn it off in Android's list"
-                            } else {
-                                dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(ctx)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                if (chordsOn) {
+                                    dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOff(ctx)
+                                } else {
+                                    dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(ctx)
+                                }
                             }
                         },
                     ),

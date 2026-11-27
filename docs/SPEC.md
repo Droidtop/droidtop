@@ -14914,19 +14914,10 @@ trusted (`stopTrustingOrigin`, `stopTrustingApp`, the same calls "Keys you
 trust" makes). Pressing a row asks, then removes it. The page stores nothing: it
 reads each key from where it lives, so the service's own page and this one never
 disagree.
-**Keys and accounts (built 2026-11-05, mytop-project/tracker#12; the owner, 2026-10-28: "Add one 'Keys and accounts' page
-under Settings > Accounts and sources. It lists every key and token droidtop holds, where each is used, and a Remove.
-Each service's own page keeps its row.").** Accounts and sources has a "Keys and accounts" row
-(`KeysAndAccountsCatalog`) that opens one list in three groups:
-- Sign-ins: GitHub, and each store signed in to (an itch.io API key, a Steam, GOG, Epic or Amazon sign-in, a
-  plugin's store).
-- Keys: each service with a key in `CredentialStore` (ScreenScraper, TheGamesDB, IGDB, SteamGridDB,
-  RetroAchievements, TorBox, Real-Debrid, Pixeldrain, Gofile), each saying where it is used.
-- Plugins: a link to "Keys you trust", whose review and remove rules stay its own.
-The page stores nothing. Remove goes through the service's own clear: GitHub's Sign out, the store's Sign out (which,
-as on its page, removes its games that are not installed), or a blank write to the store's keys, which is what
-clearing the service's field does. `CredentialServices` names each `CredentialStore` key's service, and a test fails
-when a key is added to the store without one, so the page can never miss a key.
+One page, one implementation (mytop-project/tracker#964, step 2): a second copy of this page
+(`KeysAndAccountsCatalog`, with its own `CredentialServices` table) also sat in the Accounts group under the same id,
+so Gaming silently dropped it and Mobile showed both; it is deleted. A test fails when `CredentialStore` gains a key no
+`ScraperKeyService` field holds, so the page can never miss one (Real-Debrid's device sign-in follows its token).
 
 **A plugin's store (2026-10-28, mytop-project/tracker#220, docs/plugin-api.md 3
 A13).** A plugin that provides `library.stores` adds a store beside
@@ -22473,9 +22464,9 @@ Settings tab, the left menu's places, Console systems and Containers.
 
 - **Internet (2026-11-22).** The owner: "reflow the settings to put internet settings together, so we can present our
   own browser with deeper integration". A category of its own, after Accounts and sources: **Browser** (droidtop
-  Browser's install and update row, and "Web pages open in", which names the engine droidtop's sign-in, check and
-  download pages use now: droidtop Browser when its plugin is approved and allowed, else Android WebView and its major
-  version), then **Download sites**, **File hosts** and **Debrid services**, moved from Accounts and sources so each has
+  Browser's install and update row, whose value is its version and says "not in use" when droidtop's sign-in, check
+  and download pages open in Android WebView instead, its plugin not approved or not allowed; a separate "Web pages
+  open in" row said the same and was folded in, mytop-project/tracker#964), then **Download sites**, **File hosts** and **Debrid services**, moved from Accounts and sources so each has
   one home. Network shares stay with Accounts and sources. Its glyph is Downloads' until it has one of its own.
 - **Two panes.** A navigator that fills the page (at least 80% of the
   screen's width; never one inside a sheet or a dialog) whose root has three

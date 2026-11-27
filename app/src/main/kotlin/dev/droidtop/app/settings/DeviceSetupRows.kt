@@ -20,9 +20,12 @@ import kotlinx.coroutines.withContext
  * through the shell: build off the main thread.
  */
 internal object DeviceSetupRows {
-    /** The "Device setup" group under Accounts and sources, every item this Android has. */
+    /**
+     * The "Device setup" group under Accounts and sources, every item this Android has but button presses, whose one row
+     * is Controls' "HOME button combos over games" (it runs the same item, on and off; mytop-project/tracker#964).
+     */
     suspend fun group(context: Context): CatalogGroup? {
-        val rows = DeviceSetup.items.mapNotNull { row(context, it, "device_setup_${it.id}") }
+        val rows = DeviceSetup.items.filter { it !== DeviceSetup.buttonPresses }.mapNotNull { row(context, it, "device_setup_${it.id}") }
         if (rows.isEmpty()) return null
         return CatalogGroup(id = "accounts_device_setup", title = words(R.string.device_setup_group), items = rows)
     }

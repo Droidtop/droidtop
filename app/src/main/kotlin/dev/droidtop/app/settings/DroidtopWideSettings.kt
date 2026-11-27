@@ -306,24 +306,6 @@ object DroidtopWideSettings {
         title = "Desktop mode",
         groups = { context ->
             listOf(
-                // The same first row Gaming's settings lead with: from
-                // Desktop, Global settings (and the Modes in it) was only
-                // an unlabelled action-bar icon, and with Gaming turned off
-                // the rig found no way back to it (dq-coordinator-23, F5).
-                CatalogGroup(
-                    id = dev.droidtop.library.settings.GamingSettingsCatalog.GROUP_GLOBAL,
-                    title = null,
-                    items = listOf(
-                        // The Global settings page itself, titled as such: shown
-                        // in place under this page it kept the title "Desktop
-                        // mode" (rig, dq-onboard-01).
-                        ActionItem(
-                            id = "pref_desktop_global_settings",
-                            title = "Settings",
-                            run = { ctx -> dev.droidtop.shell.standard.BackButtonMenu.openGlobalSettings(ctx) },
-                        ),
-                    ),
-                ),
                 CatalogGroup(
                     id = "desktop",
                     title = null,
