@@ -14,6 +14,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicLong
 
 object EaAuth {
     private const val TAG = "EaAuth"
@@ -24,7 +25,7 @@ object EaAuth {
     const val REDIRECT = "qrc:///html/login_successful.html"
     private const val REFRESH_MARGIN_MS = 5 * 60 * 1000L
     private val refreshLock = Any()
-    private var generation = 0L
+    private val generation = AtomicLong()
     private val random = SecureRandom()
 
     private val PC_SIGN_KEYS = mapOf(
@@ -121,6 +122,7 @@ object EaAuth {
     }
 
     fun begin(context: Context): Pending {
+        generation.incrementAndGet()
         val verifier = EaCrypto.base64Url(ByteArray(32).also(random::nextBytes))
         val challenge = EaCrypto.base64Url(EaCrypto.sha256(verifier.toByteArray()))
         val state = EaCrypto.base64Url(ByteArray(32).also(random::nextBytes))
@@ -153,7 +155,7 @@ object EaAuth {
     }
 
     fun exchange(context: Context, code: String, verifier: String) {
-        val started = synchronized(refreshLock) { generation }
+        val started = generation.get()
         val token = tokenCall(
             listOf(
                 "grant_type" to "authorization_code", "code" to code, "code_verifier" to verifier,
@@ -172,7 +174,7 @@ object EaAuth {
             .put("display_name", player.displayName)
             .put("ea_id", player.eaId)
         synchronized(refreshLock) {
-            check(generation == started) { "The EA sign-in was cancelled. Start it again." }
+            check(generation.get() == started) { "The EA sign-in was cancelled. Start it again." }
             write(context.applicationContext, record)
         }
     }
@@ -262,7 +264,6 @@ object EaAuth {
 
     /** Waits for any refresh in progress, so it cannot write the sign-in back afterwards. */
     fun signOut(context: Context) {
-        synchronized(refreshLock) { generation++; authFile(context.applicationContext).delete() }
+        synchronized(refreshLock) { generation.incrementAndGet(); authFile(context.applicationContext).delete() }
     }
 }
-

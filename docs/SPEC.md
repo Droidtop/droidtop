@@ -17424,6 +17424,18 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
 - **No external client where there is a way without one.** EA and Ubisoft games install and start without the EA app
   or Ubisoft Connect; Epic and GOG keep droidtop's own direct installs rather than Epic's launcher or Galaxy.
 - **One mechanism per job.** Each store moved onto the engines deletes the GameNative code it replaces.
+- **EA direct installs.** The stable library key remains the content id; the saved offer id asks `EaApi.downloadUrl`
+  for the account's signed build URL. `EaInstaller` calls the unchanged native EA engine, reporting its checking and
+  download progress into `StoreInstallJob`. Pause and cancellation ask the engine to stop, then wait for its terminal
+  callback before releasing the handle; cleanup waits for that worker too. Files that already match resume in place.
+  `ea/installs.json` records installed files independently of the signed-in library: sign-out keeps them, and a sync
+  that no longer owns them shows them as not owned. A new install gets its own directory and proof file; resumed
+  writes and removal require the recorded game id, proof and containment as a direct child of the recorded store
+  root. Cancelling an update never discards the previously installed game. A build is not complete until the engine
+  succeeds and the in-progress marker is cleared. Its bounded installer XML supplies the executable, arguments,
+  version, content ids, registry paths and touchup command; parent paths, escaping symlinks and XML declarations
+  cannot escape the game's folder. EA activation, the local LSX service and Wine touchup/registry preparation are
+  the following launch batch, not evidence supplied by a successful download.
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 

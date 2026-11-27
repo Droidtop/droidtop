@@ -84,4 +84,3 @@ internal object EaCrypto {
     fun base64Url(data: ByteArray): String =
         java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(data)
 }
-

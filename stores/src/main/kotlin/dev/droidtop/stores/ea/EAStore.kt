@@ -7,6 +7,9 @@ import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
+import dev.droidtop.library.stores.StoreHolding
+import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.net.AtomicWrite
 import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.util.StoreFiles
@@ -14,6 +17,9 @@ import dev.droidtop.stores.util.StoreHttp
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -25,10 +31,12 @@ import timber.log.Timber
  * The EA app's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after Lutris's EA app
  * service (GPL-3.0, `lutris/services/ea_app.py`): the person signs in on EA's own page using DroidDeck's EA desktop
  * client flow (PKCE, one-time state and refresh tokens), and EA's GraphQL service lists the account's PC base games (`ownedGameProducts`) and their titles and art
- * (`gameProducts`, `legacyOffers` for each one's content id). EA serves games only through its own EA app, so this
- * store lists them and does not install them here.
+ * (`gameProducts`, `legacyOffers` for each one's content id). Direct installs use DroidDeck's unchanged native
+ * download engine; launcher metadata comes from the build's installer manifest.
  */
 class EAStore : StoreLibrary {
+    private val installLocks = ConcurrentHashMap<String, Mutex>()
+    private fun installLock(id: String) = installLocks.getOrPut(id) { Mutex() }
     override val id = "ea"
     override val label = "EA app"
     override val siteUrl = "https://www.ea.com/"
@@ -107,18 +115,107 @@ class EAStore : StoreLibrary {
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
-        libraryFile(context).takeIf { it.isFile }?.let { decode(it.readText()) }.orEmpty().map { game ->
-            StoreGame(store = id, gameId = game.id, title = game.title, installed = false, installPath = null, sizeBytes = 0L, artUrl = game.artUrl)
+        val owned = readLibrary(context).associateBy { it.id }
+        val installs = EaInstalls.read(context).associateBy { it.id }
+        (owned.keys + installs.keys).map { gameId ->
+            val game = owned[gameId]
+            val install = installs[gameId]
+            val folder = install?.takeIf { it.complete }?.let { runCatching { EaInstalls.ownedFolder(it) }.getOrNull() }?.takeIf { it.isDirectory }
+            StoreGame(store = id, gameId = gameId, title = game?.title ?: install!!.title,
+                installed = folder != null, installPath = folder?.absolutePath, sizeBytes = install?.sizeBytes ?: 0,
+                artUrl = game?.artUrl ?: install?.art, installedVersion = install?.version?.takeIf { it.isNotBlank() },
+                holding = if (game != null) StoreHolding.OWNED else StoreHolding.NOT_OWNED)
         }
     }
 
-    override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String =
-        error("EA games install through EA's own EA app, which droidtop does not run")
+    private fun readLibrary(context: Context): List<Game> = libraryFile(context).takeIf { it.isFile }?.let { decode(it.readText()) }.orEmpty()
 
-    override suspend fun uninstall(context: Context, gameId: String): Result<Unit> =
-        Result.failure(IllegalStateException("droidtop did not install this game; the EA app did"))
+    override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {
+        EaInstalls.read(context).firstOrNull { it.id == gameId && it.complete }
+            ?.let { runCatching { EaInstalls.ownedFolder(it).absolutePath }.getOrNull() }
+    }
 
-    override fun changeStamp(context: Context): Long = StoreFiles.stamp(listOf(authFile(context), libraryFile(context)))
+    override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String = withContext(Dispatchers.IO) {
+        installLock(gameId).withLock {
+        val game = readLibrary(context).firstOrNull { it.id == gameId } ?: error("EA no longer lists this game. Refresh its library first.")
+        check(game.offerId.isNotBlank()) { "Refresh the EA library once before installing this game" }
+        var token = EaAuth.accessToken(context) ?: error("Sign in to EA before installing this game")
+        progress.report(-1f, "Asking EA for the game files")
+        val url = try { EaApi.downloadUrl(token, game.offerId) } catch (e: EaApiException) {
+            if (e.status != 401) throw e
+            token = EaAuth.refreshNow(context, token) ?: error("Sign in to EA again")
+            EaApi.downloadUrl(token, game.offerId)
+        }
+        val offer = EaApi.offers(token, listOf(game.offerId)).firstOrNull()
+        val existing = EaInstalls.read(context).firstOrNull { it.id == gameId }
+        val row = if (existing != null) {
+            EaInstalls.ownedFolder(existing)
+            existing
+        } else {
+            check(root.isDirectory || root.mkdirs()) { "The EA games folder could not be created" }
+            val folder = StoreFiles.freshFolder(root, game.title, "ea-${StoreFiles.idPart(gameId)}")
+            check(folder.isDirectory || folder.mkdirs()) { "The game's folder could not be created" }
+            check(folder.canonicalFile.parentFile == root.canonicalFile) { "The EA install folder is outside its store folder" }
+            val made = EaInstall(gameId, game.offerId, game.title, game.artUrl, root.canonicalPath, folder.canonicalPath)
+            File(folder, EaInstalls.PROOF).writeText(gameId)
+            File(folder, StoreInstallJob.IN_PROGRESS_MARKER).writeText(gameId)
+            EaInstalls.put(context, made)
+            made
+        }
+        val outcome = EaInstaller.download(context, row, url, progress)
+        val folder = EaInstalls.ownedFolder(row)
+        val manifest = EaManifest.read(folder)
+        val launcher = manifest?.launcher()
+        val exe = listOfNotNull(launcher?.path, offer?.executePathOverride)
+            .firstNotNullOfOrNull { EaPaths.relative(it).takeIf(String::isNotBlank)?.let { path -> EaPaths.relativeOnDisk(folder, path) } }.orEmpty()
+        val registry = JSONArray()
+        listOfNotNull(offer?.installCheckOverride, offer?.executePathOverride, launcher?.path).mapNotNull(EaPaths::registered)
+            .distinctBy { it.key.lowercase() + "|" + it.value.lowercase() }
+            .forEach { registry.put(JSONArray().put(it.key).put(it.value)) }
+        val completed = row.copy(
+            complete = true, everInstalled = true, version = offer?.gameVersion?.ifBlank { null } ?: manifest?.version.orEmpty(),
+            sizeBytes = outcome.optLong("totalBytes"), executable = exe,
+            arguments = EaPaths.splitArgs(listOfNotNull(offer?.executeParameters, launcher?.parameters).filter { it.isNotBlank() }.joinToString(" ")),
+            extra = mapOf("contentId" to gameId, "multiplayerId" to offer?.multiplayerId.orEmpty(),
+                "masterTitleId" to offer?.masterTitleId.orEmpty(), "touchup" to manifest?.touchupPath.orEmpty(),
+                "touchupArgs" to manifest?.touchupParameters.orEmpty(), "contentIds" to manifest?.contentIds.orEmpty().joinToString(","),
+                "locale" to (offer?.locales?.firstOrNull { it == "en_US" } ?: offer?.locales?.firstOrNull() ?: "en_US"),
+                "registry" to registry.toString(), "displayName" to (manifest?.title("en_US") ?: game.title)),
+        )
+        check(File(folder, StoreInstallJob.IN_PROGRESS_MARKER).let { !it.exists() || it.delete() }) { "The download finished but its progress marker could not be cleared" }
+        EaInstalls.put(context, completed)
+        progress.report(1f, "Installed ${game.title}")
+        "Installed ${game.title}"
+        }
+    }
+
+    override suspend fun discardPartial(context: Context, gameId: String) = withContext(Dispatchers.IO) {
+        installLock(gameId).withLock {
+        val row = EaInstalls.read(context).firstOrNull { it.id == gameId } ?: return@withContext
+        if (!row.everInstalled) { EaInstalls.delete(row); EaInstalls.remove(context, gameId) }
+        }
+    }
+
+    override suspend fun uninstall(context: Context, gameId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        installLock(gameId).withLock {
+        runCatchingCancellable {
+            val row = EaInstalls.read(context).firstOrNull { it.id == gameId } ?: error("droidtop has no EA install for this game")
+            EaInstalls.delete(row)
+            EaInstalls.remove(context, gameId)
+        }
+        }
+    }
+
+    override suspend fun launch(context: Context, gameId: String): StoreLaunch? = withContext(Dispatchers.IO) {
+        val row = EaInstalls.read(context).firstOrNull { it.id == gameId && it.complete } ?: return@withContext null
+        val folder = EaInstalls.ownedFolder(row)
+        if (row.executable.isBlank()) return@withContext null // the runtime's existing executable picker handles this
+        val executable = EaPaths.find(folder, row.executable)?.takeIf { it.isFile }
+            ?: error("EA did not name an installed program for this game")
+        StoreLaunch(executable, executable.parentFile ?: folder, row.arguments)
+    }
+
+    override fun changeStamp(context: Context): Long = StoreFiles.stamp(listOf(authFile(context), libraryFile(context), EaInstalls.file(context)))
 
     /** One game of the account: its content id (the EA app's own), title and art. */
     internal data class Game(val id: String, val title: String, val artUrl: String?, val offerId: String = "")

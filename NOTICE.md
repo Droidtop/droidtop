@@ -233,6 +233,8 @@ This project is distributed under the GNU General Public License v3.0 (see
   EA's desktop-client authentication, API, crypto helpers and GraphQL query resources are ported from
   `app/src/main/java/com/droiddeck/launcher/stores/ea/` and `app/src/main/resources/ea/` at `cc63b403872b`,
   with droidtop's own persistence and shared HTTP client, PKCE callback-state checking and sign-out handling.
+  EA's JNI binding, installer event handling and installer-manifest reader are adapted from that same source pin,
+  with droidtop's job progress, cancellation, installed-file records and path guards.
 
 ## Bundled themes
 

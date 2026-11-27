@@ -38,6 +38,7 @@
 -keep class dev.droidtop.app.vpn.TunnelNative { *; }
 -keep class org.pocketworkstation.pckeyboard.** { *; }
 -keep class com.droiddeck.launcher.stores.** { *; }
+-keepclassmembers class * implements com.droiddeck.launcher.stores.ea.EaNative$InstallListener { *; }
 # apksig checks the signature of an app that carries a plugin (AppInterfaces). Its
 # ASN.1 reader fills certificate and signer classes field by field through
 # reflection, so a field nothing in its code writes is not unused.
