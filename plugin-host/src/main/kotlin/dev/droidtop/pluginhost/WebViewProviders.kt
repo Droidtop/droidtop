@@ -235,8 +235,8 @@ object WebViewProviders {
         } catch (error: Exception) {
             if (!reported) {
                 if (context != null) deliver {
-                    val reason = if (error is BrokerException) error.message else "The browser result could not be kept; reopen the page and try again"
-                    android.widget.Toast.makeText(context.applicationContext, reason, android.widget.Toast.LENGTH_LONG).show()
+                    val reason = if (error is BrokerException) error.message.orEmpty().take(512) else "The browser result could not be kept; reopen the page and try again"
+                    dev.droidtop.library.settings.Notices.flash(reason, tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context.applicationContext)
                 }
                 complete(token, asked, WebSessionResult(false, null, null))
             }
