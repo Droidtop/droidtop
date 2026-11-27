@@ -226,6 +226,13 @@ This project is distributed under the GNU General Public License v3.0 (see
   `LeftMenu.kt`), and the store page's header chips and busy bar (`ui/StorePage.kt`, as catalog chips and
   progress rows in `CatalogNavigator.kt` and `MenuRow.kt`). Each ported file names
   the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
+  Its store download engines, the Rust crate `app/src/main/rust/stores` (GPL-3.0-or-later, with its vendored
+  xdelta3 under its own licence), are built unchanged from the `vendor/droiddeck` submodule at its pinned commit
+  (`build-scripts/build-store-engines.sh`, `libdroiddeckstores.so`), and the Kotlin that drives them is ported into
+  `:stores`, each ported file naming the DroidDeck file and commit it came from (mytop-project/tracker#335).
+  EA's desktop-client authentication, API, crypto helpers and GraphQL query resources are ported from
+  `app/src/main/java/com/droiddeck/launcher/stores/ea/` and `app/src/main/resources/ea/` at `cc63b403872b`,
+  with droidtop's own persistence and shared HTTP client, PKCE callback-state checking and sign-out handling.
 
 ## Bundled themes
 
