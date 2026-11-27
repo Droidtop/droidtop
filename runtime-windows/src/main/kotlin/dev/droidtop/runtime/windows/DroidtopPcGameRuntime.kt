@@ -421,6 +421,7 @@ class DroidtopPcGameRuntime(
         workingDir: File,
         arguments: List<String>,
         entryId: String?,
+        storeEnvironment: Map<String, String>,
     ): PcLaunchResult {
         // The game is already running (Back left it for the Quick Menu): launching it again is
         // Resume, which returns to the screen and leaves Wine alone. Stop is what ends it.
@@ -430,7 +431,7 @@ class DroidtopPcGameRuntime(
                 onFailure = { PcLaunchResult(false, it.message ?: "couldn't return to the running game") },
             )
         }
-        return when (val resolved = resolveWindowsLaunch(executable, gameRoot, workingDir, arguments, entryId)) {
+        return when (val resolved = resolveWindowsLaunch(executable, gameRoot, workingDir, arguments, entryId, storeEnvironment)) {
             is WindowsLaunchPlan.Refused -> PcLaunchResult(false, resolved.reason)
             is WindowsLaunchPlan.Ready ->
                 launchInPrefix(wineEngine, resolved.container, resolved.target, resolved.workingDir, resolved.arguments, entryId)
@@ -449,6 +450,7 @@ class DroidtopPcGameRuntime(
         workingDir: File,
         arguments: List<String>,
         entryId: String?,
+        storeEnvironment: Map<String, String> = emptyMap(),
     ): WindowsLaunchPlan {
         // The same rule the game's Wine settings resolve with, so the
         // prefix somebody edited is the prefix this starts in: the game's
@@ -493,7 +495,7 @@ class DroidtopPcGameRuntime(
         // (docs/SPEC.md 7i, "Game properties"): laid over this one launch with
         // the Steamworks shim's, never into the prefix.
         val gameSettings = withContext(Dispatchers.IO) { entryId?.let { WineGameSettingsPrefs.get(context, it) } }
-        val ownEnv = GameLaunchOptions.launchEnvironment(gameSettings)
+        val ownEnv = listOf(storeEnvironmentText(storeEnvironment), GameLaunchOptions.launchEnvironment(gameSettings)).filter { it.isNotEmpty() }.joinToString(" ")
 
         // The game's translation cache (docs/SPEC.md 9, "Translation cache"), first, so a variable the person set for
         // the game still wins over it.
@@ -567,7 +569,7 @@ class DroidtopPcGameRuntime(
         }
         val windows = withContext(Dispatchers.IO) { WindowsLaunchResolver.forEntry(context, entryId, gameRoot) }
             ?: error("Choose which program starts this game first (the game's settings, Program to run).")
-        return when (val plan = resolveWindowsLaunch(windows.executable, gameRoot, windows.workingDir, windows.arguments, entryId)) {
+        return when (val plan = resolveWindowsLaunch(windows.executable, gameRoot, windows.workingDir, windows.arguments, entryId, windows.environment)) {
             is WindowsLaunchPlan.Refused -> error(plan.reason)
             is WindowsLaunchPlan.Ready -> WinePrecache.run(context, plan, entryId, windows.executable, report)
         }

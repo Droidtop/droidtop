@@ -87,6 +87,8 @@ interface PcGameRuntime {
         workingDir: File = gameRoot,
         arguments: List<String> = emptyList(),
         entryId: String? = null,
+        /** Store-provided variables for this launch only, never persisted as prefix settings. */
+        storeEnvironment: Map<String, String> = emptyMap(),
     ): PcLaunchResult
 
     /**

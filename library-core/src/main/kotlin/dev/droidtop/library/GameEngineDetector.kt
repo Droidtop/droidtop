@@ -1907,7 +1907,7 @@ class EngineGameProvider(
         // The game's own Wine settings (docs/SPEC.md 7i) name its program
         // when it has them; detection otherwise, as before.
         val windowsLaunch = if (windows && !singleFile) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { WindowsLaunchResolver.resolve(context, entryId, gameRoot) }
+            WindowsLaunchResolver.forEntry(context, entryId, gameRoot)
         } else {
             null
         }
@@ -1925,7 +1925,7 @@ class EngineGameProvider(
         )
 
         val result = if (windows) {
-            runtime.launchWindows(executable, folder, windowsLaunch?.workingDir ?: folder, windowsLaunch?.arguments.orEmpty(), entryId)
+            runtime.launchWindows(executable, folder, windowsLaunch?.workingDir ?: folder, windowsLaunch?.arguments.orEmpty(), entryId, windowsLaunch?.environment.orEmpty())
         } else {
             runtime.launchLinux(executable, folder, entryId)
         }
