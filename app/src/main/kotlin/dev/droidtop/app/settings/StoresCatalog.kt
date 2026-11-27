@@ -330,7 +330,7 @@ internal object StoresCatalog {
                     ChoiceItem(
                         id = "stores_auto_sync",
                         title = "Sync store libraries automatically",
-                        subtitle = "When Gaming opens, stores read longer ago are read again, on unmetered networks only",
+                        subtitle = "When Gaming opens, stores read longer ago are read again, on the networks Download rules allow",
                         options = StoreAutoSync.Interval.entries.map { ChoiceOption(it.name, it.label) },
                         current = StoreAutoSync.interval(context).name,
                         onSelect = { ctx, value -> StoreAutoSync.setInterval(ctx, StoreAutoSync.Interval.valueOf(value)) },

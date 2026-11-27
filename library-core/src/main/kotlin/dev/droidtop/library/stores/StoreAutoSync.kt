@@ -1,12 +1,10 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 
 /**
  * Reads the signed-in stores' libraries again when the Gaming shell opens, if the last good read
- * is older than the person's interval and the network is unmetered (docs/SPEC.md 7g, "Stores",
+ * is older than the person's interval and Download rules allow this network (docs/SPEC.md 7g, "Stores",
  * mytop-project/tracker#225). There is no timer, loop or worker: it runs once per opening, from the
  * shell, through the one [StoreSyncs.run], and a store whose read was recent is not asked.
  */
@@ -45,12 +43,12 @@ object StoreAutoSync {
 
     /**
      * Reads every due, signed-in store, one after the other, off the main thread, and announces the
-     * change once if any read worked. Does nothing on a metered network or with the setting Off.
+     * change once if any read worked. Does nothing offline, on a network Download rules keep it off, or with the setting Off.
      */
     suspend fun runIfDue(context: Context) {
         val app = context.applicationContext
         val interval = interval(app)
-        if (interval == Interval.OFF || !unmetered(app)) return
+        if (interval == Interval.OFF || !networkAllows(app)) return
         var changed = false
         // A plugin's stores are read again first, so one installed since droidtop started is synced too (A13).
         runCatching { dev.droidtop.library.integrations.PluginStores.refresh(context) }
@@ -65,10 +63,17 @@ object StoreAutoSync {
         if (changed) StoreChanges.announce(app)
     }
 
-    private fun unmetered(context: Context): Boolean {
-        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    /**
+     * Whether this network may be used for a sync: online, and on a metered one only when Download rules' network rule
+     * allows checks there (a sync is a few small reads, like an update check: only Wi-Fi only stops it). One rule for
+     * every job (mytop-project/tracker#964); this used to be "unmetered only" whatever Download rules said.
+     */
+    private fun networkAllows(context: Context): Boolean {
+        dev.droidtop.net.DownloadPolicy.load(context)
+        return when (dev.droidtop.net.DownloadPolicy.networkNow(context)) {
+            dev.droidtop.net.NetworkClass.OFFLINE -> false
+            dev.droidtop.net.NetworkClass.UNMETERED -> true
+            dev.droidtop.net.NetworkClass.METERED -> dev.droidtop.net.DownloadPolicy.checksOnMetered(dev.droidtop.net.DownloadPolicy.settings.value)
+        }
     }
 }
