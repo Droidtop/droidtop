@@ -52,6 +52,7 @@ object WebViewProviders {
     ) {
         @Volatile var taken = false
         @Volatile var handoff: String? = null
+        val bodies = ConcurrentHashMap<String, WebSessionDownload>()
     }
 
     private val pending = ConcurrentHashMap<String, Pending>()
@@ -96,7 +97,7 @@ object WebViewProviders {
         val surfaceFallback = {
             if (request.mode == WebSessionRequest.Mode.BROWSE || !openLegacy(context, record, request, sites, onClosed, fallback)) fallback()
         }
-        if (!BrowserSurfaceActivity.open(context, record, token, request.label, surfaceFallback)) {
+        if (!BrowserSurfaceActivity.open(context, record, token, request.label, request.mode == WebSessionRequest.Mode.BROWSE, surfaceFallback)) {
             pending.remove(token)
             return request.mode != WebSessionRequest.Mode.BROWSE && openLegacy(context, record, request, sites, onClosed, fallback)
         }
@@ -220,7 +221,7 @@ object WebViewProviders {
                 cookies = request.domains.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }.toMap(),
             )
             val renewed = asked.sites.keys.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }
-            val downloads = if (request.mode == WebSessionRequest.Mode.OPEN) downloadsOf(args.optJSONArray("downloads"), request.maxDownloads).map { download ->
+            val downloads = if (request.mode == WebSessionRequest.Mode.OPEN) finishDownloads(asked, args.optJSONArray("downloads")).map { download ->
                 val host = NetScope.hostOf(download.url)
                 val scoped = host != null && WebSessions.covers(host, request.domains + asked.sites.keys)
                 if (download.cookie != null && !scoped) throw BrokerException(PluginErrorCode.UNSUPPORTED, "This download needs cookies outside this page's approved sites; open that site in its own signed-in session")
@@ -258,11 +259,14 @@ object WebViewProviders {
     }
 
     private fun close(token: String, result: WebSessionResult) {
-        val asked = pending.remove(token) ?: return
+        val asked = pending[token] ?: return
+        if (!synchronized(asked) { pending.remove(token, asked) }) return
         complete(token, asked, result)
     }
 
     private fun complete(token: String, asked: Pending, result: WebSessionResult) {
+        val keptBodies = result.downloads.mapNotNull { it.headers[BrowserBodyOffers.TOKEN] }.toSet()
+        asked.bodies.values.filter { it.headers[BrowserBodyOffers.TOKEN] !in keptBodies }.forEach { BrowserBodyOffers.revoke(it.headers) }
         deliver {
             if (Build.VERSION.SDK_INT >= 30) BrowserSurfaceActivity.completed(token)
             asked.onClosed(result)
@@ -276,6 +280,27 @@ object WebViewProviders {
     internal fun surfacePage(token: String, url: String) {
         val asked = pending[token]?.takeIf { it.taken && it.request.mode == WebSessionRequest.Mode.BROWSE } ?: return
         if (WebSurfaceEvents.safeUrl(url)) asked.request.onPage?.invoke(url)
+    }
+
+    internal fun bodyOffer(context: Context, token: String, providerId: String, provider: IWebViewSurfaceProvider, metadata: BrowserBodyMetadata): Boolean {
+        val asked = pending[token]?.takeIf { it.taken && it.request.mode == WebSessionRequest.Mode.OPEN } ?: return false
+        return synchronized(asked) {
+            if (pending[token] !== asked || asked.bodies.size >= asked.request.maxDownloads.coerceIn(0, DownloadJobs.MAX_FILES) || providerId in asked.bodies) return false
+            val download = BrowserBodyOffers.offer(context, asked.pluginId, token, providerId, provider, metadata) ?: return false
+            asked.bodies[providerId] = download
+            true
+        }
+    }
+
+    private fun finishDownloads(asked: Pending, list: JSONArray?): List<WebSessionDownload> {
+        list ?: return emptyList()
+        return (0 until list.length().coerceAtMost(256)).mapNotNull { index ->
+            val item = list.optJSONObject(index) ?: return@mapNotNull null
+            if (item.has("streamOfferId")) {
+                if (item.keys().asSequence().toSet() != setOf("streamOfferId")) refuse("a browser body descriptor may only name its offer")
+                asked.bodies[item.optString("streamOfferId")] ?: refuse("the browser body was not offered to this page")
+            } else downloadsOf(JSONArray().put(item), 1).singleOrNull()
+        }.distinctBy { it.headers[BrowserBodyOffers.TOKEN] ?: it.url }.take(asked.request.maxDownloads.coerceIn(0, DownloadJobs.MAX_FILES))
     }
 
     private fun refuse(message: String): Nothing = throw BrokerException(PluginErrorCode.INVALID_ARGS, message)

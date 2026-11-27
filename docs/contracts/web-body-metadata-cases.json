@@ -1,0 +1,11 @@
+[
+  {"label":"ordinary response","valid":true,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","mimeType":"application/zip","size":3}},
+  {"label":"unknown length","valid":true,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","size":-1}},
+  {"label":"path authority","valid":false,"metadata":{"sourceUrl":"https://example.com/page","fileName":"../Game.zip","size":3}},
+  {"label":"not provenance","valid":false,"metadata":{"sourceUrl":"blob:https://example.com/1","fileName":"Game.zip","size":3}},
+  {"label":"URL credentials","valid":false,"metadata":{"sourceUrl":"https://user:secret@example.com/","fileName":"Game.zip","size":3}},
+  {"label":"excess length","valid":false,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","size":68719476737}},
+  {"label":"fractional length","valid":false,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","size":1.5}},
+  {"label":"header injection","valid":false,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","mimeType":"application/zip\r\nCookie:secret","size":3}},
+  {"label":"extra authority","valid":false,"metadata":{"sourceUrl":"https://example.com/page","fileName":"Game.zip","size":3,"path":"/sdcard/private"}}
+]

@@ -15,7 +15,9 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.*
 
 /** Android transfers input, IME and accessibility with the remote view's SurfacePackage. */
@@ -27,6 +29,7 @@ class BrowserSurfaceActivity : Activity() {
     private var boundPluginId: String? = null
     private var death: IBinder.DeathRecipient? = null
     private var opened = false
+    private var bodyCapable = false
     private var receivedSurface = false
     private var canGoBack = false
     private val events = kotlinx.coroutines.channels.Channel<WebSurfaceEvents.Event>(32)
@@ -88,6 +91,8 @@ class BrowserSurfaceActivity : Activity() {
                     check(runtime.loadContained(asked.pluginId, manifest, emptyArray(), emptyArray(), PluginBrokers.binderFor(this@BrowserSurfaceActivity, asked.pluginId))) { "The browser could not start" }
                     runtime.attachRelay(asked.pluginId, RELAY, host.asBinder())
                 }
+                delay(3_000)
+                if (provider == null) remote { runtime.attachRelay(asked.pluginId, LEGACY_RELAY, host.asBinder()) }
                 delay(10_000)
                 if (!receivedSurface) failed()
                 while (isActive && !isFinishing) {
@@ -101,16 +106,25 @@ class BrowserSurfaceActivity : Activity() {
     }
 
     private fun caller(): Boolean = session?.uid?.let { it >= 0 && Binder.getCallingUid() == it } == true
+    private fun connect(remoteProvider: IWebViewSurfaceProvider, bodies: Boolean, isolatedBrowse: Boolean = false) {
+        scope.launch {
+            if (provider != null || isFinishing) return@launch
+            if (session?.browse == true && !isolatedBrowse) { failed(); return@launch }
+            bodyCapable = bodies
+            provider = remoteProvider
+            val recipient = IBinder.DeathRecipient { scope.launch { failed() } }.also { death = it }
+            try { remoteProvider.asBinder().linkToDeath(recipient, 0); openSurface() }
+            catch (_: Exception) { failed() }
+        }
+    }
     private val host = object : IWebViewSurfaceHost.Stub() {
         override fun connected(remoteProvider: IWebViewSurfaceProvider?) {
             if (!caller() || remoteProvider == null) return
-            scope.launch {
-                if (provider != null || isFinishing) return@launch
-                provider = remoteProvider
-                val recipient = IBinder.DeathRecipient { scope.launch { failed() } }.also { death = it }
-                try { remoteProvider.asBinder().linkToDeath(recipient, 0); openSurface() }
-                catch (_: Exception) { failed() }
-            }
+            connect(remoteProvider, false)
+        }
+        override fun connectedCapabilities(remoteProvider: IWebViewSurfaceProvider?, capabilities: Array<out String>?) {
+            if (!caller() || remoteProvider == null || capabilities == null || capabilities.size > 16 || capabilities.any { it.length > 128 }) return
+            connect(remoteProvider, "web.download.body.v1" in capabilities, "web.browse.isolated.v1" in capabilities)
         }
         override fun surfaceReady(token: String?) {
             if (!caller() || token != session?.token) return
@@ -132,6 +146,16 @@ class BrowserSurfaceActivity : Activity() {
             if (!caller() || token != session?.token || eventJson == null) return
             val event = WebSurfaceEvents.parse(eventJson) ?: return
             if (events.trySend(event).isFailure && eventOverflow.compareAndSet(false, true)) scope.launch { failed() }
+        }
+        override fun download(token: String?, offerId: String?, metadataJson: String?) {
+            if (!caller() || token != session?.token || offerId == null || offerId.length !in 1..128 || metadataJson == null) return
+            val metadata = BrowserBodyMetadata.parse(metadataJson)
+            scope.launch {
+                val p = provider ?: return@launch
+                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, p, metadata) }
+                try { remote { p.offerResult(token, offerId, accepted) } }
+                catch (_: Exception) { failed() }
+            }
         }
     }
 
@@ -165,7 +189,7 @@ class BrowserSurfaceActivity : Activity() {
         } } }
     }
 
-    private fun end() { session?.let { asked -> provider?.let { p -> executor.execute { runCatching { p.close(asked.token) } } }; WebViewProviders.cancel(asked.token) }; finish() }
+    private fun end() { session?.let { asked -> provider?.let { p -> runCatching { executor.execute { runCatching { p.close(asked.token) } } } }; WebViewProviders.cancel(asked.token) }; finish() }
     private fun failed() {
         val asked = session ?: return finish()
         if (WebViewProviders.withdrawUntaken(asked.token)) asked.fallback()
@@ -182,7 +206,7 @@ class BrowserSurfaceActivity : Activity() {
             }
             provider?.let { p ->
                 death?.let { runCatching { p.asBinder().unlinkToDeath(it, 0) } }
-                executor.execute { runCatching { p.close(asked.token) } }
+                runCatching { executor.execute { runCatching { p.close(asked.token) } } }
             }
         }
         boundPluginId?.let { AppInterfaceConnections.release(this, it) }
@@ -192,13 +216,14 @@ class BrowserSurfaceActivity : Activity() {
     }
 
     companion object {
-        const val RELAY = "web.view.surface.v1"
-        private class Session(val token: String, val pluginId: String, val label: String, val fallback: () -> Unit) {
+        const val RELAY = "web.view.surface.v2"
+        const val LEGACY_RELAY = "web.view.surface.v1"
+        private class Session(val token: String, val pluginId: String, val label: String, val browse: Boolean, val fallback: () -> Unit) {
             var activity: BrowserSurfaceActivity? = null
             @Volatile var uid = -1
         }
         private val sessions = ConcurrentHashMap<String, Session>()
-        private val executor = Executors.newFixedThreadPool(2) { task -> Thread(task, "browser-surface").apply { isDaemon = true } }
+        private val executor = ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64), { task -> Thread(task, "browser-surface").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
         // A timed-out Binder call cannot stall main or hold a coroutine waiting indefinitely.
         private suspend fun <T> remote(block: () -> T): T {
             val result = CompletableDeferred<T>()
@@ -217,8 +242,8 @@ class BrowserSurfaceActivity : Activity() {
                 unclaimed.getAndSet(null)?.release()
             }
         }
-        fun open(context: Context, record: PluginRecord, token: String, label: String, fallback: () -> Unit): Boolean {
-            sessions[token] = Session(token, record.manifest.id, label, fallback)
+        fun open(context: Context, record: PluginRecord, token: String, label: String, browse: Boolean, fallback: () -> Unit): Boolean {
+            sessions[token] = Session(token, record.manifest.id, label, browse, fallback)
             return runCatching {
                 context.startActivity(Intent(context, BrowserSurfaceActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(WebViewProviders.EXTRA_TOKEN, token))
                 true
