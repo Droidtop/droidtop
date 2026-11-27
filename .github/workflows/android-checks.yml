@@ -94,7 +94,25 @@ jobs:
         # a baseline rather than an exclusion, and note that the baseline
         # still fails any finding it does not already list.
         if: ${{ !cancelled() }}
-        run: ./gradlew :app:lintDebug --stacktrace
+        run: |
+          # AGP 9's lint of a cold build has lost the hosted runner twice (Android checks 45800699493, 45925535157, no log
+          # survives), as a cold build of both variants did for the build job (83834fca5). A memory line every 30
+          # seconds stays in the log, and the daemons are stopped when lint ends so the unit tests start with an empty
+          # machine, not with the lint run's heap.
+          (
+            while true; do
+              echo "memory $(date -u +%T) $(free -m | awk '/Mem:/{print "used="$3" avail="$7}') swap=$(free -m | awk '/Swap:/{print $3}') top=$(ps -eo rss,comm --sort=-rss | sed -n 2,3p | paste -sd ';')"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          set +e
+          ./gradlew :app:lintDebug --stacktrace
+          code=$?
+          kill "$sampler" 2>/dev/null
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+          exit "$code"
 
       - name: Lint summary
         # The lint report is an artifact; this is what it holds, as lines a log can show (mytop-project/tracker#734):
