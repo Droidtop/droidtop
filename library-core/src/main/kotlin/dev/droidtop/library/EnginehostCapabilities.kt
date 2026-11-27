@@ -34,21 +34,30 @@ object EnginehostCapabilities {
     val PROVIDER_URI: Uri by lazy { Uri.parse("content://dev.enginehost.capabilities/installed") }
 
     /**
-     * Whether Enginehost holds any task of its own right now (a launch's warning, a running game, an error screen), by its
-     * `state` call, answered to droidtop alone. False once a launch was cancelled or a game ended; null when it cannot say
-     * (Enginehost not installed, one without `state`, a failed call). Blocking IPC: not for the main thread.
+     * Whether Enginehost has a game or its launch open (its question, warnings, error screen, the running game, a core
+     * screen the launch is waiting on), by its `state` call, answered to droidtop alone. Enginehost's own library, Cores
+     * and Settings are not a game: a launch that stopped and left the person in its library kept the session standing
+     * (mytop-project/tracker#967, BlueStacks rig 2026-11-27). Reads `game`, and from an Enginehost without it, whether it
+     * holds any task. False once a launch was cancelled or a game ended; null when it cannot say (Enginehost not installed,
+     * one without `state`, a failed call). Blocking IPC: not for the main thread.
      */
     fun holdsTask(context: Context): Boolean? = runCatching {
         val authority = Uri.parse("content://dev.enginehost.capabilities")
         val client = context.contentResolver.acquireContentProviderClient(authority) ?: return@runCatching null
         try {
-            val reply = client.call("state", null, null)
-            if (reply != null && reply.containsKey("tasks")) reply.getInt("tasks") > 0 else null
+            val reply = client.call("state", null, null) ?: return@runCatching null
+            stateAnswer(
+                game = if (reply.containsKey("game")) reply.getBoolean("game") else null,
+                tasks = if (reply.containsKey("tasks")) reply.getInt("tasks") else null,
+            )
         } finally {
             @Suppress("DEPRECATION")
             client.release()
         }
     }.getOrNull()
+
+    /** The `state` reply's verdict: `game` when Enginehost gives it, else any task at all, else null. Pure. */
+    fun stateAnswer(game: Boolean?, tasks: Int?): Boolean? = game ?: tasks?.let { it > 0 }
 
     data class InstalledBundle(
         val bundleId: String,
