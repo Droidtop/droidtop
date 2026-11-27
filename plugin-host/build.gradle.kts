@@ -48,6 +48,7 @@ android {
         // droidtop against them, and the app's CI checks the app against the same files.
         getByName("test") {
             resources.srcDir("../docs/contracts")
+            resources.srcDir("../vendor/mytop-plugins/android")
         }
     }
 

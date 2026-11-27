@@ -24,7 +24,8 @@ import kotlinx.coroutines.*
 internal object BrowserBodyOffers {
     const val TOKEN = "X-Droidtop-Browser-Body-Token"
     const val REQUIRED = "X-Droidtop-Browser-Body-Required"
-    private class Offer(val context: Context, val pluginId: String, val token: String, val providerId: String, val provider: IWebViewSurfaceProvider, val metadata: BrowserBodyMetadata) {
+    private class Offer(val context: Context, val record: PluginRecord, val token: String, val providerId: String, val provider: BrowserBodyTransport, val metadata: BrowserBodyMetadata) {
+        val pluginId: String get() = record.manifest.id
         val claimed = AtomicBoolean()
         val descriptor = AtomicReference<ParcelFileDescriptor?>()
         lateinit var death: IBinder.DeathRecipient
@@ -35,16 +36,18 @@ internal object BrowserBodyOffers {
     private val rpc = ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64), { task -> Thread(task, "browser-body").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
 
     @Synchronized
-    fun offer(context: Context, pluginId: String, token: String, providerId: String, provider: IWebViewSurfaceProvider, metadata: BrowserBodyMetadata): WebSessionDownload? {
+    fun offer(context: Context, pluginId: String, token: String, providerId: String, provider: BrowserBodyTransport, metadata: BrowserBodyMetadata): WebSessionDownload? {
         if (providerId.length !in 1..128 || providerId.any { !it.isLetterOrDigit() && it !in "-_." }) return null
         if (offers.size >= 32 || offers.values.count { it.token == token } >= DownloadJobs.MAX_FILES) return null
         if (offers.values.any { it.token == token && it.providerId == providerId }) return null
+        val record = PluginBundleInstaller.readRecord(PluginStore.root(context), pluginId) ?: return null
+        if (!permitted(context, record)) return null
         if (!AppInterfaceConnections.retain(pluginId)) return null
         val id = UUID.randomUUID().toString()
-        val entry = Offer(context.applicationContext, pluginId, token, providerId, provider, metadata)
+        val entry = Offer(context.applicationContext, record, token, providerId, provider, metadata)
         entry.death = IBinder.DeathRecipient { revoke(id) }
         offers[id] = entry
-        try { provider.asBinder().linkToDeath(entry.death, 0) }
+        try { provider.binder.linkToDeath(entry.death, 0) }
         catch (_: Exception) { revoke(id); return null }
         main.postDelayed({ if (!entry.claimed.get()) revoke(id) }, 60_000)
         return WebSessionDownload.direct(metadata.sourceUrl, metadata.fileName, metadata.size.takeIf { it >= 0 }, mapOf(TOKEN to id, REQUIRED to "1")).copy(mimeType = metadata.mimeType)
@@ -54,8 +57,8 @@ internal object BrowserBodyOffers {
     private fun revoke(id: String) {
         val entry = offers.remove(id) ?: return
         runCatching { entry.descriptor.getAndSet(null)?.close() }
-        runCatching { entry.provider.asBinder().unlinkToDeath(entry.death, 0) }
-        runCatching { rpc.execute { runCatching { entry.provider.cancelDownload(entry.token, entry.providerId) } } }
+        runCatching { entry.provider.binder.unlinkToDeath(entry.death, 0) }
+        runCatching { rpc.execute { runCatching { entry.provider.cancel(entry.token, entry.providerId) } } }
         AppInterfaceConnections.release(entry.context, entry.pluginId)
     }
 
@@ -80,6 +83,7 @@ internal object BrowserBodyOffers {
         check(entry.claimed.compareAndSet(false, true)) { "This browser download was already used" }
         if (active.incrementAndGet() > 4) { active.decrementAndGet(); revoke(id); error("Four browser downloads are already transferring; try again after one finishes") }
         try {
+            check(permitted(entry.context, entry.record)) { "The browser permission changed; start the download again after allowing it" }
             val fd = descriptor(entry)
             entry.descriptor.set(fd)
             check(offers[id] === entry) { "The browser disconnected" }
@@ -91,6 +95,7 @@ internal object BrowserBodyOffers {
                 check(entry.metadata.size < 0 || entry.metadata.size <= free) { "There is not enough space for this download" }
                 val started = SystemClock.elapsedRealtime()
                 var lastRead = started
+                var lastPolicy = 0L
                 val coroutine = currentCoroutineContext()
                 try {
                     ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
@@ -102,6 +107,10 @@ internal object BrowserBodyOffers {
                                         coroutine.ensureActive()
                                         val now = SystemClock.elapsedRealtime()
                                         check(now - lastRead < 60_000 && now - started < 3_600_000) { "The browser download stopped sending data" }
+                                        if (now - lastPolicy >= 1_000) {
+                                            check(permitted(entry.context, entry.record)) { "The browser permission changed during this download" }
+                                            lastPolicy = now
+                                        }
                                     } while (Os.poll(arrayOf(poll), 250) == 0)
                                 },
                                 beforeWrite = { count -> check(destination.parentFile!!.usableSpace >= count) { "There is not enough space for this download" } },
@@ -123,5 +132,12 @@ internal object BrowserBodyOffers {
             runCatching { entry.descriptor.getAndSet(null)?.close() }
             revoke(id)
         }
+    }
+
+    private fun permitted(context: Context, record: PluginRecord): Boolean {
+        val current = PluginBundleInstaller.readRecord(PluginStore.root(context), record.manifest.id) ?: return false
+        return current.runnable() && current.archiveDigest == record.archiveDigest && current.approvedKeySha256 == record.approvedKeySha256 &&
+            PluginGrants.pointRefusal(current, PluginGrants.forContext(context).read(current.manifest.id), WebViewProviders.POINT) == null &&
+            AppInterfaces.verifyRecord(context, current) == null
     }
 }

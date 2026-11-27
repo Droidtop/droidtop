@@ -53,6 +53,9 @@ object WebViewProviders {
         @Volatile var taken = false
         @Volatile var handoff: String? = null
         val bodies = ConcurrentHashMap<String, WebSessionDownload>()
+        var bodyTransport: BrowserBodyTransport? = null
+        @Volatile var bodyRequired = false
+        var cleanup: (() -> Unit)? = null
     }
 
     private val pending = ConcurrentHashMap<String, Pending>()
@@ -94,6 +97,7 @@ object WebViewProviders {
         if (Build.VERSION.SDK_INT < 30) return request.mode != WebSessionRequest.Mode.BROWSE && openLegacy(context, record, request, sites, onClosed, fallback)
         val packageName = record.manifest.app?.packageName ?: return false
         val token = register(record.manifest.id, request, sites, onClosed)
+        if (request.mode == WebSessionRequest.Mode.OPEN) requireBodyBeforeTake(token)
         val surfaceFallback = {
             if (request.mode == WebSessionRequest.Mode.BROWSE || !openLegacy(context, record, request, sites, onClosed, fallback)) fallback()
         }
@@ -118,10 +122,21 @@ object WebViewProviders {
         if (request.mode == WebSessionRequest.Mode.BROWSE) return false
         val pkg = record.manifest.app?.packageName ?: return false
         val token = register(record.manifest.id, request, sites, onClosed)
-        val started = runCatching {
+        if (request.mode == WebSessionRequest.Mode.OPEN) requireBodyBeforeTake(token)
+        fun start(): Boolean = runCatching {
             context.startActivity(Intent(ACTION).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_TOKEN, token))
         }.isSuccess
-        if (!started) { pending.remove(token); return false }
+        if (request.mode == WebSessionRequest.Mode.OPEN) {
+            BodyDownloadRelay.prepare(context, record, token,
+                ready = { if (isUntaken(token) && !start() && withdrawUntaken(token)) fallback() },
+                unavailable = {
+                    if (withdrawUntaken(token)) {
+                        dev.droidtop.library.settings.Notices.flash("Update droidtop Browser to transfer this download", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context.applicationContext)
+                        fallback()
+                    } else cancel(token)
+                },
+            )
+        } else if (!start()) { pending.remove(token); return false }
         main.postDelayed({ if (withdrawUntaken(token)) fallback() }, TAKE_MS)
         main.postDelayed({ cancel(token) }, TIMEOUT_MS)
         return true
@@ -130,9 +145,16 @@ object WebViewProviders {
     /** Takes back a page its app never took, true when it did: the caller then shows it another way, and the app is refused it. */
     internal fun withdrawUntaken(token: String): Boolean {
         val asked = pending[token] ?: return false
-        return synchronized(asked) {
+        val removed = synchronized(asked) {
             if (asked.taken) false else pending.remove(token, asked)
         }
+        if (removed) release(asked)
+        return removed
+    }
+
+    private fun isUntaken(token: String): Boolean {
+        val asked = pending[token] ?: return false
+        return synchronized(asked) { pending[token] === asked && !asked.taken }
     }
 
     /** A page given to [pluginId]'s app, by its new one-use token. */
@@ -147,6 +169,7 @@ object WebViewProviders {
         val asked = pending[token]?.takeIf { it.pluginId == pluginId } ?: refuse("no such web view")
         synchronized(asked) {
             if (pending[token] !== asked || asked.taken) refuse("this web view was already taken or withdrawn")
+            if (asked.bodyRequired && asked.bodyTransport == null) refuse("the browser response capability is not ready")
             asked.taken = true
         }
         val request = asked.request
@@ -271,6 +294,7 @@ object WebViewProviders {
     }
 
     private fun complete(token: String, asked: Pending, result: WebSessionResult) {
+        release(asked)
         val keptBodies = result.downloads.mapNotNull { it.headers[BrowserBodyOffers.TOKEN] }.toSet()
         asked.bodies.values.filter { it.headers[BrowserBodyOffers.TOKEN] !in keptBodies }.forEach { BrowserBodyOffers.revoke(it.headers) }
         deliver {
@@ -288,14 +312,42 @@ object WebViewProviders {
         if (WebSurfaceEvents.safeUrl(url)) asked.request.onPage?.invoke(url)
     }
 
-    internal fun bodyOffer(context: Context, token: String, providerId: String, provider: IWebViewSurfaceProvider, metadata: BrowserBodyMetadata): Boolean {
+    internal fun bodyOffer(context: Context, token: String, providerId: String, provider: BrowserBodyTransport, metadata: BrowserBodyMetadata): Boolean {
         val asked = pending[token]?.takeIf { it.taken && it.request.mode == WebSessionRequest.Mode.OPEN } ?: return false
         return synchronized(asked) {
             if (pending[token] !== asked || asked.bodies.size >= asked.request.maxDownloads.coerceIn(0, DownloadJobs.MAX_FILES) || asked.bodies.containsKey(providerId)) return false
+            if (asked.bodyTransport?.binder != provider.binder) return false
             val download = BrowserBodyOffers.offer(context, asked.pluginId, token, providerId, provider, metadata) ?: return false
             asked.bodies[providerId] = download
             true
         }
+    }
+
+    /** Established before take_request; a body callback cannot add authority to an already-taken token. */
+    internal fun bodyReady(token: String, transport: BrowserBodyTransport): Boolean {
+        val asked = pending[token] ?: return false
+        return synchronized(asked) {
+            if (pending[token] !== asked || asked.taken) false else { asked.bodyTransport = transport; true }
+        }
+    }
+
+    internal fun requireBodyBeforeTake(token: String) {
+        val asked = pending[token] ?: return
+        synchronized(asked) { check(!asked.taken); asked.bodyRequired = true }
+    }
+
+    internal fun bodyIsRequired(token: String): Boolean = pending[token]?.bodyRequired == true
+
+    internal fun keepBodyProvider(token: String, cleanup: () -> Unit): Boolean {
+        val asked = pending[token] ?: return false
+        return synchronized(asked) {
+            if (pending[token] !== asked || asked.cleanup != null) false else { asked.cleanup = cleanup; true }
+        }
+    }
+
+    private fun release(asked: Pending) {
+        val cleanup = synchronized(asked) { asked.cleanup.also { asked.cleanup = null } }
+        cleanup?.invoke()
     }
 
     private fun finishDownloads(asked: Pending, list: JSONArray?): List<WebSessionDownload> {

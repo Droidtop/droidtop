@@ -112,8 +112,10 @@ class BrowserSurfaceActivity : Activity() {
         scope.launch {
             if (provider != null || isFinishing) return@launch
             if (session?.browse == true && !isolatedBrowse) { failed(); return@launch }
+            if (session?.token?.let(WebViewProviders::bodyIsRequired) == true && !bodies) { failed(); return@launch }
             bodyCapable = bodies
             provider = remoteProvider
+            if (bodies) session?.let { WebViewProviders.bodyReady(it.token, SurfaceBodyTransport(remoteProvider)) }
             val recipient = IBinder.DeathRecipient { scope.launch { failed() } }.also { death = it }
             try { remoteProvider.asBinder().linkToDeath(recipient, 0); openSurface() }
             catch (_: Exception) { failed() }
@@ -157,7 +159,7 @@ class BrowserSurfaceActivity : Activity() {
             val metadata = BrowserBodyMetadata.parse(metadataJson)
             scope.launch {
                 val p = provider ?: return@launch
-                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, p, metadata) }
+                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, SurfaceBodyTransport(p), metadata) }
                 try { remote { p.offerResult(token, offerId, accepted) } }
                 catch (_: Exception) { failed() }
             }
