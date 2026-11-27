@@ -17450,6 +17450,11 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   in for them. The store can prepare its registry, finishing command and local service and return this launch's
   target and variables. Timeout or preparation failure stops the launch with its reason. Failed starts, precache
   completion and the game Activity finishing close the store's local session; rotation does not.
+  EA activation has a bounded hardware probe helper: one Wine batch queries WMI, C-drive serial and hostname and
+  executes an emitted PE32 CPUID program under that same emulator. Missing or truncated outputs fail; no Android
+  properties or guessed constants fill gaps. Private temporary results are removed and no hardware cache is reused
+  across runtime changes. This helper is not yet wired into EA launches: licence activation and fail-closed LSX remain
+  the following batch (owner handoff, 2026-11-27).
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 
