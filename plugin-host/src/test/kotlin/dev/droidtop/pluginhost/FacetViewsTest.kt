@@ -26,7 +26,7 @@ class FacetViewsTest {
         assertEquals(listOf("facets", "storage"), view.sections.map { it.id })
         val main = view.sections[0].nodes
         // A status keeps its state, for the host's glyph (mytop-project/tracker#644).
-        assertEquals(ViewNode.Info("index", "Index", "Updated 2 days ago", "OK", state = "ok"), main[0])
+        assertEquals(ViewNode.Info("index", "Index", "Updated 2 days ago", "OK", state = "ok", tone = "neutral"), main[0])
         val update = main[1] as ViewNode.Button
         assertEquals(ViewAction.Kind.JOB, update.action.kind)
         assertEquals("updateIndex", update.action.op)
@@ -39,6 +39,22 @@ class FacetViewsTest {
         assertEquals("120 of 512 MB", meter.subtitle)
         assertEquals(23, meter.percent)
         assertTrue((storage.nodes[1] as ViewNode.Toggle).value)
+    }
+
+    @Test
+    fun `a badge is its section's chip and a status keeps its tone and icon`() {
+        val json = JSONObject("""{"facets": [
+            {"id": "beta", "kind": "badge", "text": "Beta", "tone": "caution"},
+            {"id": "vpn", "kind": "status", "label": "VPN", "state": "on", "tone": "positive", "icon": "vpn", "value": "Home"},
+            {"id": "sync", "kind": "action", "label": "Sync now", "icon": "sync", "call": {"op": "sync"}}
+        ]}""")
+        val section = FacetViews.toView(Facets.read(json).facets).sections.single()
+        assertEquals(listOf("Beta" to "caution"), section.chips)
+        assertEquals(listOf("vpn", "sync"), section.nodes.map { it.id })
+        val vpn = section.nodes[0] as ViewNode.Info
+        assertEquals("positive", vpn.tone)
+        assertEquals("vpn", vpn.icon)
+        assertEquals("sync", (section.nodes[1] as ViewNode.Button).icon)
     }
 
     @Test

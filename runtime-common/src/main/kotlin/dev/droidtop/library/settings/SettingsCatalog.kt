@@ -97,6 +97,12 @@ sealed interface CatalogItem {
     val iconFile: String? get() = null
 
     /**
+     * A plugin facet's `icon`, one of droidtop's icon names (docs/plugin-api.md 1.10, "Icons are names": `vpn`, `sync`,
+     * `warning`...), drawn with droidtop's own glyph for it where the row has no [icon] or [iconFile]. Null draws none.
+     */
+    val glyphName: String? get() = null
+
+    /**
      * What this setting is SET TO, for the value column every surface
      * draws (a settings row's right-hand column, a Quick Menu tile's
      * second line). A choice, a toggle and a slider each derive it from
@@ -192,6 +198,7 @@ class ToggleItem(
     override val subtitle: String? = null,
     val current: Boolean,
     val onToggle: suspend (Context, Boolean) -> Unit,
+    override val glyphName: String? = null,
 ) : CatalogItem
 
 /** An integer range setting (rendered as a seekbar or left/right stepper). */
@@ -271,6 +278,7 @@ class ActionItem(
     // the surface goes back one screen instead of leaving a page about something that no longer exists
     // (mytop-project/tracker#531).
     val leaves: Boolean = false,
+    override val glyphName: String? = null,
 ) : CatalogItem {
     /** Whether this row has nothing to do: a value, an empty state, a line that says what happened. */
     val inert: Boolean get() = run === NOTHING
@@ -344,6 +352,7 @@ class AsyncActionItem(
     /** The safe answer's name when [confirmTitle] asks, as [ActionItem.confirmKeep]. */
     val confirmKeep: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
+    override val glyphName: String? = null,
 ) : CatalogItem
 
 /**

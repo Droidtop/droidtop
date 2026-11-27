@@ -352,6 +352,13 @@ object PluginViews {
         return done.await().also { if (!it.ok) onFailed?.invoke(jobId) }
     }
 
+    /** A status facet's tone as the host's mark: caution asks for the person, danger is an error; others are quiet. Pure. */
+    internal fun markOfTone(tone: String?): dev.droidtop.library.settings.StatusMark? = when (tone) {
+        "caution" -> dev.droidtop.library.settings.StatusMark.ATTENTION
+        "danger" -> dev.droidtop.library.settings.StatusMark.ERROR
+        else -> null
+    }
+
     /** A status facet's state as the host's status glyph; null for a quiet state or a plain fact. Pure. */
     internal fun markOf(state: String?): dev.droidtop.library.settings.StatusMark? = when (state) {
         "busy" -> dev.droidtop.library.settings.StatusMark.WORKING
@@ -560,6 +567,8 @@ private class PluginPage(
                 CatalogGroup(
                     id = "pv_${screenId}_${section.id}",
                     title = section.title,
+                    // The section's badge facets, as chips above its rows (docs/plugin-api.md 1.10, `badge`).
+                    chips = section.chips.map { (text, tone) -> dev.droidtop.library.settings.CatalogChip(text, ok = tone == "positive") },
                     items = section.nodes.map { node ->
                         section.needs[node.id]?.takeIf { it in turnedOff }?.let { permission -> turnedOffItem(screenId, node, permission) }
                             ?: item(screenId, node)
@@ -629,7 +638,16 @@ private class PluginPage(
             is ViewNode.Notice -> noticeItem(screenId, itemId, node)
             // A status facet's state is the host's glyph (mytop-project/tracker#644): busy turns a ring, warning asks for the
             // person, error is the danger octagon; ok, on and off are quiet.
-            is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, statusMark = PluginViews.markOf(node.state))
+            // A status's tone marks it too when its state says nothing (docs/plugin-api.md 1.10, `status`): caution asks for
+            // the person, danger is the danger octagon. Its icon is droidtop's glyph for that name.
+            is ViewNode.Info -> ActionItem(
+                id = itemId,
+                title = node.title,
+                subtitle = node.subtitle,
+                value = node.value,
+                statusMark = PluginViews.markOf(node.state) ?: PluginViews.markOfTone(node.tone),
+                glyphName = node.icon,
+            )
             // A plugin's progress is the host's job bar (mytop-project/tracker#643, #644), not a percent in text: the bar glides,
             // and one with no percent is the checking shimmer.
             is ViewNode.Progress -> ActionItem(
@@ -639,13 +657,14 @@ private class PluginPage(
                 progress = if (node.percent >= 0) node.percent.coerceAtMost(100) / 100f else -1f,
             )
             is ViewNode.Row -> actionItem(screenId, itemId, node.title, node.shownSubtitle(), node.shownValue(), null, node.action)
-            is ViewNode.Button -> actionItem(screenId, itemId, node.title, node.subtitle, node.value, node.confirm, node.action)
+            is ViewNode.Button -> actionItem(screenId, itemId, node.title, node.subtitle, node.value, node.confirm, node.action, node.icon)
             is ViewNode.Toggle -> ToggleItem(
                 id = itemId,
                 title = node.title,
                 subtitle = node.subtitle,
                 current = values[node.id] == "true",
                 onToggle = { context, on -> commit(context, node.id, on.toString(), node.action) },
+                glyphName = node.icon,
             )
             is ViewNode.Choice -> ChoiceItem(
                 id = itemId,
@@ -757,8 +776,9 @@ private class PluginPage(
         value: String?,
         confirm: String?,
         action: ViewAction?,
+        glyph: String? = null,
     ): CatalogItem = if (action == null) {
-        ActionItem(id = itemId, title = title, subtitle = subtitle, value = value)
+        ActionItem(id = itemId, title = title, subtitle = subtitle, value = value, glyphName = glyph)
     } else when (action.kind) {
         ViewAction.Kind.VIEW -> NestedScreenItem(
             id = itemId,
@@ -777,6 +797,7 @@ private class PluginPage(
             value = value,
             confirmTitle = confirm,
             run = { context, onStatus -> perform(context, action, title, onStatus) },
+            glyphName = glyph,
         )
     }
 

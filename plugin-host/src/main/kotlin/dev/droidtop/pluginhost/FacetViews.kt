@@ -50,6 +50,8 @@ object FacetViews {
         title = title,
         nodes = facets.flatMap { f -> if (f.body is FacetBody.ListBody) rows(f) else listOfNotNull(node(f)) } + listOfNotNull(submit),
         needs = facets.mapNotNull { f -> f.needs?.let { f.id to it } }.toMap(),
+        // A badge is a small chip, not a row of its own (docs/plugin-api.md 1.10): the section's chips above its rows.
+        chips = facets.mapNotNull { f -> (f.body as? FacetBody.Badge)?.let { it.text to it.tone } },
     )
 
     /** One facet as a node; null for the kinds a node does not show. */
@@ -58,15 +60,16 @@ object FacetViews {
         return when (val b = facet.body) {
             is FacetBody.Info -> ViewNode.Info(id, b.label, b.sub, b.value)
             // A status keeps its state for the host's glyph (mytop-project/tracker#644), and its words for the value column.
-            is FacetBody.Status -> ViewNode.Info(id, b.label, b.value, stateWords(b.state), state = b.state)
-            is FacetBody.Badge -> ViewNode.Info(id, b.text, null, null)
+            is FacetBody.Status -> ViewNode.Info(id, b.label, b.value, stateWords(b.state), state = b.state, tone = b.tone, icon = b.icon)
+            // A badge is drawn as its section's chip (section, above), never a row.
+            is FacetBody.Badge -> null
             is FacetBody.Progress -> ViewNode.Progress(id, b.label, b.sub, b.value)
             // A meter is the host's bar, filled to how much of its maximum it holds, with its figures under it.
             is FacetBody.Meter -> ViewNode.Progress(id, b.label, meterWords(b), meterPercent(b))
             is FacetBody.Chart -> ViewNode.Info(id, b.label, null, chartWords(b))
-            is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, confirmQuestion(b), action(b.call, id, null))
+            is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, confirmQuestion(b), action(b.call, id, null), icon = b.icon)
             // Inside a form an input has no call: droidtop only holds its value until the form's submit.
-            is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, b.call?.let { action(it, id, "bool") })
+            is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, b.call?.let { action(it, id, "bool") }, icon = b.icon)
             is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, b.call?.let { action(it, id, "string") })
             is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.unit, b.min.toInt(), b.max.toInt(), b.value.toInt(), b.call?.let { action(it, id, "number") })
             is FacetBody.Input -> ViewNode.Text(id, b.label, b.hint, b.value, b.call?.let { action(it, id, "string") })

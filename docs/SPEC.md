@@ -11813,6 +11813,20 @@ declines them). Everything the person chose is a plain value, never a banner or 
   "Waiting for another plugin", Activity names the permission in words and "Refused" (the API and op only with the
   Developer menu), and "Provided by" names an API by its offer words.
 
+**Facets are drawn with all they declare (2026-11-27, mytop-project/tracker#965).** A plugin's facets reach the one
+renderer (`FacetViews`, `PluginViews`, `CatalogNavigator`) with everything docs/plugin-api.md 1.10 gives them, where
+before some fields were dropped:
+- a `badge` is a chip above its section's rows (`ViewSection.chips`, `CatalogGroup.chips`), not a row of its own;
+  a positive one is the ticked chip;
+- a `status`'s `tone` marks it when its state does not (caution asks for the person, danger is the danger octagon,
+  `PluginViews.markOfTone`);
+- an `icon` on a `status`, `action` or `toggle` is drawn with droidtop's own glyph for that name (`facetGlyph`, one
+  per name in `Facet.ICONS`), where the row has no picture of its own (`CatalogItem.glyphName`);
+- a source's `item.page` button that asks first asks its question, which for a danger button names what is lost
+  (`FacetViews.confirmQuestion`, carried as `UpdateSources.Control.question`). Armed on the record page, it shows
+  that question and "Press again to go ahead"; it showed the download row's "Press again to download this version",
+  for a button that downloaded nothing.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:

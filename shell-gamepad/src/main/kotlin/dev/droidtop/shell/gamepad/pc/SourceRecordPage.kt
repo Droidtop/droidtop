@@ -573,7 +573,7 @@ internal fun SourceRecordPage(
                             title = row.title,
                             value = row.value,
                             switchOn = row.on,
-                            subtitle = if (armed == index) "Press again to download this version. It lands beside your other versions" else row.subtitle,
+                            subtitle = if (armed == index) armedWords(row.action) ?: row.subtitle else row.subtitle,
                             selected = index == focusIndex,
                             chevron = row.action != null,
                             onClick = {
@@ -655,3 +655,14 @@ private val HOST_HINTS = listOf(
     HintBinding(GamepadAction.A, "Download"),
     HintBinding(GamepadAction.B, "Back"),
 )
+
+/**
+ * What a row armed for its second press says that press does. A source's own button asks its question (its label, and for
+ * a danger button what is lost); it read "Press again to download this version" before, the download row's words, for a
+ * button that downloaded nothing.
+ */
+private fun armedWords(action: RecordAction?): String? = when (action) {
+    is RecordAction.Control -> action.control.question?.let { "$it Press again to go ahead" }
+    is RecordAction.Download, RecordAction.GetBest -> "Press again to download this version. It lands beside your other versions"
+    else -> null
+}
