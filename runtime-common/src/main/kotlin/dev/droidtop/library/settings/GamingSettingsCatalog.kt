@@ -261,7 +261,7 @@ object GamingSettingsCatalog {
                     ChoiceItem(
                         id = ID_UI_MODE,
                         title = words(R.string.gaming_ui_mode),
-                        subtitle = null,
+                        subtitle = UiMode.entries.filter { it != UiMode.FULL }.joinToString(". ") { "${it.label} hides ${it.hides.lowercase()}" },
                         options = UiMode.entries.map { ChoiceOption(it.name, it.label) },
                         current = UiModePrefs.get(context).name,
                         onSelect = { ctx, value ->

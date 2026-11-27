@@ -97,7 +97,7 @@ internal fun DeviceSetupStep(
     ) {
         val current = view ?: return@OnboardingScaffold
         if (!current.canRun) {
-            StepSectionLabel("Elevated access")
+            StepSectionLabel("More controls")
             when (current.pairing) {
                 PairingState.TO_PAIR -> SelectableRow(
                     title = "Pair with wireless debugging",

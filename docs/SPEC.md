@@ -14832,6 +14832,16 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**One name per thing (mytop-project/tracker#964, step 3).** Rows and their values use the person's words; internal
+names stay in a row's Info (its subtitle, shown on request) and in the code. Elevated access is **More controls**
+everywhere it is named: the choice row, onboarding's section, the reasons a privileged action cannot run, and
+"Needs More controls" on a device-setup row that cannot run; the options keep the providers' names (Shizuku, wireless
+debugging). The provider host's row is the **Helper app**. The UI mode row is "Who uses it", its options plain names
+(Full, Kiosk, Kid, Guest; "Leave Kiosk" reads right), what each hides in its Info. Gaming's "Other shells" is "Other
+modes", as Mobile already says; "Users and guest" (Android's own users) is "Android users"; Game sources' "Folders" is
+"Game folders", the same page as Library's. A value is a word: "Done", "Undone", "Forgotten", with any next step in
+the question asked first. Row ids do not change, so search, links and backups keep working.
+
 **Settings is built off the main thread, without the Quick Menu's rows
 (mytop-project/tracker#964, step 1).** `settingsGroups` does not build the
 `quickOnly` group at all (`groups(context, includeQuick = false)`): that group

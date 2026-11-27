@@ -269,7 +269,7 @@ internal object StoresCatalog {
                     add(
                         NestedScreenItem(
                             id = "game_sources_folders",
-                            title = "Folders",
+                            title = "Game folders",
                             registryId = FoldersCatalog.SCREEN_ID,
                             valueLabel = { FoldersCatalog.summary(folders) },
                             icon = CatalogIcon.GAME_FOLDERS,

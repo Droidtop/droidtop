@@ -116,17 +116,17 @@ object ElevatedAccess {
         appInstalled: Boolean = false,
         wireless: BackendState = BackendState.ABSENT,
     ): String? = when (choice) {
-        ElevatedChoice.OFF -> "Elevated access is Off: $SETTINGS_PLACE > Elevated access"
+        ElevatedChoice.OFF -> "More controls is Off: $SETTINGS_PLACE > More controls"
         ElevatedChoice.SHIZUKU_APP -> when (app) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
-            BackendState.ABSENT, BackendState.UNBACKED -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > Elevated access"
+            BackendState.ABSENT, BackendState.UNBACKED -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > More controls"
         }
         ElevatedChoice.SHIZUKU_PLUGIN -> when (plugin) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
             BackendState.UNBACKED -> PLUGIN_UNBACKED
-            BackendState.ABSENT -> "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not installed or not running"
+            BackendState.ABSENT -> "The Shizuku plugin picked in $SETTINGS_PLACE > More controls is not installed or not running"
         }
         ElevatedChoice.WIRELESS_DEBUGGING -> when (wireless) {
             BackendState.READY -> null

@@ -573,7 +573,7 @@ object DroidtopWideSettings {
         if (context.packageManager.resolveActivity(intent, 0) == null) return null
         return ActionItem(
             id = "pref_global_users",
-            title = "Users and guest",
+            title = "Android users",
             run = { ctx -> ctx.startActivity(Intent(intent)) },
         )
     }

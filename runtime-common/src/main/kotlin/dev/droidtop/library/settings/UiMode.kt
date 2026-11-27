@@ -24,11 +24,12 @@ import android.content.Context
  * What each mode shows and hides, on every surface, is [ControlAccess]'s
  * to say; this enum only names the modes.
  */
-enum class UiMode(val label: String) {
-    FULL("Full"),
-    KIOSK("Kiosk (no settings)"),
-    KID("Kid (kid-friendly games only)"),
-    GUEST("Guest (no settings, stores or accounts)"),
+enum class UiMode(val label: String, val hides: String) {
+    // A label is the mode's name alone (it reads "Leave Kiosk" too); what it hides is the row's Info (tracker#964).
+    FULL("Full", "Nothing"),
+    KIOSK("Kiosk", "Settings"),
+    KID("Kid", "Games that aren't kid-friendly"),
+    GUEST("Guest", "Settings, stores and accounts"),
     ;
 
     // Both answers come from ControlAccess, the one restriction model (docs/SPEC.md "UI modes and ControlAccess").

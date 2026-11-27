@@ -168,7 +168,7 @@ class ElevatedAccessTest {
         // The app being usable-after-allowing wins the wording when both need the person.
         assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, needs, needs)!!.contains("not allowed in Shizuku"))
         assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_PLUGIN, ready, absent)!!.contains("Shizuku plugin"))
-        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.OFF, ready, ready)!!.startsWith("Elevated access is Off"))
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.OFF, ready, ready)!!.startsWith("More controls is Off"))
     }
 
     @Test

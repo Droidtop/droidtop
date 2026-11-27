@@ -145,7 +145,7 @@ internal object StorageCatalog {
                 ActionItem(
                     id = "storage_no_folder",
                     title = "No game folder yet",
-                    subtitle = "Store games install into a game folder. Add one under Game sources > Folders",
+                    subtitle = "Store games install into a game folder. Add one under Settings > Library > Game folders",
                 ),
             )
         } else {

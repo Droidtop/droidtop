@@ -26,12 +26,13 @@ object ElevatedAccessCatalog {
     private fun hostRow(context: Context): CatalogItem? {
         val (title, subtitle) = when (dev.droidtop.app.ProviderHostSetup.plan(context)) {
             dev.droidtop.pluginhost.ProviderHost.Plan.NONE -> return null
-            dev.droidtop.pluginhost.ProviderHost.Plan.INSTALL -> "Set up the provider host" to
-                "An app droidtop makes for itself to hold root, Shizuku and wireless debugging, so droidtop holds none. Android asks you once"
-            dev.droidtop.pluginhost.ProviderHost.Plan.UPDATE -> "Update the provider host" to "A newer provider host comes with this droidtop"
-            dev.droidtop.pluginhost.ProviderHost.Plan.FOREIGN -> "Replace the provider host" to
-                "The one installed wasn't made by this droidtop. Remove it, then set it up again"
-            dev.droidtop.pluginhost.ProviderHost.Plan.CURRENT -> "Provider host" to "Installed and up to date. Approve it and choose what it may do in Plugins"
+            // "Helper app" on the row; "provider host" is the internal name and stays in the Info text (tracker#964).
+            dev.droidtop.pluginhost.ProviderHost.Plan.INSTALL -> "Set up the helper app" to
+                "The provider host: an app droidtop makes for itself to hold root, Shizuku and wireless debugging, so droidtop holds none. Android asks you once"
+            dev.droidtop.pluginhost.ProviderHost.Plan.UPDATE -> "Update the helper app" to "A newer provider host comes with this droidtop"
+            dev.droidtop.pluginhost.ProviderHost.Plan.FOREIGN -> "Replace the helper app" to
+                "The provider host installed wasn't made by this droidtop. Remove it, then set it up again"
+            dev.droidtop.pluginhost.ProviderHost.Plan.CURRENT -> "Helper app" to "The provider host, up to date. Approve it and choose what it may do in Plugins"
         }
         return dev.droidtop.library.settings.AsyncActionItem(
             id = "accounts_provider_host",
@@ -62,10 +63,11 @@ object ElevatedAccessCatalog {
             title = "Wireless debugging",
             subtitle = if (on) "Paired and on. Press to forget the pairing" else "Paired, but it's off. Turn it on in Developer options",
             value = if (on) "On" else "Off",
-            confirmTitle = "Forget droidtop's pairing with wireless debugging? Pairing again needs a new code",
+            confirmTitle = "Forget droidtop's pairing with wireless debugging? Pairing again needs a new code. " +
+                "Remove droidtop under Paired devices in Wireless debugging too",
             run = { _, _ ->
                 wireless.forget()
-                "Forgotten. Remove droidtop under Paired devices in Wireless debugging too"
+                "Forgotten"
             },
         )
     }
@@ -89,7 +91,8 @@ object ElevatedAccessCatalog {
         val shown = if (current in offered) offered else offered + current
         return ChoiceItem(
             id = "accounts_elevated_access",
-            title = "Elevated access",
+            // One name for this everywhere: More controls (tracker#964). The options keep the providers' names.
+            title = "More controls",
             // Nothing answering is said, with the one step that changes it, rather than a backend that cannot act
             // (mytop-project/tracker#851).
             subtitle = if (active == null) shell.unavailableReason() else null,

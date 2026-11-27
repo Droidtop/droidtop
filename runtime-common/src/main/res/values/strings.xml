@@ -58,9 +58,9 @@
     <string name="accessibility_talkback">TalkBack</string>
     <string name="accessibility_android_s_screen_reader_speaks">Android\'s screen reader</string>
     <!-- Device setup (docs/SPEC.md "Device setup", mytop-project/tracker#816) -->
-    <string name="device_setup_no_shell">Needs Shizuku or wireless debugging</string>
+    <string name="device_setup_no_shell">Needs More controls</string>
     <string name="device_setup_failed">Couldn\'t change it</string>
-    <string name="device_setup_done">Done. Press again to undo it</string>
+    <string name="device_setup_done">Done</string>
     <string name="device_setup_undone">Undone</string>
     <string name="device_setup_group">Device setup</string>
     <string name="device_setup_child_title">Lift the 32-program limit</string>
@@ -103,7 +103,7 @@
     <string name="gaming_home_rows">Home rows</string>
     <string name="gaming_pin_rows_to_the_top_of">Pin rows to the top of Home or hide them</string>
     <string name="gaming_kids_and_guests">Kids and guests</string>
-    <string name="gaming_ui_mode">UI mode</string>
+    <string name="gaming_ui_mode">Who uses it</string>
     <string name="gaming_passkey_to_leave_kid_kiosk_and">Passkey to leave Kid, Kiosk and Guest</string>
     <string name="gaming_remove_the_passkey">Remove the passkey</string>
     <string name="gaming_kid_mode_s_highest_volume">Kid mode\'s highest volume</string>
@@ -197,7 +197,7 @@
     <string name="gaming_restart">Restart</string>
     <string name="gaming_audio_output">Audio output</string>
     <string name="gaming_opens_android_s_output_switcher">Where sound plays, in Android\'s switcher</string>
-    <string name="gaming_other_shells">Other shells</string>
+    <string name="gaming_other_shells">Other modes</string>
     <string name="gaming_desktop_mode">Desktop mode</string>
     <string name="gaming_settings_for_the_desktop_shell">Settings for the Desktop shell</string>
     <string name="gaming_mobile_mode">Mobile mode</string>
