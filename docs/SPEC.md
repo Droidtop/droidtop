@@ -25195,6 +25195,14 @@ AGP 9 lint (45800699493, 45925535157, 46044151638); the missing logs do not
 prove which resource caused those losses. APK builds keep their parallel
 budget. The owner directed: "No local builds. CI is the only build."
 
+Protobuf remains pinned to 0.10.1. Integration run 46079599640 could not
+resolve its plugin marker, although the same version passed the independent
+AGP gates; its log did not expose a specific HTTP failure. Plugin resolution
+selects the same published implementation coordinate directly,
+`com.google.protobuf:protobuf-gradle-plugin`, using the requested version and
+existing repositories. This coordinate is documented by the
+[official plugin releases](https://github.com/google/protobuf-gradle-plugin/releases).
+
 **Native vendor code** is cross-compiled by
 `build-scripts/build-vendor-deps.sh`, once per ABI, before Gradle runs; the
 result is cached keyed on the vendor submodules' commits:
