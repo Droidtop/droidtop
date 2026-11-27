@@ -36,6 +36,8 @@ class BrowserSurfaceActivity : Activity() {
     private val eventOverflow = java.util.concurrent.atomic.AtomicBoolean()
     private lateinit var surfaceView: SurfaceView
     private lateinit var location: TextView
+    /** SurfaceView owns this package; this reference only forwards API 33+ configuration. */
+    private var embeddedSurface: android.view.SurfaceControlViewHost.SurfacePackage? = null
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -135,7 +137,10 @@ class BrowserSurfaceActivity : Activity() {
                     val p = provider ?: error("The browser disconnected")
                     val surface = remote { p.surface(token) } ?: error("The browser returned no view")
                     // setChildSurfacePackage takes ownership (Android SurfaceView API contract).
-                    if (isFinishing) surface.release() else surfaceView.setChildSurfacePackage(surface)
+                    if (isFinishing) surface.release() else {
+                        surfaceView.setChildSurfacePackage(surface)
+                        embeddedSurface = surface
+                    }
                 } catch (_: Exception) { failed() }
             }
         }
@@ -180,7 +185,7 @@ class BrowserSurfaceActivity : Activity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (Build.VERSION.SDK_INT >= 33) surfaceView.childSurfacePackage?.let { surface ->
+        if (Build.VERSION.SDK_INT >= 33) embeddedSurface?.let { surface ->
             scope.launch { try { remote { surface.notifyConfigurationChanged(Configuration(newConfig)) } } catch (_: Exception) { failed() } }
         }
         session?.let { asked -> provider?.let { p -> scope.launch {
@@ -210,6 +215,7 @@ class BrowserSurfaceActivity : Activity() {
             }
         }
         boundPluginId?.let { AppInterfaceConnections.release(this, it) }
+        embeddedSurface = null
         events.close()
         scope.cancel()
         super.onDestroy()
