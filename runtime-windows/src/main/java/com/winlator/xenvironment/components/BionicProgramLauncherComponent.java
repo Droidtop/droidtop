@@ -385,7 +385,8 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         // every hook above has finished.
         dev.droidtop.runtime.windows.WineSandbox.applyLaunchEnv(context, envVars);
 
-        Log.d("BionicProgramLauncherComponent", "env vars are " + envVars.toString());
+        // Store launches carry short-lived credentials here. Diagnostics need names, never their values.
+        Log.d("BionicProgramLauncherComponent", "env var names: " + String.join(", ", envVars));
 
         String emulator = container.getEmulator();
 
