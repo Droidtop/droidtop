@@ -17464,6 +17464,13 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   encoding, never a shell command, and no variable is saved to the prefix or displayed in command previews.
   Names that alter the host loader, path or prefix, and values with control characters, are refused. A store's
   launch error is reported; it never silently falls back to another executable or a launch without its credentials.
+- **Wine preparation belongs to the runtime.** A store's `prepareWindowsLaunch` is called only for a real launch,
+  after its prefix is selected. Its `StoreWineContext` names that prefix, maps files to its C drive or the mapped
+  game drives and runs bounded commands through the existing silent, non-root `WineXSession`. Hardware probes
+  therefore see the Wine WMI and emulated CPUID the game sees; host properties or guessed constants never stand
+  in for them. The store can prepare its registry, finishing command and local service and return this launch's
+  target and variables. Timeout or preparation failure stops the launch with its reason. Failed starts, precache
+  completion and the game Activity finishing close the store's local session; rotation does not.
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 

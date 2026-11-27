@@ -251,6 +251,16 @@ data class StoreLaunch(
     val environment: Map<String, String> = emptyMap(),
 )
 
+/** A store's preparatory command runs inside the exact Wine prefix the game will use, as the app's uid. */
+interface StoreWineContext {
+    val prefix: File
+    val windowsUser: String
+    fun windowsPath(file: File): String
+    suspend fun command(target: String, arguments: List<String>, workingDir: File, timeoutMs: Long): StoreCommandResult
+}
+
+data class StoreCommandResult(val exitCode: Int, val output: String)
+
 /**
  * A way to play one game that a store offers beside running its files here
  * (Steam's "Stream with Steam Link"): a row on the game's Play list. [detail]
@@ -423,6 +433,12 @@ interface StoreLibrary {
 
     /** How the store itself starts [gameId], or null to let droidtop find the executable in the folder. */
     suspend fun launch(context: Context, gameId: String): StoreLaunch? = null
+
+    /** Runtime-only setup (licences, registry, the store's local service), never called for a command preview. */
+    suspend fun prepareWindowsLaunch(context: Context, gameId: String, launch: StoreLaunch, wine: StoreWineContext): StoreLaunch = launch
+
+    /** Ends only the local session for this game. No network or disk work on the finishing Activity's thread. */
+    fun windowsGameEnded(context: Context, gameId: String) {}
 
     /**
      * The other ways the store offers to play [gameId] (Steam: stream it from
