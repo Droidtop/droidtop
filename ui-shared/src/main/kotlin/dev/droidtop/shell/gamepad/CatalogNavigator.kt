@@ -372,9 +372,11 @@ fun CatalogNavigator(
             loadedGroups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID } + shown.copy(title = null)
         }
     }
-    val rows = remember(groups, showSearch, depth, categoryMode) {
+    // Groups whose Advanced rows are open on this screen (docs/SPEC.md "The Advanced row"); a new screen opens closed.
+    var openAdvanced by remember(screen.id) { mutableStateOf(emptySet<String>()) }
+    val rows = remember(groups, showSearch, depth, categoryMode, openAdvanced) {
         val built = groups.flatMap { group ->
-            group.items.mapIndexed { index, item ->
+            group.shownItems(expanded = group.id in openAdvanced) { openAdvanced = openAdvanced + group.id }.mapIndexed { index, item ->
                 CatalogRow(
                     item,
                     headerAbove = if (index == 0) group.title else null,
@@ -841,6 +843,9 @@ fun CatalogNavigator(
         if (index >= 0) {
             setSelected(index)
             pendingFocusId = null
+        } else {
+            // A search hit behind a group's Advanced row: open it, and the rows built next hold the hit.
+            groups.firstOrNull { group -> group.advanced.any { it.id == id } }?.let { openAdvanced = openAdvanced + it.id }
         }
     }
 

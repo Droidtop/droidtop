@@ -30014,13 +30014,15 @@ without its runtime said "Running". Decisions:
   the plugin page leads with the header and its one action
   (mytop-project/tracker#512).
 
-**v2 direction:** an `advanced: Boolean` flag on the existing catalog row
-model (additive to `AppSettingsCatalogs.kt`, not a new screen type), with
-advanced rows collapsed behind a per-group "Advanced" row that expands in
-place — same `CatalogRowView`/`LazyColumn`, same search index (search
-still finds an advanced row by name; expanding is a display concern only,
-never a plugin-vs-official-style capability gate). This is additive to
-every mode's existing catalog rather than a second settings mechanism.
+**The Advanced row (built 2026-11-27, mytop-project/tracker#964 step 4).** A group's expert rows are its
+`CatalogGroup.advanced` list, drawn after its rows behind one "Advanced" row (its value is how many) that opens them
+in place: `CatalogGroup.shownItems`, used by both renderers, the Compose navigator and Mobile's Preference navigator.
+Which groups are open is the renderer's, per screen, and a new screen opens closed. Search walks `allItems`, so it
+still finds an advanced row by name, and going to one opens its group first. A mode that hides a row hides it there
+too (`ControlAccess.filter`). It is a display matter only, never a gate. A list rather than a flag on each row kind,
+since rows are a sealed family of fifteen kinds. Behind Advanced so far: Console systems' Manage platforms and the
+platform database's source, adding a custom player (the players already added stay in view), and KDE Connect's
+name and devices by address.
 
 ### Onboarding
 

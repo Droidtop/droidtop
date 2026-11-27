@@ -564,7 +564,33 @@ data class CatalogGroup(
      * be pressed is a row. Drawn only above a group that has rows.
      */
     val chips: List<CatalogChip> = emptyList(),
-)
+    /**
+     * Expert rows a person rarely needs (docs/SPEC.md "The Advanced row", mytop-project/tracker#964 step 4): drawn after
+     * [items] behind one "Advanced" row that opens them in place, so a page leads with what most people change. Search
+     * still finds them by name and opens them; expanding is a display matter only, never a gate.
+     */
+    val advanced: List<CatalogItem> = emptyList(),
+) {
+    /** Every row this group holds, advanced ones included: what search and lookups by id walk. */
+    val allItems: List<CatalogItem> get() = if (advanced.isEmpty()) items else items + advanced
+
+    /** What a renderer draws: [items], then [advanced] when [expanded], else the one row that opens them. */
+    fun shownItems(expanded: Boolean, onExpand: (Context) -> Unit): List<CatalogItem> = when {
+        advanced.isEmpty() -> items
+        expanded -> items + advanced
+        else -> items + ActionItem(
+            id = advancedRowId(id),
+            title = "Advanced",
+            value = advanced.size.toString(),
+            run = onExpand,
+        )
+    }
+
+    companion object {
+        /** The id of [groupId]'s Advanced row. */
+        fun advancedRowId(groupId: String) = "advanced_$groupId"
+    }
+}
 
 /** One status chip ([CatalogGroup.chips]): a short fact, and whether it is a good state (signed in, up to date). */
 data class CatalogChip(val label: String, val ok: Boolean = false)

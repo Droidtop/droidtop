@@ -688,7 +688,10 @@ object EmulatorsCatalog {
                     subtitle = player.packageName,
                     inline = customPlayerScreen(system, player.id),
                 )
-            } + listOf(
+            },
+            // Wiring an app up by its launch command is for the few whose emulator droidtop doesn't know (tracker#964):
+            // the players already added stay in view, adding one is behind Advanced.
+            advanced = listOf(
                 NestedScreenItem(
                     id = "emulator_custom_add_${system.id}",
                     title = "Add a custom player",

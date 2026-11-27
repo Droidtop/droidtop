@@ -74,7 +74,8 @@ object SettingsSearchIndex {
                 // the Quick Menu draws these, Settings does not, and
                 // neither does its search.
                 if (group.quickOnly) continue
-                for (item in group.items) {
+                // Advanced rows are found by name like any other (the renderer opens them when it goes to one).
+                for (item in group.allItems) {
                     // A page's header names the page itself, and its bar's buttons are actions, not settings.
                     if (item is TextBlockItem || item is PageHeaderItem || item is ButtonBarItem) continue
                     val result = SettingsSearchResult(

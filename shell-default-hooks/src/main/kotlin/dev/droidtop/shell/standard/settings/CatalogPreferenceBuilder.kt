@@ -135,6 +135,9 @@ class CatalogPreferenceNavigator(
      */
     private var restoreFocusKey: String? = null
 
+    /** Groups whose Advanced rows are open, as "screen id/group id" (docs/SPEC.md "The Advanced row"). */
+    private val openAdvanced = mutableSetOf<String>()
+
     /**
      * The row the user last activated. In touch mode a tapped row holds
      * no focus, so the focused view alone cannot name the row a
@@ -336,6 +339,11 @@ class CatalogPreferenceNavigator(
                     },
                 )
             }
+            val screenKey = screen?.id ?: rootScreenId
+            // A search hit behind a group's Advanced row opens that group, so the row it names is there to focus.
+            if (focusKey != null) {
+                groups.filter { group -> group.advanced.any { it.id == focusKey } }.forEach { openAdvanced += "$screenKey/${it.id}" }
+            }
             for (group in groups) {
                 if (screen == null && group.id in skipGroupIds) continue
                 val container: PreferenceGroup = if (group.title != null) {
@@ -359,7 +367,9 @@ class CatalogPreferenceNavigator(
                         },
                     )
                 }
-                for (item in group.items) {
+                val groupKey = "$screenKey/${group.id}"
+                // Pressing the Advanced row runs this, then rebuilds (as any action row does) with the group open.
+                for (item in group.shownItems(expanded = groupKey in openAdvanced) { openAdvanced += groupKey }) {
                     container.addPreference(toPreference(context, item))
                 }
             }

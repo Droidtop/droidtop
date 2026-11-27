@@ -185,7 +185,12 @@ object ControlAccess {
         if (rules.hiddenGroupIds.isEmpty() && rules.hiddenItemIds.isEmpty()) return groups
         return groups
             .filter { it.id !in rules.hiddenGroupIds }
-            .map { group -> group.copy(items = group.items.filter { it.id !in rules.hiddenItemIds }) }
-            .filter { it.items.isNotEmpty() }
+            .map { group ->
+                group.copy(
+                    items = group.items.filter { it.id !in rules.hiddenItemIds },
+                    advanced = group.advanced.filter { it.id !in rules.hiddenItemIds },
+                )
+            }
+            .filter { it.items.isNotEmpty() || it.advanced.isNotEmpty() }
     }
 }

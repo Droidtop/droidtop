@@ -296,16 +296,19 @@ object AppSettingsCatalogs {
                 title = "Management",
                 items = listOf(
                     NestedScreenItem(
-                        id = "console_systems_platforms",
-                        title = "Manage platforms",
-                        registryId = SCREEN_PLATFORMS,
-                        icon = CatalogIcon.PLATFORMS,
-                    ),
-                    NestedScreenItem(
                         id = "console_systems_enginehost",
                         title = "Enginehost",
                         registryId = SCREEN_ENGINEHOST,
                         icon = CatalogIcon.ENGINEHOST,
+                    ),
+                ),
+                // Editing the platform list by hand is for the few who add a system droidtop doesn't know (tracker#964).
+                advanced = listOf(
+                    NestedScreenItem(
+                        id = "console_systems_platforms",
+                        title = "Manage platforms",
+                        registryId = SCREEN_PLATFORMS,
+                        icon = CatalogIcon.PLATFORMS,
                     ),
                 ),
             ),
@@ -328,6 +331,8 @@ object AppSettingsCatalogs {
                             }
                         },
                     ),
+                ),
+                advanced = listOf(
                     // One source for the whole database tree (see
                     // PlatformDatabaseSource). Editable because these URLs
                     // ship compiled into the app and raw.githubusercontent

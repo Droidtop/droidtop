@@ -53,7 +53,7 @@ object KdeConnectCatalog {
             pluginNames = dev.droidtop.pluginhost.PluginStore.installed(context).associate { it.manifest.id to it.manifest.label }
         }
         buildList {
-            add(CatalogGroup(id = "kdeconnect_switch", title = null, items = switchRows(context, on)))
+            add(CatalogGroup(id = "kdeconnect_switch", title = null, items = switchRows(context, on), advanced = expertRows(context)))
             if (!on || !KdeConnect.running.value) return@buildList
             val asking = devices.filter { it.pairing == "requested_by_peer" }
             if (asking.isNotEmpty()) {
@@ -142,25 +142,28 @@ object KdeConnectCatalog {
                 onToggle = { ctx, value -> KdeConnect.setOn(ctx, value) },
             ),
         )
-        add(
-            TextInputItem(
-                id = "kdeconnect_name",
-                title = "Name",
-                subtitle = "What other devices see",
-                value = KdeConnect.name(context),
-                onChange = { ctx, text -> KdeConnect.setName(ctx, text) },
-            ),
-        )
-        add(
-            TextInputItem(
-                id = "kdeconnect_addresses",
-                title = "Devices by address",
-                subtitle = "Comma-separated IPs",
-                value = KdeConnect.addresses(context).joinToString(", "),
-                onChange = { ctx, text -> KdeConnect.setAddresses(ctx, text) },
-            ),
-        )
     }
+
+    /**
+     * The name other devices see and devices reached by address: most people never change either, so they are behind
+     * the group's Advanced row (docs/SPEC.md "The Advanced row", mytop-project/tracker#964).
+     */
+    private fun expertRows(context: Context): List<CatalogItem> = listOf(
+        TextInputItem(
+            id = "kdeconnect_name",
+            title = "Name",
+            subtitle = "What other devices see",
+            value = KdeConnect.name(context),
+            onChange = { ctx, text -> KdeConnect.setName(ctx, text) },
+        ),
+        TextInputItem(
+            id = "kdeconnect_addresses",
+            title = "Devices by address",
+            subtitle = "Devices on another network, by IP address, separated by commas",
+            value = KdeConnect.addresses(context).joinToString(", "),
+            onChange = { ctx, text -> KdeConnect.setAddresses(ctx, text) },
+        ),
+    )
 
     /** Installed plugins' names by id, read once per build of the screen (on its IO thread). */
     @Volatile
