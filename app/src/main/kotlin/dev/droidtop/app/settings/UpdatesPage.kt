@@ -737,6 +737,9 @@ object UpdatesPage {
                             )
                         },
                     ),
+                    // When automatic updates run (Download rules kept these until mytop-project/tracker#964 step 6). Stored in
+                    // DownloadPolicy, as before, so nothing changes for anyone who set them.
+                    whenGroup(dev.droidtop.net.DownloadPolicy.also { it.load(context) }.settings.value),
                     CatalogGroup(
                         id = "updates_settings_main",
                         title = null,
@@ -771,6 +774,54 @@ object UpdatesPage {
                     ),
                 )
             }
+        },
+    )
+
+    /** The hours a window may start and end on. */
+    private val HOURS = (0..23).map { ChoiceOption(it.toString(), dev.droidtop.net.DownloadPolicy.clock(it * 60)) }
+
+    /** When automatic updates may run: a time window, and whether while a game is running. Ids kept from Download rules. */
+    private fun whenGroup(s: dev.droidtop.net.DownloadSettings): CatalogGroup = CatalogGroup(
+        id = "updates_settings_when",
+        title = "When",
+        items = buildList {
+            add(
+                ToggleItem(
+                    id = "download_rules_window_on",
+                    title = "Update only during a set time",
+                    current = s.windowEnabled,
+                    onToggle = { ctx, value -> dev.droidtop.net.DownloadPolicy.update(ctx) { it.copy(windowEnabled = value) } },
+                ),
+            )
+            if (s.windowEnabled) {
+                add(
+                    ChoiceItem(
+                        id = "download_rules_window_start",
+                        title = "From",
+                        options = HOURS,
+                        current = (s.windowStartMinute / 60).toString(),
+                        onSelect = { ctx, value -> dev.droidtop.net.DownloadPolicy.update(ctx) { it.copy(windowStartMinute = value.toInt() * 60) } },
+                    ),
+                )
+                add(
+                    ChoiceItem(
+                        id = "download_rules_window_end",
+                        title = "Until",
+                        options = HOURS,
+                        current = (s.windowEndMinute / 60).toString(),
+                        onSelect = { ctx, value -> dev.droidtop.net.DownloadPolicy.update(ctx) { it.copy(windowEndMinute = value.toInt() * 60) } },
+                    ),
+                )
+            }
+            add(
+                ToggleItem(
+                    id = "download_rules_while_playing",
+                    title = "Update while a game is running",
+                    subtitle = "Off: updates wait until you stop",
+                    current = s.whilePlaying,
+                    onToggle = { ctx, value -> dev.droidtop.net.DownloadPolicy.update(ctx) { it.copy(whilePlaying = value) } },
+                ),
+            )
         },
     )
 

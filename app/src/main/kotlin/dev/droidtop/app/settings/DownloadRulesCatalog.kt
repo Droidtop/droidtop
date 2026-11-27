@@ -102,47 +102,8 @@ object DownloadRulesCatalog {
                     ),
                 ),
             ),
-            CatalogGroup(
-                id = "download_rules_updates",
-                title = "Automatic updates",
-                items = listOf(
-                    ToggleItem(
-                        id = "download_rules_auto_default",
-                        title = "Keep installed store games up to date",
-                        subtitle = "A game's own menu can change it",
-                        current = s.autoUpdateDefault,
-                        onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(autoUpdateDefault = value) } },
-                    ),
-                    ToggleItem(
-                        id = "download_rules_window_on",
-                        title = "Update only during a set time",
-                        subtitle = "For automatic updates",
-                        current = s.windowEnabled,
-                        onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(windowEnabled = value) } },
-                    ),
-                    ChoiceItem(
-                        id = "download_rules_window_start",
-                        title = "From",
-                        options = HOURS,
-                        current = (s.windowStartMinute / 60).toString(),
-                        onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(windowStartMinute = value.toInt() * 60) } },
-                    ),
-                    ChoiceItem(
-                        id = "download_rules_window_end",
-                        title = "Until",
-                        options = HOURS,
-                        current = (s.windowEndMinute / 60).toString(),
-                        onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(windowEndMinute = value.toInt() * 60) } },
-                    ),
-                    ToggleItem(
-                        id = "download_rules_while_playing",
-                        title = "Update while a game is running",
-                        subtitle = "Off: updates wait until you stop",
-                        current = s.whilePlaying,
-                        onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(whilePlaying = value) } },
-                    ),
-                ),
-            ),
+            // Automatic updates (keep store games up to date, when, while playing) are Update settings' rows: one place
+            // decides what updates by itself (mytop-project/tracker#964 step 6).
             // How long finished jobs are kept, in Downloads' Older jobs (owner, 2026-11-15, mytop-project/tracker#940).
             CatalogGroup(
                 id = "download_rules_history",
@@ -166,7 +127,6 @@ object DownloadRulesCatalog {
         )
     }
 
-    private val HOURS = (0..23).map { ChoiceOption(it.toString(), DownloadPolicy.clock(it * 60)) }
 
     private const val AUTOMATIC = "auto"
 

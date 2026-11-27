@@ -214,7 +214,6 @@ object GitHubAccountCatalog {
         val repos: List<UserOriginKey>,
         val signedIn: Boolean,
         val checked: Map<String, Boolean>,
-        val auto: Boolean,
         val prereleases: Boolean,
         val found: List<dev.droidtop.library.integrations.DetectedRepo>,
     )
@@ -241,7 +240,6 @@ object GitHubAccountCatalog {
                     repos = repos,
                     signedIn = GitHubTokenStore.isSet(context),
                     checked = repos.associate { it.repo.orEmpty() to (PluginRepoUpdates.lastResult(context, it.repo.orEmpty()) != null) },
-                    auto = PluginRepoUpdates.autoUpdate(context),
                     prereleases = PluginRepoUpdates.includePrereleases(context),
                     found = PluginRepoDetection.cached(context),
                 )
@@ -303,13 +301,8 @@ object GitHubAccountCatalog {
                     id = "repos_updates",
                     title = "Updates",
                     items = listOf(
-                        ToggleItem(
-                            id = "repos_auto",
-                            title = "Update these plugins automatically",
-                            subtitle = "On the networks Download rules allow",
-                            current = read.auto,
-                            onToggle = { c, value -> PluginRepoUpdates.setAutoUpdate(c, value) },
-                        ),
+                        // Whether these update by themselves is Update settings' Plugins row, the same preference
+                        // (UpdateKinds), so it is not a second switch here (mytop-project/tracker#964 step 6).
                         ToggleItem(
                             id = "repos_prereleases",
                             title = "Include pre-releases",
