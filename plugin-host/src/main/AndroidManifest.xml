@@ -146,6 +146,13 @@
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
         <activity
+            android:name="dev.droidtop.pluginhost.BrowserSurfaceActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity
             android:name="dev.droidtop.pluginhost.BrokerAskActivity"
             android:exported="false"
             android:excludeFromRecents="true"

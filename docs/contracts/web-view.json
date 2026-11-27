@@ -21,6 +21,6 @@
       "reply": ["accepted"]
     }
   },
-  "modes": ["sign_in", "check", "open"],
+  "modes": ["sign_in", "check", "open", "browse"],
   "download": ["url", "size", "mimeType", "contentDisposition", "referer", "cookie", "userAgent"]
 }

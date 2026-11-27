@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
 import android.util.Log
 import dev.droidtop.shared.sitecheck.SiteCheck
 import java.util.UUID
@@ -24,7 +25,7 @@ import org.json.JSONObject
  * - The app ends with `web.view.finish`: the cookies of the request's sites only, its user agent and what downloads the
  *   page started. droidtop seals the session in the plugin's vault and runs the downloads, exactly as after its own view.
  *
- * A store's own pages ([WebSessionRequest.Mode.BROWSE]) stay in droidtop's view: a checkout is typed there. The person
+ * Store browse is embedded only with a separate provider context and no credential import or export. The person
  * turns this off with the app plugin's `web.view` point in its Permissions, which sends every page back to droidtop's view.
  */
 object WebViewProviders {
@@ -88,35 +89,49 @@ object WebViewProviders {
         onClosed: (WebSessionResult) -> Unit,
         fallback: () -> Unit,
     ): Boolean {
-        if (request.mode == WebSessionRequest.Mode.BROWSE) return false
         val record = runCatching { provider(context) }.onFailure { Log.w(TAG, "web.view provider could not be read", it) }.getOrNull() ?: return false
+        if (Build.VERSION.SDK_INT < 30) return request.mode != WebSessionRequest.Mode.BROWSE && openLegacy(context, record, request, sites, onClosed, fallback)
         val packageName = record.manifest.app?.packageName ?: return false
         val token = register(record.manifest.id, request, sites, onClosed)
-        val intent = Intent(ACTION).apply {
-            setPackage(packageName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(EXTRA_TOKEN, token)
+        val surfaceFallback = {
+            if (request.mode == WebSessionRequest.Mode.BROWSE || !openLegacy(context, record, request, sites, onClosed, fallback)) fallback()
         }
-        if (runCatching { context.startActivity(intent) }.onFailure { Log.w(TAG, "$packageName: its web view could not be started", it) }.isFailure) {
+        if (!BrowserSurfaceActivity.open(context, record, token, request.label, surfaceFallback)) {
             pending.remove(token)
-            return false
+            return request.mode != WebSessionRequest.Mode.BROWSE && openLegacy(context, record, request, sites, onClosed, fallback)
         }
         Log.i(TAG, "${request.mode.name.lowercase()} for ${request.label} shown in ${record.manifest.label}")
         main.postDelayed({
             if (withdrawUntaken(token)) {
+                BrowserSurfaceActivity.completed(token)
                 Log.w(TAG, "${record.manifest.label} did not take the page in ${TAKE_MS / 1000} s; showing it in droidtop's own view")
-                fallback()
+                surfaceFallback()
             }
         }, TAKE_MS)
         main.postDelayed({ close(token, WebSessionResult(false, null, null)) }, TIMEOUT_MS)
         return true
     }
 
+    /** Old providers and Android 26–29 retain Gecko in its own Activity, with a newly issued one-use token. */
+    private fun openLegacy(context: Context, record: PluginRecord, request: WebSessionRequest, sites: Map<String, String>, onClosed: (WebSessionResult) -> Unit, fallback: () -> Unit): Boolean {
+        if (request.mode == WebSessionRequest.Mode.BROWSE) return false
+        val pkg = record.manifest.app?.packageName ?: return false
+        val token = register(record.manifest.id, request, sites, onClosed)
+        val started = runCatching {
+            context.startActivity(Intent(ACTION).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_TOKEN, token))
+        }.isSuccess
+        if (!started) { pending.remove(token); return false }
+        main.postDelayed({ if (withdrawUntaken(token)) fallback() }, TAKE_MS)
+        main.postDelayed({ cancel(token) }, TIMEOUT_MS)
+        return true
+    }
+
     /** Takes back a page its app never took, true when it did: the caller then shows it another way, and the app is refused it. */
     internal fun withdrawUntaken(token: String): Boolean {
         val asked = pending[token] ?: return false
-        if (asked.taken) return false
-        return pending.remove(token, asked)
+        return synchronized(asked) {
+            if (asked.taken) false else pending.remove(token, asked)
+        }
     }
 
     /** A page given to [pluginId]'s app, by its new one-use token. */
@@ -129,22 +144,27 @@ object WebViewProviders {
     /** `web.view.take_request`: the request behind [token], once, to the plugin it was given to. */
     internal fun take(pluginId: String, token: String): JSONObject {
         val asked = pending[token]?.takeIf { it.pluginId == pluginId } ?: refuse("no such web view")
-        if (asked.taken) refuse("this web view was already taken")
-        asked.taken = true
+        synchronized(asked) {
+            if (pending[token] !== asked || asked.taken) refuse("this web view was already taken or withdrawn")
+            asked.taken = true
+        }
         val request = asked.request
         val cookies = JSONObject()
-        request.session?.cookies?.forEach { (domain, header) -> if (domain in request.domains) cookies.put(domain, header) }
-        asked.sites.forEach { (domain, header) -> cookies.put(domain, header) }
+        val browse = request.mode == WebSessionRequest.Mode.BROWSE
+        if (!browse) {
+            request.session?.cookies?.forEach { (domain, header) -> if (domain in request.domains) cookies.put(domain, header) }
+            asked.sites.forEach { (domain, header) -> cookies.put(domain, header) }
+        }
         return JSONObject()
             .put("mode", request.mode.name.lowercase())
             .put("label", request.label)
             .put("url", request.url)
-            .put("domains", JSONArray(request.domains))
+            .put("domains", JSONArray(if (browse) emptyList<String>() else request.domains))
             .put("cookies", cookies)
             .put("maxDownloads", if (request.mode == WebSessionRequest.Mode.OPEN) request.maxDownloads else 0)
-            .put("signInUrl", request.signInUrl?.takeIf { NetScope.isHttps(it) } ?: JSONObject.NULL)
+            .put("signInUrl", request.signInUrl?.takeIf { !browse && WebSurfaceEvents.safeUrl(it) } ?: JSONObject.NULL)
             // The site's "signed in" cookie: the app says in each report_page whether it is set on the request's sites.
-            .put("doneCookie", request.doneCookie ?: JSONObject.NULL)
+            .put("doneCookie", request.doneCookie?.takeUnless { browse } ?: JSONObject.NULL)
     }
 
     /**
@@ -154,6 +174,10 @@ object WebViewProviders {
     internal fun page(pluginId: String, token: String, url: String, title: String?, hostCookies: String?, signedIn: Boolean?): JSONObject {
         val asked = pending[token]?.takeIf { it.pluginId == pluginId && it.taken } ?: refuse("no such web view")
         val request = asked.request
+        if (request.mode == WebSessionRequest.Mode.BROWSE) {
+            if (WebSurfaceEvents.safeUrl(url)) deliver { request.onPage?.invoke(url) }
+            return JSONObject().put("finish", false)
+        }
         val host = NetScope.hostOf(url)
         val finish = when {
             host == null -> false
@@ -176,47 +200,89 @@ object WebViewProviders {
 
     /** `web.view.finish`: what the page left; droidtop keeps the request's sites' cookies and the downloads it started. */
     internal fun finish(context: Context?, pluginId: String, token: String, args: JSONObject): Boolean {
-        val asked = pending[token]?.takeIf { it.pluginId == pluginId } ?: refuse("no such web view")
-        val request = asked.request
-        val left = args.optJSONObject("cookies") ?: JSONObject()
-        fun cookieFor(domain: String) = left.optString(domain).takeIf { it.isNotBlank() && it.length <= MAX_TEXT * 4 }
-        val userAgent = args.optString("userAgent").takeIf { it.isNotBlank() && it.length <= MAX_TEXT }
-        val session = WebSessions.Stored(
-            userAgent = userAgent,
-            cookies = request.domains.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }.toMap(),
-        )
-        val renewed = asked.sites.keys.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }
-        if (renewed.isNotEmpty() && context != null) DownloadSites.renewLater(context.applicationContext, renewed)
-        val downloads = if (request.mode == WebSessionRequest.Mode.OPEN) downloadsOf(args.optJSONArray("downloads"), request.maxDownloads) else emptyList()
-        val completed = args.optBoolean("completed", false)
-        close(token, WebSessionResult(completed, session, downloads.firstOrNull(), downloads, asked.handoff))
-        return true
+        val asked = pending[token]?.takeIf { it.pluginId == pluginId && it.taken } ?: refuse("no such web view")
+        synchronized(asked) {
+            if (!pending.remove(token, asked)) refuse("this web view already finished")
+        }
+        var reported = false
+        try {
+            val request = asked.request
+            if (request.mode == WebSessionRequest.Mode.BROWSE) {
+                reported = true
+                complete(token, asked, WebSessionResult(false, null, null))
+                return true
+            }
+            val left = args.optJSONObject("cookies") ?: JSONObject()
+            fun cookieFor(domain: String) = header(left.optString(domain), MAX_TEXT * 4)
+            val userAgent = header(args.optString("userAgent"), MAX_TEXT)
+            val session = WebSessions.Stored(
+                userAgent = userAgent,
+                cookies = request.domains.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }.toMap(),
+            )
+            val renewed = asked.sites.keys.mapNotNull { domain -> cookieFor(domain)?.let { domain to it } }
+            val downloads = if (request.mode == WebSessionRequest.Mode.OPEN) downloadsOf(args.optJSONArray("downloads"), request.maxDownloads).map { download ->
+                val host = NetScope.hostOf(download.url)
+                val scoped = host != null && WebSessions.covers(host, request.domains + asked.sites.keys)
+                if (download.cookie != null && !scoped) throw BrokerException(PluginErrorCode.UNSUPPORTED, "This download needs cookies outside this page's approved sites; open that site in its own signed-in session")
+                download
+            } else emptyList()
+            if (renewed.isNotEmpty() && context != null) DownloadSites.renewLater(context.applicationContext, renewed)
+            val completed = args.optBoolean("completed", false)
+            reported = true
+            complete(token, asked, WebSessionResult(completed, session, downloads.firstOrNull(), downloads, asked.handoff))
+            return true
+        } catch (error: Exception) {
+            if (!reported) complete(token, asked, WebSessionResult(false, null, null))
+            throw error
+        }
     }
 
     /** The downloads an app reports: web addresses only, each once, at most [max]. */
     internal fun downloadsOf(list: JSONArray?, max: Int): List<WebSessionDownload> {
         list ?: return emptyList()
-        return (0 until list.length()).mapNotNull { list.optJSONObject(it) }.mapNotNull { item ->
+        return (0 until list.length().coerceAtMost(256)).mapNotNull { list.optJSONObject(it) }.mapNotNull { item ->
             val url = item.optString("url").trim()
-            if (!url.startsWith("https://", ignoreCase = true) && !url.startsWith("http://", ignoreCase = true)) return@mapNotNull null
+            if (!WebSurfaceEvents.safeUrl(url)) return@mapNotNull null
             if (url.length > MAX_TEXT) return@mapNotNull null
-            fun text(key: String) = item.optString(key).takeIf { it.isNotBlank() && it.length <= MAX_TEXT }
+            fun text(key: String) = header(item.optString(key), MAX_TEXT)
             WebSessionDownload(
                 url = url,
                 userAgent = text("userAgent"),
                 contentDisposition = text("contentDisposition"),
                 mimeType = text("mimeType"),
                 size = item.optLong("size", -1L).takeIf { it > 0 },
-                referer = text("referer"),
-                cookie = item.optString("cookie").takeIf { it.isNotBlank() && it.length <= MAX_TEXT * 4 },
+                referer = text("referer")?.also { if (!WebSurfaceEvents.safeUrl(it)) refuse("the download has an invalid referring page") },
+                cookie = header(item.optString("cookie"), MAX_TEXT * 4),
             )
-        }.distinctBy { it.url }.take(max.coerceAtLeast(1))
+        }.distinctBy { it.url }.take(max.coerceIn(0, 256))
     }
 
     private fun close(token: String, result: WebSessionResult) {
         val asked = pending.remove(token) ?: return
-        deliver { asked.onClosed(result) }
+        complete(token, asked, result)
+    }
+
+    private fun complete(token: String, asked: Pending, result: WebSessionResult) {
+        deliver {
+            if (Build.VERSION.SDK_INT >= 30) BrowserSurfaceActivity.completed(token)
+            asked.onClosed(result)
+        }
+    }
+
+    /** A closed/dead embedded surface cannot replay the page in another engine after take_request. */
+    internal fun cancel(token: String) = close(token, WebSessionResult(false, null, null))
+
+    /** A browse surface reports addresses only; its private cookies, forms and downloads never enter the broker. */
+    internal fun surfacePage(token: String, url: String) {
+        val asked = pending[token]?.takeIf { it.taken && it.request.mode == WebSessionRequest.Mode.BROWSE } ?: return
+        if (WebSurfaceEvents.safeUrl(url)) asked.request.onPage?.invoke(url)
     }
 
     private fun refuse(message: String): Nothing = throw BrokerException(PluginErrorCode.INVALID_ARGS, message)
+
+    private fun header(value: String, max: Int): String? {
+        if (value.isBlank()) return null
+        if (value.length > max || value.any { it.isISOControl() }) refuse("the browser returned an invalid header")
+        return value
+    }
 }
