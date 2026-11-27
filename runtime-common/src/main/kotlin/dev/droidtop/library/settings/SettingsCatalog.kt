@@ -580,7 +580,7 @@ data class CatalogGroup(
         expanded -> items + advanced
         else -> items + ActionItem(
             id = advancedRowId(id),
-            title = "Advanced",
+            title = words(dev.droidtop.runtime.R.string.settings_advanced),
             value = advanced.size.toString(),
             run = onExpand,
         )

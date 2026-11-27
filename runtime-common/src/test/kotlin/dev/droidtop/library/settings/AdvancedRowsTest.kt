@@ -1,10 +1,14 @@
 package dev.droidtop.library.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 /** A group's expert rows sit behind one Advanced row (docs/SPEC.md "The Advanced row", mytop-project/tracker#964). */
 class AdvancedRowsTest {
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private fun row(id: String) = ActionItem(id = id, title = id)
 
     private val group = CatalogGroup(id = "g", title = null, items = listOf(row("a"), row("b")), advanced = listOf(row("x"), row("y")))
