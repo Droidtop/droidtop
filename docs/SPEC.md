@@ -22504,7 +22504,11 @@ Settings tab, the left menu's places, Console systems and Containers.
   job follows, "One network rule", and the metered connections allowed always, moved from Download rules, which keeps a
   "Networks" row that opens this page), **Network shares and cloud storage** and **Devices** (computers and KDE
   Connect, moved from Accounts and sources), then **Browser**, **Download sites**, **File hosts** and **Debrid
-  services** as before. The review found network settings in about ten places with none called Network.
+  services** as before. The review found network settings in about ten places with none called Network. **Add share**
+  is one row where there were four (one per kind): the address first (`smb://nas/games`, `\nas\games`,
+  `sftp://you@host:2222/dir`, `s3://bucket/dir` or an S3 endpoint, any other `https://` address as WebDAV;
+  `ShareAddress`), which picks the kind and fills in that kind's form, the same form each kind always had; a Kind row
+  overrides the guess or picks one when the address names none.
 - **Two panes.** A navigator that fills the page (at least 80% of the
   screen's width; never one inside a sheet or a dialog) whose root has three
   or more categories draws a **category column** and a **pane**. The column

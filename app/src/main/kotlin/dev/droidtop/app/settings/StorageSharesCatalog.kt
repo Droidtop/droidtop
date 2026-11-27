@@ -153,7 +153,7 @@ object StorageSharesCatalog {
     fun group(context: Context): CatalogGroup = CatalogGroup(
         id = "accounts_storage",
         title = "Network and cloud storage",
-        items = StorageShares.all(context).map(::shareRow) + addRow() + addS3Row() + addSftpRow() + addSmbRow(),
+        items = StorageShares.all(context).map(::shareRow) + addShareRow(),
     )
 
     private fun shareRow(share: StorageShare): CatalogItem {
@@ -703,4 +703,106 @@ object StorageSharesCatalog {
             },
         ),
     )
+
+    // ---- One Add share: the address first, the kind follows it (docs/SPEC.md "Settings > Network", tracker#964) ----
+
+    @Volatile private var shareAddress = ""
+
+    /** The kind the person picked over the one the address names; null follows the address. */
+    @Volatile private var kindPicked: String? = null
+
+    private val KIND_LABELS = linkedMapOf(
+        StorageShares.WEBDAV to "WebDAV",
+        StorageShares.S3 to "S3",
+        StorageShares.SFTP to "SFTP",
+        StorageShares.SMB to "SMB",
+    )
+
+    /** Fills the [kind]'s own form from what [address] says, leaving what it does not say as the person typed it. */
+    private fun prefill(kind: String, address: String) {
+        val p = dev.droidtop.library.storage.ShareAddress.parse(address)?.takeIf { it.kind == kind } ?: return
+        when (kind) {
+            StorageShares.WEBDAV -> pendingUrl = p.url
+            StorageShares.S3 -> {
+                if (p.url.isNotEmpty()) s3Endpoint = p.url
+                if (p.bucket.isNotEmpty()) s3Bucket = p.bucket
+                if (p.folder.isNotEmpty()) s3Folder = p.folder
+            }
+            StorageShares.SFTP -> {
+                sftpHost = p.host
+                if (p.port.isNotEmpty()) sftpPort = p.port
+                if (p.user.isNotEmpty()) sftpUser = p.user
+                if (p.folder.isNotEmpty()) sftpFolder = p.folder
+            }
+            StorageShares.SMB -> {
+                smbServer = p.host
+                if (p.share.isNotEmpty()) smbShare = p.share
+                if (p.user.isNotEmpty()) smbUser = p.user
+                if (p.folder.isNotEmpty()) smbFolder = p.folder
+            }
+        }
+    }
+
+    /** The form for [kind], the one each kind has always had. */
+    private fun formFor(kind: String): CatalogScreen? = (
+        when (kind) {
+            StorageShares.S3 -> addS3Row()
+            StorageShares.SFTP -> addSftpRow()
+            StorageShares.SMB -> addSmbRow()
+            else -> addRow()
+        } as? NestedScreenItem
+        )?.inline
+
+    /**
+     * Add share: one row where there were four, one per kind (review 2.1). The address comes first; the kind it names
+     * fills in that kind's form, and a Kind row changes it when the guess is wrong or the address names none.
+     */
+    private fun addShareRow(): CatalogItem = NestedScreenItem(
+        id = "accounts_storage_add_any",
+        title = "Add share",
+        inline = CatalogScreen(
+            id = "accounts_storage_add_any_screen",
+            title = "Add share",
+            groups = {
+                val named = dev.droidtop.library.storage.ShareAddress.kindOf(shareAddress)
+                val kind = kindPicked ?: named
+                listOf(
+                    CatalogGroup(
+                        id = "accounts_storage_add_any_group",
+                        title = null,
+                        items = listOfNotNull(
+                            TextInputItem(
+                                id = "accounts_storage_add_any_address",
+                                title = "Address",
+                                subtitle = "Such as smb://nas/games, sftp://you@host, s3://bucket or a WebDAV https:// address",
+                                value = shareAddress,
+                                onChange = { _, v ->
+                                    shareAddress = v.trim()
+                                    (kindPicked ?: dev.droidtop.library.storage.ShareAddress.kindOf(shareAddress))?.let { prefill(it, shareAddress) }
+                                },
+                            ),
+                            ChoiceItem(
+                                id = "accounts_storage_add_any_kind",
+                                title = "Kind",
+                                options = listOf(ChoiceOption(AUTO_KIND, named?.let { "From the address: ${KIND_LABELS[it]}" } ?: "From the address")) +
+                                    KIND_LABELS.map { (key, label) -> ChoiceOption(key, label) },
+                                current = kindPicked ?: AUTO_KIND,
+                                onSelect = { _, v ->
+                                    kindPicked = v.takeIf { it != AUTO_KIND }
+                                    (kindPicked ?: named)?.let { prefill(it, shareAddress) }
+                                },
+                            ),
+                            kind?.let { k ->
+                                formFor(k)?.let { form ->
+                                    NestedScreenItem(id = "accounts_storage_add_any_next", title = "Next", valueLabel = { KIND_LABELS[k] }, inline = form)
+                                }
+                            },
+                        ),
+                    ),
+                )
+            },
+        ),
+    )
+
+    private const val AUTO_KIND = "auto"
 }
