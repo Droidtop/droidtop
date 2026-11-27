@@ -16,7 +16,7 @@ as git trailers, a commit may say:
     Onboarding: <what a person needs to do or know after updating>
 
 - `Changelog:` is the change's line in the build's entry, under that heading. Several make several lines. `none` marks
-  a change nobody will notice (CI, tests, docs, a refactor): it folds into one "Internal changes" line.
+  a change nobody will notice (CI, tests, docs, a refactor): it folds into one line, "Various bug fixes and performance improvements".
 - `Onboarding:` is a line under "After updating" in the release notes and in What's new: something a person must do
   after this update (sign in again, turn a setting on). Every build's lines between the installed version and the
   new one are shown, so an update that skips builds misses none.

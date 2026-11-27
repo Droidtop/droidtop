@@ -3,7 +3,8 @@
 The owner, 2026-11-04 (relayed): "That fragment should be automatically pulled from the github change log, and
 ENHANCED by the fragment." So the base of every build's entry is the commits since the previous published build,
 one line each, grouped Added / Changed / Fixed; a changelog.d fragment, where its change added one, replaces that
-change's line with better words; commits nobody will notice fold into one "Internal changes" line.
+change's line with better words; commits nobody will notice fold into one line, "Various bug fixes and performance
+improvements" (the owner, 2026-11-27: the industry's shorthand for "we made changes").
 
 The commit convention the generator reads (changelog.d/README.md says it for people):
 
@@ -42,7 +43,7 @@ INTERNAL_RE = re.compile(
 FIXED_RE = re.compile(r"\b(fix|fixes|fixed|no longer|crash\w*|broken|regression|again works|works again)\b", re.IGNORECASE)
 ADDED_RE = re.compile(r"^(add|adds|added|new)\b|\b(gets|now has|now offers)\b", re.IGNORECASE)
 
-INTERNAL_LINE = "Internal changes: {count}. Nothing looks different"
+INTERNAL_LINE = "Various bug fixes and performance improvements"
 
 
 class ConventionError(ValueError):
@@ -182,7 +183,7 @@ def entry(commits, fragments, private_names=()):
             for section in SECTIONS:
                 sections[section].extend(parts.get(section, []))
     if internal:
-        sections["Changed"].append(INTERNAL_LINE.format(count=internal))
+        sections["Changed"].append(INTERNAL_LINE)
     lowered = [p.lower() for p in private_names]
 
     def public(text):

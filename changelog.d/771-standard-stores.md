@@ -6,4 +6,4 @@
 
 ### Changed
 - Standard: the Close all apps messages and the import summary's colours come from the same place as the rest of
-  Standard's; nothing looks different.
+  Standard's.

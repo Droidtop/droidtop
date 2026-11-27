@@ -68,7 +68,7 @@ class Entry(unittest.TestCase):
         ]
         sections, onboarding = cc.entry(commits, fragments)
         self.assertEqual(["Open thread on a game's Downloads"], sections["Added"])
-        self.assertEqual(["Search leaves the left menu for a Power and mode tile", "Internal changes: 2. Nothing looks different"], sections["Changed"])
+        self.assertEqual(["Search leaves the left menu for a Power and mode tile", "Various bug fixes and performance improvements"], sections["Changed"])
         self.assertEqual(["Fix the crash on start"], sections["Fixed"])
         self.assertEqual(["Sign in to TorBox again"], onboarding)
 
@@ -78,7 +78,7 @@ class Entry(unittest.TestCase):
 
     def test_only_internal_commits_still_make_an_entry(self):
         sections, _ = cc.entry([("CI: one", []), ("Docs: two", [])], {})
-        self.assertEqual({"Changed": ["Internal changes: 2. Nothing looks different"]}, sections)
+        self.assertEqual({"Changed": ["Various bug fixes and performance improvements"]}, sections)
 
 
 class Cited(unittest.TestCase):
