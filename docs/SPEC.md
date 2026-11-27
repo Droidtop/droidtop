@@ -11845,6 +11845,16 @@ before some fields were dropped:
   that question and "Press again to go ahead"; it showed the download row's "Press again to download this version",
   for a button that downloaded nothing.
 
+**Static surface review (owner, 2026-11-27: "Please just work on the code. Static analysis").** The same facet
+guards apply to a group's children and its form submit: a child cannot introduce a subject or an explicit target
+that the surface does not take, a form cannot ask for an undeclared permission, and hiding a child still hides it
+inside its group. An empty group is omitted. The old aggregate Plugin status widget now reads through
+`PluginWidgets` and `PluginWidgetContent`, as the configurable Plugin widget does: per-entry ids, widget surface
+and game-scope checks, state budgets and cached replies have one path. An absent value never means "OK".
+The plugin page's store-library sync also goes through `StoreSyncs.run`, with the same successful-sync timestamp,
+hidden-game mirroring, update check and metadata request as the Stores place. See `docs/ui-static-review-2026-11-27.md`
+for remaining surface gaps; this is source evidence, not a device usability result.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:

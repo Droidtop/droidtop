@@ -123,6 +123,45 @@ class FacetsTest {
     }
 
     @Test
+    fun `a group cannot smuggle another subject or target onto a surface`() {
+        val facets = read("""{"facets": [{"id":"g","kind":"group","targets":["quickmenu"],"facets":[
+            {"id":"device","kind":"status","subject":{"type":"device"},"label":"Network","state":"on"},
+            {"id":"item","kind":"status","subject":{"type":"item","source":"s","id":"1"},"label":"Other item","state":"on"},
+            {"id":"window","kind":"action","subject":{"type":"window","windowId":9,"appId":"other"},"label":"Close","call":{"op":"close"}},
+            {"id":"elsewhere","kind":"status","targets":["status.area"],"label":"Elsewhere","state":"on"}
+        ]}]}""").facets
+        val messages = mutableListOf<String>()
+        val group = FacetGuards.admit(facets, "quickmenu", plugin, messages).single().body as FacetBody.Group
+        assertEquals(listOf("device"), group.facets.map { it.id })
+        assertTrue(messages.any { it.contains("item") && it.contains("not about") })
+        assertTrue(messages.any { it.contains("elsewhere") && it.contains("does not ask") })
+    }
+
+    @Test
+    fun `a forms submit can ask only for a permission the plugin declares`() {
+        val facets = read("""{"facets":[{"id":"form","kind":"group","targets":["plugin.page"],"form":true,
+            "submit":{"label":"Allow","call":{"kind":"grant","permission":"priv.packages"}},
+            "facets":[{"id":"note","kind":"info","label":"Access"}]}]}""").facets
+        val targetPlugin = plugin.copy(declaredTargets = setOf("plugin.page"))
+        assertTrue(FacetGuards.admit(facets, "plugin.page", targetPlugin).isEmpty())
+        assertEquals(1, FacetGuards.admit(facets, "plugin.page", targetPlugin.copy(permissions = setOf("priv.packages"))).size)
+    }
+
+    @Test
+    fun `hidden children stay hidden inside a group and an empty group disappears`() {
+        val facets = read("""{"facets":[{"id":"g","kind":"group","targets":["quickmenu"],"facets":[
+            {"id":"one","kind":"status","label":"One","state":"ok"},
+            {"id":"two","kind":"status","label":"Two","state":"ok"}]}]}""").facets
+        val first = FacetGuards.facetKey("quickmenu", "one")
+        val second = FacetGuards.facetKey("quickmenu", "two")
+        val snapshot = PluginGrants.Snapshot(states = mapOf(first to GrantState.DENIED))
+        val group = FacetGuards.unhidden(facets, "quickmenu", snapshot).single().body as FacetBody.Group
+        assertEquals(listOf("two"), group.facets.map { it.id })
+        assertTrue(FacetGuards.unhidden(facets, "quickmenu", snapshot.copy(states = snapshot.states + (second to GrantState.DENIED))).isEmpty())
+        assertEquals(facets, FacetGuards.unhidden(facets, "status.area", snapshot))
+    }
+
+    @Test
     fun `pictures come only from the plugin's own sites`() {
         val facets = read("""{"facets": [
             {"id": "a", "kind": "image", "subject": {"type": "item", "source": "s", "id": "1"}, "targets": ["item.page"], "role": "cover", "url": "https://img.cdn.example.com/a.png", "alt": "A"},

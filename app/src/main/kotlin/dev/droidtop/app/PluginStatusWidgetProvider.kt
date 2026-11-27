@@ -4,12 +4,9 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.widget.RemoteViews
-import dev.droidtop.pluginhost.PluginCapability
-import dev.droidtop.pluginhost.PluginCrashPolicy
-import dev.droidtop.pluginhost.PluginRecord
-import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.library.integrations.PluginWidgets
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 
 /**
  * droidtop's own plugin-fed launcher surface (docs/SPEC.md, Launcher
@@ -25,11 +22,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * shape as [ContinuePlayingWidgetProvider], placed like any Nova/Apex
  * widget from the Standard launcher's stock widget picker.
  *
- * Each plugin gets exactly one short-lived [PluginCrashPolicy]
- * connection per refresh tick, torn down right after (the same
- * "no ongoing binder connection to keep warm" shape the Quick Menu's
- * plugin panels use, `PluginTiles.refresh`) -- this widget holds no
- * plugin process alive between updates.
+ * Its sources and state go through [PluginWidgets], as the configurable
+ * Plugin widget's do. That path honours each tile's id, declared surfaces,
+ * game scope and state budget; this widget owns no separate plugin call path.
  */
 class PluginStatusWidgetProvider : AppWidgetProvider() {
 
@@ -42,8 +37,6 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val CALL_TIMEOUT_MS = 5_000L
-
         /** Called after a plugin's approval/enabled state changes, so the widget need not wait for the next 30-minute system tick. */
         fun requestUpdate(context: Context) {
             DroidtopWidgets.update(context, PluginStatusWidgetProvider::class.java, build = ::render)
@@ -58,46 +51,20 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
                 context,
                 DroidtopWidgets.look(context),
                 context.getString(R.string.widget_plugin_status_title),
-                statusTiles(context).map { DroidtopWidgets.Row("${it.label}: ${it.value}", null) },
+                statusLines(context).map { DroidtopWidgets.Row(it, null) },
                 context.getString(R.string.widget_plugin_status_empty),
             )
 
         /**
-         * One real invoke() per candidate plugin ([PluginStore.runnableFor]
-         * -- installed, approved, enabled and re-verified), reading
-         * `label`/`value` from its result the same way a real
-         * status-tile plugin returns them,
-         * falling back to the manifest's own label and "OK" when it uses
-         * other keys (`status_tile`'s contract names no required keys, and
-         * a raw key=value dump is not droidtop's language). A plugin that times out or fails is
-         * dropped for this refresh, not shown as broken (the approval
-         * screen is where a crashed/disabled plugin's own status lives).
+         * The same declared sources, tile ids, widget context and cached state as the configurable Plugin widget.
+         * A game-scoped tile never appears on a home screen. A missing value never becomes a made-up "OK".
          */
-        private suspend fun statusTiles(context: Context): List<StatusTile> {
-            val app = context.applicationContext
-            val candidates = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                PluginStore.runnableFor(app, PluginCapability.STATUS_TILE)
-            }
-            if (candidates.isEmpty()) return emptyList()
-            val policy = PluginCrashPolicy(app)
-            try {
-                return candidates.take(DroidtopWidgets.MAX_ROWS).mapNotNull { record -> tileFor(policy, record) }
-            } finally {
-                policy.shutdown()
-            }
+        private suspend fun statusLines(context: Context): List<String> = withContext(Dispatchers.IO) {
+            PluginWidgets.sources(context).filter { it.kind == PluginWidgets.Kind.STATUS }
+                .take(DroidtopWidgets.MAX_ROWS).flatMap { source ->
+                    val state = PluginWidgets.tileState(context, source) ?: return@flatMap emptyList()
+                    PluginWidgetContent.tile(source.label, state, quick = false).lines.map { it.text }
+                }
         }
-
-        private suspend fun tileFor(policy: PluginCrashPolicy, record: PluginRecord): StatusTile? {
-            val result = withTimeoutOrNull(CALL_TIMEOUT_MS) {
-                runCatching { policy.invoke(record, PluginCapability.STATUS_TILE, emptyMap()) }.getOrNull()
-            } ?: return null
-            if (!result.ok) return null
-            val label = result.values["label"] ?: record.manifest.label
-            // Only the words the plugin gave for the tile; its other keys are its own, never shown raw.
-            val value = result.values["value"] ?: "OK"
-            return StatusTile(label, value)
-        }
-
-        private data class StatusTile(val label: String, val value: String)
     }
 }

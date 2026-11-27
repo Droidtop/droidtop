@@ -1693,6 +1693,10 @@ is not asked for.
 the plugin uses, with a switch each and the hidden facets to show again. A hidden facet is not asked for. A target's
 order of plugins is the person's, kept per target.
 
+Groups do not bypass those rules: children must have subjects the target takes, explicit child targets must include
+the current target (an omitted list uses the group's placement), and hidden children stay hidden. A form's submit
+is checked like any other action, including the declared-permission check on a grant action. An empty group is omitted.
+
 #### Interaction: actions, values and live updates
 
 - **An action** (`call`) is `{op, args?, kind?}` on the point that gave the facet: `kind` `call` (a quick call, 15 s,

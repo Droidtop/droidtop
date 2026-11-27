@@ -1004,7 +1004,10 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                                 if (!withContext(Dispatchers.IO) { store.signedIn(ctx) }) {
                                     "Sign in to ${store.label} first"
                                 } else {
-                                    store.sync(ctx).fold({ "$it games from ${store.label}" }, { it.message ?: "${store.label} did not answer" })
+                                    dev.droidtop.library.stores.StoreSyncs.run(ctx, store).fold(
+                                        { "${store.label}: ${it.line()}" },
+                                        { it.message ?: "${store.label} did not answer" },
+                                    )
                                 }
                             },
                         ),
