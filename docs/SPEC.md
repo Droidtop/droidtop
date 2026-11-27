@@ -13608,7 +13608,9 @@ one component (`DialogChoices`, Steam's power dialog): flat rows on one plate,
 groups split by a thin rule in the scrim role, the safe choices first and the
 way out (OK, Cancel, Decide later) last in a group of its own (first instead when
 every other choice is one-way, as in the cloud-save conflict), the row under the
-cursor the solid selected inversion; the page behind is dimmed to the scrim
+cursor focused as a menu row is (the accent behind it and the leading bar, mytop-project/tracker#644; until
+2026-11-27 it was the solid black inversion, which sat oddly over the light menu a Kill or Quit question opened
+from, BlueStacks rig, mytop-project/tracker#967); the page behind is dimmed to the scrim
 role's 80% (`ModalScrim`). The launch failure dialog, the launch screen chooser
 (which gained a Cancel row in place of its "B cancels" line) and the cloud-save
 conflict dialog use it, and so do the shell's three one-time offers (fetch box
