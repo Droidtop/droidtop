@@ -18,8 +18,9 @@ import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.pc.PcGameStandalone
 
-/** Whether [entry] has a game page outside Gaming: a PC or engine game, or a console game (docs/SPEC.md 7j). */
-fun hasGamePage(entry: LibraryEntry): Boolean = entry.isPcOrEngineGame || entry.kind == LibraryEntryKind.CONSOLE_ROM
+/** Every kind with a shared game page can open it from Mobile and Desktop too (docs/SPEC.md 7j). */
+fun hasGamePage(entry: LibraryEntry): Boolean = entry.isPcOrEngineGame ||
+    entry.kind == LibraryEntryKind.CONSOLE_ROM || entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP
 
 /**
  * A game's page outside the Gaming shell, the one Gaming opens (docs/SPEC.md 7j "Places in every mode",
@@ -37,16 +38,23 @@ fun GamePageStandalone(
     onOpenDownloads: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val entries by library.backgroundScanState(LibraryKinds.GAMES).collectAsState()
-    val all = entries ?: return
-    val entry = all.firstOrNull { it.id == entryId }
-    LaunchedEffect(entry) { if (entry == null || !hasGamePage(entry)) onClose() }
+    val games by library.backgroundScanState(LibraryKinds.GAMES).collectAsState()
+    val apps by library.backgroundScanState(LibraryKinds.APPS).collectAsState()
+    LaunchedEffect(library) {
+        library.scanInBackground(LibraryKinds.GAMES)
+        library.scanInBackground(LibraryKinds.APPS)
+    }
+    // Android apps are in APPS, even when their own page calls them a game. A games-only lookup silently closed it.
+    val entry = games?.firstOrNull { it.id == entryId } ?: apps?.firstOrNull { it.id == entryId }
+    LaunchedEffect(entry, games == null, apps == null) {
+        if ((entry == null && games != null && apps != null) || (entry != null && !hasGamePage(entry))) onClose()
+    }
     if (entry == null) return
     if (entry.isPcOrEngineGame) {
         PcGameStandalone(library = library, entryId = entryId, onLaunch = onLaunch, onOpenDownloads = onOpenDownloads, onClose = onClose)
         return
     }
-    if (entry.kind != LibraryEntryKind.CONSOLE_ROM) return
+    if (entry.kind != LibraryEntryKind.CONSOLE_ROM && entry.kind != LibraryEntryKind.NATIVE_ANDROID_APP) return
     ShellDialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),

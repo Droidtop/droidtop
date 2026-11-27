@@ -19210,7 +19210,12 @@ copied:
   page's frame since mytop-project/tracker#845 slice U2) in a window of its own, with its Play, Edit metadata (Scrape
   first), and Options (Choose match, View media, Collections). Play
   is the host's launch path. `hasGamePage` says which games have one, so Mobile's options and Desktop's
-  row menu offer Game page for PC, engine and console games. What the themed gamelist draws around a
+  row menu offer Game page for PC, engine, console and Android games. Android apps use that same
+  `EntryDetailScreen` (app details, updates, favourite and app options); the standalone host observes
+  both Games and Apps, since Android entries belong to Apps, and waits for both reads before deciding
+  an entry is gone. This finishes the route to the existing app page rather than adding another one
+  (owner, 2026-11-27: "go through all the user-facing surfaces to see if they're usable").
+  What the themed gamelist draws around a
   game (the theme's own elements) stays Gaming's.
 
 **The page's frame (decided 2026-10-30, mytop-project/tracker#845, slice U1).** The owner, verbatim: "Activity tab:

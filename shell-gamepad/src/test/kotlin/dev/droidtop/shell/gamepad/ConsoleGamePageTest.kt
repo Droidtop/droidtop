@@ -23,6 +23,13 @@ import org.junit.Test
  * and status row say about the emulator.
  */
 class ConsoleGamePageTest {
+    @Test
+    fun androidAppsCanReachTheirSharedPageOutsideGaming() {
+        assertTrue(hasGamePage(LibraryEntry("dev.example.game", "Android game", LibraryEntryKind.NATIVE_ANDROID_APP)))
+        assertTrue(hasGamePage(LibraryEntry("/roms/game.sfc", "Console game", LibraryEntryKind.CONSOLE_ROM)))
+        assertFalse(hasGamePage(LibraryEntry("container:editor", "Linux editor", LibraryEntryKind.LINUX_CONTAINER_APP)))
+    }
+
     @Before
     fun installWords() = dev.droidtop.library.settings.WordsForTests.install()
 

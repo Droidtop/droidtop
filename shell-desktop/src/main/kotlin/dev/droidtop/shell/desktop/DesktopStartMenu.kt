@@ -351,7 +351,11 @@ internal fun StartMenu(
                 HostedRow(
                     key = "page",
                     title = "Game page",
-                    subtitle = if (page.isPcOrEngineGame) "Install, runner, saves and more" else "Details, artwork, scraping and collections",
+                    subtitle = when {
+                        page.isPcOrEngineGame -> "Install, runner, saves and more"
+                        page.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP -> "App details, updates and options"
+                        else -> "Details, artwork, scraping and collections"
+                    },
                     onSelect = {
                         menuFor = null
                         openPage(page)
