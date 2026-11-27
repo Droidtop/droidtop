@@ -151,6 +151,9 @@ internal fun GamePageFrame(
     optionsRows: (close: () -> Unit) -> List<ActionRow>,
     // The primary action, from the band and from X; the page decides what it does in each [play] state.
     onPrimary: () -> Unit,
+    // How it can run (docs/SPEC.md "How it runs, beside Play", mytop-project/tracker#965): the dropdown beside Play, each
+    // row a runner, given the menu's close. Null, or no rows, draws no dropdown (a game with one way to run).
+    runWithRows: ((close: () -> Unit) -> List<ActionRow>)? = null,
     onToggleFavorite: () -> Unit,
     // The game's whole menu, which L2 and Select open; null opens Options instead.
     onGameMenu: (() -> Unit)?,
@@ -167,11 +170,14 @@ internal fun GamePageFrame(
     val tabs = remember { PageTab.values() }
     val kind = PageKind.of(entry)
     val hasEditMetadata = editMetadataRows != null
-    val buttons = remember(hasEditMetadata) { pageButtons(hasEditMetadata) }
+    val hasRunWith = runWithRows != null
+    val buttons = remember(hasEditMetadata, hasRunWith) { pageButtons(hasEditMetadata, hasRunWith) }
     var editOpen by remember(entry.id) { mutableStateOf(false) }
     var optionsOpen by remember(entry.id) { mutableStateOf(false) }
+    var runWithOpen by remember(entry.id) { mutableStateOf(false) }
     val editAnchor = rememberAnchor()
     val optionsAnchor = rememberAnchor()
+    val runWithAnchor = rememberAnchor()
 
     // ONE cursor in three zones: the buttons, the tabs, the tab's rows.
     var zone by remember(entry.id) { mutableStateOf(PageZone.ACTIONS) }
@@ -219,6 +225,7 @@ internal fun GamePageFrame(
     fun pressButton(which: PageButton) {
         when (which) {
             PageButton.PRIMARY -> onPrimary()
+            PageButton.RUN_WITH -> runWithOpen = true
             PageButton.EDIT_METADATA -> editOpen = true
             PageButton.OPTIONS -> optionsOpen = true
             PageButton.FAVOURITE -> onToggleFavorite()
@@ -380,6 +387,7 @@ internal fun GamePageFrame(
                             onPlayPlaced = onPlayPlaced,
                             editModifier = Modifier.anchorFor(editAnchor),
                             optionsModifier = Modifier.anchorFor(optionsAnchor),
+                            runWithModifier = Modifier.anchorFor(runWithAnchor),
                             onPress = { which ->
                                 zone = PageZone.ACTIONS
                                 button = buttons.indexOf(which).coerceAtLeast(0)
@@ -524,6 +532,16 @@ internal fun GamePageFrame(
             onDismiss = { optionsOpen = false },
         )
     }
+    // How it runs, at the arrow beside Play: where the choice is seen and made, not two menus deep (the owner,
+    // 2026-11-27: "It should be under a dropdown arrow next to the "run button"").
+    if (runWithOpen && runWithRows != null) {
+        AnchoredMenu(
+            anchor = runWithAnchor.value,
+            title = RUN_WITH,
+            rows = runWithRows { runWithOpen = false },
+            onDismiss = { runWithOpen = false },
+        )
+    }
 }
 
 /** Where the page's one cursor is: the action band's buttons, the tab strip, or the tab's rows. */
@@ -643,11 +661,19 @@ internal fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
 }
 
 /** The action band's buttons, in the order they are drawn and the cursor moves along them. */
-internal enum class PageButton { PRIMARY, EDIT_METADATA, OPTIONS, FAVOURITE }
+internal enum class PageButton { PRIMARY, RUN_WITH, EDIT_METADATA, OPTIONS, FAVOURITE }
 
-/** The band's buttons: Edit metadata only on a page that has metadata to edit ([hasEditMetadata]). Pure. */
-internal fun pageButtons(hasEditMetadata: Boolean): List<PageButton> =
-    PageButton.values().filter { it != PageButton.EDIT_METADATA || hasEditMetadata }
+/**
+ * The band's buttons: the dropdown beside Play only when the game has a choice of how to run ([hasRunWith]), Edit
+ * metadata only on a page that has metadata to edit ([hasEditMetadata]). Pure.
+ */
+internal fun pageButtons(hasEditMetadata: Boolean, hasRunWith: Boolean = false): List<PageButton> =
+    PageButton.values().filter {
+        (it != PageButton.EDIT_METADATA || hasEditMetadata) && (it != PageButton.RUN_WITH || hasRunWith)
+    }
+
+/** The dropdown beside Play, and its menu's title. */
+internal const val RUN_WITH = "Runs with"
 
 /** The two buttons beside the primary action, and the panels they open (mytop-project/tracker#845). */
 internal const val EDIT_METADATA = "Edit metadata"
@@ -707,6 +733,7 @@ internal fun xNamesPlay(zone: PageZone, button: PageButton): Boolean = !(zone ==
 
 internal fun pageActionLabel(button: PageButton, primaryVerb: String): String = when (button) {
     PageButton.PRIMARY -> primaryVerb
+    PageButton.RUN_WITH -> RUN_WITH
     PageButton.EDIT_METADATA -> EDIT_METADATA
     PageButton.OPTIONS -> OPTIONS
     PageButton.FAVOURITE -> "Favourite"
@@ -831,18 +858,32 @@ private fun PageActionBand(
     // Where Edit metadata and Options are, for their menus to open beside ([anchorFor]).
     editModifier: Modifier,
     optionsModifier: Modifier,
+    runWithModifier: Modifier,
     onPress: (PageButton) -> Unit,
 ) {
+    // Play, and right beside it the arrow that opens how it runs (Steam's split Play button): one unit.
     val primary: @Composable () -> Unit = {
-        ShellChip(
-            play.verb,
-            modifier = Modifier.onGloballyPositioned(onPlayPlaced),
-            primary = true,
-            large = true,
-            enabled = play.pressable,
-            selected = selectedButton == PageButton.PRIMARY,
-            onClick = { onPress(PageButton.PRIMARY) },
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.Hair), verticalAlignment = Alignment.CenterVertically) {
+            ShellChip(
+                play.verb,
+                modifier = Modifier.onGloballyPositioned(onPlayPlaced),
+                primary = true,
+                large = true,
+                enabled = play.pressable,
+                selected = selectedButton == PageButton.PRIMARY,
+                onClick = { onPress(PageButton.PRIMARY) },
+            )
+            if (PageButton.RUN_WITH in buttons) {
+                PageIconButton(
+                    glyph = "▾",
+                    description = RUN_WITH,
+                    on = false,
+                    selected = selectedButton == PageButton.RUN_WITH,
+                    onClick = { onPress(PageButton.RUN_WITH) },
+                    modifier = runWithModifier,
+                )
+            }
+        }
     }
     val rest: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
@@ -923,7 +964,14 @@ private fun PageActionBand(
  * button does.
  */
 @Composable
-private fun PageIconButton(glyph: String, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
+private fun PageIconButton(
+    glyph: String,
+    description: String,
+    on: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val lit = selected && dev.droidtop.shell.gamepad.input.PadModality.showsFocus
     val ink = when {
         lit -> MenuTokens.OnSelected
@@ -932,7 +980,7 @@ private fun PageIconButton(glyph: String, description: String, on: Boolean, sele
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
             .semantics { contentDescription = description }
             .padRow(onClick = onClick)

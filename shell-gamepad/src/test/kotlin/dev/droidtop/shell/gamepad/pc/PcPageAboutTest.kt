@@ -375,6 +375,15 @@ class PcPageAboutTest {
     }
 
     @Test
+    fun theDropdownSitsRightAfterPlayWhenTheGameHasAChoiceOfHowToRun() {
+        assertEquals(
+            listOf(PageButton.PRIMARY, PageButton.RUN_WITH, PageButton.EDIT_METADATA, PageButton.OPTIONS, PageButton.FAVOURITE),
+            pageButtons(hasEditMetadata = true, hasRunWith = true),
+        )
+        assertEquals(RUN_WITH, pageActionLabel(PageButton.RUN_WITH, "Play"))
+    }
+
+    @Test
     fun theScrapeRowSaysWhatItDoesAndTakesNoPressWhileItRuns() {
         val unscraped = entry()
         assertEquals(SCRAPE_ROW, scrapeRow(unscraped, null, "the PC sources") {}.title)

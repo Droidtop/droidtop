@@ -123,6 +123,11 @@ internal fun PcGamePage(
     // "put "scrape" IN the edit metadata panel"), through the one PC scrape pipeline (docs/SPEC.md 7n). What the scrape
     // said is the row's line while the panel is open, and a flash once it is done.
     val scope = rememberCoroutineScope()
+    // Every way it can run, for the dropdown beside Play (docs/SPEC.md "How it runs, beside Play", tracker#965): runner
+    // checks, the store's files and the paired computers, read off the main thread with the runner itself.
+    val howItRuns by produceState<HowItRuns?>(null, entry.id, reloadToken) {
+        value = withContext(Dispatchers.IO) { runCatching { HowItRuns.load(context, entry) }.getOrNull() }
+    }
     var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     // What the action band's Edit metadata and Options open over the page.
     var pickingMatch by remember(entry.id) { mutableStateOf(false) }
@@ -634,6 +639,25 @@ internal fun PcGamePage(
                     )
                 },
                 onPrimary = { pressPrimary() },
+                runWithRows = howItRuns?.takeIf { it.hasChoice }?.let { how ->
+                    { close ->
+                        howItRunsRows(
+                            context,
+                            entry,
+                            how,
+                            launch = { start ->
+                                scope.launch {
+                                    val said = withContext(Dispatchers.IO) { start() }
+                                    if (said.isNotBlank()) {
+                                        dev.droidtop.library.settings.Notices.flash(said, source = GameNaming.displayName(entry.title), context = context)
+                                    }
+                                }
+                            },
+                            onChanged = { reloadToken++ },
+                            close = close,
+                        )
+                    }
+                },
                 onToggleFavorite = onToggleFavorite,
                 onGameMenu = onOpenOptions,
                 onBack = closePage,

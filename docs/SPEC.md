@@ -19414,6 +19414,17 @@ Install, Update and Downloading verbs of the primary action (#223), which
 land in `PcPlayState` and appear here without a change to the page. No
 version rollback (#231).
 
+**How it runs, beside Play (2026-11-27, mytop-project/tracker#965).** The owner: "Right now, in droidtop, the user has no
+way to select how to run a game", "It should be under a dropdown arrow next to the "run button"", "We keep hiding
+important stuff in menus now", and "look at how steam handles games with in-home streaming options". A game page's
+Play button has a dropdown arrow right beside it (`PageButton.RUN_WITH`, drawn only when there is more than one way to
+run) that opens, at the button, every way the game can run (`HowItRuns`): the runners on this device (Enginehost, Wine,
+a Linux container, an emulator...; the current one marked, each with its state), the store's other ways to play
+(Steam's "Stream with Steam Link"), and "Stream from <computer>" for each paired computer that has it, as Steam's Play
+button offers "Stream from <PC>" beside Install. Pressing a runner makes it the game's runner, which Play then uses and
+which stays until changed (Steam remembers a launch choice too); the others start at once. The game menu's How it runs
+keeps its rows, and reads the same computers (`HowItRuns.streamSources`).
+
 ### Home (decided 2026-10-14, mytop-project/tracker#485 F7a; the final design's section B)
 
 What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter, no Sort By and no List options: Select does nothing there, **Y is Search**, L1/R1 step the strip, L2 (or a long press) is the focused game's Options, A opens and X plays (mytop-project/tracker#641). Top to bottom:
