@@ -431,11 +431,24 @@ class DroidtopPcGameRuntime(
                 onFailure = { PcLaunchResult(false, it.message ?: "couldn't return to the running game") },
             )
         }
-        return when (val resolved = resolveWindowsLaunch(executable, gameRoot, workingDir, arguments, entryId, storeEnvironment)) {
-            is WindowsLaunchPlan.Refused -> PcLaunchResult(false, resolved.reason)
-            is WindowsLaunchPlan.Ready ->
-                launchInPrefix(wineEngine, resolved.container, resolved.target, resolved.workingDir, resolved.arguments, entryId)
+        var handedOff = false
+        return try {
+            val result = when (val resolved = resolveWindowsLaunch(executable, gameRoot, workingDir, arguments, entryId, storeEnvironment)) {
+                is WindowsLaunchPlan.Refused -> PcLaunchResult(false, resolved.reason)
+                is WindowsLaunchPlan.Ready ->
+                    launchInPrefix(wineEngine, resolved.container, resolved.target, resolved.workingDir, resolved.arguments, entryId)
+            }
+            handedOff = result.succeeded
+            result
+        } finally {
+            if (!handedOff) endStoreSession(entryId)
         }
+    }
+
+    private fun endStoreSession(entryId: String?) {
+        if (entryId == null) return
+        runCatching { dev.droidtop.library.stores.StoreLibraries.forKey(entryId)?.windowsGameEnded(context, entryId.substringAfter(':')) }
+            .onFailure { android.util.Log.w(TAG, "The store session could not close", it) }
     }
 
     /**
@@ -491,11 +504,26 @@ class DroidtopPcGameRuntime(
             (WineStorageGrants.GAME_FOLDER to gameRoot.absolutePath) +
             (if (redists.isEmpty()) emptyMap() else mapOf(REDISTS_OVERRIDE to dev.droidtop.runtime.windows.redist.RedistPlan.toJson(redists)))
 
+        val prepared = try {
+            withContext(Dispatchers.IO) {
+                container.setLaunchOverrides(overrides)
+                val launch = dev.droidtop.library.stores.StoreLaunch(executable, workingDir, arguments, storeEnvironment)
+                val store = entryId?.let { dev.droidtop.library.stores.StoreLibraries.forKey(it) }
+                store?.prepareWindowsLaunch(context, entryId!!.substringAfter(':'), launch, WineStoreTools(context, container)) ?: launch
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            endStoreSession(entryId)
+            throw cancelled
+        } catch (error: Exception) {
+            endStoreSession(entryId)
+            return WindowsLaunchPlan.Refused(error.message ?: "The store could not prepare this game")
+        }
+
         // The game's own language and the variables the person set for it
         // (docs/SPEC.md 7i, "Game properties"): laid over this one launch with
         // the Steamworks shim's, never into the prefix.
         val gameSettings = withContext(Dispatchers.IO) { entryId?.let { WineGameSettingsPrefs.get(context, it) } }
-        val ownEnv = listOf(storeEnvironmentText(storeEnvironment), GameLaunchOptions.launchEnvironment(gameSettings)).filter { it.isNotEmpty() }.joinToString(" ")
+        val ownEnv = listOf(storeEnvironmentText(prepared.environment), GameLaunchOptions.launchEnvironment(gameSettings)).filter { it.isNotEmpty() }.joinToString(" ")
 
         // The game's translation cache (docs/SPEC.md 9, "Translation cache"), first, so a variable the person set for
         // the game still wins over it.
@@ -535,7 +563,7 @@ class DroidtopPcGameRuntime(
             }
             val launch = runCatching {
                 SteamworksShim.prepare(
-                    context, container, shim, entryId, executable, gameRoot, workingDir, arguments,
+                    context, container, shim, entryId, prepared.executable, gameRoot, prepared.workingDir, prepared.arguments,
                     GameLanguage.bySteam(gameSettings?.language),
                 )
             }.getOrElse {
@@ -549,7 +577,7 @@ class DroidtopPcGameRuntime(
         }
         val env = listOf(cacheEnv, ownEnv).filter { it.isNotEmpty() }.joinToString(" ")
         container.setLaunchOverrides(if (env.isEmpty()) overrides else overrides + (Container.LAUNCH_ENV to env))
-        return WindowsLaunchPlan.Ready(container, executable.absolutePath, workingDir, arguments)
+        return WindowsLaunchPlan.Ready(container, prepared.executable.absolutePath, prepared.workingDir, prepared.arguments)
     }
 
     /**
@@ -569,9 +597,13 @@ class DroidtopPcGameRuntime(
         }
         val windows = withContext(Dispatchers.IO) { WindowsLaunchResolver.forEntry(context, entryId, gameRoot) }
             ?: error("Choose which program starts this game first (the game's settings, Program to run).")
-        return when (val plan = resolveWindowsLaunch(windows.executable, gameRoot, windows.workingDir, windows.arguments, entryId, windows.environment)) {
-            is WindowsLaunchPlan.Refused -> error(plan.reason)
-            is WindowsLaunchPlan.Ready -> WinePrecache.run(context, plan, entryId, windows.executable, report)
+        return try {
+            when (val plan = resolveWindowsLaunch(windows.executable, gameRoot, windows.workingDir, windows.arguments, entryId, windows.environment)) {
+                is WindowsLaunchPlan.Refused -> error(plan.reason)
+                is WindowsLaunchPlan.Ready -> WinePrecache.run(context, plan, entryId, windows.executable, report)
+            }
+        } finally {
+            endStoreSession(entryId)
         }
     }
 

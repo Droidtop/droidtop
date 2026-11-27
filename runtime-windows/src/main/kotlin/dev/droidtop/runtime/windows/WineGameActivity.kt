@@ -769,6 +769,10 @@ class WineGameActivity : Activity() {
         layoutDriver?.close()
         layoutDriver = null
         if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
+        if (isFinishing) entryId?.let { key ->
+            runCatching { dev.droidtop.library.stores.StoreLibraries.forKey(key)?.windowsGameEnded(applicationContext, key.substringAfter(':')) }
+                .onFailure { android.util.Log.w("droidtop.StoreLaunch", "The store session could not close", it) }
+        }
         session?.stop()
         session = null
         blackScreen?.stop()
