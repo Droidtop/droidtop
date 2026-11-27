@@ -233,7 +233,13 @@ object WebViewProviders {
             complete(token, asked, WebSessionResult(completed, session, downloads.firstOrNull(), downloads, asked.handoff))
             return true
         } catch (error: Exception) {
-            if (!reported) complete(token, asked, WebSessionResult(false, null, null))
+            if (!reported) {
+                if (context != null) deliver {
+                    val reason = if (error is BrokerException) error.message else "The browser result could not be kept; reopen the page and try again"
+                    android.widget.Toast.makeText(context.applicationContext, reason, android.widget.Toast.LENGTH_LONG).show()
+                }
+                complete(token, asked, WebSessionResult(false, null, null))
+            }
             throw error
         }
     }
