@@ -58,6 +58,27 @@ class AppCloserTest {
     }
 
     @Test
+    fun `Kill ends an Enginehost game through Enginehost when no helper can force-stop`() {
+        endGameAnswer = true
+
+        val outcome = closer(FakeOps(TaskPrivileges.NONE)).kill(TaskPolicy.ENGINEHOST_PACKAGE)
+
+        assertEquals(CloseOutcome.Closed, outcome)
+        assertEquals(1, endGameAsks)
+        assertTrue(killed.isEmpty())
+        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), closed)
+    }
+
+    @Test
+    fun `Kill of another app without a helper still says it needs one, and asks Enginehost nothing`() {
+        val outcome = closer(FakeOps(TaskPrivileges.NONE)).kill("com.example.game")
+
+        assertTrue(outcome is CloseOutcome.Failed)
+        assertEquals(0, endGameAsks)
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
     fun `when Enginehost could not be asked the close is only asked of Android`() {
         endGameAnswer = null
 

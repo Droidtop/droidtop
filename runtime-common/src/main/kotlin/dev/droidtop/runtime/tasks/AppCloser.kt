@@ -32,7 +32,10 @@ class AppCloser(
     /**
      * Kill: force-stop at once, with none of [close]'s gentler steps first (Enginehost's own end, the move to the
      * background). The owner, 2026-10-16: "kill should immediately force-stop it" (mytop-project/tracker#571 row 16).
-     * Without a helper that can force-stop there is no such stop on Android, and it says so instead of trying less.
+     * Without a helper that can force-stop there is no such stop on Android, and it says so instead of trying less, except
+     * for an Enginehost game: Enginehost's END_GAME kills the game's process at once (`RuntimeProcess.kill`), which is
+     * a kill, and needs no helper. Kill used to refuse an Enginehost game without one and point at More controls
+     * (BlueStacks rig, 2026-11-27, mytop-project/tracker#967).
      */
     fun kill(packageName: String): CloseOutcome {
         ops.connect(CONNECT_MS)
@@ -42,9 +45,19 @@ class AppCloser(
                 CloseOutcome.Closed
             }
             is ForceStopResult.Failed -> CloseOutcome.Failed("Couldn't kill it: ${result.message}")
-            ForceStopResult.NoProvider -> CloseOutcome.Failed(
+            ForceStopResult.NoProvider -> killEnginehostGame(packageName) ?: CloseOutcome.Failed(
                 "Kill needs More controls to force-stop it" + (ops.unavailableReason()?.let { ": $it" } ?: "") + ". Quit ends it the way Android allows",
             )
+        }
+    }
+
+    /** Kill's way for an Enginehost game without a helper: Enginehost's END_GAME. Null for another app, or no answer. */
+    private fun killEnginehostGame(packageName: String): CloseOutcome? {
+        if (packageName != TaskPolicy.ENGINEHOST_PACKAGE) return null
+        return when (endEnginehostGame()) {
+            true -> CloseOutcome.Closed.also { onClosed(packageName) }
+            false -> CloseOutcome.NotRunning("Enginehost has no game running").also { onClosed(packageName) }
+            null -> null
         }
     }
 
