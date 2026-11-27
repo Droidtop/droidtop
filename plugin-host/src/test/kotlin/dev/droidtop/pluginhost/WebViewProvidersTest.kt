@@ -81,6 +81,40 @@ class WebViewProvidersTest {
     }
 
     @Test
+    fun `a result before take cannot close or alter a pending session`() {
+        val token = WebViewProviders.register("dev.droidtop.browser", request(WebSessionRequest.Mode.SIGN_IN), emptyMap()) { results += it }
+        assertFalse(call(app(), "finish", JSONObject().put("token", token).put("completed", true)).ok)
+        assertTrue(results.isEmpty())
+        assertTrue(WebViewProviders.withdrawUntaken(token))
+    }
+
+    @Test
+    fun `store browse receives no credentials and returns no session or downloads`() {
+        val token = WebViewProviders.register("dev.droidtop.browser", request(WebSessionRequest.Mode.BROWSE), mapOf("mega.nz" to "secret=2")) { results += it }
+        val taken = call(app(), "take_request", JSONObject().put("token", token)).data
+        assertEquals(0, taken.getJSONObject("cookies").length())
+        assertEquals(0, taken.getJSONArray("domains").length())
+        assertTrue(call(app(), "finish", JSONObject().put("token", token).put("completed", true).put("userAgent", "secret").put("cookies", JSONObject().put("f95zone.to", "secret=3"))).ok)
+        assertNull(results.single().session)
+        assertNull(results.single().download)
+    }
+
+    @Test
+    fun `invalid headers and unscoped download cookies end incomplete without a success result`() {
+        for (args in listOf(
+            JSONObject().put("userAgent", "UA\r\nCookie: bad"),
+            JSONObject().put("downloads", JSONArray().put(JSONObject().put("url", "https://other.example/file.zip").put("cookie", "secret=1"))),
+        )) {
+            val token = WebViewProviders.register("dev.droidtop.browser", request(WebSessionRequest.Mode.OPEN), emptyMap()) { results += it }
+            WebViewProviders.take("dev.droidtop.browser", token)
+            assertFalse(call(app(), "finish", args.put("token", token).put("completed", true)).ok)
+            assertFalse(results.last().completed)
+            assertNull(results.last().download)
+            assertFalse(call(app(), "finish", JSONObject().put("token", token)).ok)
+        }
+    }
+
+    @Test
     fun `a page given to one app is refused to another, and a plugin that shows no pages is refused`() {
         val token = WebViewProviders.register("someone.else", request(WebSessionRequest.Mode.CHECK), emptyMap()) { results += it }
         assertFalse(call(app(), "take_request", JSONObject().put("token", token)).ok)

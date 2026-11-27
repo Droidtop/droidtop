@@ -49,7 +49,7 @@ class WebViewProvidersContractTest {
 
     @Test
     fun `take_request answers with exactly the contract's keys, in one of its modes`() {
-        for (mode in listOf(WebSessionRequest.Mode.SIGN_IN, WebSessionRequest.Mode.CHECK, WebSessionRequest.Mode.OPEN)) {
+        for (mode in WebSessionRequest.Mode.entries) {
             val request = WebSessionRequest("Site", mode, "https://site.example/", listOf("site.example"), null, doneCookie = "u", signInUrl = "https://site.example/login")
             val token = WebViewProviders.register(app.manifest.id, request, emptyMap()) {}
             val reply = WebViewProviders.take(app.manifest.id, token)
@@ -60,7 +60,7 @@ class WebViewProvidersContractTest {
 
     @Test
     fun `report_page and finish read the contract's args and answer its reply keys`() {
-        val request = WebSessionRequest("Site", WebSessionRequest.Mode.OPEN, "https://site.example/", listOf("site.example"), null, doneCookie = null, maxDownloads = 2)
+        val request = WebSessionRequest("Site", WebSessionRequest.Mode.OPEN, "https://site.example/", listOf("site.example", "files.example"), null, doneCookie = null, maxDownloads = 2)
         val token = WebViewProviders.register(app.manifest.id, request, emptyMap()) {}
         WebViewProviders.take(app.manifest.id, token)
         val page = WebViewProviders.page(app.manifest.id, token, "https://site.example/", "Site", "a=1", null)
@@ -69,14 +69,14 @@ class WebViewProvidersContractTest {
         // Every download field the contract names is read: a download carrying all of them keeps each one.
         val fields = contract.getJSONArray("download").strings()
         val download = JSONObject().apply {
-            fields.forEach { key -> put(key, if (key == "size") 12L else if (key == "url") "https://files.example/a.zip" else "v-$key") }
+            fields.forEach { key -> put(key, if (key == "size") 12L else if (key == "url") "https://files.example/a.zip" else if (key == "referer") "https://site.example/" else "v-$key") }
         }
         val parsed = WebViewProviders.downloadsOf(JSONArray().put(download), 2).single()
         assertEquals("https://files.example/a.zip", parsed.url)
         assertEquals(12L, parsed.size)
         assertEquals("v-mimeType", parsed.mimeType)
         assertEquals("v-contentDisposition", parsed.contentDisposition)
-        assertEquals("v-referer", parsed.referer)
+        assertEquals("https://site.example/", parsed.referer)
         assertEquals("v-cookie", parsed.cookie)
         assertEquals("v-userAgent", parsed.userAgent)
         assertEquals(setOf("url", "size", "mimeType", "contentDisposition", "referer", "cookie", "userAgent"), fields)
