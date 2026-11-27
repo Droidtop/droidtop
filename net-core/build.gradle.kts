@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 // The engine's version is the pin's tag (aria2-engine.pin), the one place it is written.
@@ -9,7 +8,7 @@ val aria2EngineVersion: String = file("aria2-engine.pin").readLines()
 
 android {
     namespace = "dev.droidtop.net"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     defaultConfig { minSdk = 26 }
     buildFeatures { buildConfig = true }
     val revision = System.getenv("VERSION_REVISION") ?: "0"
@@ -18,7 +17,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     sourceSets {
         getByName("main") {
             // droidtop's native library for both ABIs (docs/SPEC.md 7o): native/, over the shared
@@ -26,10 +24,10 @@ android {
             jniLibs.srcDir("agent/jniLibs")
             // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/mytop-net,
             // docs/SPEC.md 12a, mytop-project/tracker#751): here and not in :runtime-common, which depends on this module.
-            java.srcDir("../vendor/mytop-net/sitecheck/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-net/sitecheck/src/main/kotlin")
             // The GitHub client droidtop and Enginehost share (vendor/mytop-net :net, mytop-project/tracker#194): GitHubAuth, which
             // decides per hop where the person's token may go, is that module's; dev.droidtop.net.GitHubAuth calls it.
-            java.srcDir("../vendor/mytop-net/net/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-net/net/src/main/kotlin")
         }
     }
 }
@@ -44,3 +42,6 @@ dependencies {
     testImplementation(libs.json.v20240303)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

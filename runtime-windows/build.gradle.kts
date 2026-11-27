@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -16,7 +15,7 @@ plugins {
  */
 android {
     namespace = "dev.droidtop.runtime.windows"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
@@ -73,7 +72,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     buildFeatures {
         // ContainerData and XServerState are Compose state holders upstream.
@@ -108,3 +106,6 @@ dependencies {
     // A real org.json for tests of what is kept as JSON (Android's is a stub off the device).
     testImplementation(libs.json.v20240303)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

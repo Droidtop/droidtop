@@ -5,12 +5,11 @@
 // device. Its user id, not droidtop's, is what the person allows in the root manager and in Shizuku.
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.droidtop.providerhost"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         applicationId = "dev.droidtop.providerhost"
@@ -49,7 +48,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
@@ -57,3 +55,6 @@ dependencies {
     // IPluginRuntime binder droidtop binds (docs/plugin-api.md 1.3, app_interface).
     implementation(project(":plugin-host"))
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

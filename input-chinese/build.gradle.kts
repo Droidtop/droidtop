@@ -16,7 +16,6 @@
 //   code as BuildConfig.RIME_PIN and BuildConfig.RIME_DATA_FILES.
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 val rimePin: String = file("rime-engine.pin").readText()
@@ -27,7 +26,7 @@ fun javaString(text: String): String =
 
 android {
     namespace = "dev.droidtop.input.chinese"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
@@ -57,7 +56,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     lint {
         abortOnError = false
@@ -70,3 +68,6 @@ dependencies {
 
     testImplementation(libs.junit)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

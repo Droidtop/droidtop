@@ -14,7 +14,7 @@ plugins {
 
 android {
     namespace = "com.termux.terminal"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

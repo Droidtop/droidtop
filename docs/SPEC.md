@@ -25197,6 +25197,17 @@ AGP 9 lint (45800699493, 45925535157, 46044151638); the missing logs do not
 prove which resource caused those losses. APK builds keep their parallel
 budget. The owner directed: "No local builds. CI is the only build."
 
+The follow-up enables built-in Kotlin and the new Android DSL rather than
+keeping AGP compatibility opt-outs. Each custom Kotlin source root uses the
+Android source set Kotlin directory API, compiler options use the top-level
+Kotlin extension, and compileSdk declares release 37 minor API 1. Baseline
+Profile plugin/benchmark 1.5.0 supplies new-DSL support, as recorded in the
+[AndroidX release notes](https://developer.android.com/jetpack/androidx/releases/benchmark#1.5.0-alpha01).
+Murine uses built-in Kotlin when embedded in AGP 9 and its external Kotlin plugin
+only for its pinned standalone AGP 8 build. Dagger uses KSP. :ui-shared
+exports the Compose BOM as an API platform so versionless Compose API
+dependencies resolve in its consumers without android.dependency.useConstraints.
+
 Protobuf remains pinned to 0.10.1. Integration run 46079599640 could not
 resolve its plugin marker, although the same version passed the independent
 AGP gates; its log did not expose a specific HTTP failure. Plugin resolution

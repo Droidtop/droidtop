@@ -1,11 +1,10 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.droidtop.pluginhost"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     // Only for :plugin-host's own bridge (native/ -- libdroidtoppy.so,
     // docs/SPEC.md 12a's "python" kind): dlopen/dlsym glue that never
     // links or bundles CPython itself. Matches input-keyboard's/
@@ -62,7 +61,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
@@ -115,3 +113,6 @@ dependencies {
     // pattern as :library-core).
     testImplementation(libs.json.v20240303)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

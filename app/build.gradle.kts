@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     // droidtop's own baseline profile (docs/SPEC.md 10b): recorded by :baselineprofile, kept in src/release/generated.
     alias(libs.plugins.androidx.baselineprofile)
@@ -20,7 +19,7 @@ android {
     // module stays on its own existing compileSdk; only the final
     // linking module (:app) has to be >= the highest compileSdk among
     // everything it depends on.
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     // A plain incrementing integer, not a git SHA — CI passes the number
     // of commits reachable from the commit it builds (see
@@ -174,7 +173,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     /**
      * The minSdk gate. droidtop's minSdk is 26 and every module agrees on
@@ -400,3 +398,6 @@ androidComponents {
     }
 }
 tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach { dependsOn(copyRigThrowaway) }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

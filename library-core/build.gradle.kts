@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     // Real use: RomDatabase (persistent ROM-scan cache, see
     // consoles/RomDatabase.kt's own doc comment).
     alias(libs.plugins.google.ksp)
@@ -15,7 +14,7 @@ android {
     // shell-default (below) compiles against 36 -- same real AAR-metadata
     // mismatch :app already hit and fixed once this session; any module
     // that depends on shell-default needs to match or exceed it.
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         minSdk = 26
@@ -35,7 +34,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
 
     // The scan code logs for real (one line per folder, one per root --
@@ -193,3 +191,6 @@ dependencies {
     // throwing stub there, so the real library backs the tests.
     testImplementation(libs.json.v20240303)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

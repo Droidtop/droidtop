@@ -14,7 +14,6 @@
 //   with the protobuf plugin shell-default uses for Launcher3's protos and protoc at the catalog's protobuf release.
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.protobuf)
 }
 
@@ -22,7 +21,7 @@ val mozcPin: String = file("mozc-engine.pin").readText()
 
 android {
     namespace = "dev.droidtop.input.japanese"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         minSdk = 26
@@ -47,7 +46,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     lint {
         abortOnError = false
@@ -75,3 +73,6 @@ dependencies {
 
     testImplementation(libs.junit)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
