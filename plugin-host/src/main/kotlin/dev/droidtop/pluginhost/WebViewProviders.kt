@@ -291,7 +291,7 @@ object WebViewProviders {
     internal fun bodyOffer(context: Context, token: String, providerId: String, provider: IWebViewSurfaceProvider, metadata: BrowserBodyMetadata): Boolean {
         val asked = pending[token]?.takeIf { it.taken && it.request.mode == WebSessionRequest.Mode.OPEN } ?: return false
         return synchronized(asked) {
-            if (pending[token] !== asked || asked.bodies.size >= asked.request.maxDownloads.coerceIn(0, DownloadJobs.MAX_FILES) || providerId in asked.bodies) return false
+            if (pending[token] !== asked || asked.bodies.size >= asked.request.maxDownloads.coerceIn(0, DownloadJobs.MAX_FILES) || asked.bodies.containsKey(providerId)) return false
             val download = BrowserBodyOffers.offer(context, asked.pluginId, token, providerId, provider, metadata) ?: return false
             asked.bodies[providerId] = download
             true
