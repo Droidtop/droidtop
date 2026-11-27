@@ -1,4 +1,13 @@
 pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "com.google.protobuf") {
+                // Same published implementation/version as the marker; CI 46079599640 could not resolve only
+                // com.google.protobuf:com.google.protobuf.gradle.plugin:0.10.1. No repository/version fallback.
+                useModule("com.google.protobuf:protobuf-gradle-plugin:${requested.version}")
+            }
+        }
+    }
     repositories {
         google()
         // Google's mirror of Maven Central first, Maven Central after it: Maven Central answered CI with HTTP 429
