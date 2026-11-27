@@ -84,6 +84,47 @@ object WhatsNew {
         builds.filter { it.versionCode <= current && it.versionCode > (lastSeen ?: (current - 1)) }
 
     /**
+     * [builds] as What's new shows them (the owner, 2026-11-27: "Merging multiple versions without listed changes and
+     * giving them the generic message"). An older build's "Internal changes: N. Nothing looks different", which read as
+     * nothing having changed, reads [QUIET_LINE], the line changelog_commits.py now writes. A run of builds with
+     * nothing but that line, and nothing to do after them, is one entry named for its oldest and newest versions.
+     * Newest first, as given. Pure.
+     */
+    internal fun condense(builds: List<ChangelogBuild>): List<ChangelogBuild> {
+        val out = mutableListOf<ChangelogBuild>()
+        val quiet = mutableListOf<ChangelogBuild>()
+        fun flush() {
+            if (quiet.isEmpty()) return
+            val newest = quiet.first()
+            val oldest = quiet.last()
+            out += ChangelogBuild(
+                versionCode = newest.versionCode,
+                versionName = if (quiet.size == 1) newest.versionName else "${oldest.versionName} to ${newest.versionName}",
+                sections = listOf("Changed" to listOf(QUIET_LINE)),
+            )
+            quiet.clear()
+        }
+        builds.forEach { build ->
+            val sections = build.sections.map { (name, lines) -> name to lines.map { if (OLD_QUIET.matches(it.trim())) QUIET_LINE else it }.distinct() }
+            val plain = ChangelogBuild(build.versionCode, build.versionName, sections, build.onboarding)
+            if (build.onboarding.isEmpty() && sections.all { (_, lines) -> lines.all { it == QUIET_LINE } }) {
+                quiet += plain
+            } else {
+                flush()
+                out += plain
+            }
+        }
+        flush()
+        return out
+    }
+
+    /** The line for changes nobody will notice, as build-scripts/changelog_commits.py writes it (`INTERNAL_LINE`). */
+    internal const val QUIET_LINE = "Various bug fixes and performance improvements"
+
+    /** The line it replaced in builds published before 2026-11-27, in both of its spellings. */
+    private val OLD_QUIET = Regex("""^Internal changes(: \d+\.| \(\d+\);) [Nn]othing looks different\.?$""")
+
+    /**
      * What a person must do after an update that brought [builds], each line once, oldest build's first: the update
      * onboarding's lines from every build between the version they had and this one, so a skipped build's are there
      * too (owner, 2026-11-04: "make sure we get every onboarding thing and etc required"). Pure.

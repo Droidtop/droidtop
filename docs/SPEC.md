@@ -11415,6 +11415,11 @@ displays it."
   opens it with every build's entry, any time. Above the builds, under "After updating", are the `Onboarding:`
   lines of every build shown, each once, oldest first (10b, 2026-11-04); About's "Changes since your last update"
   opens the same view for the last update's range any time.
+  **Quiet builds are one entry** (the owner, 2026-11-27: "Merging multiple versions without listed changes and giving
+  them the generic message"). A run of builds whose only line is "Various bug fixes and performance improvements"
+  (changelog_commits.py's line for changes nobody will notice, 10b), with nothing under After updating, shows as one
+  entry named "<oldest> to <newest>" with that one line (`WhatsNew.condense`, tested). Builds published before that
+  line existed carry "Internal changes: N. Nothing looks different", which What's new shows as the same line.
   **It opens once the shell is placed, and nothing covers it** (mytop-project/tracker#824; the owner on the console after
   an update: "I don't have a "what's new" splash"). It opened over the first `MainActivity` of a fresh process, and
   0.4 s later the screen placement started the shell a second time on the second screen, over it. Two changes, no
