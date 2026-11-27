@@ -14832,6 +14832,16 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**One place for automatic updates (mytop-project/tracker#964, step 6).** Update settings (Updates' settings screen)
+decides what updates by itself: each kind's policy (droidtop, Plugins, Android apps, Store games; `UpdateKinds`),
+then **When** (Update only during a set time, its From and Until, Update while a game is running), then the check
+frequency, the build channel and apps without asking. Three places used to decide it: Download rules' Automatic
+updates group (Keep installed store games up to date, which is the Store games policy, and the window and game rows),
+this screen, and a plugin repository screen's "Update these plugins automatically" (the Plugins policy). Download
+rules keeps how many at once, host order and history; the stored values (`DownloadPolicy`, `PluginRepoUpdates`) and
+row ids did not change, so nothing anyone set is lost and search still finds them. The rules themselves are as
+"Download rules" below describes.
+
 **One network rule (mytop-project/tracker#964, step 5).** Download rules' network rule (Wi-Fi only; Wi-Fi and
 mobile data for small downloads; any connection) is the one rule every job follows: downloads by size
 (`DownloadPolicy.allowsMetered`), and checks, store syncs and other small reads on a metered network unless it is Wi-Fi
