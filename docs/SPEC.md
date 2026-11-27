@@ -25263,8 +25263,9 @@ Now:
   (`changelog_commits.py`): its `Changelog:` trailer, else its subject, under
   Fixed when the subject says it fixes something, Added when it adds, else
   Changed. A commit about tests, CI, docs or a fragment, or one marked
-  `Changelog: none`, folds into one line, "Internal changes (N); nothing looks
-  different". A bracketed tracker reference is left out; a line naming a
+  `Changelog: none`, folds into one line, "Various bug fixes and performance
+  improvements" (the owner, 2026-11-27, the industry's shorthand for "we made changes"; it read "Internal changes:
+  N. Nothing looks different", which said nothing had changed). A bracketed tracker reference is left out; a line naming a
   private plugin is dropped, not published. The first paragraph of a message
   is not used: it says why for developers, with tracker numbers and file
   paths, and the subject is already the change in one line.
