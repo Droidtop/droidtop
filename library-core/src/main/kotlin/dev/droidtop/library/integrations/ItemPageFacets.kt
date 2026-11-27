@@ -115,7 +115,7 @@ object ItemPageFacets {
     fun controls(facets: List<Facet>): List<UpdateSources.Control> = facets.mapNotNull { f ->
         when (val b = f.body) {
             is FacetBody.Toggle -> b.call?.let { UpdateSources.Control(f.id, UpdateSources.Control.Kind.TOGGLE, b.label, b.sub, on = b.value, action = FacetViews.action(it, f.id, "bool")) }
-            is FacetBody.Action -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.ACTION, b.label, b.sub, action = FacetViews.action(b.call, f.id, null), confirm = b.confirm != "none")
+            is FacetBody.Action -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.ACTION, b.label, b.sub, action = FacetViews.action(b.call, f.id, null), question = FacetViews.confirmQuestion(b))
             is FacetBody.Link -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.LINK, b.label, NetScope.hostOf(b.url), url = b.url)
             is FacetBody.Notice -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.NOTICE, b.title, b.sub, action = b.call?.let { FacetViews.action(it, f.id, null) })
             else -> null

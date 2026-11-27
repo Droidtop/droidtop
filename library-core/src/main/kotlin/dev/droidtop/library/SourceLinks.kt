@@ -132,7 +132,9 @@ interface UpdateSources {
 
     /**
      * One of the source's controls on the record page: a switch (watch this thread), a button, a link or a notice.
-     * [action] is what pressing it sends the source; a link opens [url]; a notice without an action only says.
+     * [action] is what pressing it sends the source; a link opens [url]; a notice without an action only says. [question] is
+     * what droidtop asks before a button the source marked to confirm runs (`FacetViews.confirmQuestion`: its label, and
+     * for a danger button what it says is lost); null runs it at once.
      */
     data class Control(
         val id: String,
@@ -142,8 +144,11 @@ interface UpdateSources {
         val on: Boolean = false,
         val url: String? = null,
         val action: dev.droidtop.pluginhost.ViewAction? = null,
-        val confirm: Boolean = false,
+        val question: String? = null,
     ) {
+        /** Whether pressing it asks [question] first. */
+        val confirm: Boolean get() = question != null
+
         enum class Kind { TOGGLE, ACTION, LINK, NOTICE }
     }
 

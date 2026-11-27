@@ -165,6 +165,8 @@ fun MenuRow(
     icon: CatalogIcon? = null,
     // A picture in place of [icon] (a store's cached mark, mytop-project/tracker#503).
     iconFile: String? = null,
+    // A plugin facet's icon name, drawn with droidtop's glyph for it where there is no [icon] or [iconFile].
+    glyphName: String? = null,
     onClick: (() -> Unit)? = null,
     // Long-press is the touch route to Y on a row (the same convention
     // the shell's cards use for their detail).
@@ -310,12 +312,13 @@ fun MenuRow(
                     .background(accent),
             )
             Spacer(Modifier.width(12.dp))
-        } else if (icon != null || iconFile != null) {
+        } else if (icon != null || iconFile != null || facetGlyph(glyphName) != null) {
             CatalogGlyph(
                 icon,
                 iconFile,
                 tint = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                 modifier = Modifier.size(24.dp),
+                glyphName = glyphName,
             )
             Spacer(Modifier.width(16.dp))
         } else if (leading != null) {

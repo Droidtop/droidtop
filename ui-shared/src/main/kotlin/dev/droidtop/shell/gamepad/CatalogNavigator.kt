@@ -1715,6 +1715,7 @@ private fun CatalogMenuRow(
         accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
         icon = item.icon,
         iconFile = item.iconFile,
+        glyphName = item.glyphName,
         onClick = onClick,
         onLongClick = onLongClick,
         onAdjust = onAdjust,

@@ -263,7 +263,8 @@ object SourceRecordScreen {
                     id = id,
                     title = row.title,
                     subtitle = row.subtitle,
-                    confirmTitle = row.title.takeIf { action.control.confirm },
+                    // The question names what is lost for a danger button (docs/plugin-api.md 1.10, `confirm`), not just the title.
+                    confirmTitle = action.control.question,
                     run = { _, _ -> library.runSourceControl(facet.source.key, record.externalId, action.control, null).ifBlank { "Done" } },
                 )
             }

@@ -146,7 +146,14 @@ data class PluginView(
  * mytop-project/tracker#521 item 5): while the person has that permission turned off, droidtop draws the node as an inert
  * row saying so instead of the node, and the rest of the page is untouched.
  */
-data class ViewSection(val id: String, val title: String?, val nodes: List<ViewNode>, val needs: Map<String, String> = emptyMap())
+/** [chips] are the section's `badge` facets, (text, tone): small chips above its rows (docs/plugin-api.md 1.10, `badge`). */
+data class ViewSection(
+    val id: String,
+    val title: String?,
+    val nodes: List<ViewNode>,
+    val needs: Map<String, String> = emptyMap(),
+    val chips: List<Pair<String, String>> = emptyList(),
+)
 
 /**
  * What a node does when used: [Kind.VIEW] opens the reply as a page, [Kind.CALL]
@@ -189,9 +196,18 @@ sealed interface ViewNode {
 
     /**
      * [state] is a status facet's state (`busy`, `warning`, `error`, ...), drawn as the host's status glyph beside the
-     * title (mytop-project/tracker#644); null for a plain fact.
+     * title (mytop-project/tracker#644); null for a plain fact. [tone] is a status facet's `tone` (`neutral`, `positive`,
+     * `caution`, `danger`) and [icon] its icon name (docs/plugin-api.md 1.10), both drawn by the host.
      */
-    data class Info(override val id: String, override val title: String, override val subtitle: String?, val value: String?, val state: String? = null) : ViewNode
+    data class Info(
+        override val id: String,
+        override val title: String,
+        override val subtitle: String?,
+        val value: String?,
+        val state: String? = null,
+        val tone: String? = null,
+        val icon: String? = null,
+    ) : ViewNode
 
     data class Row(
         override val id: String,
@@ -216,9 +232,18 @@ sealed interface ViewNode {
         val value: String?,
         val confirm: String?,
         val action: ViewAction,
+        /** An action facet's icon name (docs/plugin-api.md 1.10, "Icons are names"). */
+        val icon: String? = null,
     ) : ViewNode
 
-    data class Toggle(override val id: String, override val title: String, override val subtitle: String?, val value: Boolean, val action: ViewAction?) : ViewNode
+    data class Toggle(
+        override val id: String,
+        override val title: String,
+        override val subtitle: String?,
+        val value: Boolean,
+        val action: ViewAction?,
+        val icon: String? = null,
+    ) : ViewNode
 
     data class Choice(
         override val id: String,

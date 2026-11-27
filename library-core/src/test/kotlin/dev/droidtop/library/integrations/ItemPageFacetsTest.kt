@@ -89,6 +89,7 @@ class ItemPageFacetsTest {
         assertEquals(false, args.get("value"))
         assertEquals("93340", args.getString("thread"))
         assertEquals(true, record.controls[1].confirm)
+        assertEquals("Rate it?", record.controls[1].question)
         assertNull(record.controls[2].action)
     }
 
