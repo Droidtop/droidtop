@@ -44,7 +44,7 @@ not that every task in that area was traced. **Traced** refers only to the paths
 | Aggregate Plugin status widget | `PluginStatusWidgetProvider` | Fixed here: use `PluginWidgets` sources/state and `PluginWidgetContent`, rather than a second legacy invoke and invented “OK” value. Each tile now keeps its id and obeys widget/game scope. |
 | Configurable Plugin widget | `PluginWidgetConfigureActivity` → `PluginWidgets` → `PluginWidgetProvider` → action receiver | Shared widget transport and renderer exist. Full `widget` Facets consumption remains separate work; this change does not pretend the C10 templates are Facets. |
 | Facet sections and forms | `FacetGuards.admit` / `unhidden` → `FacetViews` | Fixed here: child subject/placement checks, submit grant validation and nested hiding. JVM cases cover hostile and valid content. |
-| Source search and acquisition | `LibraryQueryUi` → `UnifiedSearch` / `AcquireContentSources` → `PluginViews.acquire` → download queue → `AcquireIndexing` | The earlier blocked-source in-place ask exists on this base. Download/session lifetime and restart behavior require their own code audit; a successful source search does not prove an acquisition completes. |
+| Source search and acquisition | `LibraryQueryUi` → `UnifiedSearch` / `AcquireContentSources` → `PluginViews.acquire` → download queue → `AcquireIndexing` | The earlier blocked-source in-place ask exists on this base. `StoresCatalog.getGamesGroups` and `LauncherSearchActivity.EXTRA_GET_GAMES` also expose the same search outside Gaming; the older review's mode-reachability gap is superseded. Download/session lifetime and restart behavior still require their own audit. |
 
 Paths abbreviated as `Plugin*.kt` are under `library-core/src/main/kotlin/dev/droidtop/library/integrations/`,
 unless named with another module. Guards and facet models are in `plugin-host/src/main/kotlin/dev/droidtop/pluginhost/`.
@@ -56,7 +56,9 @@ unless named with another module. Guards and facet models are in `plugin-host/sr
    not promise that its page repeats every legacy managed-app or store action. Keep one guarded renderer after adaptation.
 2. Move aggregate/configurable widgets onto the `widget` facet target, retaining existing widget configurations and
    per-entry identities. Status, quick and template widgets currently share calls but still use older wire models.
-3. Make source search reachable outside Gaming, then trace sign-in → acquire → queue → index independently of page lifetime.
+3. Trace sign-in → acquire → queue → index independently of page lifetime from each existing mode entry point. Source
+   search already has an outside-Gaming route (`StoresCatalog.getGamesGroups` → `LauncherSearchActivity.getGamesIntent`
+   → shared `GetGamesSearch`); do not rebuild or duplicate it based on the older review.
 4. Review the DroidDeck visual proposals against the current shared components, especially contrast fitting and settings
    search. Those are product changes, not evidence that the existing routes are broken.
 
