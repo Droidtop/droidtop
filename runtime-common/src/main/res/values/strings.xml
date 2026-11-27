@@ -97,7 +97,7 @@
     <string name="gaming_in_x_mode">In %1$s mode</string>
     <string name="gaming_settings">Settings</string>
     <string name="gaming_home_screen_and_modes">Home screen and modes</string>
-    <string name="gaming_shell">Shell</string>
+    <string name="gaming_shell">Gaming mode</string>
     <string name="gaming_quick_menu_order">Quick Menu order</string>
     <string name="gaming_which_section_comes_where_on_the">The order of the Quick Menu\'s sections</string>
     <string name="gaming_home_rows">Home rows</string>

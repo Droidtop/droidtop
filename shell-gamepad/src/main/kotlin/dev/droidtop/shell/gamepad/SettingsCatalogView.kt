@@ -58,21 +58,8 @@ internal fun SettingsCatalogView(
     )
 }
 
-/**
- * The Gaming shell's Settings, as one screen: what the Settings page opens and what the one search indexes, so a
- * setting the search finds is a setting the page shows. [placeScreenIds] are the places the left menu already has,
- * which Settings does not repeat.
- */
-internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): CatalogScreen = CatalogScreen(
-    id = "gaming_settings",
-    title = words(R.string.gamepad_settings),
-    categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
-    // Merged first, then filtered: the places Global settings links to (Updates) were merged in after the filter ran,
-    // so Settings kept a second Updates (mytop-project/tracker#610).
-    groups = { ctx ->
-        withoutPlaceLinks(mergeShortScreens(GamingSettingsCatalog.settingsGroups(ctx)) { it.groups(ctx) }, placeScreenIds)
-    },
-)
+/** The Gaming shell's Settings: the one tree every mode opens ([SettingsRoot]), without the left menu's places. */
+internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): CatalogScreen = SettingsRoot.screen(placeScreenIds)
 
 /**
  * A place from the left menu (Stores, Downloads and jobs, Updates,

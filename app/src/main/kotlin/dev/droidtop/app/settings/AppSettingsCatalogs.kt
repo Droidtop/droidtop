@@ -207,6 +207,9 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
+        // The one settings tree every mode opens (docs/SPEC.md "One settings tree"): Mobile's Settings row and Desktop's
+        // Start > Settings show it in droidtop's screen host; the Gaming shell draws it in place.
+        SettingsScreenRegistry.register(dev.droidtop.shell.gamepad.SettingsRoot.screen())
         SettingsScreenRegistry.register(moreControlsScreen())
         // Settings > Library > Storage: what installed games take, biggest first (it sat inside Game sources until step 9).
         SettingsScreenRegistry.register(StorageCatalog.screen())

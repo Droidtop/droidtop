@@ -848,16 +848,16 @@ internal fun openModes(context: Context) {
 }
 
 /**
- * Desktop's settings in droidtop's screen host, the chrome Containers and the places open in (mytop-project/tracker#692),
- * with Desktop's page first and the rest of Settings one row away at its end. It opened Launcher3's settings
- * activity, which drew the same catalog as stock Android preferences; that page stays Standard's.
+ * Start > Settings: the one settings tree every mode opens (docs/SPEC.md "One settings tree", mytop-project/tracker#964
+ * step 10) in droidtop's screen host, the chrome Containers and the places open in (mytop-project/tracker#692). Desktop's
+ * own page is under Modes. It opened Desktop's page alone, from which the rest of Settings was one row away.
  */
 internal fun openSettings(context: Context) {
-    context.startActivity(CatalogScreenLink.intent(context, DESKTOP_SETTINGS_SCREEN_ID))
+    context.startActivity(CatalogScreenLink.intent(context, SETTINGS_SCREEN_ID))
 }
 
-/** `DroidtopWideSettings.SCREEN_DESKTOP` in :app, which this module cannot see. */
-internal const val DESKTOP_SETTINGS_SCREEN_ID = "desktop_settings"
+/** `SettingsRoot.SCREEN_ID` in :ui-shared. */
+internal const val SETTINGS_SCREEN_ID = "settings"
 
 /**
  * "Companion" on the taskbar while the device has one screen (docs/SPEC.md "The companion's tabs", One screen): the

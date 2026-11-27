@@ -492,8 +492,8 @@ private fun DesktopSearch(
         },
         // Desktop has no game page; the Start menu's search plays the game.
         onOpen = onPlay,
-        // Desktop's own settings are searched with the rest.
-        settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get("desktop_settings") },
+        // The whole settings tree is searched, Desktop's own page with it.
+        settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(SETTINGS_SCREEN_ID) },
         onDismiss = onDismiss,
     )
 }

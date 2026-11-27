@@ -58,7 +58,9 @@ object GamingSettingsCatalog {
         // shares and paired devices joined the web there.
         // Accounts and sources became Accounts on 2026-11-27 (tracker#964 step 8): sign-ins only.
         "Modes", "Library", "Accounts", "Network", "Appearance",
-        "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
+        // One tree for every mode since 2026-11-27 (tracker#964 step 10): Shell behaviour is Modes' Gaming section,
+        // Companion screen a row of Displays, and Controls and keyboard is Controls.
+        "Controls", "Displays", "System",
     )
     const val GROUP_INTERNET = "gaming_internet"
     const val GROUP_MORE_CONTROLS = "gaming_more_controls"
@@ -289,9 +291,11 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_GAMING,
+            // Gaming mode's own behaviour, a section of Modes beside Mobile's and Desktop's (tracker#964 step 10): it was a
+            // category of its own, "Shell behaviour", a word for the internals.
             title = words(R.string.gaming_shell),
             icon = CatalogIcon.GAMING,
-            category = "Shell behaviour",
+            category = "Modes",
             items = buildList {
                 add(defaultSectionItem(context))
                 add(
@@ -529,7 +533,7 @@ object GamingSettingsCatalog {
             id = GROUP_KEYBOARD,
             title = words(R.string.gaming_keyboard_on_the_screens),
             icon = CatalogIcon.INPUT,
-            category = "Controls and keyboard",
+            category = "Controls",
             items = secondScreenKeyboardItems(context).filter { it.id != ID_DISPLAY_COMPANION },
         ),
         // The companion screen's own settings, a category of their own: they were about 28 rows under Displays. A
@@ -537,6 +541,8 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_COMPANION_SCREEN,
             title = null,
+            // A row of Displays, with the screens it is one of (tracker#964 step 10), where it was a category of its own.
+            category = "Displays",
             items = secondScreenKeyboardItems(context).filter { it.id == ID_DISPLAY_COMPANION },
         ),
         // More controls (elevated access) and what it changes on Android itself (device setup): System, not Accounts
@@ -574,7 +580,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_INPUT,
             title = words(R.string.gaming_controls),
-            category = "Controls and keyboard",
+            category = "Controls",
             icon = CatalogIcon.INPUT,
             items = buildList {
                 // The controllers connected now, each with its battery where Android reports one (mytop-project/tracker#723).

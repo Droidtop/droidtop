@@ -14832,6 +14832,16 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**One settings tree (mytop-project/tracker#964, step 10).** Every mode opens the same Settings: the Gaming shell's
+Settings page draws it in place, Mobile's Settings row and Desktop's Start > Settings open it in droidtop's screen host
+(`SettingsRoot`, registered as `settings`). Its categories are Modes, Library, Accounts, Network, Appearance, Controls,
+Displays and System. Modes holds each mode's own section (Gaming mode's behaviour, which was the category "Shell
+behaviour"; Mobile's and Desktop's pages under Other modes), the companion screen is a row of Displays (it was a
+category of its own), and Controls and keyboard is Controls. In Mobile, Library, Accounts, Network and Controls used to
+be inside "Other modes > Gaming mode"; Desktop's Start > Settings opened Desktop's page alone. Desktop's page is Modes >
+Other modes > Desktop mode. A test fails when two rows of the root share an id (`SettingsTreeIdsTest`): a renderer keeps
+the first of two, so a duplicate was hidden in Gaming and shown in Mobile.
+
 **Library: one page per system (mytop-project/tracker#964, step 9).** Console systems and Emulators are one entry,
 **Systems and emulators** (`console_systems`; `emulators` stays registered for old links): the default emulator, the
 emulators found on this device and RetroArch's cores first (`EmulatorsCatalog.overviewGroups`), then each system

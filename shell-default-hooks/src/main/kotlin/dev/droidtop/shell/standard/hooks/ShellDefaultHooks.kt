@@ -189,33 +189,26 @@ object ShellDefaultHooks {
         private const val LAUNCHER_IMPORT = "pref_launcher_import"
         private const val TASKBAR = "pref_taskbar"
 
+        /** The settings tree's registered id (`SettingsRoot.SCREEN_ID`), and this list's row that opens it. */
+        private const val SETTINGS_TREE = "settings"
+
+        // droidtop's Settings: the one tree every mode opens (docs/SPEC.md "One settings tree", tracker#964 step 10), in
+        // droidtop's screen host, so Library, Accounts, Network and Controls are here as in Gaming and Desktop. It
+        // replaces this list's Global settings and its "Gaming mode" holder, where those used to hide.
         private fun global(context: Context) = SettingsHooks.Row(
-            id = "global_settings",
+            id = SETTINGS_TREE,
             title = context.getString(R.string.pref_global_settings_title),
             summary = context.getString(R.string.pref_global_settings_desc),
             icon = LauncherR.drawable.ic_settings_general,
-            fragment = SettingsGlobalFragment::class.java.name,
         )
 
         override fun rows(context: Context): List<SettingsHooks.Row> {
             val places = context.getString(R.string.pref_subcategory_places)
-            val shells = context.getString(R.string.pref_subcategory_other_shells)
+            // Desktop's and Gaming's own pages are in the tree, under Modes.
             return listOf(global(context)) +
                 Place.visible(UiModePrefs.get(context)).map { place ->
                     SettingsHooks.Row(PLACE + place.screenId, place.title, icon = place.icon.drawableRes(), group = places)
-                } +
-                listOf(
-                    SettingsHooks.Row(
-                        "desktop_settings", context.getString(R.string.pref_category_desktop_title),
-                        context.getString(R.string.pref_category_desktop_desc), R.drawable.ic_catalog_desktop,
-                        shells, SettingsDesktopFragment::class.java.name,
-                    ),
-                    SettingsHooks.Row(
-                        "gaming_settings", context.getString(R.string.pref_category_gaming_title),
-                        context.getString(R.string.pref_category_gaming_desc), R.drawable.ic_catalog_gaming,
-                        shells, SettingsGamingFragment::class.java.name,
-                    ),
-                )
+                }
         }
 
         override fun toolbarRow(context: Context) = global(context)
@@ -225,6 +218,7 @@ object ShellDefaultHooks {
         override fun run(id: String, context: Context) {
             val intent = when {
                 id.startsWith(PLACE) -> Place.byScreenId(id.removePrefix(PLACE))?.let { Place.openIntent(context, it) }
+                id == SETTINGS_TREE -> dev.droidtop.library.settings.CatalogScreenLink.intent(context, SETTINGS_TREE)
                 id == HOME_SCREEN -> Intent(context, SettingsActivity::class.java)
                     .putExtra(SettingsActivity.EXTRA_FRAGMENT, SettingsGlobalFragment::class.java.name)
                 id == LAUNCHER_IMPORT -> Intent(context, LauncherImportActivity::class.java)
