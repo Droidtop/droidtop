@@ -112,7 +112,7 @@ object FacetGuards {
                     drop(messages, facet, "it is about a ${facet.subject.type} droidtop did not ask about")
                 else -> guarded(facet, plugin, messages)
             }
-        }.mapNotNull { facet -> shown(facet, spec, plugin, messages) }.sortedBy { -it.priority.ordinal }
+        }.mapNotNull { facet -> shown(facet, spec, plugin, messages, target, asked) }.sortedBy { -it.priority.ordinal }
 
         val cap = PluginViewLimits.facetsPerTarget(target)
         val perKind = HashMap<String, Int>()
@@ -141,16 +141,25 @@ object FacetGuards {
      * the guards (a group cannot carry a kind its target does not draw), and store information is cut to what it may
      * claim ([cleanStore]). Null when nothing of a group is left.
      */
-    private fun shown(facet: Facet, spec: Target?, plugin: Plugin, messages: MutableList<String>): Facet? = when (val body = facet.body) {
+    private fun shown(facet: Facet, spec: Target?, plugin: Plugin, messages: MutableList<String>, target: String, asked: FacetSubject?): Facet? = when (val body = facet.body) {
         is FacetBody.Group -> {
-            val inner = body.facets.filter { child ->
-                when {
-                    child.kind == "group" -> drop(messages, child, "a group inside a group is one level too deep")
-                    spec != null && child.kind !in spec.kinds -> drop(messages, child, "${spec.name} does not take ${child.kind}")
-                    else -> guarded(child, plugin, messages)
-                }
-            }.map { child -> (child.body as? FacetBody.Store)?.let { child.copy(body = cleanStore(it, plugin)) } ?: child }
-            if (inner.isEmpty()) null else facet.copy(body = body.copy(facets = inner))
+            // A form's submit is an action too: nesting it must not bypass the declared-permission guard.
+            if (body.submit != null && !grantGuard(facet, body.submit.call, plugin, messages)) {
+                null
+            } else {
+                val inner = body.facets.filter { child ->
+                    when {
+                        child.kind == "group" -> drop(messages, child, "a group inside a group is one level too deep")
+                        child.targets.isNotEmpty() && target !in child.targets -> drop(messages, child, "it does not ask for $target")
+                        spec != null && child.kind !in spec.kinds -> drop(messages, child, "${spec.name} does not take ${child.kind}")
+                        spec != null && child.subject.type !in spec.subjects -> drop(messages, child, "$target is not about a ${child.subject.type}")
+                        namedByDroidtop(child.subject) && child.subject != asked ->
+                            drop(messages, child, "it is about a ${child.subject.type} droidtop did not ask about")
+                        else -> guarded(child, plugin, messages)
+                    }
+                }.map { child -> (child.body as? FacetBody.Store)?.let { child.copy(body = cleanStore(it, plugin)) } ?: child }
+                if (inner.isEmpty()) null else facet.copy(body = body.copy(facets = inner))
+            }
         }
         is FacetBody.Store -> facet.copy(body = cleanStore(body, plugin))
         else -> facet
@@ -279,7 +288,11 @@ object FacetGuards {
 
     /** [facets] less the ones the person hid on [target]. A hidden facet is not drawn, and its group goes with it. */
     fun unhidden(facets: List<Facet>, target: String, snapshot: PluginGrants.Snapshot): List<Facet> =
-        facets.filter { facetOn(snapshot, target, it.id) }
+        facets.filter { facetOn(snapshot, target, it.id) }.mapNotNull { facet ->
+            val group = facet.body as? FacetBody.Group ?: return@mapNotNull facet
+            val children = group.facets.filter { facetOn(snapshot, target, it.id) }
+            if (children.isEmpty()) null else facet.copy(body = group.copy(facets = children))
+        }
 
     /** The person's switch for [target]: on unless they turned it off, and always on for the plugin's own pages. */
     fun targetOn(snapshot: PluginGrants.Snapshot, target: String): Boolean =

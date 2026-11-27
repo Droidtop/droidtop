@@ -61,5 +61,6 @@ class PluginWidgetContentTest {
         assertEquals("Battery · 80%", status.lines.single().text)
         assertFalse(status.lines.single().press)
         assertEquals("Battery", PluginWidgetContent.tile("Battery", null, quick = false).lines.single().text)
+        assertEquals("Battery", PluginWidgetContent.tile("Battery", TileState("Battery", null, null, null), quick = false).lines.single().text)
     }
 }
