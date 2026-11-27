@@ -14832,6 +14832,14 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**Accounts and System (mytop-project/tracker#964, step 8).** Accounts and sources is **Accounts**: sign-ins and keys
+(GitHub, Keys and accounts, Game sources, the scraper and achievement services) and Plugins and App integrations.
+Network took its shares and devices (step 7). **More controls** (where elevated actions come from: the choice,
+wireless debugging, the Helper app, Allow droidtop in Shizuku) and the device setup it runs are one page, Settings >
+System > More controls (`more_controls`), and the reasons a privileged action cannot run name that place. Desktop's and
+Windows games' "Child processes" row is shown only while Android's limit applies to droidtop, the hint where it bites;
+lifting it lives on More controls.
+
 **One place for automatic updates (mytop-project/tracker#964, step 6).** Update settings (Updates' settings screen)
 decides what updates by itself: each kind's policy (droidtop, Plugins, Android apps, Store games; `UpdateKinds`),
 then **When** (Update only during a set time, its From and Until, Update while a game is running), then the check

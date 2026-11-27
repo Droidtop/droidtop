@@ -23,6 +23,10 @@ internal object PhantomProcessRow {
         val status = withContext(Dispatchers.IO) {
             PhantomProcesses.read(TaskManager.shell, sdk, android.os.Process.myUid(), context.packageName)
         }
+        // Shown only while Android's limit applies to droidtop: lifting it, or putting it back, is More controls' device
+        // setup row (Settings > System > More controls); here it is the in-place hint where the limit bites
+        // (mytop-project/tracker#964 step 8).
+        if (!status.applies) return null
         val limitText = status.limit?.takeIf { it < PhantomProcesses.LIFTED }?.toString() ?: PhantomProcesses.DEFAULT_LIMIT.toString()
         val value = when {
             status.applies -> "${status.ours} of $limitText"
@@ -32,7 +36,7 @@ internal object PhantomProcessRow {
         val noShell = if (sdk >= PhantomProcesses.FLAG_SDK) {
             "Android ends extras. Developer options: Disable child process restrictions"
         } else {
-            "Android ends extras. Shizuku or wireless debugging can lift that limit"
+            "Android ends extras. More controls can lift that limit"
         }
         val row = DeviceSetupRows.row(context, DeviceSetup.childProcesses, id, title = "Child processes", value = value, noShell = noShell)
         // Over the limit, the warning leads whatever the row offers.
