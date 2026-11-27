@@ -54,6 +54,8 @@ public class LatinIMESettings extends PreferenceActivity
     // Dialog ids
     private static final int VOICE_INPUT_CONFIRM_DIALOG = 0;
 
+    public static final String EXTRA_OPEN_DICTIONARIES = "open_dictionaries";
+
     private CheckBoxPreference mQuickFixes;
     private ListPreference mVoicePreference;
     private ListPreference mSettingsKeyPreference;
@@ -211,6 +213,11 @@ public class LatinIMESettings extends PreferenceActivity
         }
 
         mLabelVersion.setSummary(version);
+        // Setup uses the same dictionary manager and result handling as Settings.
+        if (icicle == null && getIntent().getBooleanExtra(EXTRA_OPEN_DICTIONARIES, false)
+                && dictionaries != null) {
+            DictionaryRow.open(this, dictionaries);
+        }
     }
 
     @Override
