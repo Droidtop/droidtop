@@ -113,3 +113,8 @@
 [submodule "vendor/mytop-runners"]
 	path = vendor/mytop-runners
 	url = https://github.com/mytop-project/mytop-runners
+[submodule "vendor/droiddeck"]
+	path = vendor/droiddeck
+	url = https://github.com/Droid-Deck/DroidDeck
+	shallow = true
+	update = none

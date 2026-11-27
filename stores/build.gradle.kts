@@ -29,6 +29,14 @@ android {
     }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
+    sourceSets {
+        getByName("main") {
+            // DroidDeck's store download engines for both ABIs (docs/SPEC.md 7g, "Store engines from DroidDeck"):
+            // its Rust crate from vendor/droiddeck, unchanged, built by build-scripts/build-store-engines.sh.
+            jniLibs.srcDir("engines/jniLibs")
+        }
+    }
+
     // The stores log through android.util.Log and Timber; a JVM unit test
     // reaching either gets the stub's defaults instead of an exception.
     testOptions {

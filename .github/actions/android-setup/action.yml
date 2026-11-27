@@ -337,6 +337,26 @@ runs:
       shell: bash
       run: bash build-scripts/build-agent-lib.sh
 
+    - name: Pin of the DroidDeck store engines
+      id: storeengines-pin
+      shell: bash
+      run: echo "sha=$(git ls-tree HEAD vendor/droiddeck | awk '{print $3}')" >> "$GITHUB_OUTPUT"
+
+    - name: Cache the DroidDeck store engines
+      id: storeengines-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: stores/engines/jniLibs
+        key: store-engines-${{ steps.storeengines-pin.outputs.sha }}-${{ hashFiles('build-scripts/build-store-engines.sh') }}-ndk-${{ env.NDK_VERSION }}
+
+    - name: Build the DroidDeck store engines
+      # libdroiddeckstores.so for both ABIs, DroidDeck's Rust store crate from the vendor/droiddeck submodule, unchanged
+      # (docs/SPEC.md 7g, "Store engines from DroidDeck"; mytop-project/tracker#335). The script fetches only the
+      # crate's folder of the pinned commit.
+      if: steps.storeengines-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/build-store-engines.sh
+
     - name: Cache the bundled SQLite
       id: sqlite-cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
