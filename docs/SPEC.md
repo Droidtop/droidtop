@@ -17464,7 +17464,7 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   encoding, never a shell command, and no variable is saved to the prefix or displayed in command previews.
   Names that alter the host loader, path or prefix, and values with control characters, are refused. A store's
   launch error is reported; it never silently falls back to another executable or a launch without its credentials.
-  Native process diagnostics list environment variable names only; their values can contain account credentials.
+  Native process diagnostics list environment variable names or counts only; their values can contain account credentials.
 - **Wine preparation belongs to the runtime.** A store's `prepareWindowsLaunch` is called only for a real launch,
   after its prefix is selected. Its `StoreWineContext` names that prefix, maps files to its C drive or the mapped
   game drives and runs bounded commands through the existing silent, non-root `WineXSession`. Hardware probes
