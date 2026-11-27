@@ -81,6 +81,7 @@ object EaApi {
         if (reply.status == 401) throw EaApiException(401, "EA refused the session")
         if (json == null) throw EaApiException(reply.status, "EA gave no answer to $name (${reply.status})")
         json.optJSONArray("errors")?.optJSONObject(0)?.let { throw EaApiException(reply.status, "$name: ${it.optString("message")}") }
+        if (!reply.ok) throw EaApiException(reply.status, "EA did not answer $name (HTTP ${reply.status})")
         return json.optJSONObject("data") ?: throw EaApiException(reply.status, "$name returned no data")
     }
 
@@ -239,4 +240,3 @@ object EaApi {
         return call(token, "sdkEntitlements", variables).optJSONObject("me")?.optJSONObject("sdkEntitlements")?.optJSONArray("entitlements") ?: JSONArray()
     }
 }
-
