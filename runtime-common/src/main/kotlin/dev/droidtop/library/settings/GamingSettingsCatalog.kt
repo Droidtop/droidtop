@@ -231,7 +231,16 @@ object GamingSettingsCatalog {
         )
     }
 
-    /** Whether a VPN is up, opening Android's VPN screen. The Quick Menu's row and Settings > Network's (tracker#964). */
+    /**
+     * Whether droidtop's own VPN (a container's proxy carrying the device's traffic) is up. `:app` owns the service and
+     * sets this at start; until then it is false.
+     */
+    @Volatile var droidtopVpnServing: () -> Boolean = { false }
+
+    /**
+     * Whether a VPN is up. Pressed, it opens where that VPN is chosen: Settings > Network when it is droidtop's own (a
+     * container's), else Android's VPN screen. The Quick Menu's row and Settings > Network's (tracker#964).
+     */
     fun vpnItem(status: dev.droidtop.runtime.systemstatus.SystemStatusSnapshot): CatalogItem = ActionItem(
         id = ID_SYSTEM_VPN,
         title = words(R.string.gaming_vpn),
@@ -239,11 +248,18 @@ object GamingSettingsCatalog {
         state = status.vpnActive,
         run = { ctx ->
             ctx.startActivity(
-                android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                if (droidtopVpnServing()) {
+                    CatalogScreenLink.intent(ctx, NETWORK_SCREEN_ID)
+                } else {
+                    android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
             )
         },
     )
+
+    /** Settings > Network's registered id (`AppSettingsCatalogs.SCREEN_NETWORK`). */
+    const val NETWORK_SCREEN_ID = "network"
 
     /**
      * Builds the live catalog. Values are read fresh on every call, so call
@@ -464,7 +480,7 @@ object GamingSettingsCatalog {
                     id = ID_INTERNET,
                     title = words(R.string.gaming_internet),
                     subtitle = words(R.string.gaming_internet_summary),
-                    registryId = "network",
+                    registryId = NETWORK_SCREEN_ID,
                     icon = CatalogIcon.DOWNLOADS,
                 ),
             ),

@@ -53,6 +53,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // droidtop's side of the Murine launcher's hooks (mytop-project/tracker#921), before LauncherApplication's own start,
         // which already reads them (its light or dark). It only sets references, so it is the same in every process.
         dev.droidtop.shell.standard.hooks.ShellDefaultHooks.install(this)
+        // The Quick Menu's VPN row opens Settings > Network when the VPN up is droidtop's own (mytop-project/tracker#964).
+        dev.droidtop.library.settings.GamingSettingsCatalog.droidtopVpnServing = {
+            dev.droidtop.app.vpn.DroidtopVpnService.state.value != dev.droidtop.app.vpn.VpnState.Off
+        }
         super.onCreate()
         // A contained plugin's isolated process (docs/plugin-api.md 5.3) starts nothing of droidtop's: it has no files,
         // no preferences, no network and no permissions, and the plugin in it reaches droidtop only through its broker.
