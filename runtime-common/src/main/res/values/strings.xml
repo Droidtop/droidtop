@@ -146,6 +146,8 @@
     <string name="gaming_controller_setup">Controller setup</string>
     <string name="gaming_home_button_combos_over_games">HOME button combos over games</string>
     <string name="gaming_keyboard">Keyboard</string>
+    <string name="gaming_keyboard_settings">Keyboard settings</string>
+    <string name="gaming_keyboard_settings_summary">droidtop\'s keyboard: layout, keys, sound and feel</string>
     <string name="gaming_turn_on_hacker_s_keyboard">Turn on Hacker\'s Keyboard</string>
     <string name="gaming_appearance">Appearance</string>
     <string name="gaming_browse_themes">Browse themes</string>

@@ -95,6 +95,10 @@ object GamingSettingsCatalog {
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
     const val ID_EMULATORS = "pref_gaming_emulators"
     const val ID_LIBRARY_STORAGE = "pref_gaming_library_storage"
+    const val ID_KEYBOARD_SETTINGS = "pref_gaming_keyboard_settings"
+
+    /** droidtop's keyboard's settings activity (`:input-keyboard`'s LatinIMESettings), by its own action. */
+    private const val KEYBOARD_SETTINGS_ACTION = "org.pocketworkstation.pckeyboard.SETTINGS"
     const val ID_WINDOWS_GAMES = "pref_gaming_windows_games"
     const val GROUP_SYSTEM = "gaming_system"
     const val ID_SYSTEM_NETWORK = "pref_gaming_system_network"
@@ -681,6 +685,23 @@ object GamingSettingsCatalog {
                         subtitle = keyboardSubtitle(context),
                         value = Keyboards.enabled(context).firstOrNull { it.isCurrent }?.label,
                         run = { ctx -> Keyboards.showPicker(ctx) },
+                    ),
+                )
+                // droidtop's keyboard's own settings (about 78, layout, keys, sound and feel), which only Android's input
+                // method settings reached before (settings review 1.5, mytop-project/tracker#964 step 13). The keyboard is
+                // vendored: this opens its own page, it does not redraw it.
+                add(
+                    ActionItem(
+                        id = ID_KEYBOARD_SETTINGS,
+                        title = words(R.string.gaming_keyboard_settings),
+                        subtitle = words(R.string.gaming_keyboard_settings_summary),
+                        run = { ctx ->
+                            ctx.startActivity(
+                                android.content.Intent(KEYBOARD_SETTINGS_ACTION)
+                                    .setPackage(ctx.packageName)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
                     ),
                 )
                 if (!Keyboards.ownKeyboardEnabled(context)) {
