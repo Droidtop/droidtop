@@ -14,7 +14,6 @@ import dev.droidtop.stores.util.StoreHttp
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -24,9 +23,8 @@ import timber.log.Timber
 
 /**
  * The EA app's library as a [StoreLibrary] (docs/SPEC.md 7g, "Stores", mytop-project/tracker#335), after Lutris's EA app
- * service (GPL-3.0, `lutris/services/ea_app.py`): the person signs in on EA's own page, the session cookies of
- * `accounts.ea.com` are traded for an access token (`connect/auth`, EA's own `ORIGIN_JS_SDK` client, a public client
- * id), and EA's GraphQL service lists the account's PC base games (`ownedGameProducts`) and their titles and art
+ * service (GPL-3.0, `lutris/services/ea_app.py`): the person signs in on EA's own page using DroidDeck's EA desktop
+ * client flow (PKCE, one-time state and refresh tokens), and EA's GraphQL service lists the account's PC base games (`ownedGameProducts`) and their titles and art
  * (`gameProducts`, `legacyOffers` for each one's content id). EA serves games only through its own EA app, so this
  * store lists them and does not install them here.
  */
@@ -45,28 +43,33 @@ class EAStore : StoreLibrary {
     override val signInKind = StoreSignInKind.WEB_PAGE
 
     private fun dir(context: Context) = File(context.filesDir, "ea")
-    private fun authFile(context: Context) = File(dir(context), "session.json")
+    private fun authFile(context: Context) = EaAuth.authFile(context)
     private fun libraryFile(context: Context) = File(dir(context), "library.json")
 
-    private fun session(context: Context): String? =
-        authFile(context).takeIf { it.isFile }?.let { runCatching { JSONObject(it.readText()).optString("cookies", "") }.getOrNull() }?.takeIf { it.isNotBlank() }
+    @Volatile private var pending: EaAuth.Pending? = null
 
-    override fun signedIn(context: Context): Boolean = authFile(context).isFile
+    override fun signedIn(context: Context): Boolean = EaAuth.signedIn(context)
+    override fun accountName(context: Context): String? = EaAuth.load(context)?.displayName?.takeIf { it.isNotBlank() }
 
-    /** EA's sign-in page; when it returns to ea.com, the accounts site's cookies are the sign-in. */
-    override fun signIn(context: Context): StoreSignIn = StoreSignIn.WebPage(
-        url = "https://www.ea.com/login",
-        isReturnPage = { address -> isReturnPage(address) },
-        codeInUrl = { null },
-        codeInCookie = StoreSignIn.WebPage.ALL_COOKIES,
-        cookieUrl = AUTH,
-    )
+    /** The qrc callback is captured by StoreSignInActivity before WebView tries to load it. */
+    override fun signIn(context: Context): StoreSignIn {
+        val attempt = EaAuth.begin(context)
+        pending = attempt
+        return StoreSignIn.WebPage(
+            url = attempt.url,
+            isReturnPage = ::isReturnPage,
+            codeInUrl = { address -> callbackSecret(address, attempt.state) },
+        )
+    }
 
     override suspend fun completeSignIn(context: Context, secret: String): Result<String?> = withContext(Dispatchers.IO) {
         runCatchingCancellable {
-            // Kept only once it yields a token: a page reached before signing in is no sign-in.
-            token(secret)
-            AtomicWrite.text(authFile(context), JSONObject().put("cookies", secret).toString())
+            val attempt = pending ?: error("Start the EA sign-in again")
+            val reply = JSONObject(secret)
+            check(reply.optString("state") == attempt.state) { "This answer is not from the EA sign-in you started" }
+            val code = reply.getString("code").takeIf { it.isNotBlank() } ?: error("EA did not return a sign-in code")
+            pending = null
+            EaAuth.exchange(context, code, attempt.verifier)
         }.getOrElse { return@withContext Result.failure(it) }
         StoreSyncs.run(context, this@EAStore).onFailure { Timber.tag(TAG).w(it, "First EA library read failed") }
         Result.success(null)
@@ -74,7 +77,8 @@ class EAStore : StoreLibrary {
 
     override suspend fun signOut(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
         runCatchingCancellable {
-            authFile(context).delete()
+            pending = null
+            EaAuth.signOut(context)
             libraryFile(context).delete()
             Unit
         }
@@ -82,11 +86,16 @@ class EAStore : StoreLibrary {
 
     override suspend fun sync(context: Context): Result<Int> = withContext(Dispatchers.IO) {
         runCatchingCancellable {
-            val token = token(session(context) ?: error("Not signed in to the EA app"))
+            var token = EaAuth.accessToken(context) ?: error("Sign in to the EA app again")
             val offers = ArrayList<String>()
             var next: String? = null
             do {
-                val page = entitlementsOf(graphql(token, ENTITLEMENTS, JSONObject().put("limit", 100).apply { next?.let { put("next", it) } }))
+                val variables = JSONObject().put("limit", 100).apply { next?.let { put("next", it) } }
+                val body = try { graphql(token, ENTITLEMENTS, variables) } catch (_: SignedOut) {
+                    token = EaAuth.refreshNow(context, token) ?: error("Sign in to the EA app again")
+                    graphql(token, ENTITLEMENTS, variables)
+                }
+                val page = entitlementsOf(body)
                 offers += page.first
                 next = page.second
             } while (next != null && offers.size < 10_000)
@@ -94,7 +103,7 @@ class EAStore : StoreLibrary {
                 .distinctBy { it.id }
             AtomicWrite.text(libraryFile(context), encode(games))
             games.size
-        }.also { result -> if (result.exceptionOrNull() is SignedOut) authFile(context).delete() }
+        }
     }
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
@@ -112,25 +121,9 @@ class EAStore : StoreLibrary {
     override fun changeStamp(context: Context): Long = StoreFiles.stamp(listOf(authFile(context), libraryFile(context)))
 
     /** One game of the account: its content id (the EA app's own), title and art. */
-    internal data class Game(val id: String, val title: String, val artUrl: String?)
+    internal data class Game(val id: String, val title: String, val artUrl: String?, val offerId: String = "")
 
     class SignedOut : IllegalStateException("Sign in to the EA app again")
-
-    /** An access token from the session cookies (EA's `connect/auth`, implicit grant to `nucleus:rest`). */
-    private fun token(cookies: String): String {
-        val url = AUTH.toHttpUrl().newBuilder()
-            .addQueryParameter("client_id", "ORIGIN_JS_SDK")
-            .addQueryParameter("response_type", "token")
-            .addQueryParameter("redirect_uri", "nucleus:rest")
-            .addQueryParameter("prompt", "none")
-            .build()
-        val body = StoreHttp.http.newCall(Request.Builder().url(url).header("Cookie", cookies).build()).execute().use { response ->
-            if (response.code in 400..499) throw SignedOut()
-            check(response.isSuccessful) { "EA did not answer (HTTP ${response.code})" }
-            response.body?.string().orEmpty()
-        }
-        return tokenOf(body)
-    }
 
     private fun graphql(token: String, query: String, variables: JSONObject): String {
         val body = JSONObject().put("query", query).put("variables", variables).toString()
@@ -149,7 +142,6 @@ class EAStore : StoreLibrary {
 
     internal companion object {
         private const val TAG = "EAStore"
-        const val AUTH = "https://accounts.ea.com/connect/auth"
         private const val API = "https://service-aggregation-layer.juno.ea.com/graphql"
 
         private const val ENTITLEMENTS = "query getEntitlements(${'$'}limit: Int, ${'$'}next: String) { me { ownedGameProducts(locale: \"DEFAULT\", " +
@@ -160,13 +152,17 @@ class EAStore : StoreLibrary {
             "{ offerId: id contentId } gameProducts(offerIds: ${'$'}offerIds, locale: \"DEFAULT\") { items { id originOfferId gameSlug " +
             "baseItem { keyArt { largestImage { path } } packArt { largestImage { path } } title } } } }"
 
-        /** Where EA's sign-in has returned to: ea.com itself, past its sign-in page. */
+        /** Only the EA desktop client's local success page completes this sign-in, never a remote lookalike. */
         fun isReturnPage(address: String): Boolean =
-            address.startsWith("https://www.ea.com/") && !address.startsWith("https://www.ea.com/login")
+            address.substringBefore('?').substringBefore('#') in setOf(EaAuth.REDIRECT, "qrc:/html/login_successful.html")
 
-        /** The access token of a `connect/auth` answer; an answer without one is a sign-in gone. Pure. */
-        fun tokenOf(json: String): String =
-            runCatching { JSONObject(json).optString("access_token", "") }.getOrDefault("").takeIf { it.isNotBlank() } ?: throw SignedOut()
+        internal fun callbackSecret(address: String, expectedState: String): String? {
+            if (!isReturnPage(address)) return null
+            val state = EaAuth.redirectValue(address, "state") ?: return null
+            if (state != expectedState) return null
+            val code = EaAuth.redirectValue(address, "code")?.takeIf { it.isNotBlank() } ?: return null
+            return JSONObject().put("code", code).put("state", state).toString()
+        }
 
         /**
          * One page of `ownedGameProducts`: the offer ids of its base games, and the cursor of the next page (null at the
@@ -201,16 +197,16 @@ class EAStore : StoreLibrary {
                 val offer = item.optString("originOfferId", "").ifBlank { item.optString("id", "") }
                 val id = contentIds[offer]?.takeIf { it.isNotBlank() } ?: offer.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 fun art(key: String) = base.optJSONObject(key)?.optJSONObject("largestImage")?.optString("path", "")?.takeIf { it.startsWith("https://") }
-                Game(id, title, art("packArt") ?: art("keyArt"))
+                Game(id, title, art("packArt") ?: art("keyArt"), offer)
             }
         }
 
         fun encode(games: List<Game>): String =
-            JSONArray(games.map { JSONObject().put("id", it.id).put("title", it.title).put("art", it.artUrl ?: "") }).toString()
+            JSONArray(games.map { JSONObject().put("id", it.id).put("title", it.title).put("art", it.artUrl ?: "").put("offer", it.offerId) }).toString()
 
         fun decode(text: String): List<Game> = runCatching {
             val array = JSONArray(text)
-            (0 until array.length()).map { i -> array.getJSONObject(i).let { Game(it.getString("id"), it.getString("title"), it.optString("art", "").ifBlank { null }) } }
+            (0 until array.length()).map { i -> array.getJSONObject(i).let { Game(it.getString("id"), it.getString("title"), it.optString("art", "").ifBlank { null }, it.optString("offer", "")) } }
         }.getOrDefault(emptyList())
     }
 }

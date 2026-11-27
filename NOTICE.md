@@ -230,6 +230,9 @@ This project is distributed under the GNU General Public License v3.0 (see
   xdelta3 under its own licence), are built unchanged from the `vendor/droiddeck` submodule at its pinned commit
   (`build-scripts/build-store-engines.sh`, `libdroiddeckstores.so`), and the Kotlin that drives them is ported into
   `:stores`, each ported file naming the DroidDeck file and commit it came from (mytop-project/tracker#335).
+  EA's desktop-client authentication, API, crypto helpers and GraphQL query resources are ported from
+  `app/src/main/java/com/droiddeck/launcher/stores/ea/` and `app/src/main/resources/ea/` at `cc63b403872b`,
+  with droidtop's own persistence and shared HTTP client, PKCE callback-state checking and sign-out handling.
 
 ## Bundled themes
 
