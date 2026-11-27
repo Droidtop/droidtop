@@ -117,8 +117,10 @@
     <string name="gaming_import_from_another_frontend">Import from another frontend</string>
     <string name="gaming_import_from_another_frontend_subtitle">Pegasus favourites and collections</string>
     <string name="gaming_artwork_and_metadata">Artwork and metadata</string>
-    <string name="gaming_console_systems">Console systems</string>
-    <string name="gaming_systems_and_folders">Systems and folders</string>
+    <string name="gaming_storage">Storage</string>
+    <string name="gaming_storage_summary">What installed games take, biggest first</string>
+    <string name="gaming_console_systems">Systems and emulators</string>
+    <string name="gaming_systems_and_folders">Each system, its folders and its emulator</string>
     <string name="gaming_emulators">Emulators</string>
     <string name="gaming_system_emulators">System emulators</string>
     <string name="gaming_downloads_and_updates">Downloads and Updates</string>

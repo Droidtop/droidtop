@@ -92,6 +92,7 @@ object GamingSettingsCatalog {
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
     const val ID_EMULATORS = "pref_gaming_emulators"
+    const val ID_LIBRARY_STORAGE = "pref_gaming_library_storage"
     const val ID_WINDOWS_GAMES = "pref_gaming_windows_games"
     const val GROUP_SYSTEM = "gaming_system"
     const val ID_SYSTEM_NETWORK = "pref_gaming_system_network"
@@ -400,6 +401,16 @@ object GamingSettingsCatalog {
                         icon = CatalogIcon.SCRAPER,
                     ),
                 )
+                // What installed games take (from Game sources, tracker#964 step 9).
+                add(
+                    NestedScreenItem(
+                        id = ID_LIBRARY_STORAGE,
+                        title = words(R.string.gaming_storage),
+                        subtitle = words(R.string.gaming_storage_summary),
+                        registryId = "stores_storage",
+                        icon = CatalogIcon.DATA,
+                    ),
+                )
                 // What another frontend kept, brought in (mytop-project/tracker#724).
                 add(
                     NestedScreenItem(
@@ -418,15 +429,8 @@ object GamingSettingsCatalog {
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
                 )
-                add(
-                    NestedScreenItem(
-                        id = ID_EMULATORS,
-                        title = words(R.string.gaming_emulators),
-                        subtitle = words(R.string.gaming_system_emulators),
-                        registryId = "emulators",
-                        icon = CatalogIcon.CONSOLE_SYSTEMS,
-                    ),
-                )
+                // Emulators is part of Systems and emulators (console_systems) since tracker#964 step 9; its own screen
+                // stays registered for old links.
                 add(
                     NestedScreenItem(
                         id = ID_DOWNLOADS,

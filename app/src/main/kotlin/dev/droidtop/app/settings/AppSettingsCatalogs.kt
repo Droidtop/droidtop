@@ -208,6 +208,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
         SettingsScreenRegistry.register(moreControlsScreen())
+        // Settings > Library > Storage: what installed games take, biggest first (it sat inside Game sources until step 9).
+        SettingsScreenRegistry.register(StorageCatalog.screen())
         SettingsScreenRegistry.register(networkScreen(SCREEN_NETWORK))
         SettingsScreenRegistry.register(networkScreen(SCREEN_INTERNET))
         SettingsScreenRegistry.register(androidSettingsScreen())
@@ -229,8 +231,12 @@ object AppSettingsCatalogs {
 
     private fun consoleSystemsScreen(systemId: String? = null): CatalogScreen = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
-        title = "Console systems",
-        groups = { context -> consoleSystemsGroups(context, systemId) },
+        // Console systems and Emulators are one page (mytop-project/tracker#964 step 9): the emulators overview first, then
+        // each system folder, which opens the one page for that system.
+        title = "Systems and emulators",
+        groups = { context ->
+            (if (systemId == null) EmulatorsCatalog.overviewGroups(context) else emptyList()) + consoleSystemsGroups(context, systemId)
+        },
         // The search index must not pay for the folder walk in
         // consoleSystemsGroups: on a real device it held "Indexing
         // settings..." for 10-40 s before the first result
@@ -435,7 +441,13 @@ object AppSettingsCatalogs {
         )
     }
 
-    private fun folderScreen(folder: File, resolved: ConsoleSystemDef?): CatalogScreen = CatalogScreen(
+    /**
+     * One page per system folder (docs/SPEC.md "Library", mytop-project/tracker#964 step 9): which system the folder is,
+     * its games' scrape and gamelist import, the system's BIOS check, then the system's emulator rows (choice, launch
+     * test, setup, known and custom emulators) in place, where there used to be a second page per system under
+     * Emulators. Emulators' system rows open this page too.
+     */
+    internal fun folderScreen(folder: File, resolved: ConsoleSystemDef?): CatalogScreen = CatalogScreen(
         id = "console_folder_${folder.absolutePath}",
         title = folder.name,
         groups = { context ->
@@ -450,7 +462,6 @@ object AppSettingsCatalogs {
                             items = buildList {
                                 add(systemChoiceItem(context, folder, systems))
                                 if (resolved != null) {
-                                    add(EmulatorsCatalog.systemPlayerChoiceItem(context, resolved))
                                     // docs/SPEC.md 12a "app_status": where droidtop
                                     // shows an installed app -- here, the emulator
                                     // this system's player choice actually resolved
@@ -472,13 +483,6 @@ object AppSettingsCatalogs {
                                             )
                                         }
                                     }
-                                    add(
-                                        NestedScreenItem(
-                                            id = "folder_emulator_setup_${resolved.id}",
-                                            title = "Emulator setup and test",
-                                            inline = EmulatorsCatalog.systemScreen(resolved),
-                                        ),
-                                    )
                                     add(
                                         ActionItem(
                                             id = "folder_scrape_${folder.absolutePath}",
@@ -525,31 +529,9 @@ object AppSettingsCatalogs {
                             },
                         ),
                     )
-                    // EmuDeck-style setup helper: when no installed emulator
-                    // can run this system, offer the real known presets'
-                    // packages for installation instead of a dead end.
-                    if (resolved != null) {
-                        val installedPkgs = availablePlayers(context, resolved).map { it.packageName }.toSet()
-                        val missing = KnownPlayers.forSystem(context, resolved.id)
-                            .filter { it.pkg !in installedPkgs }
-                            .distinctBy { it.pkg }
-                        if (installedPkgs.isEmpty() && missing.isNotEmpty()) {
-                            add(
-                                CatalogGroup(
-                                    id = "folder_get_emulator",
-                                    title = "Get an emulator",
-                                    items = missing.take(8).map { preset ->
-                                        ActionItem(
-                                            id = "install_${preset.pkg}",
-                                            title = "Get ${preset.label}",
-                                            subtitle = preset.pkg,
-                                            run = installPackageAction(preset.pkg),
-                                        )
-                                    },
-                                ),
-                            )
-                        }
-                    }
+                    // The system's emulator rows, in place (the choice, what is in use, setup, launch test, the known
+                    // emulators to get and custom players): one page per system, where Emulators used to have a second.
+                    if (resolved != null) addAll(EmulatorsCatalog.systemScreen(resolved).groups(context))
                 }
             }
         },

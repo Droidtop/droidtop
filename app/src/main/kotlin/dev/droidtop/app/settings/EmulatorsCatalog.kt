@@ -72,6 +72,20 @@ object EmulatorsCatalog {
     // from, small enough that a huge folder is never read through.
     private const val TEST_GAME_LIMIT = 30
 
+    /**
+     * The emulator rows Systems and emulators leads with (docs/SPEC.md "Library", mytop-project/tracker#964 step 9): the
+     * default emulator, the emulators found on this device and RetroArch's cores, without the per-system list (each
+     * system folder there opens its one page). Off the main thread.
+     */
+    suspend fun overviewGroups(context: Context): List<CatalogGroup> = groups(context, forIndex = false).flatMap { group ->
+        if (group.id != "emulators_systems") {
+            listOf(group)
+        } else {
+            group.items.filter { it.id == "emulators_retroarch_cores" }.takeIf { it.isNotEmpty() }
+                ?.let { listOf(CatalogGroup(id = "emulators_retroarch", title = null, items = it)) }.orEmpty()
+        }
+    }
+
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_EMULATORS,
         title = "Emulators",
@@ -238,7 +252,10 @@ object EmulatorsCatalog {
     // that can run them first: that is the list a person came here to fix.
     private fun systemsGroup(context: Context, systems: List<ConsoleSystemDef>, globalPackage: String?): CatalogGroup {
         val systemsById = systems.associateBy { it.id }
-        val withGames = SystemFolders.all(context, systemsById).map { it.second }.distinctBy { it.id }
+        val folders = SystemFolders.all(context, systemsById)
+        val withGames = folders.map { it.second }.distinctBy { it.id }
+        // Each system's first folder: its row opens that folder's page, the one page per system (tracker#964 step 9).
+        val folderOf = folders.groupBy({ it.second.id }, { it.first }).mapValues { it.value.first() }
         val resolvedById = withGames.associate { system ->
             system.id to EmulatorResolution.resolveWithoutGame(
                 availablePlayers(context, system),
@@ -253,7 +270,7 @@ object EmulatorsCatalog {
                 title = system.displayName,
                 subtitle = resolved?.let { "Chosen: ${it.source.label}" }
                     ?: "No emulator installed. Open it to see what to install.",
-                inline = systemScreen(system),
+                inline = folderOf[system.id]?.let { AppSettingsCatalogs.folderScreen(it, system) } ?: systemScreen(system),
                 valueLabel = { _ -> resolved?.player?.name ?: "Not set up" },
             )
             Triple(resolved == null, system.displayName.lowercase(), row)

@@ -292,18 +292,7 @@ internal object StoresCatalog {
                     }
                 },
             ),
-            CatalogGroup(
-                id = "stores_storage_group",
-                title = null,
-                items = listOf(
-                    NestedScreenItem(
-                        id = "stores_storage",
-                        title = "Storage",
-                        inline = StorageCatalog.screen(),
-                        icon = CatalogIcon.DATA,
-                    ),
-                ),
-            ),
+            // Storage is Library's (Settings > Library > Storage) since mytop-project/tracker#964 step 9.
             CatalogGroup(
                 id = "stores_links_group",
                 title = null,

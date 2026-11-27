@@ -14832,6 +14832,15 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**Library: one page per system (mytop-project/tracker#964, step 9).** Console systems and Emulators are one entry,
+**Systems and emulators** (`console_systems`; `emulators` stays registered for old links): the default emulator, the
+emulators found on this device and RetroArch's cores first (`EmulatorsCatalog.overviewGroups`), then each system
+folder. A system folder's page is the one page for that system: which system the folder is, the app-status plugins of
+its emulator, scrape and gamelist import, the BIOS check, then the system's emulator rows in place (the choice, what is
+in use, setup, launch test, the emulators to get and custom players, `EmulatorsCatalog.systemScreen`'s groups). There
+used to be a second page per system under Emulators choosing the same emulator; Emulators' rows now open the folder
+page. **Storage** (what installed games take) moved from Game sources to Library (`stores_storage`).
+
 **Accounts and System (mytop-project/tracker#964, step 8).** Accounts and sources is **Accounts**: sign-ins and keys
 (GitHub, Keys and accounts, Game sources, the scraper and achievement services) and Plugins and App integrations.
 Network took its shares and devices (step 7). **More controls** (where elevated actions come from: the choice,
