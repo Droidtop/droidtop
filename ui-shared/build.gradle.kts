@@ -17,6 +17,13 @@ android {
         minSdk = 26
     }
 
+    sourceSets.getByName("main") {
+        // Pinned shared source, like notices and trust in :runtime-common. JobLook is compiled by :runtime-common;
+        // these two roots contain only the pure Compose components. Android adapters stay in this module.
+        java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/shell")
+        java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/ui")
+    }
+
     buildFeatures {
         compose = true
     }

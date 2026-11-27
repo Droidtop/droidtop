@@ -5,7 +5,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.theme.GamingThemeColors
-import dev.droidtop.library.theme.noticeColors
+import dev.droidtop.lib.ui.tokens.noticeColors
 import dev.droidtop.notices.NoticeColors
 
 /**

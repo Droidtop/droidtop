@@ -197,38 +197,6 @@ fun TouchHintBar(
 }
 
 /**
- * The one way a shell element takes a tap (mytop-project/tracker#679): the click, and the click's own focus target made
- * unfocusable ahead of it. A `clickable` is a focus target, so without this the D-pad could park on a row or pill
- * whose screen moves its own cursor, a node with no visible selection where A does nothing (rig, build 546: Down out
- * of the PC grid landed in the hint bar). The shell's cursor is the selection everywhere; a tap is still the press.
- * [onLongClick] makes it a combined click. [silent] draws no press indication (the cursor is the one selection);
- * [interactionSource] then reports the presses to the caller. An element that is itself a focus target keeps its own
- * `focusable()` ahead of this; only the click's extra node goes.
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-fun Modifier.padRow(
-    enabled: Boolean = true,
-    onLongClick: (() -> Unit)? = null,
-    silent: Boolean = false,
-    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource? = null,
-    onClick: () -> Unit,
-): Modifier {
-    val press = when {
-        silent && onLongClick != null -> Modifier.combinedClickable(
-            interactionSource = interactionSource,
-            indication = null,
-            enabled = enabled,
-            onLongClick = onLongClick,
-            onClick = onClick,
-        )
-        silent -> Modifier.clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
-        onLongClick != null -> Modifier.combinedClickable(enabled = enabled, onLongClick = onLongClick, onClick = onClick)
-        else -> Modifier.clickable(enabled = enabled, onClick = onClick)
-    }
-    return this.focusProperties { canFocus = false }.then(press)
-}
-
-/**
  * The shell's one pressable list row (mytop-project/tracker#763): a focus target the pad's cursor lands on, framed while it
  * is there ([selectionFrame] in [shape], [rest] when not), where A on the pad and a tap ([padRow]) both run [onClick].
  * The pad handler sits ahead of the focus target, as [GameCard]'s does, so A reaches it. A row that is not [enabled]
@@ -316,66 +284,6 @@ private fun TouchHint(action: GamepadAction, label: String?, plated: Boolean, on
                 )
             }
         }
-    }
-}
-
-/**
- * The one button glyph the shell draws (docs/SPEC.md 7k): a keycap, round
- * for a single letter ("A") and a pill for a word ("Start", "L1"), filled
- * with the muted ink and lettered in the ground colour, so it reads as a
- * quieter thing than the label beside it, as Steam's footer glyphs do. The
- * hint bar's glyphs, the L1/R1 beside a strip and every other place that
- * names a button use this and nothing else. Not focusable, no tap target of
- * its own: the row it sits in is the control. [dimmed] is a glyph whose
- * press has nowhere to go (a strip at its end), drawn at half strength.
- * The keycap is ported in spirit from DroidDeck's non-focusable bumper caps
- * (ui/SettingsWidgets.kt at 9310d19).
- */
-@Composable
-fun Keycap(label: String, modifier: Modifier = Modifier, height: Dp = MenuTokens.KeycapHeight, dimmed: Boolean = false) {
-    val style = MaterialTheme.typography.labelMedium.copy(
-        fontSize = MenuTokens.HintGlyphTextSize,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
-        label,
-        color = MenuTokens.Ground,
-        style = style,
-        maxLines = 1,
-        textAlign = TextAlign.Center,
-        modifier = modifier
-            .graphicsLayer { alpha = if (dimmed) 0.5f else 1f }
-            .background(MenuTokens.OnSurfaceMuted, Corners.Pill)
-            .widthIn(min = height)
-            .padding(horizontal = MenuTokens.HintGlyphPaddingHorizontal)
-            .opticallyCentred(height, style.fontSize),
-    )
-}
-
-/**
- * A tiny shoulder-button glyph ("L1"/"R1") beside a tab or section row it
- * switches, replacing a pill in the hint bar for the one thing every
- * screen with tabs does the same way (owner, 2026-09-25: "Can remove the
- * next/previous section pills"). It is a [Keycap], not a hint pill -- no
- * label and no tap target of its own -- because the row it sits beside
- * already IS the switch's visible state, and L1/R1 keep working exactly
- * as before; this only says which buttons step it. One composable, used
- * beside every tab row L1/R1 drives (the shell's top-level section tabs,
- * the Quick Menu's own Notifications/System tabs), so all of them read
- * the same way and none of them repeats the label text or the styling.
- */
-@Composable
-fun ShoulderGlyph(label: String, modifier: Modifier = Modifier, badge: Boolean = false, dimmed: Boolean = false) {
-    // The strip's edition sits in a box as tall as the selected tab's pill,
-    // centred the same way, so the two read on one line (tester, 2026-09-29,
-    // mytop-project/tracker#157: "L1/R1 are smaller than the tab labels and look
-    // misaligned with the pill"). One keycap style either way.
-    if (badge) {
-        Box(modifier.heightIn(min = MenuTokens.TabPillHeight), contentAlignment = Alignment.Center) {
-            Keycap(label, dimmed = dimmed)
-        }
-    } else {
-        Keycap(label, modifier, height = MenuTokens.KeycapHeightSmall, dimmed = dimmed)
     }
 }
 

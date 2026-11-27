@@ -102,6 +102,9 @@ class GamingPalette(
     /** Labels drawn in a theme's capitals are drawn as written ([labelCase]); always so under [highContrast]. */
     val sentenceCase: Boolean = false,
 ) {
+    /** The shared components read this same resolved palette; Android keeps only fonts and texture here. */
+    val componentColors = PaletteColors(colors, highContrast, sentenceCase)
+
     val ground = Color(colors.ground)
     val overlaySurface = Color(colors.overlaySurface)
     val card = Color(colors.card)
@@ -286,25 +289,29 @@ object GamingTheme {
                     }
                 }
                 .flowOn(Dispatchers.Default)
-                .collect { outside = it }
+                .collect { outside = it; publishComponents() }
         }
     }
 
     fun setAppearance(light: Boolean) {
         if (appearanceLight != light) appearanceLight = light
+        publishComponents()
     }
 
     fun acquire() {
         holders++
+        publishComponents()
         dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
 
     fun release() {
         if (holders > 0) holders--
+        publishComponents()
         dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
 
     init {
+        publishComponents()
         // The role tokens UI droidtop does not draw reads (docs/SPEC.md 7k, mytop-project/tracker#559): the theme's while a
         // Gaming surface holds one; otherwise droidtop's own for the appearance, which RoleTokens works out itself.
         dev.droidtop.library.theme.RoleTokens.provider = {
@@ -346,7 +353,13 @@ object GamingTheme {
         }
         if (next !== current) current = next
         resolved = true
+        publishComponents()
         dev.droidtop.library.theme.RoleTokens.checkSoon()
+    }
+
+    /** Published synchronously with the Android theme, so Material and shared components never use different colours. */
+    private fun publishComponents() {
+        ComponentTheme.palette = palette.componentColors
     }
 
     private fun paletteFor(context: Context): GamingPalette {
@@ -587,10 +600,3 @@ fun Modifier.groundBackground(): Modifier = drawBehind {
 }
 
 private const val TEXTURE_STRENGTH = 0.6f
-
-/**
- * A label a theme draws in capitals (a section label, a tab, a chip, an eyebrow), as the palette says: in
- * capitals, or as written when Sentence case or High contrast is on (docs/SPEC.md 7k, "High contrast").
- * Never for data a person typed or a game's own name (tracker#532: theme transforms never apply to data).
- */
-fun String.labelCase(): String = dev.droidtop.library.settings.ReadingPrefs.caps(this, GamingTheme.palette.sentenceCase)
