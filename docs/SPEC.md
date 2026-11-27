@@ -5494,7 +5494,10 @@ a close path of its own. Every call works off the main thread.
   force-stop it").** Kill (the Quick Menu's Kill pill, the companion's Kill row) is `Library.killRunning`: a
   helper's force-stop straight away (`TaskManager.kill`, `AppCloser.kill`), never Quit's gentler steps first
   (Enginehost's own end, the move to the background); without a helper that can force-stop it says "Kill needs
-  More controls to force-stop it ... Quit ends it the way Android allows" and stops nothing. droidtop's own
+  More controls to force-stop it ... Quit ends it the way Android allows" and stops nothing. An Enginehost game is
+  the exception (2026-11-27, mytop-project/tracker#967): without a helper Kill sends Enginehost's END_GAME, which
+  kills the game's process at once, so it is a kill all the same; before, the BlueStacks rig's Kill on an Enginehost
+  game refused and pointed at More controls. droidtop's own
   Windows screen ends its guest at once either way. Its second press asks Kill's own question ("It is stopped at
   once, without saving"). Before this Kill and Quit were one call.
   Quit is `Library.quitRunning`, run so that it finishes even when the
