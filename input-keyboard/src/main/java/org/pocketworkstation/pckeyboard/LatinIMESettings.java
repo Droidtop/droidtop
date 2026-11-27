@@ -93,6 +93,10 @@ public class LatinIMESettings extends PreferenceActivity
                 DictionaryRow.open(this, p);
                 return true;
             });
+            // Setup uses the same manager and result handling as Settings, once on a fresh launch.
+            if (icicle == null && getIntent().getBooleanExtra(EXTRA_OPEN_DICTIONARIES, false)) {
+                DictionaryRow.open(this, dictionaries);
+            }
         }
 
         // droidtop: the folders the emoji panel's GIFs and Stickers tabs read (mytop-project/tracker#903 H5).
@@ -213,11 +217,6 @@ public class LatinIMESettings extends PreferenceActivity
         }
 
         mLabelVersion.setSummary(version);
-        // Setup uses the same dictionary manager and result handling as Settings.
-        if (icicle == null && getIntent().getBooleanExtra(EXTRA_OPEN_DICTIONARIES, false)
-                && dictionaries != null) {
-            DictionaryRow.open(this, dictionaries);
-        }
     }
 
     @Override
