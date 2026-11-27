@@ -25101,10 +25101,20 @@ dependencies, and the local build cache that `org.gradle.caching` turns on).
 Cache entries are written only by runs on `main` and read by every run.
 
 Both Android workflows run on `ubuntu-24.04` with a pinned SDK
-(platform 36, build-tools 36.0.0) and NDK 27.0.12077973, JDK 17 and 21, Go,
-and the Gradle wrapper (`gradle/wrapper/gradle-wrapper.properties`, 9.3.1).
+(platforms 34, 36 and 37.1, build-tools 34.0.0 and 36.0.0) and NDK 27.0.12077973, JDK 17 and 21, Go,
+and the Gradle wrapper (`gradle/wrapper/gradle-wrapper.properties`, 9.6.1).
 The comments in the workflow files and the setup action record why each setup step is the way it
 is.
+
+**AGP 9 and the shared UI (owner handoff, 2026-11-27).** AGP 9.5.2 and
+Compose 1.13 require the newer Gradle and compileSdk 37.1. Lint's scope and
+accepted baseline stay the same. Its cold-build gate runs with one worker,
+parallel projects off and Kotlin compilation in the Gradle process, so it
+does not compete with a separate Kotlin daemon and simultaneous lint workers
+for the hosted runner's memory. This responds to three runner losses during
+AGP 9 lint (45800699493, 45925535157, 46044151638); the missing logs do not
+prove which resource caused those losses. APK builds keep their parallel
+budget. The owner directed: "No local builds. CI is the only build."
 
 **Native vendor code** is cross-compiled by
 `build-scripts/build-vendor-deps.sh`, once per ABI, before Gradle runs; the
