@@ -41,10 +41,10 @@ class GameLanguageTest {
 
     @Test
     fun `the Controls row steps through every layout and back to Gamepad`() {
-        assertEquals(GameControls.KEYBOARD_MOUSE, GameControls.next(null))
-        assertEquals(GameControls.MOUSE_ONLY, GameControls.next(GameControls.KEYBOARD_MOUSE))
-        assertEquals(null, GameControls.next(GameControls.MOUSE_ONLY))
-        assertEquals(GameControls.MOUSE_ONLY, GameControls.byId("mouse_only"))
-        assertEquals(null, GameControls.byId(""))
+        assertEquals(GamePadLayouts.KEYBOARD_MOUSE, GamePadLayouts.next(null))
+        assertEquals(GamePadLayouts.MOUSE_ONLY, GamePadLayouts.next(GamePadLayouts.KEYBOARD_MOUSE))
+        assertEquals(null, GamePadLayouts.next(GamePadLayouts.MOUSE_ONLY))
+        assertEquals(GamePadLayouts.MOUSE_ONLY, GamePadLayouts.byId("mouse_only"))
+        assertEquals(null, GamePadLayouts.byId(""))
     }
 }
