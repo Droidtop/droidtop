@@ -20293,7 +20293,7 @@ ships one language's files speaks that language whatever is picked here.
 **Controls** sets the game's pad layout before a launch: Gamepad (the pad
 reaches the game as a pad), Keyboard and mouse, or Mouse only (§5b,
 "Controller layouts"). It is the same per-game choice the Quick Menu's
-Controls row steps through while the game runs (`GameControlsPrefs`,
+Controls row steps through while the game runs (`GamePadLayoutPrefs`,
 `:library-core`, which both read and write); the layouts' files stay with the
 runtime. A game's own remapped layout is not offered here: the prefix's
 controller tab (§5b) remains where bindings are edited.

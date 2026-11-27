@@ -13,8 +13,8 @@ import android.view.ViewGroup
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
-import dev.droidtop.library.GameControls
-import dev.droidtop.library.GameControlsPrefs
+import dev.droidtop.library.GamePadLayouts
+import dev.droidtop.library.GamePadLayoutPrefs
 import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.mapping.ControllerLayout
 import dev.droidtop.library.diagnostics.RunRecords
@@ -124,14 +124,14 @@ class WineGameActivity : Activity() {
             runOnUiThread { setMouseMode(on) }
         }
         override val controls: String?
-            get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: GameControls.GAMEPAD_LINE
+            get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: GamePadLayouts.GAMEPAD_LINE
         override fun nextControls(): String? {
             if (this@WineGameActivity.layoutDriver == null) return null
-            val next = GameControls.next(controlsChoice)
+            val next = GamePadLayouts.next(controlsChoice)
             useControls(next)
             val id = this@WineGameActivity.entryId
-            if (id != null) startupExecutor.execute { GameControlsPrefs.setLayout(applicationContext, id, next) }
-            return next?.line ?: GameControls.GAMEPAD_LINE
+            if (id != null) startupExecutor.execute { GamePadLayoutPrefs.setLayout(applicationContext, id, next) }
+            return next?.line ?: GamePadLayouts.GAMEPAD_LINE
         }
         override val canReport: Boolean get() = true
         override fun reportProblem(done: (String) -> Unit) {
@@ -276,14 +276,14 @@ class WineGameActivity : Activity() {
             fun read(raw: Int) = runCatching {
                 resources.openRawResource(raw).bufferedReader().use { ControllerLayout.parse(it.readText()) }
             }.getOrNull()
-            val parsed = GameControls.entries.mapNotNull { choice -> read(choice.raw)?.let { choice to it } }.toMap()
+            val parsed = GamePadLayouts.entries.mapNotNull { choice -> read(choice.raw)?.let { choice to it } }.toMap()
             val mouse = read(R.raw.controls_mouse_mode)
-            val chosen = entryId?.let { GameControlsPrefs.layout(applicationContext, it) }
+            val chosen = entryId?.let { GamePadLayoutPrefs.layout(applicationContext, it) }
             // A game whose genre is played with a pointer starts with mouse mode on until the person chooses
             // (mytop-project/tracker#618 C2); the library's launch carries the genre. Its first start says how to reach it.
             val genre = entryId?.let { id -> dev.droidtop.library.LaunchDisplay.runningGame?.takeIf { it.gameId == id }?.genre }
-            val mouseOn = entryId?.let { GameControlsPrefs.mouseMode(applicationContext, it, MouseModeDefault.genreNeedsMouse(genre)) } ?: false
-            val hint = entryId?.let { GameControlsPrefs.firstMouseHint(applicationContext, it) } ?: false
+            val mouseOn = entryId?.let { GamePadLayoutPrefs.mouseMode(applicationContext, it, MouseModeDefault.genreNeedsMouse(genre)) } ?: false
+            val hint = entryId?.let { GamePadLayoutPrefs.firstMouseHint(applicationContext, it) } ?: false
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 controlLayouts = parsed
@@ -660,8 +660,8 @@ class WineGameActivity : Activity() {
 
     /** The layouts' driver, once they are read; Gamepad unless the game was left with a layout. */
     private var layoutDriver: LayoutDriver? = null
-    private var controlLayouts: Map<GameControls, ControllerLayout> = emptyMap()
-    private var controlsChoice: GameControls? = null
+    private var controlLayouts: Map<GamePadLayouts, ControllerLayout> = emptyMap()
+    private var controlsChoice: GamePadLayouts? = null
 
     /** Mouse mode's own layout (res/raw/controls_mouse_mode.vdf) and whether it is played over the chosen one. */
     private var mouseLayout: ControllerLayout? = null
@@ -672,7 +672,7 @@ class WineGameActivity : Activity() {
     private val toggleHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /** Plays [choice]'s layout (null: Gamepad), unless mouse mode is on. Main thread. */
-    private fun useControls(choice: GameControls?) {
+    private fun useControls(choice: GamePadLayouts?) {
         controlsChoice = choice?.takeIf { it in controlLayouts }
         playControls()
     }
@@ -707,7 +707,7 @@ class WineGameActivity : Activity() {
         playControls()
         showPadMouse(on, announce = true)
         val id = entryId ?: return
-        startupExecutor.execute { GameControlsPrefs.setMouseMode(applicationContext, id, on) }
+        startupExecutor.execute { GamePadLayoutPrefs.setMouseMode(applicationContext, id, on) }
     }
 
     /** The visible sign that the pad is a mouse: a small badge in the top corner while it is on. */
