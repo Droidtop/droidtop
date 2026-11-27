@@ -306,7 +306,7 @@ object GitHubAccountCatalog {
                         ToggleItem(
                             id = "repos_auto",
                             title = "Update these plugins automatically",
-                            subtitle = "Unmetered only",
+                            subtitle = "On the networks Download rules allow",
                             current = read.auto,
                             onToggle = { c, value -> PluginRepoUpdates.setAutoUpdate(c, value) },
                         ),

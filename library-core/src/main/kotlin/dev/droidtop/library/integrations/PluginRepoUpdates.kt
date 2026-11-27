@@ -324,7 +324,7 @@ object PluginRepoUpdates {
         RepoCheckResult.Unchanged -> "Nothing new."
         is RepoCheckResult.Seen -> "Nothing new since ${result.tag}."
         is RepoCheckResult.NoBundles -> "No plugin bundles in its latest release."
-        is RepoCheckResult.Deferred -> "${result.tag} is out; it is fetched on an unmetered connection."
+        is RepoCheckResult.Deferred -> "${result.tag} is out. It downloads on Wi-Fi"
         is RepoCheckResult.Processed -> (result.outcomes.map { describe(it) } + result.failures).ifEmpty { listOf("Nothing to update in ${result.tag}.") }.joinToString(" ")
         RepoCheckResult.SignInAgain -> "GitHub no longer accepts the saved sign-in. Sign in again."
         is RepoCheckResult.NotFound ->
@@ -360,6 +360,12 @@ object PluginRepoUpdates {
         } finally {
             running.set(false)
         }
+    }
+
+    /** Whether Download rules let a download of [bytes] use a metered network. Reads preferences: off the main thread. */
+    private fun meteredAllowed(context: Context, bytes: Long): Boolean {
+        dev.droidtop.net.DownloadPolicy.load(context)
+        return dev.droidtop.net.DownloadPolicy.allowsMetered(dev.droidtop.net.DownloadPolicy.settings.value, bytes)
     }
 
     /** The manual "Check now": the same check, not deferred on a metered network. */
@@ -460,7 +466,10 @@ object PluginRepoUpdates {
         }
         // Asking first: a release already read is not fetched again; what it carries is in Updates.
         if (!install && !force && prefs(context).getLong(readKey, 0L) == release.id) return RepoCheckResult.Seen(release.tag)
-        if (metered && !force) return RepoCheckResult.Deferred(release.tag)
+        // On a metered network the release waits unless Download rules allow a download its size there (one rule for
+        // every job, mytop-project/tracker#964): an unknown size counts as not small.
+        val releaseBytes = release.bundles.take(MAX_BUNDLES_PER_RELEASE).sumOf { it.size.coerceAtLeast(0L) }
+        if (metered && !force && !meteredAllowed(context, releaseBytes)) return RepoCheckResult.Deferred(release.tag)
         val outcomes = mutableListOf<RepoUpdateOutcome>()
         val failures = mutableListOf<String>()
         val read = mutableListOf<RepoBundleRead>()

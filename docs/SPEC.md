@@ -14832,6 +14832,13 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**One network rule (mytop-project/tracker#964, step 5).** Download rules' network rule (Wi-Fi only; Wi-Fi and
+mobile data for small downloads; any connection) is the one rule every job follows: downloads by size
+(`DownloadPolicy.allowsMetered`), and checks, store syncs and other small reads on a metered network unless it is Wi-Fi
+only (`checksOnMetered`). Store auto-sync (`StoreAutoSync`) and a plugin repository's automatic update
+(`PluginRepoUpdates`, by the release's bundle sizes; an unknown size is not small) used to be "unmetered only" in
+their own code; both ask the rule now. A release held back says it downloads on Wi-Fi.
+
 **One name per thing (mytop-project/tracker#964, step 3).** Rows and their values use the person's words; internal
 names stay in a row's Info (its subtitle, shown on request) and in the code. Elevated access is **More controls**
 everywhere it is named: the choice row, onboarding's section, the reasons a privileged action cannot run, and
@@ -21630,11 +21637,14 @@ menu still list every `listed` place.
   `StoreAutoSync.runIfDue`), each signed-in store whose last good read
   (`StoreSyncs.lastSynced`; never read counts as due) is older than the
   interval is read again through `StoreSyncs.run`, one after the other off the
-  main thread, provided the active network is unmetered; a store asked within
+  main thread, on a network Download rules allow: a sync is a few small reads,
+  so like an update check it runs on a metered network unless the rule is Wi-Fi
+  only (`DownloadPolicy.checksOnMetered`; it was "unmetered only" whatever the
+  rule said until mytop-project/tracker#964). A store asked within
   the last 15 minutes in this process is not asked again, so reopening the
   shell does not hammer one that is down. There is no service, alarm, worker
-  or loop: nothing runs while the shell is not opening, and a metered network
-  or Off means nothing is read.
+  or loop: nothing runs while the shell is not opening, and offline, a network
+  the rule keeps it off, or Off means nothing is read.
   A store adds its own rows to its page (`StoreLibrary.settingsItems`):
   Steam's status (Online, Invisible, Offline), cloud saves and message
   notifications. The "last synced"

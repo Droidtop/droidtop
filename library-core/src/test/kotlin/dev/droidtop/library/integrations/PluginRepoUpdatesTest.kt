@@ -90,7 +90,7 @@ class PluginRepoUpdatesTest {
         )
         assertTrue(results.all { PluginRepoUpdates.describe(it).isNotBlank() })
         assertTrue(PluginRepoUpdates.describe(RepoCheckResult.NotFound(signedIn = false)).contains("sign in"))
-        assertTrue(PluginRepoUpdates.describe(RepoCheckResult.Deferred("v2")).contains("unmetered"))
+        assertTrue(PluginRepoUpdates.describe(RepoCheckResult.Deferred("v2")).contains("downloads on Wi-Fi"))
     }
 
     @Test
