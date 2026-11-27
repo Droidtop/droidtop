@@ -14832,6 +14832,17 @@ Screens (main screen, game launch target, the companion), Software
 updates and Android settings. The Quick Menu shows those configuration
 rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
+**Settings is built off the main thread, without the Quick Menu's rows
+(mytop-project/tracker#964, step 1).** `settingsGroups` does not build the
+`quickOnly` group at all (`groups(context, includeQuick = false)`): that group
+reads live device state through binder calls and waits up to 1.5 s for
+Shizuku's binder, which only the Quick Menu and the companion draw. Every
+renderer builds a screen's rows on the IO dispatcher (the Compose navigator's
+root and pane, Mobile's Preference navigator) and only draws and handles
+presses on Main, after every change as before. A row's value is read while its
+screen is built, never in composition. The Quick Menu still builds the whole
+catalog, on IO, since it takes Settings rows by id.
+
 **Battery tile (mytop-project/tracker#84).** The System tab's Battery row shows the
 live level, "charging" and Android's Battery Saver state ("83%, charging",
 "12%, saver on"), from the same `BatteryManager` sticky broadcast `SystemStatus`

@@ -249,10 +249,11 @@ object DroidtopWideSettings {
                             title = "Updates",
                             registryId = AppSettingsCatalogs.SCREEN_UPDATES,
                             icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
-                            valueLabel = { ctx ->
-                                dev.droidtop.app.update.AppSelfUpdate.newerSeenVersionName(ctx)?.let { "droidtop $it is out" }
+                            // Read here, as the screen is built off the main thread; the label is drawn in composition.
+                            valueLabel = (
+                                dev.droidtop.app.update.AppSelfUpdate.newerSeenVersionName(context)?.let { "droidtop $it is out" }
                                     ?: "Check for updates"
-                            },
+                                ).let { label -> { _: android.content.Context -> label } },
                         ),
                         ActionItem(
                             id = "pref_global_version",

@@ -320,7 +320,9 @@ class CatalogPreferenceNavigator(
         val context = fragment.preferenceManager.context
         fragment.lifecycleScope.launch {
             val screen = stack.lastOrNull()
-            val groups = screen?.groups?.invoke(context) ?: rootGroups(context)
+            // Built on IO: builders read preferences, disk, the package manager and binder services, and this runs
+            // after every change. The Preference tree below is made on Main.
+            val groups = withContext(Dispatchers.IO) { screen?.groups?.invoke(context) ?: rootGroups(context) }
             val prefScreen = fragment.preferenceManager.createPreferenceScreen(context)
             if (screen == null && enableSearch) {
                 prefScreen.addPreference(

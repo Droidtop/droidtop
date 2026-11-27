@@ -191,17 +191,19 @@ object GamingSettingsCatalog {
 
     /**
      * What a Settings renderer shows: the catalog without its quick-only
-     * groups (docs/SPEC.md 7f, "Where things live"). The Quick Menu reads
-     * [groups] whole.
+     * group (docs/SPEC.md 7f, "Where things live"). That group is not even
+     * built here: it reads live device state (binder calls, and a wait of up
+     * to 1.5 s for Shizuku) that only the Quick Menu and the companion draw.
+     * The Quick Menu reads [groups] whole.
      */
-    fun settingsGroups(context: Context): List<CatalogGroup> = groups(context).filterNot { it.quickOnly }
+    fun settingsGroups(context: Context): List<CatalogGroup> = groups(context, includeQuick = false)
 
     /**
-     * Builds the live catalog. Values are read fresh on every call --
-     * renderers rebuild after applying a change (cheap: a few pref reads
-     * plus the active theme's already-cached capabilities).
+     * Builds the live catalog. Values are read fresh on every call, so call
+     * it off the main thread: renderers rebuild after applying a change.
+     * [includeQuick] false leaves out the quick-only System group.
      */
-    fun groups(context: Context): List<CatalogGroup> = listOf(
+    fun groups(context: Context, includeQuick: Boolean = true): List<CatalogGroup> = listOfNotNull(
         CatalogGroup(
             id = GROUP_GLOBAL,
             title = null,
@@ -626,7 +628,7 @@ object GamingSettingsCatalog {
         // Live device state and one-shot device actions: the Quick Menu's
         // System tab draws these, and Settings does not (quickOnly). They
         // used to be listed in both, row for row (UI pass 2026-09-24, M2).
-        CatalogGroup(
+        if (!includeQuick) null else CatalogGroup(
             id = GROUP_SYSTEM,
             title = words(R.string.gaming_system),
             quickOnly = true,

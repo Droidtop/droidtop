@@ -286,10 +286,12 @@ fun CatalogNavigator(
     }
     // The root's rows, built once per change: they are the category
     // column, and the pane's rows for a plain category or a navigator
-    // without a column. Suspend builder (real screens run Room queries /
-    // filesystem walks), rebuilt after every value change.
+    // without a column. Built on IO, never on the main thread: builders read
+    // preferences, disk, the package manager and binder services, and run
+    // again after every value change. Handlers still run on Main.
     val rootGroups by produceState<List<CatalogGroup>?>(null, root, version, refreshKey, rootLive) {
-        value = withOfflineNotice(root, context, mergeShortScreens(root.groups(context)) { it.groups(context) })
+        value = withContext(Dispatchers.IO) { mergeShortScreens(root.groups(context)) { it.groups(context) } }
+            .let { withOfflineNotice(root, context, it) }
     }
     val categories = remember(rootGroups, root) {
         rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys, root.categoryOrder) }.orEmpty()
@@ -327,7 +329,8 @@ fun CatalogNavigator(
         // screen already showing reloads at once (a live change, a value set).
         if (depth == 0 && value?.first !== screen) delay(PANE_LOAD_SETTLE_MS)
         // A screen inside Settings (Accounts and sources) does not repeat a place the left menu has either.
-        value = screen to withOfflineNotice(screen, context, withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds))
+        val groups = withContext(Dispatchers.IO) { mergeShortScreens(screen.groups(context)) { it.groups(context) } }
+        value = screen to withOfflineNotice(screen, context, withoutPlaceLinks(groups, placeScreenIds))
     }
     // A new feature that lives on this screen is explained once it is open, as the shell's confirm card
     // (docs/SPEC.md 7b, "Update onboarding"). A linked category waits, as its rows do, for the cursor to rest on it.
