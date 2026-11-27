@@ -19424,6 +19424,9 @@ a Linux container, an emulator...; the current one marked, each with its state),
 button offers "Stream from <PC>" beside Install. Pressing a runner makes it the game's runner, which Play then uses and
 which stays until changed (Steam remembers a launch choice too); the others start at once. The game menu's How it runs
 keeps its rows, and reads the same computers (`HowItRuns.streamSources`).
+A console game's page (`EntryDetailScreen`, the same frame) has the same arrow for its emulator: Follow the system,
+then each installed emulator (`GameEmulatorChoice.options`, the model the Quick Menu, the metadata editor and the
+companion already draw), the one Play uses marked; pressing one saves it as the game's own choice.
 
 ### Home (decided 2026-10-14, mytop-project/tracker#485 F7a; the final design's section B)
 

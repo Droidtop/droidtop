@@ -315,9 +315,29 @@ internal fun EntryDetailScreen(
         return
     }
 
+    // What runs it, beside Play (docs/SPEC.md "How it runs, beside Play", mytop-project/tracker#965), as on a PC game's page:
+    // Follow the system, then each installed emulator, the one Play uses marked. Shown only when there is a choice.
+    val emulatorChoices = emulators?.takeIf { isRomEntry && GameEmulatorChoice.offered(it) }
+        ?.let { GameEmulatorChoice.options(it, entry.altEmulator) }
+        ?.takeIf { it.size > 1 }
+
     GamePageFrame(
         entry = shown,
         play = play,
+        runWithRows = emulatorChoices?.let { options ->
+            { close ->
+                options.map { option ->
+                    ActionRow(option.label + if (option.current) " (current)" else "", option.detail) {
+                        close()
+                        if (!option.current) {
+                            scope.launch {
+                                if (GameEmulatorChoice.save(library, entry, option.id)) onEntryChanged(entry.copy(altEmulator = option.id))
+                            }
+                        }
+                    }
+                }
+            }
+        },
         statuses = statuses,
         strip = strip,
         rowsByTab = rowsByTab,
