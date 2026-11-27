@@ -11,7 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.scanFollowingGamesRoots
-import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.shell.gamepad.hasGamePage
 import dev.droidtop.shell.gamepad.query.LauncherSearchApp
 import dev.droidtop.shell.gamepad.query.LauncherSearchScreen
 import dev.droidtop.shell.standard.LauncherSearch
@@ -95,9 +95,9 @@ class LauncherSearchActivity : ComponentActivity() {
                             }
                     },
                     // The game's page on the Games screen, where Play or Install is (docs/SPEC.md 12a). Standard gives
-                    // PC and engine games a page; any other game starts as before.
+                    // Every supported library game uses the shared page, including console ROMs.
                     onOpen = { entry ->
-                        if (entry.isPcOrEngineGame) {
+                        if (hasGamePage(entry)) {
                             startActivity(LauncherGamesActivity.pageIntent(this@LauncherSearchActivity, entry.id))
                             finish()
                         } else {

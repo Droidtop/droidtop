@@ -1981,6 +1981,9 @@ all; launching Chrome then Clock and reopening the drawer shows
 to the front ("Calendar, Clock, Chrome").
 
 **Launcher search (rebuilt 2026-09-29, mytop-project/tracker#12, owner: "go ahead").**
+Library results use the shared game-page availability rule before opening a page;
+console ROM results therefore open their details and options as PC games do.
+Installed Android app and shortcut search hits retain their direct launch action.
 The drawer's search field is no longer a filter of the drawer. It is a door:
 a tap or Enter on it, or a printable key typed on a hardware keyboard while the
 drawer is up, opens the Murine launcher's one search (`MurineHooks.search`, which droidtop
