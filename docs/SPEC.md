@@ -25119,7 +25119,10 @@ budget. The owner directed: "No local builds. CI is the only build."
 The follow-up enables built-in Kotlin and the new Android DSL rather than
 keeping AGP compatibility opt-outs. Each custom Kotlin source root uses the
 Android source set Kotlin directory API, compiler options use the top-level
-Kotlin extension, and compileSdk declares release 37 minor API 1. Murine
+Kotlin extension, and compileSdk declares release 37 minor API 1. Baseline
+Profile plugin/benchmark 1.5.0 supplies new-DSL support, as recorded in the
+[AndroidX release notes](https://developer.android.com/jetpack/androidx/releases/benchmark#1.5.0-alpha01).
+Murine
 uses built-in Kotlin when embedded in AGP 9 and its external Kotlin plugin
 only for its pinned standalone AGP 8 build. Dagger uses KSP. :ui-shared
 exports the Compose BOM as an API platform so versionless Compose API
