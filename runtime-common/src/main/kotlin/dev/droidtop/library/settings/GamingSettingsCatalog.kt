@@ -56,10 +56,16 @@ object GamingSettingsCatalog {
         // own browser with deeper integration"): droidtop Browser and the sign-ins droidtop keeps for the web.
         // Internet became Network on 2026-11-27 (mytop-project/tracker#964 step 7): the connection, downloads' networks,
         // shares and paired devices joined the web there.
-        "Modes", "Library", "Accounts and sources", "Network", "Appearance",
+        // Accounts and sources became Accounts on 2026-11-27 (tracker#964 step 8): sign-ins only.
+        "Modes", "Library", "Accounts", "Network", "Appearance",
         "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
     )
     const val GROUP_INTERNET = "gaming_internet"
+    const val GROUP_MORE_CONTROLS = "gaming_more_controls"
+    const val ID_MORE_CONTROLS = "pref_gaming_more_controls"
+
+    /** Settings > System > More controls' registered id (`AppSettingsCatalogs.SCREEN_MORE_CONTROLS`). */
+    const val MORE_CONTROLS_SCREEN_ID = "more_controls"
     const val ID_INTERNET = "pref_gaming_internet"
     const val GROUP_KIDS = "gaming_kids"
     const val GROUP_KEYBOARD = "gaming_keyboard"
@@ -528,6 +534,22 @@ object GamingSettingsCatalog {
             id = GROUP_COMPANION_SCREEN,
             title = null,
             items = secondScreenKeyboardItems(context).filter { it.id == ID_DISPLAY_COMPANION },
+        ),
+        // More controls (elevated access) and what it changes on Android itself (device setup): System, not Accounts
+        // (mytop-project/tracker#964 step 8). The page is :app's, registered as MORE_CONTROLS_SCREEN_ID.
+        CatalogGroup(
+            id = GROUP_MORE_CONTROLS,
+            title = null,
+            category = "System",
+            items = listOf(
+                NestedScreenItem(
+                    id = ID_MORE_CONTROLS,
+                    title = words(R.string.gaming_more_controls),
+                    subtitle = words(R.string.gaming_more_controls_summary),
+                    registryId = MORE_CONTROLS_SCREEN_ID,
+                    icon = CatalogIcon.ANDROID_SETTINGS,
+                ),
+            ),
         ),
         CatalogGroup(
             id = GROUP_ANDROID,

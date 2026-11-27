@@ -105,6 +105,8 @@
     <string name="gaming_kids_and_guests">Kids and guests</string>
     <!-- The row a group's expert rows sit behind (docs/SPEC.md "The Advanced row") -->
     <string name="settings_advanced">Advanced</string>
+    <string name="gaming_more_controls">More controls</string>
+    <string name="gaming_more_controls_summary">What droidtop may change on Android, through Shizuku or wireless debugging</string>
     <string name="gaming_ui_mode">Who uses it</string>
     <string name="gaming_passkey_to_leave_kid_kiosk_and">Passkey to leave Kid, Kiosk and Guest</string>
     <string name="gaming_remove_the_passkey">Remove the passkey</string>
@@ -125,8 +127,8 @@
     <string name="gaming_add_or_remove_the_folders_droidtop">Folders droidtop scans</string>
     <string name="gaming_windows_games">Windows games</string>
     <string name="gaming_set_up_the_wine_environment_windows">Set up Wine</string>
-    <string name="gaming_accounts_and_sources">Accounts and sources</string>
-    <string name="gaming_accounts_and_plugins">Accounts and plugins</string>
+    <string name="gaming_accounts_and_sources">Accounts</string>
+    <string name="gaming_accounts_and_plugins">Sign-ins, keys and plugins</string>
     <string name="gaming_internet">Network</string>
     <string name="gaming_internet_summary">Connection, downloads, shares, devices and the web</string>
     <string name="gaming_displays">Displays</string>

@@ -128,6 +128,9 @@ object AppSettingsCatalogs {
     const val SCREEN_PLUGIN_KEYS = "plugin_keys"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
+    /** Settings > System > More controls (docs/SPEC.md "Accounts and System", mytop-project/tracker#964 step 8). */
+    const val SCREEN_MORE_CONTROLS = GamingSettingsCatalog.MORE_CONTROLS_SCREEN_ID
+
     /** Settings > Network (docs/SPEC.md "Settings > Network", mytop-project/tracker#964 step 7). */
     const val SCREEN_NETWORK = "network"
 
@@ -204,6 +207,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
+        SettingsScreenRegistry.register(moreControlsScreen())
         SettingsScreenRegistry.register(networkScreen(SCREEN_NETWORK))
         SettingsScreenRegistry.register(networkScreen(SCREEN_INTERNET))
         SettingsScreenRegistry.register(androidSettingsScreen())
@@ -997,7 +1001,7 @@ object AppSettingsCatalogs {
      */
     private fun accountsAndSourcesScreen() = CatalogScreen(
         id = SCREEN_ACCOUNTS_AND_SOURCES,
-        title = "Accounts and sources",
+        title = "Accounts",
         groups = { context -> accountsAndSourcesGroups(context) },
     )
 
@@ -1070,7 +1074,7 @@ object AppSettingsCatalogs {
             CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
-                items = ElevatedAccessCatalog.rows(context) + listOf(
+                items = listOf(
                     NestedScreenItem(
                         id = "accounts_plugins_screen",
                         title = "Plugins",
@@ -1086,8 +1090,6 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
-            // What droidtop can set on Android itself, through the elevated access above (mytop-project/tracker#816).
-            DeviceSetupRows.group(context),
         )
     }
 
@@ -1099,6 +1101,31 @@ object AppSettingsCatalogs {
      * "reflow the settings to put internet settings together, so we can present our own browser with deeper integration").
      * Registered under [SCREEN_NETWORK] and, for old links, [SCREEN_INTERNET].
      */
+    private fun moreControlsScreen() = CatalogScreen(
+        id = SCREEN_MORE_CONTROLS,
+        title = "More controls",
+        // Where elevated actions come from (the choice, wireless debugging, the helper app, Shizuku's allow), then what
+        // droidtop can set on Android itself through them (mytop-project/tracker#816). Both read binder state: on IO.
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                listOfNotNull(
+                    ElevatedAccessCatalog.rows(context).takeIf { it.isNotEmpty() }?.let {
+                        CatalogGroup(id = "more_controls_access", title = null, items = it)
+                    },
+                    DeviceSetupRows.group(context),
+                ).ifEmpty {
+                    listOf(
+                        CatalogGroup(
+                            id = "more_controls_none",
+                            title = null,
+                            items = listOf(ActionItem(id = "more_controls_none_row", title = "None set up", subtitle = "Install Shizuku, or pair wireless debugging")),
+                        ),
+                    )
+                }
+            }
+        },
+    )
+
     private fun networkScreen(id: String) = CatalogScreen(
         id = id,
         title = "Network",
