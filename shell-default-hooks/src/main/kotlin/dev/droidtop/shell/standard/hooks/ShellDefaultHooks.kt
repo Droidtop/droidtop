@@ -27,7 +27,6 @@ import dev.droidtop.runtime.LauncherSelfFilter
 import dev.droidtop.runtime.keyboard.AccessibilityHost
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import com.android.launcher3.Launcher
-import com.android.launcher3.settings.SettingsActivity
 import dev.droidtop.library.settings.AppearancePrefs
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.shell.standard.BackButtonMenu
@@ -39,9 +38,6 @@ import dev.droidtop.shell.standard.LauncherImportActivity
 import dev.droidtop.shell.standard.LauncherSearch
 import dev.droidtop.shell.standard.ModeSwitcher
 import dev.droidtop.shell.standard.StandardPadHints
-import dev.droidtop.shell.standard.settings.SettingsDesktopFragment
-import dev.droidtop.shell.standard.settings.SettingsGamingFragment
-import dev.droidtop.shell.standard.settings.SettingsGlobalFragment
 import dev.droidtop.shell.standard.settings.drawableRes
 import dev.droidtop.ui.shared.MenuViews
 import com.android.launcher3.R as LauncherR
@@ -219,8 +215,7 @@ object ShellDefaultHooks {
             val intent = when {
                 id.startsWith(PLACE) -> Place.byScreenId(id.removePrefix(PLACE))?.let { Place.openIntent(context, it) }
                 id == SETTINGS_TREE -> dev.droidtop.library.settings.CatalogScreenLink.intent(context, SETTINGS_TREE)
-                id == HOME_SCREEN -> Intent(context, SettingsActivity::class.java)
-                    .putExtra(SettingsActivity.EXTRA_FRAGMENT, SettingsGlobalFragment::class.java.name)
+                id == HOME_SCREEN -> dev.droidtop.library.settings.CatalogScreenLink.intent(context, SETTINGS_TREE)
                 id == LAUNCHER_IMPORT -> Intent(context, LauncherImportActivity::class.java)
                 else -> null
             } ?: return

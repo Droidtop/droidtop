@@ -14840,7 +14840,12 @@ behaviour"; Mobile's and Desktop's pages under Other modes), the companion scree
 category of its own), and Controls and keyboard is Controls. In Mobile, Library, Accounts, Network and Controls used to
 be inside "Other modes > Gaming mode"; Desktop's Start > Settings opened Desktop's page alone. Desktop's page is Modes >
 Other modes > Desktop mode. A test fails when two rows of the root share an id (`SettingsTreeIdsTest`): a renderer keeps
-the first of two, so a duplicate was hidden in Gaming and shown in Mobile.
+the first of two, so a duplicate was hidden in Gaming and shown in Mobile. **One renderer (step 11):** Settings is
+drawn only by the Compose navigator, in Mobile too, so rows look and behave alike in every mode (a row's Info is shown
+on request, never under every row); the launcher's Preference pages for droidtop's catalogs (`SettingsGlobalFragment`,
+`SettingsGamingFragment`, `SettingsDesktopFragment`, `CatalogPreferenceNavigator`) are deleted, and Global settings'
+old routes (the crash route, the launcher's Home screen row) open the tree. The launcher's own pages (icons, home,
+drawer, search bar) stay the launcher's, one row away.
 
 **Library: one page per system (mytop-project/tracker#964, step 9).** Console systems and Emulators are one entry,
 **Systems and emulators** (`console_systems`; `emulators` stays registered for old links): the default emulator, the

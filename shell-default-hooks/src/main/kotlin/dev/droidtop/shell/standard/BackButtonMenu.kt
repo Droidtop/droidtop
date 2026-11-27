@@ -28,7 +28,6 @@ import dev.droidtop.library.settings.Modes
  * in every mode.
  */
 object BackButtonMenu {
-    private const val GLOBAL_SETTINGS_FRAGMENT = "dev.droidtop.shell.standard.settings.SettingsGlobalFragment"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
 
     // Real, deep-link-only extras used by SettingsGamingFragment (same
@@ -209,18 +208,10 @@ object BackButtonMenu {
             .putExtra(EXTRA_MODE, modeId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** Global settings, on the settings surface every mode shares. */
+    /** droidtop's Settings: the one tree every mode opens (docs/SPEC.md "One settings tree"), in droidtop's screen host. */
     @JvmStatic
     fun openGlobalSettings(context: Context) {
-        context.startActivity(
-            Intent(Intent.ACTION_MAIN).apply {
-                component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
-                putExtra(":settings:fragment", GLOBAL_SETTINGS_FRAGMENT)
-                // Settings has its own task: a fresh page, never the one
-                // left open last time, and never on top of a shell.
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            },
-        )
+        context.startActivity(dev.droidtop.library.settings.CatalogScreenLink.intent(context, "settings"))
     }
 }
 
