@@ -22,5 +22,7 @@
     }
   },
   "modes": ["sign_in", "check", "open", "browse"],
-  "download": ["url", "size", "mimeType", "contentDisposition", "referer", "cookie", "userAgent"]
+  "download": ["url", "size", "mimeType", "contentDisposition", "referer", "cookie", "userAgent"],
+  "bodyDownload": ["streamOfferId"],
+  "surfaceAuthority": "vendor/mytop-plugins/android/web-surface-v1.json at the pinned API commit"
 }

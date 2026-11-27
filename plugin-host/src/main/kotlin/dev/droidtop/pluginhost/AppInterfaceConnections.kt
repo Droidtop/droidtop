@@ -32,6 +32,13 @@ internal object AppInterfaceConnections {
     /** Whether droidtop holds a binding for [pluginId] here, so the runner releases it here and not in [PluginProcesses]. */
     fun holds(pluginId: String): Boolean = bound.containsKey(pluginId)
 
+    /** An accepted, short-lived body offer keeps the already-verified provider bound until consumption or expiry. */
+    fun retain(pluginId: String): Boolean = synchronized(this) {
+        val entry = bound[pluginId]?.takeIf { it.runtime?.asBinder()?.isBinderAlive == true } ?: return false
+        entry.users++
+        true
+    }
+
     /** [record]'s app's runtime, bound if it is not yet; null when the app's service cannot be reached in time. */
     suspend fun acquire(context: Context, record: PluginRecord): IPluginRuntime? {
         val id = record.manifest.id

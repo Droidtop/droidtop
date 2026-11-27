@@ -756,7 +756,8 @@ object DownloadJobs {
         }
         if (secret.isNotEmpty()) secretHeaders[name] = secret.associate { it.key to it.value }
         // The key to decrypt with stays in memory; what is persisted says there was one, so a restart fails instead of placing the encrypted file.
-        val marker = if (HostDecryption.SECRET in headers) mapOf(HostDecryption.PENDING to "1") else emptyMap()
+        val marker = (if (HostDecryption.SECRET in headers) mapOf(HostDecryption.PENDING to "1") else emptyMap()) +
+            (if (BrowserBodyOffers.TOKEN in headers) mapOf(BrowserBodyOffers.REQUIRED to "1") else emptyMap())
         return plain.associate { it.key to it.value } + marker
     }
 
@@ -885,6 +886,7 @@ object DownloadJobs {
             return
         }
         partsOf(args).forEach { part ->
+            part[ARG_NAME]?.let { secretHeaders[it] }?.let(BrowserBodyOffers::revoke)
             part[ARG_NAME]?.let { name ->
                 runCatching {
                     val file = fileFor(context, name)
@@ -1269,6 +1271,14 @@ object DownloadJobs {
          */
         expectedBytes: Long = 0L,
     ) {
+        if (BrowserBodyOffers.REQUIRED in headers || BrowserBodyOffers.TOKEN in headers) {
+            allow?.invoke(url)
+            if (range != null) {
+                BrowserBodyOffers.revoke(headers)
+                error("A browser response cannot be resumed by byte range; start the download again")
+            }
+            if (BrowserBodyOffers.transfer(headers, destination, maxBytes, numbers, report)) return
+        }
         val engine = engineFor(context, requireNotNull(destination.parentFile) { "the download has no folder" })
         try {
             EngineFetch.fetch(
