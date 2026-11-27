@@ -75,7 +75,7 @@ object PageViews {
         val muted = NoticeViews.attr(context, android.R.attr.textColorSecondary) ?: base.onSurfaceMuted
         val accent = base.accent
         val notices = NoticeViews.paletteFor(context)
-        val onAccent = dev.droidtop.library.theme.FocusRingInks.inner(accent) // black or white, whichever reads on the accent
+        val onAccent = dev.droidtop.lib.ui.tokens.FocusRingInks.inner(accent) // black or white, whichever reads on the accent
         return PageColors(
             primary = Color(accent),
             onPrimary = Color(onAccent),

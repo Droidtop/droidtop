@@ -6,39 +6,6 @@ import androidx.compose.ui.input.key.nativeKeyCode
 import dev.droidtop.library.controller.FaceRole
 
 /**
- * What a press MEANS -- the one vocabulary every screen in the shell reads
- * (docs/SPEC.md 6e). It is real ES-DE's own `es_input.xml` vocabulary
- * (a/b/x/y/start/select/up/down/left/right/l/r/l2/r2/l3/r3), which is
- * also what a theme's `<helpsystem>` glyphs are keyed to, and it is
- * LOGICAL, not physical: [A] is "accept" and [B] is "back one level"
- * whichever face button the person chose for them, and a keyboard's Enter
- * is [A] and Escape is [B]. What each one means in droidtop:
- *
- * - [A] accept, [B] back one level, [X] the focused thing's toggle
- *   (favourite), [Y] the focused thing's detail or info;
- * - [UP]/[DOWN]/[LEFT]/[RIGHT] move;
- * - [L]/[R] previous/next tab of the nearest tab strip, else of the top
- *   bar (a keyboard's Page Up/Page Down and Shift+Tab/Tab);
- * - [R2] the Quick Menu (a held Select is the same press, for pads whose
- *   triggers send no key), [START] the left menu, [SELECT] the options of the
- *   list or screen you are on, [L2] the focused thing's own menu (a held Start is the
- *   same press, as a held Select is R2's);
- * - [BACK] the system back key. It belongs to the back dispatcher
- *   (`BackHandler`), never to a key handler, so a long press of it still
- *   reaches the activity.
- */
-enum class GamepadAction {
-    A, B, X, Y, START, SELECT,
-    UP, DOWN, LEFT, RIGHT,
-    L, R, L2, R2, L3, R3,
-    BACK,
-    ;
-
-    /** A direction repeats while it is held; nothing else does. */
-    val isDirection: Boolean get() = this == UP || this == DOWN || this == LEFT || this == RIGHT
-}
-
-/**
  * The ONE table from a key to the [GamepadAction] it means, and the label
  * and key code the hint bar uses for each action (docs/SPEC.md 6e). Pad
  * buttons and the keyboard are in the same table, so no screen keeps a
@@ -57,39 +24,15 @@ object GamepadKeyMap {
      * (SPEC 7j), so a keyboard needs its own route to the shoulders that
      * cycle the sections. A focused text field takes its own keys first.
      */
-    fun physicalAction(keyCode: Int, shift: Boolean = false): GamepadAction? = when (keyCode) {
-        KeyEvent.KEYCODE_BUTTON_A,
-        KeyEvent.KEYCODE_DPAD_CENTER,
-        KeyEvent.KEYCODE_ENTER,
-        KeyEvent.KEYCODE_NUMPAD_ENTER,
-        -> GamepadAction.A
-        KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_ESCAPE -> GamepadAction.B
-        KeyEvent.KEYCODE_BACK -> GamepadAction.BACK
-        KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_SPACE -> GamepadAction.X
-        KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_DEL -> GamepadAction.Y
-        KeyEvent.KEYCODE_BUTTON_START -> GamepadAction.START
-        KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_MENU -> GamepadAction.SELECT
-        KeyEvent.KEYCODE_DPAD_UP -> GamepadAction.UP
-        KeyEvent.KEYCODE_DPAD_DOWN -> GamepadAction.DOWN
-        KeyEvent.KEYCODE_DPAD_LEFT -> GamepadAction.LEFT
-        KeyEvent.KEYCODE_DPAD_RIGHT -> GamepadAction.RIGHT
-        KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_PAGE_UP -> GamepadAction.L
-        KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_PAGE_DOWN -> GamepadAction.R
-        KeyEvent.KEYCODE_TAB -> if (shift) GamepadAction.L else GamepadAction.R
-        KeyEvent.KEYCODE_BUTTON_L2 -> GamepadAction.L2
-        KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_F10 -> GamepadAction.R2
-        KeyEvent.KEYCODE_BUTTON_THUMBL -> GamepadAction.L3
-        KeyEvent.KEYCODE_BUTTON_THUMBR -> GamepadAction.R3
-        else -> null
-    }
+    fun physicalAction(keyCode: Int, shift: Boolean = false): GamepadAction? =
+        PadKeyMap.physicalAction(Key(keyCode), shift)
 
     /**
      * Keys a text field types or moves with. A PREVIEW handler sees a key
      * before the focused field does, so it leaves these alone; otherwise a
      * menu around a search box would eat its space bar.
      */
-    fun isTextKey(keyCode: Int): Boolean =
-        keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_TAB
+    fun isTextKey(keyCode: Int): Boolean = PadKeyMap.isTextKey(Key(keyCode))
 
     /**
      * The action [keyCode] means, the swap applied. The swap is a fact about
@@ -101,11 +44,8 @@ object GamepadKeyMap {
      * (`Generic.kcm`), and the system back key stays back.
      */
     fun actionFor(keyCode: Int, shift: Boolean = false): GamepadAction? {
-        val action = physicalAction(keyCode, shift) ?: return null
-        val keyboardOnly = keyCode == KeyEvent.KEYCODE_ENTER ||
-            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
-            keyCode == KeyEvent.KEYCODE_ESCAPE
-        return if (keyboardOnly) action else applySwap(action)
+        dev.droidtop.shell.gamepad.SharedComponentPlatform.install()
+        return PadKeyMap.actionFor(Key(keyCode), shift)
     }
 
     /** [actionFor] for a Compose [Key]. */

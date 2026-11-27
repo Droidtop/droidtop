@@ -1,7 +1,7 @@
 package dev.droidtop.ui.shared
 
-import dev.droidtop.library.theme.noticeColors
-import dev.droidtop.library.theme.noticeInputs
+import dev.droidtop.lib.ui.tokens.noticeColors
+import dev.droidtop.lib.ui.tokens.noticeInputs
 import dev.droidtop.notices.ColorVision
 import dev.droidtop.notices.NoticeChecks
 import dev.droidtop.library.theme.EsDeThemeParser

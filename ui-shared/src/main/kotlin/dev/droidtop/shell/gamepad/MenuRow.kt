@@ -575,16 +575,6 @@ private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
 private val ROW_TAG_MAX_WIDTH = 120.dp
 
 /**
- * The one scrolling-text rule for a label that must stay on one line (a
- * grid tile, a carousel card, a tab label): while [active] (the focused
- * item) the whole text scrolls, so nothing is unreadable forever
- * (docs/SPEC.md "Text in rows and tiles"). Pair with maxLines = 1.
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-fun Modifier.focusMarquee(active: Boolean): Modifier =
-    if (active) basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 600) else this
-
-/**
  * The width of the value column every row of one list shares, so values
  * and their arrows align down the screen (content-sized to the widest
  * value, not a share of the window). Null: each row sizes its own.

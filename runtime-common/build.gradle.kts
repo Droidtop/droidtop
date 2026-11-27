@@ -20,6 +20,10 @@ android {
         // compile (mytop-ui's notices module, vendor/mytop-ui, mytop-project/mytop-ui, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
             java.srcDir("../vendor/mytop-ui/notices/src/commonMain/kotlin")
+            // The palette model and neutral job states are also shared source, compiled only here. The Compose
+            // components which use them are compiled by :ui-shared, so no UI code enters :runtime-common.
+            java.srcDir("../vendor/mytop-ui/tokens/src/commonMain/kotlin")
+            java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/library/settings")
             // The version and trust code droidtop and Enginehost share (vendor/mytop-net, mytop-project/mytop-net,
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
             java.srcDir("../vendor/mytop-net/version/src/main/kotlin")

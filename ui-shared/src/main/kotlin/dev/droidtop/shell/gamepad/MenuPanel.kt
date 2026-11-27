@@ -157,9 +157,6 @@ private val PANEL_SCROLL_STEP = 96.dp
 /** How small a sheet starts as it glides in: 96 percent of its size. */
 private const val PANEL_OPEN_SCALE = 0.96f
 
-/** How tall the fade at the foot of a long sheet is, in dp. */
-internal const val MoreFadeDp = 36
-
 /**
  * A sheet's own name at its top: one heading style for every sheet, and a heading and the window's pane title to a
  * screen reader, so TalkBack names the sheet as it opens and its first stop is the name, not the hint row under the
@@ -220,44 +217,6 @@ internal fun Modifier.fadeWhileMoreBelow(scroll: androidx.compose.foundation.Scr
                     ),
                     topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade),
                     size = androidx.compose.ui.geometry.Size(size.width, fade),
-                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                )
-            }
-        }
-
-/**
- * The ends of a scrolling row fading out on the side it can still scroll to, so a tab or chip cut at the edge reads
- * as "more this way" (mytop-project/tracker#661): a row of tabs never ends mid-letter with nothing to say so. Drawn in the
- * draw phase; the row is composited offscreen only while a fade shows.
- */
-fun Modifier.fadeWhileMoreSideways(state: androidx.compose.foundation.lazy.LazyListState): Modifier =
-    this
-        .graphicsLayer {
-            compositingStrategy = if (state.canScrollForward || state.canScrollBackward) {
-                androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-            } else {
-                androidx.compose.ui.graphics.CompositingStrategy.Auto
-            }
-        }
-        .drawWithContent {
-            drawContent()
-            val fade = MoreFadeDp.dp.toPx().coerceAtMost(size.width / 4f)
-            if (state.canScrollForward) {
-                drawRect(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(Color.Black, Color.Transparent),
-                        startX = size.width - fade,
-                        endX = size.width,
-                    ),
-                    topLeft = androidx.compose.ui.geometry.Offset(size.width - fade, 0f),
-                    size = androidx.compose.ui.geometry.Size(fade, size.height),
-                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                )
-            }
-            if (state.canScrollBackward) {
-                drawRect(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = fade),
-                    size = androidx.compose.ui.geometry.Size(fade, size.height),
                     blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
                 )
             }
