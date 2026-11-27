@@ -17,10 +17,8 @@
 package org.pocketworkstation.pckeyboard;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.Spanned;
@@ -29,12 +27,9 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 import android.widget.TextView.BufferType;
 
 public class Main extends Activity {
-
-    private final static String MARKET_URI = "market://search?q=pub:\"Klaus Weidner\"";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -75,15 +70,8 @@ public class Main extends Activity {
         final Button setup3 = (Button) findViewById(R.id.main_setup_btn_get_dicts);
         setup3.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                Intent it = new Intent(Intent.ACTION_VIEW, Uri.parse(MARKET_URI));
-                try {
-                	startActivity(it);
-                } catch (ActivityNotFoundException e) {
-                    Toast.makeText(getApplicationContext(),
-                            getResources().getString(
-                            		R.string.no_market_warning), Toast.LENGTH_LONG)
-                            .show();
-                }
+                startActivity(new Intent(that, LatinIMESettings.class)
+                        .putExtra(LatinIMESettings.EXTRA_OPEN_DICTIONARIES, true));
             }
         });
         // PluginManager.getPluginDictionaries(getApplicationContext()); // why?
