@@ -36,6 +36,7 @@ class NativePluginRunner(
 
     /** The runtime each plugin was loaded on by this runner. */
     private val runtimes = ConcurrentHashMap<String, IPluginRuntime>()
+    private val appBindings = ConcurrentHashMap<String, AppInterfaceConnections.Lease>()
 
     /** The processes this runner registered a callback with ([callbacks]). */
     private val registered = ConcurrentHashMap<IBinder, IPluginRuntime>()
@@ -251,9 +252,11 @@ class NativePluginRunner(
      */
     private suspend fun loadApp(record: PluginRecord): Boolean {
         val id = record.manifest.id
-        val runtime = AppInterfaceConnections.acquire(appContext, record)
+        val binding = AppInterfaceConnections.acquireLease(appContext, record)
             ?: return failLoad(id, "its app's service could not be reached")
-        runtimes.put(id, runtime)?.let { if (it.asBinder() !== runtime.asBinder()) AppInterfaceConnections.release(appContext, id) }
+        val runtime = binding.runtime
+        appBindings.put(id, binding)?.close()
+        runtimes[id] = runtime
         val binder = runtime.asBinder()
         if (registered.putIfAbsent(binder, runtime) == null) {
             val callback = ProcessCallback(binder).also { callbacks[binder] = it }
@@ -402,7 +405,7 @@ class NativePluginRunner(
         registered.clear()
         callbacks.clear()
         runtimes.keys.toList().forEach { id ->
-            if (AppInterfaceConnections.holds(id)) AppInterfaceConnections.release(appContext, id) else PluginProcesses.release(appContext, id)
+            appBindings.remove(id)?.let { it.close() } ?: PluginProcesses.release(appContext, id)
         }
         runtimes.clear()
     }

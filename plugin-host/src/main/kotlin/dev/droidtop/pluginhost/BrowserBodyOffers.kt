@@ -24,7 +24,7 @@ import kotlinx.coroutines.*
 internal object BrowserBodyOffers {
     const val TOKEN = "X-Droidtop-Browser-Body-Token"
     const val REQUIRED = "X-Droidtop-Browser-Body-Required"
-    private class Offer(val context: Context, val record: PluginRecord, val token: String, val providerId: String, val provider: BrowserBodyTransport, val metadata: BrowserBodyMetadata) {
+    private class Offer(val context: Context, val record: PluginRecord, val token: String, val providerId: String, val provider: BrowserBodyTransport, val metadata: BrowserBodyMetadata, val lease: AppInterfaceConnections.Lease) {
         val pluginId: String get() = record.manifest.id
         val claimed = AtomicBoolean()
         val descriptor = AtomicReference<ParcelFileDescriptor?>()
@@ -42,9 +42,9 @@ internal object BrowserBodyOffers {
         if (offers.values.any { it.token == token && it.providerId == providerId }) return null
         val record = PluginBundleInstaller.readRecord(PluginStore.root(context), pluginId) ?: return null
         if (!permitted(context, record)) return null
-        if (!AppInterfaceConnections.retain(pluginId)) return null
+        val lease = AppInterfaceConnections.retainLease(context, pluginId, provider.runtime) ?: return null
         val id = UUID.randomUUID().toString()
-        val entry = Offer(context.applicationContext, record, token, providerId, provider, metadata)
+        val entry = Offer(context.applicationContext, record, token, providerId, provider, metadata, lease)
         entry.death = IBinder.DeathRecipient { revoke(id) }
         offers[id] = entry
         try { provider.binder.linkToDeath(entry.death, 0) }
@@ -59,7 +59,7 @@ internal object BrowserBodyOffers {
         runCatching { entry.descriptor.getAndSet(null)?.close() }
         runCatching { entry.provider.binder.unlinkToDeath(entry.death, 0) }
         runCatching { rpc.execute { runCatching { entry.provider.cancel(entry.token, entry.providerId) } } }
-        AppInterfaceConnections.release(entry.context, entry.pluginId)
+        entry.lease.close()
     }
 
     private suspend fun descriptor(entry: Offer): ParcelFileDescriptor {

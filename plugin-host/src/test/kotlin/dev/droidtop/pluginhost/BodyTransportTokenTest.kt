@@ -21,6 +21,7 @@ class BodyTransportTokenTest {
                 else -> null
             }
         } as IBinder
+        override val runtime: IBinder get() = binder
         override fun download(token: String, offerId: String) = throw AssertionError("No body was offered")
         override fun cancel(token: String, offerId: String) = Unit
         override fun acknowledge(token: String, offerId: String, accepted: Boolean) = Unit
@@ -57,5 +58,16 @@ class BodyTransportTokenTest {
             assertFalse(WebViewProviders.withdrawUntaken(token))
             assertEquals(1, released.get())
         }
+    }
+
+    @Test fun `simultaneous UI and provider-death cleanup closes one lease once`() {
+        val runtime = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(IPluginRuntime::class.java)) { _, _, _ -> null } as IPluginRuntime
+        val releases = AtomicInteger()
+        val lease = AppInterfaceConnections.Lease(runtime) { releases.incrementAndGet() }
+        val cleanupGate = java.util.concurrent.CountDownLatch(1)
+        val threads = List(16) { Thread { cleanupGate.await(); lease.close() }.apply { start() } }
+        cleanupGate.countDown()
+        threads.forEach { it.join(2000); assertFalse(it.isAlive) }
+        assertEquals(1, releases.get())
     }
 }
