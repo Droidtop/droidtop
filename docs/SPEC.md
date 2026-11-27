@@ -22505,10 +22505,15 @@ Settings tab, the left menu's places, Console systems and Containers.
   "Networks" row that opens this page), **Network shares and cloud storage** and **Devices** (computers and KDE
   Connect, moved from Accounts and sources), then **Browser**, **Download sites**, **File hosts** and **Debrid
   services** as before. The review found network settings in about ten places with none called Network. **Add share**
-  is one row where there were four (one per kind): the address first (`smb://nas/games`, `\nas\games`,
+  is one row where there were four (one per kind): the address first (`smb://nas/games`, `\\nas\games`,
   `sftp://you@host:2222/dir`, `s3://bucket/dir` or an S3 endpoint, any other `https://` address as WebDAV;
   `ShareAddress`), which picks the kind and fills in that kind's form, the same form each kind always had; a Kind row
-  overrides the guess or picks one when the address names none.
+  overrides the guess or picks one when the address names none. **VPN through a container** (shown when there
+  is a container) is one choice for the whole device, Carry traffic through: Off or a container, whose SOCKS5 proxy
+  then carries the device's traffic, with Apps it carries and Android's always-on under it
+  (`ContainersCatalog.vpnGroup`). A container's own page shows whether it carries the traffic, as a fact that opens
+  Network: each container used to have its own switch, and turning one on silently replaced another's. The VPN row,
+  here and in the Quick Menu, opens Network when the VPN up is droidtop's own, else Android's VPN screen.
 - **Two panes.** A navigator that fills the page (at least 80% of the
   screen's width; never one inside a sheet or a dialog) whose root has three
   or more categories draws a **category column** and a **pane**. The column

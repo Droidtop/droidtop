@@ -1588,52 +1588,81 @@ object ContainersCatalog {
 
     // ---- VPN (docs/SPEC.md 4a) ----
 
-    private suspend fun vpnItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
-        val id = info.container.id
+    /**
+     * The container page's VPN row: a fact, whether this container carries the device's traffic, opening Settings >
+     * Network, where the one device-wide choice is (docs/SPEC.md "Settings > Network", mytop-project/tracker#964). Each
+     * container used to have its own switch, and turning one on silently replaced another's.
+     */
+    private suspend fun vpnItems(context: Context, @Suppress("UNUSED_PARAMETER") runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
         val config = withContext(Dispatchers.IO) { VpnPrefs.read(context) }
-        val state = DroidtopVpnService.state.value
-        val serves = config.containerId == id && state != VpnState.Off
-        val socket = File(runtime.hostSocketDir(), ContainerLayout.VPN_SOCKET)
-        val needsConsent = VpnService.prepare(context) != null
-        val apps = config.allowedApps
+        val serves = config.containerId == info.container.id && DroidtopVpnService.state.value != VpnState.Off
         return listOf(
-            ToggleItem(
-                id = "container_vpn",
-                title = "Carry the device's traffic",
-                subtitle = when {
-                    serves -> describe(state)
-                    needsConsent -> "Android asks once to allow droidtop's VPN. Allow it, then turn this on again. " +
-                        "The container serves a SOCKS5 proxy at ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.VPN_SOCKET}"
-                    else -> "Through a SOCKS5 proxy the container serves at ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.VPN_SOCKET}"
-                },
-                current = serves,
-                onToggle = { ctx, on ->
-                    // Another container's VPN is replaced, not stacked.
-                    DroidtopVpnService.stop(ctx)
-                    if (on) {
-                        val ask = VpnService.prepare(ctx)
-                        if (ask != null) {
-                            ctx.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        } else {
-                            VpnPrefs.serveFrom(ctx, id, socket)
-                            DroidtopVpnService.start(ctx)
-                        }
-                    }
-                },
-            ),
             NestedScreenItem(
-                id = "container_vpn_apps",
-                title = "Apps it carries",
-                inline = vpnAppsScreen(),
-                valueLabel = { if (apps.isEmpty()) "Every app" else "${apps.size} app${if (apps.size == 1) "" else "s"}" },
-            ),
-            ActionItem(
-                id = "container_vpn_always_on",
-                title = "Always-on in Android",
-                run = { ctx -> SettingsLaunch.start(ctx, Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                id = "container_vpn",
+                title = "Carries the device's traffic",
+                subtitle = "Through a SOCKS5 proxy the container serves at ${ContainerLayout.SOCKET_DIR}/${ContainerLayout.VPN_SOCKET}. " +
+                    "Chosen in Settings > Network",
+                registryId = AppSettingsCatalogs.SCREEN_NETWORK,
+                valueLabel = { if (serves) "Yes" else "No" },
             ),
         )
     }
+
+    /**
+     * Settings > Network's "VPN through a container": one choice for the whole device, Off or the container whose
+     * SOCKS5 proxy carries the device's traffic, then which apps it carries and Android's always-on. Null when there is
+     * no container. Lists containers: off the main thread.
+     */
+    suspend fun vpnGroup(context: Context): CatalogGroup? {
+        val runtime = ContainerRuntimeFactory.select(context, waitForRoot = false)
+        val containers = withContext(Dispatchers.IO) { runCatching { runtime.listContainers() }.getOrDefault(emptyList()) }
+        if (containers.isEmpty()) return null
+        val config = withContext(Dispatchers.IO) { VpnPrefs.read(context) }
+        val state = DroidtopVpnService.state.value
+        val serving = config.containerId?.takeIf { id -> state != VpnState.Off && containers.any { it.container.id == id } }
+        val socket = File(runtime.hostSocketDir(), ContainerLayout.VPN_SOCKET)
+        val apps = config.allowedApps
+        return CatalogGroup(
+            id = "network_vpn_container",
+            title = "VPN through a container",
+            items = listOf(
+                ChoiceItem(
+                    id = "network_vpn_through",
+                    title = "Carry traffic through",
+                    subtitle = if (serving != null) describe(state) else "A container's SOCKS5 proxy, as the device's VPN",
+                    options = listOf(ChoiceOption(VPN_OFF, "Off")) + containers.map { ChoiceOption(it.container.id, it.displayName) },
+                    current = serving ?: VPN_OFF,
+                    onSelect = { ctx, value ->
+                        // One at a time: the one serving now stops first.
+                        DroidtopVpnService.stop(ctx)
+                        if (value != VPN_OFF) {
+                            val ask = VpnService.prepare(ctx)
+                            if (ask != null) {
+                                // Android asks once; the choice is made again after allowing it.
+                                ctx.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            } else {
+                                VpnPrefs.serveFrom(ctx, value, socket)
+                                DroidtopVpnService.start(ctx)
+                            }
+                        }
+                    },
+                ),
+                NestedScreenItem(
+                    id = "container_vpn_apps",
+                    title = "Apps it carries",
+                    inline = vpnAppsScreen(),
+                    valueLabel = { if (apps.isEmpty()) "Every app" else "${apps.size} app${if (apps.size == 1) "" else "s"}" },
+                ),
+                ActionItem(
+                    id = "container_vpn_always_on",
+                    title = "Always-on in Android",
+                    run = { ctx -> SettingsLaunch.start(ctx, Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                ),
+            ),
+        )
+    }
+
+    private const val VPN_OFF = "off"
 
     private fun describe(state: VpnState): String = when (state) {
         VpnState.Connected -> "Connected: the device's traffic goes through this container"

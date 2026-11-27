@@ -1126,7 +1126,7 @@ object AppSettingsCatalogs {
                     KdeConnectCatalog.linkRow(dev.droidtop.net.kdeconnect.KdeConnect.isOn(context)),
                 ),
             ),
-        ) + internetGroups(context)
+        ) + internetGroups(context) + listOfNotNull(ContainersCatalog.vpnGroup(context))
     }
 
     private suspend fun internetGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
