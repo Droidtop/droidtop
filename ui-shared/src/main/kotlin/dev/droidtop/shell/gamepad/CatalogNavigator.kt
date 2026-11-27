@@ -1739,6 +1739,7 @@ private fun CatalogMenuRow(
         onInfo = onLongClick,
         // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
+        switchIsToggle = toggle != null,
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
         progress = item.progress,
         progressLook = item.progressLook,

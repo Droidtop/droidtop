@@ -11845,6 +11845,13 @@ before some fields were dropped:
   that question and "Press again to go ahead"; it showed the download row's "Press again to download this version",
   for a button that downloaded nothing.
 
+**Custom control semantics (static UI review, 2026-11-27, mytop-project/tracker#967).** The interactive menu row owns
+a switch's accessible role and checked state; `ShellSwitch` remains drawing only. A row displaying a system state
+which opens another screen still speaks On/Off, but does not claim that activating it directly toggles the state.
+The touch adjustment arrows speak Increase/Decrease plus the setting's title, expose the button role, and call the
+same adjustment as Left/Right. Their existing minimum touch targets are retained. This follows the official
+Compose semantics and custom-control accessibility guidance; no device usability pass is claimed.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:

@@ -43,6 +43,17 @@ import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.ui.shared.LocalNoticePalette
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import dev.droidtop.ui.shared.R
 
 /*
  * The Gaming shell's shared menu language, in one place. Its colours
@@ -193,6 +204,8 @@ fun MenuRow(
     // A toggle drawn as a switch in the value column (on/off), instead of
     // a value text. Null: not a toggle.
     switchOn: Boolean? = null,
+    // A navigational row can display a system's state without itself changing that state.
+    switchIsToggle: Boolean = true,
     // A slider's position (0..1), drawn as a short track before its value.
     // Null: not a slider.
     sliderFraction: Float? = null,
@@ -253,6 +266,11 @@ fun MenuRow(
     // meant to read about an armed confirm row confirmed it (rig, build 1908, trusting a plugin origin).
     onInfo: (() -> Unit)? = null,
 ) {
+    val spokenSwitchState = switchOn?.let {
+        stringResource(if (it) R.string.ui_shared_on else R.string.ui_shared_off)
+    }
+    val decreaseLabel = stringResource(R.string.ui_shared_decrease_value, title)
+    val increaseLabel = stringResource(R.string.ui_shared_increase_value, title)
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
     // MenuPanel/MenuRow (Quick Menu, Settings, and PcGameMenu's L2 game
@@ -292,6 +310,13 @@ fun MenuRow(
             )
             .clip(MenuTokens.RowShape)
             .selectionFrame(selected, MenuTokens.RowShape, row = true)
+            .then(if (switchOn != null) Modifier.semantics {
+                stateDescription = spokenSwitchState!!
+                if (onClick != null && switchIsToggle) {
+                    role = Role.Switch
+                    toggleableState = ToggleableState(switchOn)
+                }
+            } else Modifier)
             // Touch works on every row, always -- the shell is
             // gamepad-first, never gamepad-only.
             .then(
@@ -413,7 +438,7 @@ fun MenuRow(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.valueShare().then(if (columnWidth != null) Modifier.width(columnWidth + window.pressTarget * 2) else Modifier),
                 ) {
-                    AdjustArrow("‹") { onAdjust(-1) }
+                    AdjustArrow("‹", decreaseLabel) { onAdjust(-1) }
                     if (valueChip) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -434,7 +459,7 @@ fun MenuRow(
                             },
                         )
                     }
-                    AdjustArrow("›") { onAdjust(+1) }
+                    AdjustArrow("›", increaseLabel) { onAdjust(+1) }
                 }
             } else if (valueChip) {
                 Row(
@@ -559,12 +584,17 @@ fun StatusChip(text: String, ink: Color, fill: Color, modifier: Modifier = Modif
  * second way in, never a second definition.
  */
 @Composable
-private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
+private fun AdjustArrow(glyph: String, label: String, onPress: () -> Unit) {
     Box(
         modifier = Modifier
             .size(LocalShellWindow.current.pressTarget)
             .clip(Corners.Pill)
-            .padRow(onClick = onPress),
+            .padRow(onClick = onPress)
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+                onClick { onPress(); true }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
