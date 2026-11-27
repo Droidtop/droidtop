@@ -107,7 +107,12 @@ jobs:
           ) &
           sampler=$!
           set +e
-          ./gradlew :app:lintDebug --stacktrace
+          # The runner was lost again on e1184f9539 (46044151638), before any report survived. Bound the whole
+          # analysis to one worker: otherwise Gradle's 8 GB heap, a 3 GB Kotlin daemon and several isolated lint
+          # workers can compete on the same 16 GB machine. Compilation for this gate stays inside Gradle's heap;
+          # the APK workflow keeps its own parallel build budget. No detector, dependency or baseline is skipped.
+          ./gradlew :app:lintDebug --no-parallel --max-workers=1 \
+            -Pkotlin.compiler.execution.strategy=in-process --stacktrace
           code=$?
           kill "$sampler" 2>/dev/null
           ./gradlew --stop
