@@ -136,12 +136,6 @@ internal class PadKeys(private val ime: LatinIME) {
         event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK) ||
             KeyEvent.isGamepadButton(event.keyCode)
 
-    companion object {
-        /** A panel replaces the invisible key grid; a hidden whole IME must still release input to the app. */
-        internal fun surfaceShown(keyboard: View, deck: View?, panelOpen: Boolean): Boolean =
-            keyboard.isShown || (panelOpen && deck?.isShown == true)
-    }
-
     private fun view(): LatinKeyboardView? = KeyboardSwitcher.getInstance().inputView
 
     /** The ring onto the tool above the keys nearest [keyX] (in the keys' coordinates); false when there is none. */
@@ -313,9 +307,13 @@ internal class PadKeys(private val ime: LatinIME) {
         ime.onRelease(code)
     }
 
-    private companion object {
+    companion object {
+        /** A panel replaces the invisible key grid; a hidden whole IME must still release input to the app. */
+        internal fun surfaceShown(keyboard: View, deck: View?, panelOpen: Boolean): Boolean =
+            keyboard.isShown || (panelOpen && deck?.isShown == true)
+
         /** The tool ring's stroke, as wide as the key ring's (LatinKeyboardBaseView). */
-        const val RING_DP = 3f
+        private const val RING_DP = 3f
     }
 
     /** A press can change the layer (Shift, symbols): the ring moves to the new layer's key nearest its point. */
