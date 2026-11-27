@@ -15,6 +15,15 @@
 
 # --- API-gated by an explicit Build.VERSION branch at the only call site ---
 
+# SurfacePackage (API 30), including generated AIDL and coroutine signatures.
+# WebViewProviders.open checks SDK_INT < 30 at WebViewProviders.kt:94 before
+# BrowserSurfaceActivity.open at :100; complete calls it only under >= 30.
+# The activity is not exported. SurfaceBodyTransport is constructed only
+# inside that activity; shared offers name the PFD-only BrowserBodyTransport,
+# so neither the generated interface nor the surface activity loads below 30.
+dev.droidtop.pluginhost.BrowserSurfaceActivity
+dev.droidtop.pluginhost.IWebViewSurfaceProvider
+
 # The launcher's predictive-back adapter itself: the one class naming
 # android.window's API-34 interfaces, registered only from
 # Launcher.registerBackDispatcher() under Utilities.ATLEAST_U.

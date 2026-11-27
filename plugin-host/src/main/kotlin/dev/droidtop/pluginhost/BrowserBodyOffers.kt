@@ -24,7 +24,7 @@ import kotlinx.coroutines.*
 internal object BrowserBodyOffers {
     const val TOKEN = "X-Droidtop-Browser-Body-Token"
     const val REQUIRED = "X-Droidtop-Browser-Body-Required"
-    private class Offer(val context: Context, val pluginId: String, val token: String, val providerId: String, val provider: IWebViewSurfaceProvider, val metadata: BrowserBodyMetadata) {
+    private class Offer(val context: Context, val pluginId: String, val token: String, val providerId: String, val provider: BrowserBodyTransport, val metadata: BrowserBodyMetadata) {
         val claimed = AtomicBoolean()
         val descriptor = AtomicReference<ParcelFileDescriptor?>()
         lateinit var death: IBinder.DeathRecipient
@@ -35,7 +35,7 @@ internal object BrowserBodyOffers {
     private val rpc = ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64), { task -> Thread(task, "browser-body").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
 
     @Synchronized
-    fun offer(context: Context, pluginId: String, token: String, providerId: String, provider: IWebViewSurfaceProvider, metadata: BrowserBodyMetadata): WebSessionDownload? {
+    fun offer(context: Context, pluginId: String, token: String, providerId: String, provider: BrowserBodyTransport, metadata: BrowserBodyMetadata): WebSessionDownload? {
         if (providerId.length !in 1..128 || providerId.any { !it.isLetterOrDigit() && it !in "-_." }) return null
         if (offers.size >= 32 || offers.values.count { it.token == token } >= DownloadJobs.MAX_FILES) return null
         if (offers.values.any { it.token == token && it.providerId == providerId }) return null
@@ -44,7 +44,7 @@ internal object BrowserBodyOffers {
         val entry = Offer(context.applicationContext, pluginId, token, providerId, provider, metadata)
         entry.death = IBinder.DeathRecipient { revoke(id) }
         offers[id] = entry
-        try { provider.asBinder().linkToDeath(entry.death, 0) }
+        try { provider.binder.linkToDeath(entry.death, 0) }
         catch (_: Exception) { revoke(id); return null }
         main.postDelayed({ if (!entry.claimed.get()) revoke(id) }, 60_000)
         return WebSessionDownload.direct(metadata.sourceUrl, metadata.fileName, metadata.size.takeIf { it >= 0 }, mapOf(TOKEN to id, REQUIRED to "1")).copy(mimeType = metadata.mimeType)
@@ -54,8 +54,8 @@ internal object BrowserBodyOffers {
     private fun revoke(id: String) {
         val entry = offers.remove(id) ?: return
         runCatching { entry.descriptor.getAndSet(null)?.close() }
-        runCatching { entry.provider.asBinder().unlinkToDeath(entry.death, 0) }
-        runCatching { rpc.execute { runCatching { entry.provider.cancelDownload(entry.token, entry.providerId) } } }
+        runCatching { entry.provider.binder.unlinkToDeath(entry.death, 0) }
+        runCatching { rpc.execute { runCatching { entry.provider.cancel(entry.token, entry.providerId) } } }
         AppInterfaceConnections.release(entry.context, entry.pluginId)
     }
 

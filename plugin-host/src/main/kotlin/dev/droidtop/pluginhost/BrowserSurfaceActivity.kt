@@ -157,7 +157,7 @@ class BrowserSurfaceActivity : Activity() {
             val metadata = BrowserBodyMetadata.parse(metadataJson)
             scope.launch {
                 val p = provider ?: return@launch
-                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, p, metadata) }
+                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, SurfaceBodyTransport(p), metadata) }
                 try { remote { p.offerResult(token, offerId, accepted) } }
                 catch (_: Exception) { failed() }
             }
