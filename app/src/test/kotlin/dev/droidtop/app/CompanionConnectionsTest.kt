@@ -20,9 +20,15 @@ class CompanionConnectionsTest {
         allTraffic = allTraffic, metered = false,
     )
 
-    @Test fun `a row reads State (name), and Details says only what is known`() {
-        assertEquals("Connected (WireGuard)", netLine(net(NetKind.VPN, "WireGuard")))
-        assertEquals("Connected", netLine(net(NetKind.VPN)))
+    @Test fun `a network's row is its kind, its name as the value, its details in Info`() {
+        val rows = networkRows(NetworkState(listOf(net(NetKind.VPN, "WireGuard"), net(NetKind.WIFI)), interfaces = listOf("tun0", "wlan0"), helper = false))
+        assertEquals(listOf("VPN", "Wi-Fi", "Check public address", "Interfaces"), rows.map { it.title })
+        assertEquals(listOf("WireGuard", "Connected"), rows.take(2).map { it.value })
+        assertEquals("2", rows.last().value)
+        assertEquals("Offline", networkRows(NetworkState(emptyList(), emptyList(), helper = false)).first().title)
+    }
+
+    @Test fun `Details says only what is known`() {
         assertEquals(
             listOf("Interface tun0", "Address 10.8.0.2", "DNS 10.8.0.1", "All traffic goes through it", "Not metered"),
             detailFacts(net(NetKind.VPN, allTraffic = true)),

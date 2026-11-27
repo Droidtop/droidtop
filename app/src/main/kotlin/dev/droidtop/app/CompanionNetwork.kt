@@ -10,22 +10,16 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -33,7 +27,6 @@ import dev.droidtop.display.secondScreenScroll
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
@@ -61,62 +54,66 @@ internal fun CompanionNetworkTab() {
             CompanionNote("Reading…")
             return@Column
         }
-        if (now.networks.isEmpty()) {
-            CompanionCard("Offline") {
-                CompanionNote("No network is connected")
-                CompanionPill("Manage") { SettingsLaunch.start(context, manageIntent(NetKind.WIFI)) }
-            }
-        }
-        now.networks.forEach { net -> NetworkCard(net, now.helper) }
-        CompanionCard("Interfaces") {
-            if (now.interfaces.isEmpty()) CompanionNote("None up")
-            now.interfaces.forEach { line ->
-                Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            }
-            // Read with the helper app only (it was System > Connections' line before the Network tab).
-            now.adbWifi?.let { CompanionNote(if (it) "Wireless debugging: on" else "Wireless debugging: off") }
-        }
+        // The same rows Settings draws (docs/SPEC.md "Settings > Network", mytop-project/tracker#964 step 12), where the
+        // tab had cards of its own: one per network that is up, its name as the value, Manage as the press, its details
+        // in its Info; then the interfaces and wireless debugging as facts.
+        CompanionCatalogItems(items = networkRows(now), onChanged = { version++ })
         CompanionPill("Refresh") { version++ }
     }
 }
 
-@Composable
-private fun NetworkCard(net: NetFact, helper: Boolean) {
-    val context = LocalContext.current
-    var details by remember(net.kind, net.iface) { mutableStateOf(false) }
-    CompanionCard(net.kind.label) {
-        Text(netLine(net), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        detailFacts(net).takeIf { details }?.forEach { CompanionNote(it) }
-        if (details && net.kind == NetKind.VPN) {
-            if (net.name == null) CompanionNote(vpnNameMissing(helper))
-            PublicAddress()
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CompanionPill(if (details) "Hide details" else "Details") { details = !details }
-            CompanionPill("Manage") { SettingsLaunch.start(context, manageIntent(net.kind)) }
-        }
+/** The tab's rows for [now]. Pure but for the press actions, which open Android's own screens or ask an outside service. */
+internal fun networkRows(now: NetworkState): List<dev.droidtop.library.settings.CatalogItem> = buildList {
+    if (now.networks.isEmpty()) {
+        add(
+            dev.droidtop.library.settings.ActionItem(
+                id = "companion_net_offline",
+                title = "Offline",
+                subtitle = "No network is connected",
+                run = { ctx -> SettingsLaunch.start(ctx, manageIntent(NetKind.WIFI)) },
+            ),
+        )
     }
-}
-
-/**
- * Where this device's traffic leaves for the internet: asked of an outside service only when the person presses the
- * button (owner, 2026-10-17: "yes, behind a button in Details"), never by itself.
- */
-@Composable
-private fun PublicAddress() {
-    var answer by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    answer?.let { CompanionNote(it) }
-    CompanionPill("Check public address") {
-        answer = "Asking ${PUBLIC_ADDRESS_HOST}…"
-        scope.launch {
-            answer = withContext(Dispatchers.IO) {
-                runCatching {
-                    val reply = dev.droidtop.net.Http.get(PUBLIC_ADDRESS_URL, maxBytes = 256).text().trim()
-                    "Public address: $reply (answered by $PUBLIC_ADDRESS_HOST)"
-                }.getOrElse { "Could not ask $PUBLIC_ADDRESS_HOST: ${it.message ?: "no answer"}" }
-            }
-        }
+    now.networks.forEach { net ->
+        val details = detailFacts(net) + listOfNotNull(vpnNameMissing(now.helper).takeIf { net.kind == NetKind.VPN && net.name == null })
+        add(
+            dev.droidtop.library.settings.ActionItem(
+                id = "companion_net_${net.kind.name.lowercase()}_${net.iface.orEmpty()}",
+                title = net.kind.label,
+                value = net.name ?: "Connected",
+                subtitle = details.joinToString(". ").ifEmpty { null },
+                run = { ctx -> SettingsLaunch.start(ctx, manageIntent(net.kind)) },
+            ),
+        )
+    }
+    // Where traffic leaves for the internet, asked only on a press (owner, 2026-10-17: "yes, behind a button in Details").
+    if (now.networks.any { it.kind == NetKind.VPN }) {
+        add(
+            dev.droidtop.library.settings.AsyncActionItem(
+                id = "companion_net_public_address",
+                title = "Check public address",
+                subtitle = "Asks $PUBLIC_ADDRESS_HOST",
+                run = { _, onStatus ->
+                    onStatus("Asking $PUBLIC_ADDRESS_HOST…")
+                    withContext(Dispatchers.IO) {
+                        runCatching { dev.droidtop.net.Http.get(PUBLIC_ADDRESS_URL, maxBytes = 256).text().trim() }
+                            .fold({ "Public address: $it" }, { "Couldn't ask $PUBLIC_ADDRESS_HOST: ${it.message ?: "no answer"}" })
+                    }
+                },
+            ),
+        )
+    }
+    add(
+        dev.droidtop.library.settings.ActionItem(
+            id = "companion_net_interfaces",
+            title = "Interfaces",
+            value = if (now.interfaces.isEmpty()) "None up" else now.interfaces.size.toString(),
+            subtitle = now.interfaces.joinToString(". ").ifEmpty { null },
+        ),
+    )
+    // Read with More controls only (it was System > Connections' line before the Network tab).
+    now.adbWifi?.let {
+        add(dev.droidtop.library.settings.ActionItem(id = "companion_net_adb_wifi", title = "Wireless debugging", value = if (it) "On" else "Off"))
     }
 }
 
@@ -150,8 +147,6 @@ internal data class NetFact(
 
 internal data class NetworkState(val networks: List<NetFact>, val interfaces: List<String>, val helper: Boolean, val adbWifi: Boolean? = null)
 
-/** The row's one line: "Connected (Home)", a VPN's "Connected (WireGuard)", or "Connected" with no name. Pure. */
-internal fun netLine(net: NetFact): String = "Connected" + (net.name?.let { " ($it)" } ?: "")
 
 /** What Details adds under the line. Pure. */
 internal fun detailFacts(net: NetFact): List<String> = buildList {

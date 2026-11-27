@@ -14846,6 +14846,10 @@ on request, never under every row); the launcher's Preference pages for droidtop
 `SettingsGamingFragment`, `SettingsDesktopFragment`, `CatalogPreferenceNavigator`) are deleted, and Global settings'
 old routes (the crash route, the launcher's Home screen row) open the tree. The launcher's own pages (icons, home,
 drawer, search bar) stay the launcher's, one row away.
+**The companion draws the same rows (step 12):** its Network tab is catalog rows drawn by `CompanionCatalogItems`
+(`networkRows`), not cards of its own: one row per network that is up (its kind, its name as the value, its details as
+Info, Manage as the press), Offline when none is, Check public address when a VPN is up (asked only on a press), and
+the interfaces and wireless debugging as facts.
 
 **Library: one page per system (mytop-project/tracker#964, step 9).** Console systems and Emulators are one entry,
 **Systems and emulators** (`console_systems`; `emulators` stays registered for old links): the default emulator, the
