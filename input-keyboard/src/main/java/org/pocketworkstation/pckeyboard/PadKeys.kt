@@ -59,7 +59,8 @@ internal class PadKeys(private val ime: LatinIME) {
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (!fromPad(event)) return false
         val view = view() ?: return false
-        if (!view.isShown) return false
+        val deck = ime.toolsDeck
+        if (!surfaceShown(view, deck, deck?.panelOpen == true)) return false
         val keys = view.keyboard?.keys ?: return false
         if (keys.isEmpty()) return false
         // A touch took the ring away (LatinKeyboardBaseView): the pad starts again from the middle.
@@ -73,7 +74,6 @@ internal class PadKeys(private val ime: LatinIME) {
             KeyEvent.KEYCODE_DPAD_RIGHT -> Slab.Move.RIGHT
             else -> null
         }
-        val deck = ime.toolsDeck
         // A touch on the bar took its ring away.
         if (onBar && ime.candidateStrip()?.isPadActive != true) onBar = false
         if (onBar) {
@@ -135,6 +135,12 @@ internal class PadKeys(private val ime: LatinIME) {
     private fun fromPad(event: KeyEvent): Boolean =
         event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK) ||
             KeyEvent.isGamepadButton(event.keyCode)
+
+    companion object {
+        /** A panel replaces the invisible key grid; a hidden whole IME must still release input to the app. */
+        internal fun surfaceShown(keyboard: View, deck: View?, panelOpen: Boolean): Boolean =
+            keyboard.isShown || (panelOpen && deck?.isShown == true)
+    }
 
     private fun view(): LatinKeyboardView? = KeyboardSwitcher.getInstance().inputView
 
