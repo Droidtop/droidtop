@@ -8,7 +8,6 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.*
 
@@ -22,13 +21,14 @@ internal object BodyDownloadRelay {
     fun prepare(context: Context, record: PluginRecord, token: String, ready: () -> Unit, unavailable: () -> Unit) {
         val app = context.applicationContext
         scope.launch {
-            val held = AtomicBoolean()
-            val release = { if (held.compareAndSet(true, false)) AppInterfaceConnections.release(app, record.manifest.id); Unit }
+            var lease: AppInterfaceConnections.Lease? = null
+            val release = { lease?.close(); Unit }
             try {
                 withTimeout(10_000) {
                     check(allowed(app, record))
-                    held.set(true)
-                    val runtime = AppInterfaceConnections.acquire(app, record) ?: error("The browser could not be reached")
+                    val held = AppInterfaceConnections.acquireLease(app, record) ?: error("The browser could not be reached")
+                    lease = held
+                    val runtime = held.runtime
                     if (!WebViewProviders.keepBodyProvider(token, release)) { release(); return@withTimeout }
                     val connection = synchronized(connections) {
                         connections[record.manifest.id]?.takeIf { it.runtime === runtime.asBinder() && it.record.archiveDigest == record.archiveDigest }
@@ -79,7 +79,7 @@ internal object BodyDownloadRelay {
             override fun connected(provider: IWebDownloadProvider?, capabilities: Array<out String>?) {
                 if (Binder.getCallingUid() != uid || provider == null || capabilities == null || capabilities.size > 16 || capabilities.any { it.length > 128 }) return
                 if (CAPABILITY !in capabilities) { ready.complete(null); return }
-                val endpoint = DownloadBodyTransport(provider)
+                val endpoint = DownloadBodyTransport(provider, runtime)
                 try {
                     endpoint.binder.linkToDeath({ connections.remove(record.manifest.id, this@Connection) }, 0)
                     transport = endpoint

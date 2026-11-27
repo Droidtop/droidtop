@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -29,18 +30,24 @@ internal object AppInterfaceConnections {
     private val bound = ConcurrentHashMap<String, Bound>()
     private val main = Handler(Looper.getMainLooper())
 
-    /** Whether droidtop holds a binding for [pluginId] here, so the runner releases it here and not in [PluginProcesses]. */
-    fun holds(pluginId: String): Boolean = bound.containsKey(pluginId)
-
-    /** An accepted, short-lived body offer keeps the already-verified provider bound until consumption or expiry. */
-    fun retain(pluginId: String): Boolean = synchronized(this) {
-        val entry = bound[pluginId]?.takeIf { it.runtime?.asBinder()?.isBinderAlive == true } ?: return false
-        entry.users++
-        true
+    class Lease internal constructor(val runtime: IPluginRuntime, private val release: () -> Unit) : AutoCloseable {
+        private val open = AtomicBoolean(true)
+        override fun close() { if (open.compareAndSet(true, false)) release() }
     }
 
-    /** [record]'s app's runtime, bound if it is not yet; null when the app's service cannot be reached in time. */
-    suspend fun acquire(context: Context, record: PluginRecord): IPluginRuntime? {
+    /** Retains the exact runtime generation that owns an accepted response, not a later replacement under its id. */
+    fun retainLease(context: Context, pluginId: String, runtime: IBinder): Lease? = synchronized(this) {
+        val entry = bound[pluginId]?.takeIf { it.runtime?.asBinder() === runtime && runtime.isBinderAlive } ?: return null
+        entry.users++
+        Lease(entry.runtime!!) { releaseEntry(context, pluginId, entry) }
+    }
+
+    /** Each caller owns a lease to this exact service connection, even if the app later reconnects. */
+    suspend fun acquireLease(context: Context, record: PluginRecord): Lease? = acquireHeld(context, record)?.let { (entry, runtime) ->
+        Lease(runtime) { releaseEntry(context, record.manifest.id, entry) }
+    }
+
+    private suspend fun acquireHeld(context: Context, record: PluginRecord): Pair<Bound, IPluginRuntime>? {
         val id = record.manifest.id
         val target = record.manifest.app ?: return null
         val app = context.applicationContext ?: context
@@ -51,19 +58,21 @@ internal object AppInterfaceConnections {
                 val connection = object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                         val runtime = service?.let { IPluginRuntime.Stub.asInterface(it) }
-                        bound[id]?.runtime = runtime
-                        ready.complete(runtime)
+                        val current = synchronized(AppInterfaceConnections) {
+                            bound[id]?.takeIf { it.connection === this }?.also { it.runtime = runtime }
+                        }
+                        ready.complete(runtime.takeIf { current != null })
                     }
 
                     override fun onServiceDisconnected(name: ComponentName?) {
-                        bound[id]?.runtime = null
+                        synchronized(AppInterfaceConnections) { bound[id]?.takeIf { it.connection === this }?.runtime = null }
                     }
 
-                    override fun onBindingDied(name: ComponentName?) = forget(app, id)
+                    override fun onBindingDied(name: ComponentName?) = forgetConnection(app, id, this)
 
                     override fun onNullBinding(name: ComponentName?) {
                         ready.complete(null)
-                        forget(app, id)
+                        forgetConnection(app, id, this)
                     }
                 }
                 val created = Bound(connection, ready).also { it.users = 1 }
@@ -78,21 +87,22 @@ internal object AppInterfaceConnections {
                 created
             }
         }
-        return entry.runtime ?: withTimeoutOrNull(PluginRunner.CALL_TIMEOUT_MS) { entry.ready.await() }
+        return try {
+            val runtime = entry.runtime ?: withTimeoutOrNull(PluginRunner.CALL_TIMEOUT_MS) { entry.ready.await() }
+            if (runtime == null || bound[id] !== entry) { releaseEntry(app, id, entry); null } else entry to runtime
+        } catch (error: Throwable) { releaseEntry(app, id, entry); throw error }
     }
 
-    /** One user of [pluginId]'s binding is done; the binding goes [IDLE_MS] after the last. */
-    fun release(context: Context, pluginId: String) {
+    private fun releaseEntry(context: Context, pluginId: String, entry: Bound) {
         val app = context.applicationContext ?: context
         synchronized(this) {
-            val entry = bound[pluginId] ?: return
+            if (bound[pluginId] !== entry) return
             entry.users = (entry.users - 1).coerceAtLeast(0)
             if (entry.users > 0) return
         }
         main.postDelayed({
             synchronized(this) {
-                val entry = bound[pluginId] ?: return@postDelayed
-                if (entry.users == 0) forget(app, pluginId)
+                if (bound[pluginId] === entry && entry.users == 0) forgetConnection(app, pluginId, entry.connection)
             }
         }, IDLE_MS)
     }
@@ -100,6 +110,17 @@ internal object AppInterfaceConnections {
     /** Lets [pluginId]'s app go now: its plugin was turned off, denied or uninstalled, or its binding died. */
     fun forget(context: Context, pluginId: String) {
         val entry = bound.remove(pluginId) ?: return
+        dispose(context, entry)
+    }
+
+    private fun forgetConnection(context: Context, pluginId: String, expected: ServiceConnection) {
+        val entry = synchronized(this) {
+            bound[pluginId]?.takeIf { it.connection === expected }?.also { bound.remove(pluginId, it) }
+        } ?: return
+        dispose(context, entry)
+    }
+
+    private fun dispose(context: Context, entry: Bound) {
         entry.ready.complete(null)
         runCatching { (context.applicationContext ?: context).unbindService(entry.connection) }
     }

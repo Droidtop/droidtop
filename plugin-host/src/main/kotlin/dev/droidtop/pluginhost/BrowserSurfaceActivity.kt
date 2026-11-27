@@ -26,7 +26,7 @@ class BrowserSurfaceActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: Session? = null
     private var provider: IWebViewSurfaceProvider? = null
-    private var boundPluginId: String? = null
+    private var binding: AppInterfaceConnections.Lease? = null
     private var death: IBinder.DeathRecipient? = null
     private var opened = false
     private var bodyCapable = false
@@ -85,9 +85,9 @@ class BrowserSurfaceActivity : Activity() {
                     ?.takeIf { it.manifest.id == asked.pluginId } ?: error("The browser permission changed")
                 val pkg = record.manifest.app?.packageName ?: error("The browser is unavailable")
                 asked.uid = withContext(Dispatchers.IO) { packageManager.getApplicationInfo(pkg, 0).uid }
-                boundPluginId = asked.pluginId
-                val runtime = withTimeout(5_000) { AppInterfaceConnections.acquire(this@BrowserSurfaceActivity, record) }
+                val lease = withTimeout(5_000) { AppInterfaceConnections.acquireLease(this@BrowserSurfaceActivity, record).also { binding = it } }
                     ?: error("The browser is unavailable")
+                val runtime = lease.runtime
                 remote {
                     val manifest = java.io.File(PluginStore.payloadDirFor(this@BrowserSurfaceActivity, record), "manifest.json").readText()
                     check(runtime.loadContained(asked.pluginId, manifest, emptyArray(), emptyArray(), PluginBrokers.binderFor(this@BrowserSurfaceActivity, asked.pluginId))) { "The browser could not start" }
@@ -115,7 +115,8 @@ class BrowserSurfaceActivity : Activity() {
             if (session?.token?.let(WebViewProviders::bodyIsRequired) == true && !bodies) { failed(); return@launch }
             bodyCapable = bodies
             provider = remoteProvider
-            if (bodies) session?.let { WebViewProviders.bodyReady(it.token, SurfaceBodyTransport(remoteProvider)) }
+            val runtime = binding?.runtime?.asBinder() ?: run { failed(); return@launch }
+            if (bodies) session?.let { WebViewProviders.bodyReady(it.token, SurfaceBodyTransport(remoteProvider, runtime)) }
             val recipient = IBinder.DeathRecipient { scope.launch { failed() } }.also { death = it }
             try { remoteProvider.asBinder().linkToDeath(recipient, 0); openSurface() }
             catch (_: Exception) { failed() }
@@ -159,7 +160,8 @@ class BrowserSurfaceActivity : Activity() {
             val metadata = BrowserBodyMetadata.parse(metadataJson)
             scope.launch {
                 val p = provider ?: return@launch
-                val accepted = bodyCapable && metadata != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, SurfaceBodyTransport(p), metadata) }
+                val runtime = binding?.runtime?.asBinder()
+                val accepted = bodyCapable && metadata != null && runtime != null && withContext(Dispatchers.IO) { WebViewProviders.bodyOffer(this@BrowserSurfaceActivity, token!!, offerId, SurfaceBodyTransport(p, runtime), metadata) }
                 try { remote { p.offerResult(token, offerId, accepted) } }
                 catch (_: Exception) { failed() }
             }
@@ -216,7 +218,7 @@ class BrowserSurfaceActivity : Activity() {
                 runCatching { executor.execute { runCatching { p.close(asked.token) } } }
             }
         }
-        boundPluginId?.let { AppInterfaceConnections.release(this, it) }
+        binding?.close()
         embeddedSurface = null
         events.close()
         scope.cancel()
