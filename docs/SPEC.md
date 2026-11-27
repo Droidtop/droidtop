@@ -11855,6 +11855,13 @@ The plugin page's store-library sync also goes through `StoreSyncs.run`, with th
 hidden-game mirroring, update check and metadata request as the Stores place. See `docs/ui-static-review-2026-11-27.md`
 for remaining surface gaps; this is source evidence, not a device usability result.
 
+**Custom control semantics (static UI review, 2026-11-27, mytop-project/tracker#967).** The interactive menu row owns
+a switch's accessible role and checked state; `ShellSwitch` remains drawing only. A row displaying a system state
+which opens another screen still speaks On/Off, but does not claim that activating it directly toggles the state.
+The touch adjustment arrows speak Increase/Decrease plus the setting's title, expose the button role, and call the
+same adjustment as Left/Right. Their existing minimum touch targets are retained. This follows the official
+Compose semantics and custom-control accessibility guidance; no device usability pass is claimed.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:

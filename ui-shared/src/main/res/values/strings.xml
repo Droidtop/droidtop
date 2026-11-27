@@ -5,4 +5,8 @@
 -->
 <resources>
     <string name="ui_shared_details">Details</string>
+    <string name="ui_shared_on">On</string>
+    <string name="ui_shared_off">Off</string>
+    <string name="ui_shared_decrease_value">Decrease %1$s</string>
+    <string name="ui_shared_increase_value">Increase %1$s</string>
 </resources>
