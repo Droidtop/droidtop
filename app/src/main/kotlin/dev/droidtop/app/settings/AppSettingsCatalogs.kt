@@ -128,6 +128,10 @@ object AppSettingsCatalogs {
     const val SCREEN_PLUGIN_KEYS = "plugin_keys"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
+    /** Settings > Network (docs/SPEC.md "Settings > Network", mytop-project/tracker#964 step 7). */
+    const val SCREEN_NETWORK = "network"
+
+    /** What Network was called until step 7: still registered, so a link or a saved place that names it opens Network. */
     const val SCREEN_INTERNET = "internet"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
@@ -200,7 +204,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
-        SettingsScreenRegistry.register(internetScreen())
+        SettingsScreenRegistry.register(networkScreen(SCREEN_NETWORK))
+        SettingsScreenRegistry.register(networkScreen(SCREEN_INTERNET))
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(UpdatesPage.screen())
@@ -999,8 +1004,6 @@ object AppSettingsCatalogs {
     private suspend fun accountsAndSourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInStores = PcStore.entries.count { it.signedIn(context) }
         val keysHeld = runCatching { heldKeys(context).size }.getOrDefault(0)
-        val pairedComputers = dev.droidtop.net.peer.Computers.list(context).size
-
         val activeIntegrations = IntegrationStore.available(context).size
         val installedPlugins = PluginStore.installed(context)
         val pluginsValueLabel = when {
@@ -1036,10 +1039,6 @@ object AppSettingsCatalogs {
                         valueLabel = { "$signedInStores of ${PcStore.entries.size} signed in" },
                         icon = CatalogIcon.GLOBAL,
                     ),
-                    // The person's computers running droidtop-agent (docs/SPEC.md 7o).
-                    ComputersCatalog.linkRow(pairedComputers),
-                    // Phones and computers with KDE Connect, and Pythia (docs/SPEC.md "KDE Connect").
-                    KdeConnectCatalog.linkRow(dev.droidtop.net.kdeconnect.KdeConnect.isOn(context)),
                 ),
             ),
             CatalogGroup(
@@ -1068,7 +1067,6 @@ object AppSettingsCatalogs {
                 ),
             ),
             // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", mytop-project/tracker#573).
-            StorageSharesCatalog.group(context),
             CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
@@ -1094,16 +1092,42 @@ object AppSettingsCatalogs {
     }
 
     /**
-     * Settings > Internet (owner, 2026-11-22: "reflow the settings to put internet settings together, so we can present
-     * our own browser with deeper integration"; docs/SPEC.md "Settings layout"): droidtop Browser and the engine droidtop's
-     * web pages open in, then the sign-ins droidtop keeps for the web: download sites, file hosts and debrid services,
-     * moved here from Accounts and sources (one home per setting).
+     * Settings > Network (docs/SPEC.md "Settings > Network", mytop-project/tracker#964 step 7): everything about how droidtop
+     * reaches out, in one place. The connection and VPN as facts (the Quick Menu's own rows), which networks downloads,
+     * checks and syncs may use, network shares and cloud storage, the devices droidtop pairs with, then the web: droidtop
+     * Browser and the sign-ins droidtop keeps for download sites, file hosts and debrid services (the owner, 2026-11-22:
+     * "reflow the settings to put internet settings together, so we can present our own browser with deeper integration").
+     * Registered under [SCREEN_NETWORK] and, for old links, [SCREEN_INTERNET].
      */
-    private fun internetScreen() = CatalogScreen(
-        id = SCREEN_INTERNET,
-        title = "Internet",
-        groups = { context -> internetGroups(context) },
+    private fun networkScreen(id: String) = CatalogScreen(
+        id = id,
+        title = "Network",
+        groups = { context -> networkGroups(context) },
     )
+
+    private suspend fun networkGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
+        val pairedComputers = dev.droidtop.net.peer.Computers.list(context).size
+        listOf(
+            CatalogGroup(
+                id = "network_connection",
+                title = null,
+                items = listOf(GamingSettingsCatalog.connectionItem(status), GamingSettingsCatalog.vpnItem(status)),
+            ),
+        ) + DownloadRulesCatalog.networkGroups(context) + listOfNotNull(StorageSharesCatalog.group(context)) + listOf(
+            // The devices droidtop pairs with, one list (they sat with Accounts until step 7).
+            CatalogGroup(
+                id = "network_devices",
+                title = "Devices",
+                items = listOf(
+                    // The person's computers running droidtop-agent (docs/SPEC.md 7o).
+                    ComputersCatalog.linkRow(pairedComputers),
+                    // Phones and computers with KDE Connect, and Pythia (docs/SPEC.md "KDE Connect").
+                    KdeConnectCatalog.linkRow(dev.droidtop.net.kdeconnect.KdeConnect.isOn(context)),
+                ),
+            ),
+        ) + internetGroups(context)
+    }
 
     private suspend fun internetGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         listOf(

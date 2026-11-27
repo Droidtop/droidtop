@@ -125,8 +125,8 @@
     <string name="gaming_set_up_the_wine_environment_windows">Set up Wine</string>
     <string name="gaming_accounts_and_sources">Accounts and sources</string>
     <string name="gaming_accounts_and_plugins">Accounts and plugins</string>
-    <string name="gaming_internet">Internet</string>
-    <string name="gaming_internet_summary">Browser, download sites and file hosts</string>
+    <string name="gaming_internet">Network</string>
+    <string name="gaming_internet_summary">Connection, downloads, shares, devices and the web</string>
     <string name="gaming_displays">Displays</string>
     <string name="gaming_desktop_on_x">Desktop on %1$s</string>
     <string name="gaming_desktop_on_x_line">The desktop uses this screen too</string>

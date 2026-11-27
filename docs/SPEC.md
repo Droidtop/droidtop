@@ -22497,7 +22497,14 @@ Settings tab, the left menu's places, Console systems and Containers.
   Browser's install and update row, whose value is its version and says "not in use" when droidtop's sign-in, check
   and download pages open in Android WebView instead, its plugin not approved or not allowed; a separate "Web pages
   open in" row said the same and was folded in, mytop-project/tracker#964), then **Download sites**, **File hosts** and **Debrid services**, moved from Accounts and sources so each has
-  one home. Network shares stay with Accounts and sources. Its glyph is Downloads' until it has one of its own.
+  one home. Network shares stayed with Accounts and sources until Network, below. Its glyph is Downloads' until it has one of its own.
+- **Settings > Network (2026-11-27, mytop-project/tracker#964 step 7).** Internet became Network, the one place for how
+  droidtop reaches out (`network`; `internet` stays registered for old links): the connection and VPN as facts (the
+  Quick Menu's own rows, `GamingSettingsCatalog.connectionItem` and `vpnItem`), **Downloads** (the network rule every
+  job follows, "One network rule", and the metered connections allowed always, moved from Download rules, which keeps a
+  "Networks" row that opens this page), **Network shares and cloud storage** and **Devices** (computers and KDE
+  Connect, moved from Accounts and sources), then **Browser**, **Download sites**, **File hosts** and **Debrid
+  services** as before. The review found network settings in about ten places with none called Network.
 - **Two panes.** A navigator that fills the page (at least 80% of the
   screen's width; never one inside a sheet or a dialog) whose root has three
   or more categories draws a **category column** and a **pane**. The column

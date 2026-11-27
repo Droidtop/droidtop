@@ -30,18 +30,20 @@ object DownloadRulesCatalog {
         groups = { context -> groups(context) },
     )
 
-    private suspend fun groups(context: Context): List<CatalogGroup> {
-        val isolated = withContext(Dispatchers.IO) {
+    /**
+     * The network rule and the metered connections the person allowed always, for Settings > Network (docs/SPEC.md
+     * "One network rule"): which networks every download, check and sync may use. Reads preferences: off the main thread.
+     */
+    suspend fun networkGroups(context: Context): List<CatalogGroup> {
+        withContext(Dispatchers.IO) {
             DownloadPolicy.load(context)
             MeteredGrants.load(context)
-            EnginePrefs.androidIsolation(context)
         }
         val s = DownloadPolicy.settings.value
-        val keepDays = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.JobHistory.keepDays(context) }
         return listOf(
             CatalogGroup(
                 id = "download_rules_network",
-                title = "Network",
+                title = "Downloads",
                 items = listOf(
                     ChoiceItem(
                         id = "download_rules_network_rule",
@@ -57,7 +59,32 @@ object DownloadRulesCatalog {
                     ),
                 ),
             ),
-        ) + listOfNotNull(MeteredConnectionCatalog.alwaysGroup()) + listOf(
+        ) + listOfNotNull(MeteredConnectionCatalog.alwaysGroup())
+    }
+
+    private suspend fun groups(context: Context): List<CatalogGroup> {
+        val isolated = withContext(Dispatchers.IO) {
+            DownloadPolicy.load(context)
+            MeteredGrants.load(context)
+            EnginePrefs.androidIsolation(context)
+        }
+        val s = DownloadPolicy.settings.value
+        val keepDays = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.JobHistory.keepDays(context) }
+        // Which networks downloads use is Settings > Network's (mytop-project/tracker#964 step 7, networkGroups above);
+        // the row here opens it, with the rule's current choice as its value.
+        return listOf(
+            CatalogGroup(
+                id = "download_rules_network_link",
+                title = null,
+                items = listOf(
+                    dev.droidtop.library.settings.NestedScreenItem(
+                        id = "download_rules_network_open",
+                        title = "Networks",
+                        registryId = AppSettingsCatalogs.SCREEN_NETWORK,
+                        valueLabel = { s.network.label },
+                    ),
+                ),
+            ),
             // The pools (docs/SPEC.md 12a, "One download engine"): the owner, "Configurable, intelligent".
             CatalogGroup(
                 id = "download_rules_pools",

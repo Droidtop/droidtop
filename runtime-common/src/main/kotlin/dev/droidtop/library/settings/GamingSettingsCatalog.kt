@@ -54,7 +54,9 @@ object GamingSettingsCatalog {
         // guests is a section of Modes, as who the device is handed to is a mode, and Accessibility one of Appearance.
         // Internet since 2026-11-22 (owner: "reflow the settings to put internet settings together, so we can present our
         // own browser with deeper integration"): droidtop Browser and the sign-ins droidtop keeps for the web.
-        "Modes", "Library", "Accounts and sources", "Internet", "Appearance",
+        // Internet became Network on 2026-11-27 (mytop-project/tracker#964 step 7): the connection, downloads' networks,
+        // shares and paired devices joined the web there.
+        "Modes", "Library", "Accounts and sources", "Network", "Appearance",
         "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
     )
     const val GROUP_INTERNET = "gaming_internet"
@@ -197,6 +199,51 @@ object GamingSettingsCatalog {
      * The Quick Menu reads [groups] whole.
      */
     fun settingsGroups(context: Context): List<CatalogGroup> = groups(context, includeQuick = false)
+
+    /**
+     * The connection as a row: its kind in the value column ("Wi-Fi, signal 3/4", "Mobile data", "Offline", with "no
+     * internet" when nothing gets through), opening Android's internet panel. One item for the Quick Menu's System tab and
+     * Settings > Network (mytop-project/tracker#964). [status] is a snapshot read off the main thread.
+     */
+    fun connectionItem(status: dev.droidtop.runtime.systemstatus.SystemStatusSnapshot): CatalogItem {
+        val controls = dev.droidtop.runtime.systemstatus.SystemControls
+        val network = when (status.network) {
+            dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
+                "Wi-Fi" + (status.wifiLevel?.let { ", signal $it/4" } ?: "")
+            dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "Ethernet"
+            dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
+            dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
+        }
+        val noInternet = status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated
+        return ActionItem(
+            id = ID_SYSTEM_NETWORK,
+            // The row's name only; the network is state, in the value column (rig, builds 542 and 546).
+            title = words(R.string.gaming_network),
+            value = if (noInternet) "$network, no internet" else network,
+            // The captive-portal state said out loud: the system sheet is where signing in happens.
+            subtitle = if (noInternet) {
+                "Connected, but nothing gets through: a sign-in page may be waiting. Opens Wi-Fi and data controls"
+            } else {
+                "Opens Wi-Fi and data controls"
+            },
+            // The system's own internet panel: apps lost programmatic Wi-Fi toggling in API 29.
+            run = { ctx -> SettingsLaunch.start(ctx, controls.internetPanelIntent()) },
+        )
+    }
+
+    /** Whether a VPN is up, opening Android's VPN screen. The Quick Menu's row and Settings > Network's (tracker#964). */
+    fun vpnItem(status: dev.droidtop.runtime.systemstatus.SystemStatusSnapshot): CatalogItem = ActionItem(
+        id = ID_SYSTEM_VPN,
+        title = words(R.string.gaming_vpn),
+        subtitle = words(R.string.gaming_opens_the_system_vpn_screen_to),
+        state = status.vpnActive,
+        run = { ctx ->
+            ctx.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        },
+    )
 
     /**
      * Builds the live catalog. Values are read fresh on every call, so call
@@ -408,7 +455,7 @@ object GamingSettingsCatalog {
                 ),
             ),
         ),
-        // The web, in one place (docs/SPEC.md "Settings layout", "Internet"): droidtop Browser and the web sign-ins.
+        // How droidtop reaches out, in one place (docs/SPEC.md "Settings > Network").
         CatalogGroup(
             id = GROUP_INTERNET,
             title = null,
@@ -417,7 +464,7 @@ object GamingSettingsCatalog {
                     id = ID_INTERNET,
                     title = words(R.string.gaming_internet),
                     subtitle = words(R.string.gaming_internet_summary),
-                    registryId = "internet",
+                    registryId = "network",
                     icon = CatalogIcon.DOWNLOADS,
                 ),
             ),
@@ -638,15 +685,6 @@ object GamingSettingsCatalog {
             items = buildList {
                 val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
                 val controls = dev.droidtop.runtime.systemstatus.SystemControls
-                val network = when (status.network) {
-                    dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
-                        "Wi-Fi" + (status.wifiLevel?.let { ", signal $it/4" } ?: "")
-                    dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "Ethernet"
-                    dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
-                    dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "Offline"
-                }
-                val noInternet = status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE &&
-                    !status.validated
                 // The mode switcher, first: the Quick Menu is where a
                 // person in Gaming looks for "get me out of here", and the
                 // only other route was a long-press of Back that nothing
@@ -659,38 +697,7 @@ object GamingSettingsCatalog {
                         run = launchComponent("dev.droidtop.app.ModeSwitcherActivity"),
                     ),
                 )
-                add(
-                    ActionItem(
-                        id = ID_SYSTEM_NETWORK,
-                        // The row's NAME, and nothing else. What the
-                        // network is set to is state, and state goes in
-                        // the value column like every other row's
-                        // (CatalogItem.value) -- the list read
-                        // "Network: Wi-Fi, signal 4/4" as a title while
-                        // the row beside it put its state in the column
-                        // (rig, builds 542 and 546). The Quick Menu drew
-                        // it correctly by splitting the title back apart
-                        // again, which was a second mechanism for the
-                        // same job; the title is written right here now
-                        // and that splitter is gone.
-                        title = words(R.string.gaming_network),
-                        // The captive-portal state, said out loud: the
-                        // row's action opens the system sheet where
-                        // signing in actually happens.
-                        value = if (noInternet) "$network, no internet" else network,
-                        // The system's own internet panel -- apps lost
-                        // programmatic Wi-Fi toggling in API 29, and
-                        // opening the real control beats faking one.
-                        subtitle = if (noInternet) {
-                            "Connected, but nothing gets through: a sign-in page may be waiting. Opens Wi-Fi and data controls"
-                        } else {
-                            "Opens Wi-Fi and data controls"
-                        },
-                        run = { ctx ->
-                            SettingsLaunch.start(ctx, controls.internetPanelIntent())
-                        },
-                    ),
-                )
+                add(connectionItem(status))
                 // Swaps the menus and the companion between their screens and remembers it (ScreenRoles.swap), in the
                 // Quick Menu's System tab, reachable from whichever screen the person is looking at.
                 add(
@@ -892,20 +899,7 @@ object GamingSettingsCatalog {
                         ),
                     )
                 }
-                add(
-                    ActionItem(
-                        id = ID_SYSTEM_VPN,
-                        title = words(R.string.gaming_vpn),
-                        subtitle = words(R.string.gaming_opens_the_system_vpn_screen_to),
-                        state = status.vpnActive,
-                        run = { ctx ->
-                            ctx.startActivity(
-                                android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS)
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
-                    ),
-                )
+                add(vpnItem(status))
                 // Battery: the live level and Android's own Battery Saver
                 // state, with the press opening the system Battery Saver
                 // screen. Apps cannot switch power-save mode themselves
