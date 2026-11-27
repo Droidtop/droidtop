@@ -1,11 +1,10 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace = "dev.droidtop.hostbridge"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
@@ -46,7 +45,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
@@ -58,3 +56,6 @@ dependencies {
     // SwayIpc reads sway's JSON with org.json; android.jar's is a throwing stub in JVM tests.
     testImplementation(libs.json.v20240303)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     // Room's annotation processor for the store tables (StoresDatabase, SteamDatabase).
     alias(libs.plugins.google.ksp)
     // The list columns' converters encode lists and Steam's product info as JSON.
@@ -17,7 +16,7 @@ plugins {
  */
 android {
     namespace = "dev.droidtop.stores"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         minSdk = 26
@@ -27,7 +26,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     // The stores log through android.util.Log and Timber; a JVM unit test
     // reaching either gets the stub's defaults instead of an exception.
@@ -70,3 +68,6 @@ dependencies {
     // org.json is a throwing stub in android.jar; the parsers' tests need the real one.
     testImplementation(libs.json.v20240303)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

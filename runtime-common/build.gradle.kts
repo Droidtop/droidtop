@@ -1,12 +1,11 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "dev.droidtop.runtime"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         minSdk = 26 // Presentation API + DisplayManager multi-display needs are stable from here
@@ -19,24 +18,24 @@ android {
         // The notice colours and the colour arithmetic are the shared library droidtop and Enginehost both
         // compile (mytop-ui's notices module, vendor/mytop-ui, mytop-project/mytop-ui, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
-            java.srcDir("../vendor/mytop-ui/notices/src/commonMain/kotlin")
+            kotlin.srcDir("../vendor/mytop-ui/notices/src/commonMain/kotlin")
             // The palette model and neutral job states are also shared source, compiled only here. The Compose
             // components which use them are compiled by :ui-shared, so no UI code enters :runtime-common.
-            java.srcDir("../vendor/mytop-ui/tokens/src/commonMain/kotlin")
-            java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/library/settings")
+            kotlin.srcDir("../vendor/mytop-ui/tokens/src/commonMain/kotlin")
+            kotlin.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/library/settings")
             // The version and trust code droidtop and Enginehost share (vendor/mytop-net, mytop-project/mytop-net,
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
-            java.srcDir("../vendor/mytop-net/version/src/main/kotlin")
-            java.srcDir("../vendor/mytop-net/trust/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-net/version/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-net/trust/src/main/kotlin")
             // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, mytop-project/tracker#204).
-            java.srcDir("../vendor/mytop-net/launch-contract/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-net/launch-contract/src/main/kotlin")
             // The pad model droidtop and Enginehost share: mytop-project/mytop-input's PadFamily, PadFamilies.classify (SDL's ids)
             // and FaceLayout (mytop-project/tracker#867 D4), compiled in the same way.
-            java.srcDir("../vendor/mytop-input/pads/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-input/pads/src/main/kotlin")
             // A container's architecture and translator (mytop-project/mytop-containers :arch), and running x86 programs and
             // Ren'Py's Linux launcher through it (mytop-project/mytop-runners :launch): docs/SPEC.md 3c, mytop-project/tracker#962.
-            java.srcDir("../vendor/mytop-containers/arch/src/main/kotlin")
-            java.srcDir("../vendor/mytop-runners/launch/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-containers/arch/src/main/kotlin")
+            kotlin.srcDir("../vendor/mytop-runners/launch/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")
@@ -47,7 +46,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
@@ -87,3 +85,6 @@ dependencies {
     // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
     testImplementation(project(":test-pki"))
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

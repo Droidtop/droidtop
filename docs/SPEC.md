@@ -25116,6 +25116,15 @@ AGP 9 lint (45800699493, 45925535157, 46044151638); the missing logs do not
 prove which resource caused those losses. APK builds keep their parallel
 budget. The owner directed: "No local builds. CI is the only build."
 
+The follow-up enables built-in Kotlin and the new Android DSL rather than
+keeping AGP compatibility opt-outs. Each custom Kotlin source root uses the
+Android source set Kotlin directory API, compiler options use the top-level
+Kotlin extension, and compileSdk declares release 37 minor API 1. Murine
+uses built-in Kotlin when embedded in AGP 9 and its external Kotlin plugin
+only for its pinned standalone AGP 8 build. Dagger uses KSP. :ui-shared
+exports the Compose BOM as an API platform so versionless Compose API
+dependencies resolve in its consumers without android.dependency.useConstraints.
+
 **Native vendor code** is cross-compiled by
 `build-scripts/build-vendor-deps.sh`, once per ABI, before Gradle runs; the
 result is cached keyed on the vendor submodules' commits:

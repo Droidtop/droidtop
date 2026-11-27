@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -11,7 +10,7 @@ plugins {
 // so none of them depends on another shell for them.
 android {
     namespace = "dev.droidtop.ui.shared"
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
 
     defaultConfig {
         minSdk = 26
@@ -20,8 +19,8 @@ android {
     sourceSets.getByName("main") {
         // Pinned shared source, like notices and trust in :runtime-common. JobLook is compiled by :runtime-common;
         // these two roots contain only the pure Compose components. Android adapters stay in this module.
-        java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/shell")
-        java.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/ui")
+        kotlin.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/shell")
+        kotlin.srcDir("../vendor/mytop-ui/components/src/commonMain/kotlin/dev/droidtop/ui")
     }
 
     buildFeatures {
@@ -37,7 +36,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
@@ -60,7 +58,7 @@ dependencies {
     // The settings renderer (mytop-project/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
     // dispatcher and opens Android's folder and document pickers, as it did in :shell-gamepad.
     implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
+    api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
@@ -80,3 +78,6 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

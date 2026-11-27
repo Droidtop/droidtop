@@ -14,7 +14,6 @@ plugins {
     alias(libs.plugins.android.library)
     // The second-screen additions are Kotlin; the forked-in upstream tree
     // stays Java and is untouched apart from the one hook in LatinIME.
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -22,7 +21,7 @@ android {
     // androidx.core:core (via androidx-core-ktx, resolved from the shared
     // catalog) requires compiling against 36+ — same class of fix as
     // shell-default's own compileSdk bump.
-    compileSdkVersion("android-37.1")
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
@@ -48,6 +47,7 @@ android {
         named("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
             java.srcDirs("src/main/java")
+            kotlin.srcDirs("src/main/java")
             res.srcDirs("src/main/res")
         }
     }
@@ -56,7 +56,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     // A key press on a hosted keyboard runs under Robolectric, which needs the merged resources.
     testOptions {
@@ -79,3 +78,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
 }
+
+// AGP 9 built-in Kotlin uses the same bytecode target as Java.
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
