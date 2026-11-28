@@ -24307,8 +24307,10 @@ docs/DESIGN.md section 17, "Games the host starts").
   `windowcast` only while a windowcast host runs on the computer. Without a
   stream, the line says the game shows on the computer's own screen and
   nothing here streams it.
-- **Honest states.** The answers and their words are Steam Link's
-  (allowed, too old, failed, offline), with one difference. For a key that
+- **Honest states.** Remote launch recovery points to the paired handheld’s launch switch
+  in Pythia Devices. When the game is unknown, it asks the person to
+  check the computer’s library and local launch.
+  For a key that
   is not Steam's, `unknown_game` also says that only a desktop manager such
   as Pythia starts games other than Steam's: droidtop-agent on its own
   registers no launcher and answers that way. The Android library does not
@@ -24366,7 +24368,7 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
   start anything: the line says the computer cannot stream yet and to update
   droidtop-agent there. A computer that has not allowed this device names
   both places for it, since droidtop does not know which program answers:
-  Pythia's Devices, Let it start games here, and droidtop-agent's Settings,
+  Pythia's Devices, Allow starting games here, and droidtop-agent's Settings,
   Offered, Starting games here.
 - **Not built:** streaming from away (the stream travels on the home network
   only), a computer other than Windows, and showing only the game's own

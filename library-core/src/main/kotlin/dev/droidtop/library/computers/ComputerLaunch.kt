@@ -69,7 +69,12 @@ object ComputerLaunch {
     /** The words for one agent reply to `launch_game` for the game [key]. */
     fun describe(reply: JSONObject, computer: String, game: String, handheld: String, key: String): Outcome {
         if (reply.has("unreachable")) {
-            return Outcome(false, "$computer didn't answer (${reply.optString("unreachable")}). It has to be on and reachable, at home or through its WireGuard port.", definitive = false)
+            val detail = reply.optString("unreachable").takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+            return Outcome(
+                false,
+                "$computer didn’t answer$detail. Wake it, open Pythia or droidtop-agent there, and check that both devices can reach each other.",
+                definitive = false,
+            )
         }
         reply.optString("error").takeIf { reply.has("error") }?.let { return Outcome(false, "$computer: $it") }
         return when (reply.optString("result")) {
@@ -89,7 +94,7 @@ object ComputerLaunch {
             "not_allowed" -> Outcome(
                 false,
                 // Pythia and droidtop-agent both answer here, and droidtop does not know which one runs there.
-                "$computer hasn't let $handheld start games. Allow it there: in Pythia, Devices, Let it start games here; in droidtop-agent, Settings, Offered, Starting games here.",
+                "$computer hasn’t let $handheld start games. In Pythia, open Devices, find $handheld and turn on Allow starting games here. In droidtop-agent, open Settings → Offered → Starting games here.",
             )
             "unknown_game" -> Outcome(
                 false,
@@ -97,7 +102,7 @@ object ComputerLaunch {
                     "$computer doesn't have $game installed (its last scan didn't list it)."
                 } else {
                     // An agent with no program hosting it (no launch_host) answers this for every key that is not Steam's.
-                    "$computer can't start $game. Only a desktop manager such as Pythia starts games other than Steam's; droidtop-agent alone starts Steam games only."
+                    "$computer couldn’t find $game to launch. If you use Pythia there, check that the game is in its library and opens on the computer. droidtop-agent on its own starts Steam games only."
                 },
             )
             "steam_not_running" -> Outcome(false, "Steam isn't running on $computer. Start Steam there and sign in, then try again.")
