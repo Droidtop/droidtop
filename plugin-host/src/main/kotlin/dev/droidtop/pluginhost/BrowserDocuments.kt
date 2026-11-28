@@ -67,7 +67,8 @@ internal object BrowserDocuments {
                             check(runtime.loadContained(id, manifest, emptyArray(), emptyArray(), PluginBrokers.binderFor(app, id))) { "The browser could not load its document capability" }
                             runtime.attachRelay(id, RELAY, op.host.asBinder())
                         }
-                        val provider = withTimeoutOrNull(minOf(5_000L, op.left())) { op.connected.await() } ?: return@withTimeout null
+                        // The restricted provider attests its cold runtime within a bounded 15-second startup window.
+                        val provider = withTimeoutOrNull(minOf(15_000L, op.left())) { op.connected.await() } ?: return@withTimeout null
                         op.provider = provider
                         val death = IBinder.DeathRecipient { op.fail("The browser disconnected") }.also { op.death = it }
                         provider.asBinder().linkToDeath(death, 0)
