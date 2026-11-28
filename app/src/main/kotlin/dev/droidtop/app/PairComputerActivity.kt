@@ -71,7 +71,7 @@ import java.util.UUID
  * person types the address and code `droidtop-agent pair` shows there.
  * While this screen is open, and only then, droidtop listens for the computer
  * on the local network; the code works once, and three wrong ones end the
- * attempt. Opened from Settings > Accounts and sources > Computers.
+ * attempt. Opened from Settings > Accounts and sources > Computers and handhelds.
  *
  * The same screen pairs two handhelds running droidtop ([EXTRA_HANDHELD], mytop-project/tracker#556): one shows its code
  * and its address, the other types both under "Use a code from the other handheld". The agent core runs the same

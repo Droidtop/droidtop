@@ -77,7 +77,7 @@
     <string name="pair_computer_saves_sync_with_it_when">Saves sync when a game starts and ends. Show its games and programs here too?</string>
     <string name="pair_computer_show_its_games_in_my">Show its games in my library</string>
     <string name="pair_computer_show_its_programs_in_apps">Show its programs in Apps</string>
-    <string name="pair_computer_you_can_change_both_later">Change later in Settings > Computers > %1$s.</string>
+    <string name="pair_computer_you_can_change_both_later">Change later in Settings → Accounts and sources → Computers and handhelds → %1$s.</string>
     <string name="companion_connections_bluetooth_devices">Bluetooth devices</string>
     <string name="desktop_notification_permission_show_the_desktop_s_notification">Show the desktop\'s notification?</string>
     <string name="desktop_notification_permission_allow">Allow</string>
