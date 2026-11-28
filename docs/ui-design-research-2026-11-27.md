@@ -47,6 +47,20 @@ were opened on 2026-11-27. Live application and device testing is paused.
 | F11 | Pythia migration still lacks complete Review, collections, version/store-link editing, settings, tray integration and packaging parity. Its own `docs/native-ui-surfaces.md` records these. Backend-call counts are not a usability/completeness score. | 3 | Q1, Q3 |
 | F12 | Counterevidence: Get games already exists outside Gaming (`LauncherSearchActivity.kt:45`, `getGamesIntent`), and the Updates place offers it. The old review's opposite claim is obsolete. TabRail already exposes tab semantics; the settings Info preview already announces switch state. | 3 | Q3 |
 
+## Implementation status after the baseline review
+
+The ledger above records the historical source baseline, not the remaining work
+unchanged. F7's Android switch semantics and adjustment labels are addressed by
+accessibility commit `50c3f365f9`, included in this aggregate. F8's app detail host
+landed in `b6bbb27ed1`; search routing fix `8366cf9004` is also included. For F9,
+Pythia's primary/More navigation is in candidate `28c14b5`, whose native and static
+CI passed. That candidate also addresses F10's toggle roles and return focus;
+initial focus, controller navigation and hardware validation remain open. F11 is
+still partial: Settings candidate `07c5b50` is in CI, while Review, packaging and
+the other recorded parity gaps remain open. These are source and CI findings;
+they do not establish rendered accessibility, visual quality or successful
+application/device flows. Live UI and rig verification remains paused.
+
 ## Scope filter
 
 Follow-up counterevidence from the handoff's colour proposal: current
