@@ -24,8 +24,9 @@ class NativeAppLaunchTest {
         try {
             NativeAppProvider(context).launch(entry)
             fail("A missing launch target must fail visibly, not return success")
-        } catch (failure: IllegalStateException) {
+        } catch (failure: UserFacingException) {
             assertEquals(NativeAppLaunch.MISSING, failure.message)
+            assertEquals(NativeAppLaunch.MISSING, userFacingErrorMessage(failure))
         }
     }
 }

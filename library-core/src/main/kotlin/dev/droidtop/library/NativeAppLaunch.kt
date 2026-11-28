@@ -22,5 +22,5 @@ object NativeAppLaunch {
     }
 
     /** A disappeared entry must fail visibly, rather than recording an app as opened when nothing started. */
-    fun requireIntent(context: Context, packageName: String): Intent = intent(context, packageName) ?: error(MISSING)
+    fun requireIntent(context: Context, packageName: String): Intent = intent(context, packageName) ?: throw UserFacingException(MISSING)
 }
