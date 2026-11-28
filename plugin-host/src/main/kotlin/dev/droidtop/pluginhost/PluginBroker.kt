@@ -223,6 +223,7 @@ interface BrokerEnvironment {
 
     /** docs/plugin-api.md 3 G3: droidtop's own web view for a plugin's session; blocks until the person is done. Null where there is none. */
     fun webSession(request: WebSessionRequest): WebSessionResult? = null
+    fun webSession(pluginId: String, request: WebSessionRequest): WebSessionResult? = webSession(request)
 
     /** docs/plugin-api.md 3 G3a: the app that shows droidtop's pages (`web.view`) ends one; null where droidtop has no web view. */
     fun webViewFinish(pluginId: String, token: String, args: JSONObject): Boolean? = null

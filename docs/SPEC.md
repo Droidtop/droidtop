@@ -28779,6 +28779,8 @@ what the index says is display data, never a trust decision.
    other bytes, an uninstall and an approval or denial: a contained plugin's own isolated process is ended,
    a plugin in a shared slot is unloaded, and the next call loads what is on disk. The process logs the version
    it loads (`<id> <version>: loading ...`).
+   A visible web session releases the exact process it kept alive, even if
+   an update or trust change replaced the process while the page was open.
 1. A hash is always required and always verified — every payload file's
    SHA-256, checked at install AND re-checked before every activation
    (`PluginBundleInstaller.verifyInstalled`), so a file edited on disk

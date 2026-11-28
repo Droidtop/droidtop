@@ -108,21 +108,26 @@ internal object PluginProcesses {
         return runtime
     }
 
-    /**
-     * Counts one more user of [pluginId]'s process when one is running, without starting one: droidtop's web view open
-     * for the plugin's site keeps it loaded, so the request the person is passing the check for goes on in the process
-     * that met it (mytop-project/tracker#783). Whether it counted; when it did, [release] lets go.
-     */
     /** The runtime of [pluginId]'s process while it is bound and started; null otherwise. Never starts one. */
     fun running(pluginId: String): IPluginRuntime? = synchronized(lock) { byPlugin[pluginId]?.runtime }
 
-    fun keep(pluginId: String): Boolean = synchronized(lock) {
-        val process = byPlugin[pluginId]?.takeIf { it.runtime != null } ?: return false
-        process.users++
-        process.lastUsedMs = System.currentTimeMillis()
-        process.idle?.let { main.removeCallbacks(it) }
-        process.idle = null
-        true
+    /** Keep the current process alive during a web session. Closing it releases that same process (#783). */
+    fun <T> withKept(context: Context, pluginId: String, block: () -> T): T {
+        val process = synchronized(lock) {
+            byPlugin[pluginId]?.takeIf { it.runtime != null }?.also {
+                it.users++
+                it.lastUsedMs = System.currentTimeMillis()
+                it.idle?.let { idle -> main.removeCallbacks(idle) }
+                it.idle = null
+            }
+        }
+        try {
+            return block()
+        } finally {
+            if (process != null) synchronized(lock) {
+                if (processes[process.key] === process) releaseLocked(context.applicationContext, process)
+            }
+        }
     }
 
     /** One user of [pluginId]'s process is done with it; the last one starts the idle countdown. */
@@ -130,12 +135,16 @@ internal object PluginProcesses {
         val app = context.applicationContext
         synchronized(lock) {
             val process = byPlugin[pluginId] ?: return
-            if (process.users > 0) process.users--
-            if (process.users == 0 && process.idle == null) {
-                val countdown = Runnable { letGo(app, process) }
-                process.idle = countdown
-                main.postDelayed(countdown, IDLE_MS)
-            }
+            releaseLocked(app, process)
+        }
+    }
+
+    private fun releaseLocked(app: Context, process: Process) {
+        if (process.users > 0) process.users--
+        if (process.users == 0 && process.idle == null) {
+            val countdown = Runnable { letGo(app, process) }
+            process.idle = countdown
+            main.postDelayed(countdown, IDLE_MS)
         }
     }
 

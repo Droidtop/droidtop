@@ -139,11 +139,8 @@ object PluginWebAccount {
      * plugin afterwards. A plugin with no process running is not started for it.
      */
     private fun showKept(context: Context, record: PluginRecord, request: WebSessionRequest): WebSessionResult {
-        val kept = PluginProcesses.keep(record.manifest.id)
-        try {
-            return WebSessionActivity.show(context, request)
-        } finally {
-            if (kept) PluginProcesses.release(context, record.manifest.id)
+        return PluginProcesses.withKept(context, record.manifest.id) {
+            WebSessionActivity.show(context, request)
         }
     }
 

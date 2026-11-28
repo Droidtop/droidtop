@@ -59,7 +59,7 @@ internal object HostWebApis {
     }
 
     private fun show(env: BrokerEnvironment, record: PluginRecord, request: WebSessionRequest): WebSessionResult =
-        env.webSession(request)
+        env.webSession(record.manifest.id, request)
             ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop cannot show a web view for plugins")
 
     val ops: List<HostOp> = listOf(

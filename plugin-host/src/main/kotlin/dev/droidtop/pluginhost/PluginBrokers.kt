@@ -519,7 +519,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         return PickedDocument(uri.toString(), display, size, writable)
     }
 
-    override fun webSession(request: WebSessionRequest): WebSessionResult? = WebSessionActivity.show(appContext, request)
+    override fun webSession(pluginId: String, request: WebSessionRequest): WebSessionResult =
+        PluginProcesses.withKept(appContext, pluginId) { WebSessionActivity.show(appContext, request) }
 
     override fun webViewFinish(pluginId: String, token: String, args: JSONObject): Boolean = WebViewProviders.finish(appContext, pluginId, token, args)
 
