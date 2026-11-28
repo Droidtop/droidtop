@@ -8,8 +8,6 @@ import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.EditText
 import android.widget.LinearLayout
-import androidx.core.view.ViewCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import org.junit.Assert.*
 import org.junit.Test
@@ -56,14 +54,14 @@ class SlabAccessibilityTest {
         } finally { controller.pause().stop().destroy() }
     }
 
-    private fun node(slab: SlabView, action: Slab.Action): AccessibilityNodeInfoCompat =
-        checkNotNull(ViewCompat.getAccessibilityNodeProvider(slab)?.createAccessibilityNodeInfo(slab.accessibleId(action)))
+    private fun node(slab: SlabView, action: Slab.Action): AccessibilityNodeInfo =
+        checkNotNull(slab.accessibilityNodeProvider?.createAccessibilityNodeInfo(slab.accessibleId(action)))
 
     private fun activate(slab: SlabView, action: Slab.Action, operation: Int = AccessibilityNodeInfo.ACTION_CLICK): Boolean =
-        checkNotNull(ViewCompat.getAccessibilityNodeProvider(slab)).performAction(slab.accessibleId(action), operation, null)
+        checkNotNull(slab.accessibilityNodeProvider).performAction(slab.accessibleId(action), operation, null)
 
     @Test fun semanticKeysAreNamedAndCanTypeWithoutTakingEditorFocus() = fixture { slab, editor, outputs ->
-        val provider = checkNotNull(ViewCompat.getAccessibilityNodeProvider(slab))
+        val provider = checkNotNull(slab.accessibilityNodeProvider)
         val host = checkNotNull(provider.createAccessibilityNodeInfo(ExploreByTouchHelper.HOST_ID))
         assertEquals(slab.state.keys.sumOf { it.size }, host.childCount)
         val q = Slab.Action.Char('q')
@@ -102,7 +100,7 @@ class SlabAccessibilityTest {
     }
 
     @Test fun removedLetterNodesCannotActivateSymbolsAtTheirOldPosition() = fixture { slab, _, outputs ->
-        val provider = checkNotNull(ViewCompat.getAccessibilityNodeProvider(slab))
+        val provider = checkNotNull(slab.accessibilityNodeProvider)
         assertTrue(activate(slab, Slab.Action.Char('q'), AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS))
         assertTrue(activate(slab, Slab.Action.Symbols))
         assertEquals(Slab.Layer.SYMBOLS, slab.state.layer)
@@ -126,7 +124,7 @@ class SlabAccessibilityTest {
         assertTrue(activate(slab, q, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS))
         slab.measure(View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(250, View.MeasureSpec.EXACTLY))
         slab.layout(0, 100, 600, 350)
-        val focused = ViewCompat.getAccessibilityNodeProvider(slab)?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        val focused = slab.accessibilityNodeProvider?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
         assertEquals("q", focused?.text.toString())
         assertTrue(editor.hasFocus())
         assertFalse(slab.isFocusable)
