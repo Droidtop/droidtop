@@ -51,11 +51,13 @@ import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
 import dev.droidtop.net.peer.PairedDevices
 import dev.droidtop.net.peer.DeviceIdentity
+import dev.droidtop.runtime.util.AppScopes
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -117,7 +119,7 @@ class PairComputerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // Ends the listener the moment the screen goes: nothing listens once it is closed.
-        dev.droidtop.runtime.util.AppScopes.io.launch { AgentNative.call("pair_cancel") }
+        AppScopes.io.launch { AgentNative.call("pair_cancel") }
         runCatching { multicast?.release() }
         multicast = null
         super.onDestroy()
@@ -331,15 +333,17 @@ private fun PairedHandheld(device: Computer, onDone: () -> Unit) {
  */
 @Composable
 private fun PairedChoices(computer: Computer, onDone: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var games by remember { mutableStateOf(false) }
-    var apps by remember { mutableStateOf(false) }
-    fun save() {
-        val (g, a) = games to apps
-        scope.launch {
-            withContext(Dispatchers.IO) { Computers.setShown(context, computer.id, games = g, apps = a) }
-            dev.droidtop.app.settings.ComputersCatalog.refreshLibrary(context)
+    val context = LocalContext.current.applicationContext
+    var games by remember(computer.id) { mutableStateOf(computer.showGames) }
+    var apps by remember(computer.id) { mutableStateOf(computer.showApps) }
+    var lastWrite by remember(computer.id) { mutableStateOf<Job?>(null) }
+    fun save(games: Boolean? = null, apps: Boolean? = null) {
+        val previous = lastWrite
+        // A quick toggle followed by Done still has to be saved, in the order it was chosen.
+        lastWrite = AppScopes.io.launch {
+            previous?.join()
+            Computers.setShown(context, computer.id, games = games, apps = apps)
+            withContext(Dispatchers.Main) { dev.droidtop.app.settings.ComputersCatalog.refreshLibrary(context) }
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -349,14 +353,14 @@ private fun PairedChoices(computer: Computer, onDone: () -> Unit) {
             Text(stringResource(R.string.pair_computer_show_its_games_in_my), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = games, onCheckedChange = {
                 games = it
-                save()
+                save(games = it)
             })
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.pair_computer_show_its_programs_in_apps), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = apps, onCheckedChange = {
                 apps = it
-                save()
+                save(apps = it)
             })
         }
         Text(stringResource(R.string.pair_computer_you_can_change_both_later, computer.name), style = MaterialTheme.typography.bodyMedium)
