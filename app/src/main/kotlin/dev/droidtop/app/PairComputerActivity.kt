@@ -9,12 +9,15 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LocalContentColor
@@ -22,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.droidtop.app.ui.DroidtopTheme
@@ -173,34 +179,51 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
     var typed by remember { mutableStateOf("") }
     var connecting by remember { mutableStateOf<String?>(null) }
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.pair_computer_pair_a, other), style = MaterialTheme.typography.headlineSmall)
         when (val s = state) {
             PairState.Starting -> Text(stringResource(R.string.pair_computer_getting_a_code), style = MaterialTheme.typography.bodyLarge)
-            is PairState.Showing -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (handheld) {
-                        Text(
-                            "On the other handheld, open Settings > Computers > Pair a handheld, and under Use a code from the other handheld type this address and code:",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(s.at ?: "This device is on no network", style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace)
-                        Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
-                        Text(stringResource(R.string.pair_computer_keep_this_screen_open_until), style = MaterialTheme.typography.bodyMedium)
-                    } else {
-                        Text(stringResource(R.string.pair_computer_on_the_computer_open_droidtop), style = MaterialTheme.typography.bodyLarge)
-                        Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
-                        Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
-                                "No droidtop-agent yet? It is at github.com/mytop-project/droidtop-agent.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+            is PairState.Showing -> BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val wide = maxWidth >= 640.dp
+                val instructions: @Composable (Modifier) -> Unit = { modifier ->
+                    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (handheld) {
+                            Text(
+                                "On the other handheld, open Settings > Computers > Pair a handheld, and under Use a code from the other handheld type this address and code:",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(s.at ?: "This device is on no network", style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace)
+                            Text(s.code.chunked(3).joinToString(" "), fontSize = 40.sp, fontFamily = FontFamily.Monospace)
+                            Text(stringResource(R.string.pair_computer_keep_this_screen_open_until), style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            Text(stringResource(R.string.pair_computer_on_the_computer_open_droidtop), style = MaterialTheme.typography.bodyLarge)
+                            Text(s.code.chunked(3).joinToString(" "), fontSize = 40.sp, fontFamily = FontFamily.Monospace)
+                            Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
+                                    "No droidtop-agent yet? It is at github.com/mytop-project/droidtop-agent.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
-                QrCode(content = s.uri, size = 220.dp)
+                if (wide) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        instructions(Modifier.weight(1f))
+                        QrCode(content = s.uri, size = 220.dp)
+                    }
+                } else {
+                    var showQr by remember { mutableStateOf(false) }
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        instructions(Modifier.fillMaxWidth())
+                        TextButton(onClick = { showQr = !showQr }) {
+                            Text(stringResource(if (showQr) R.string.pair_computer_hide_qr else R.string.pair_computer_show_qr))
+                        }
+                        if (showQr) QrCode(content = s.uri, size = minOf(maxWidth, 220.dp))
+                    }
+                }
             }
             is PairState.Paired -> if (s.computer.handheld) PairedHandheld(s.computer, onDone) else PairedChoices(s.computer, onDone)
             is PairState.Failed -> {
@@ -216,7 +239,7 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                 if (handheld) {
                     "Or the other way round: open Pair a handheld on the other handheld, and type the address and code it shows."
                 } else {
-                    "If the computer cannot find this device, choose Show a code in droidtop-agent's Pair a handheld on the computer, and type the address and code it shows."
+                    stringResource(R.string.pair_computer_reverse_instructions)
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -224,13 +247,15 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                 value = address,
                 onValueChange = { address = it.trim() },
                 label = { Text(stringResource(R.string.pair_computer_the_s_address_such_as, other)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = typed,
-                onValueChange = { typed = it.filter { c -> c.isDigit() }.take(6) },
+                onValueChange = { typed = it.filter { c -> c in '0'..'9' }.take(6) },
                 label = { Text(stringResource(R.string.pair_computer_code)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
