@@ -103,6 +103,21 @@ internal object HostNetApis {
      * local network needs `net.local` as well. The name is looked up only once the plugin may reach it.
      */
     fun reach(env: BrokerEnvironment, record: PluginRecord, url: String) {
+        reachChecked(env, record, url) { env.addressesOf(NetScope.hostOf(url)!!) }
+    }
+
+    /** Permission before any DNS query; the gateway subsequently checks the exact resolved addresses. */
+    fun reachName(env: BrokerEnvironment, record: PluginRecord, url: String) {
+        reachChecked(env, record, url) { emptyList() }
+    }
+
+    /** No second DNS lookup: these are the same addresses the gateway passes to Socket.connect. */
+    fun reachResolved(env: BrokerEnvironment, record: PluginRecord, url: String, addresses: List<InetAddress>) {
+        require(addresses.isNotEmpty())
+        reachChecked(env, record, url) { addresses }
+    }
+
+    private fun reachChecked(env: BrokerEnvironment, record: PluginRecord, url: String, addresses: () -> List<InetAddress>) {
         val declared = record.manifest.v2.permissions
         val permission = permissionOf(declared, JSONObject().put("url", url))
         val grants = env.grants(record.manifest.id)
@@ -112,7 +127,7 @@ internal object HostNetApis {
         }
         if (permission != NetScope.LOCAL) {
             val host = NetScope.hostOf(url)!!
-            val local = env.addressesOf(host).any { NetScope.isLocalAddress(it) }
+            val local = addresses().any { NetScope.isLocalAddress(it) }
             if (local && !granted(NetScope.LOCAL)) {
                 throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "$host is on your local network, which ${record.manifest.label} may not reach")
             }
