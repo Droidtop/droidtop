@@ -16,7 +16,7 @@ internal object EaWineHardware {
         Triple("gpuPnpId", "Win32_VideoController", "PNPDeviceID"),
     )
 
-    suspend fun probe(wine: StoreWineContext): Map<String, String> {
+    suspend fun probe(wine: StoreWineContext, activationVersion: Int): Map<String, String> {
         val prefix = wine.prefix.canonicalFile
         val tempRoot = File(prefix, "drive_c/windows/temp").canonicalFile
         check(tempRoot.toPath().startsWith(prefix.toPath())) { "The Wine temporary directory leaves its prefix" }
@@ -41,11 +41,10 @@ internal object EaWineHardware {
             fun read(name: String): ByteArray = File(folder, name).also { check(it.isFile && it.length() <= 16_384) { "Wine returned no bounded EA hardware result" } }.readBytes()
             val values = fields.associate { (key, _, _) -> key to wmiValue(decode(read("$key.txt"))) }.toMutableMap()
             val serial = Regex("([0-9A-Fa-f]{4})-([0-9A-Fa-f]{4})").find(decode(read("volume.txt")))
-                ?: error("Wine did not report its C drive serial")
-            values["volumeSerial"] = (serial.groupValues[1] + serial.groupValues[2]).lowercase()
+            values["volumeSerial"] = serial?.let { (it.groupValues[1] + it.groupValues[2]).lowercase() }.orEmpty()
             values["hostname"] = decode(read("hostname.txt")).lineSequence().map(String::trim).firstOrNull { it.isNotBlank() }.orEmpty()
             values.putAll(cpuidValues(read("cpuid.bin")))
-            check(listOf("boardManufacturer", "biosManufacturer", "osInstallDate", "osSerial", "hostname").all { !values[it].isNullOrBlank() }) {
+            check(EaOoa.Hardware.fromWine(values).complete(activationVersion)) {
                 "Wine did not report all hardware required for EA activation"
             }
             return values

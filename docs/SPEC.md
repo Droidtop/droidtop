@@ -17455,6 +17455,13 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   properties or guessed constants fill gaps. Private temporary results are removed and no hardware cache is reused
   across runtime changes. This helper is not yet wired into EA launches: licence activation and fail-closed LSX remain
   the following batch (owner handoff, 2026-11-27).
+  Activation format support now identifies the actual bounded DLL product version; unknown versions remain unknown,
+  never guessed as version 1. The probe validates the fields required by that version. Missing optional serial/GPU
+  values use the upstream protocol's absent-value representation, not Android hardware substitutes. Version-specific
+  SHA-1 formatting preserves legacy unpadded hex and current padded hex. Manifest and licence XML share a bounded,
+  entity-free parser; licence fields and output content identifiers are validated and parse diagnostics reveal no
+  licence payload. This layer only formats EA licence files and does not contact EA or launch a game. Network
+  activation and LSX remain the next integration, under root's 2026-11-27 requirement: "official owned-game licence flow".
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 

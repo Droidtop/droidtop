@@ -4,10 +4,7 @@ package dev.droidtop.stores.ea
 // at cc63b403872b (GPL-3.0; see NOTICE.md); adapted to droidtop's store and HTTP interfaces.
 
 import java.io.File
-import java.io.StringReader
-import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
-import org.xml.sax.InputSource
 
 /** What `__Installer/installerdata.xml` in an EA build says about running and finishing the install. */
 class EaManifest(
@@ -40,12 +37,7 @@ class EaManifest(
         }
 
         fun parse(xml: String): EaManifest {
-            require(xml.length <= 4 * 1024 * 1024 && !xml.contains("<!DOCTYPE", true) && !xml.contains("<!ENTITY", true)) {
-                "The EA installer manifest contains unsupported XML declarations or is too large"
-            }
-            // JAXP is available on Android and the JVM: the same bounded parser runs in the format tests.
-            val factory = DocumentBuilderFactory.newInstance().apply { isExpandEntityReferences = false }
-            val root = factory.newDocumentBuilder().parse(InputSource(StringReader(xml))).documentElement
+            val root = EaXml.root(xml, 4 * 1024 * 1024)
             fun elements(parent: Element, name: String): List<Element> {
                 val nodes = parent.getElementsByTagName("*")
                 return (0 until nodes.length).mapNotNull { nodes.item(it) as? Element }.filter { it.tagName.equals(name, true) }
