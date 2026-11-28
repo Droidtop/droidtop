@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.EditText
@@ -126,6 +127,16 @@ class SlabAccessibilityTest {
         slab.layout(0, 100, 600, 350)
         val focused = slab.accessibilityNodeProvider?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
         assertEquals("q", focused?.text.toString())
+        assertTrue(editor.hasFocus())
+        assertFalse(slab.isFocusable)
+    }
+
+    @Test fun padMovementKeepsAnAlreadyAnnouncedKeyAlignedWithConfirm() = fixture { slab, editor, _ ->
+        assertTrue(activate(slab, Slab.Action.Char('q'), AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS))
+        assertTrue(slab.handleKey(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT)))
+        assertEquals(Slab.Action.Char('w'), slab.state.focused?.action)
+        val focused = slab.accessibilityNodeProvider?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        assertEquals("w", focused?.text.toString())
         assertTrue(editor.hasFocus())
         assertFalse(slab.isFocusable)
     }
