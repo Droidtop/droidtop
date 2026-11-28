@@ -4,6 +4,8 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
 import org.junit.Test
@@ -80,11 +82,15 @@ class BrowserConnectGatewayTest {
     }
 
     @Test fun deadlineClosesIdleUnauthenticatedClient() {
-        BrowserConnectGateway.open(150, beforeResolve = { fail("No request was supplied") },
-            authorize = { _, _ -> fail("No request was supplied") }).use { gateway ->
+        val expired = CountDownLatch(1)
+        BrowserConnectGateway.open(500, beforeResolve = { fail("No request was supplied") },
+            authorize = { _, _ -> fail("No request was supplied") }, failed = { expired.countDown() }).use { gateway ->
             Socket(gateway.endpoint.host, gateway.endpoint.port).use { client ->
                 client.soTimeout = 3000
-                assertEquals(-1, client.getInputStream().read())
+                // The bounded header read may send 400 just before the operation deadline closes the socket.
+                val response = client.getInputStream().readBytes().toString(Charsets.US_ASCII)
+                assertTrue(response.isEmpty() || response.startsWith("HTTP/1.1 400"))
+                assertTrue(expired.await(3, TimeUnit.SECONDS))
                 assertEquals(BrowserConnectGateway.Failure.DEADLINE, gateway.failureReason)
             }
         }
