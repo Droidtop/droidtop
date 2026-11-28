@@ -152,6 +152,8 @@ internal fun PcGamePage(
     // A linked source's record page (docs/SPEC.md 7g, "Getting an update"): the source, its record, the tab it opens on.
     var viewingRecord by remember(entry.id) { mutableStateOf<Triple<UpdateSources.Source, String, RecordTab>?>(null) }
     var updateStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    var sourceCheckStatus by remember(entry.id) { mutableStateOf(emptyMap<dev.droidtop.library.SourceKey, String>()) }
+    var sourceCheckRunning by remember(entry.id) { mutableStateOf(false) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (library != null && isFolder) library.gameLinks(gameIds) else null
     }
@@ -290,7 +292,7 @@ internal fun PcGamePage(
         val (value, subtitle) = dev.droidtop.library.OfflineReadiness.line(dev.droidtop.library.OfflineReadiness.need(entry), artNotSaved)
         PageFact(OFFLINE_ROW, value, subtitle = subtitle, tab = PageTab.DETAILS)
     }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers, offlineRow) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, sourceCheckStatus, sourceCheckRunning, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers, offlineRow) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
@@ -346,7 +348,36 @@ internal fun PcGamePage(
                             }
                         }
                     },
-                )
+                ) + updateSources.mapNotNull { source ->
+                    val link = links?.link(source.key) ?: return@mapNotNull null
+                    PageFact(
+                        title = if (updateSources.size > 1) "Check ${source.label} for updates" else "Check for update",
+                        subtitle = sourceCheckStatus[link.key],
+                        tab = PageTab.VERSIONS,
+                        onActivate = if (sourceCheckRunning) null else {
+                            {
+                                if (!sourceCheckRunning) {
+                                    sourceCheckRunning = true
+                                    sourceCheckStatus = sourceCheckStatus + (link.key to "Checking…")
+                                    scope.launch {
+                                        try {
+                                            val result = checkSourceAndSay(library, gameIds, link.key, versions, entry.latestKnown)
+                                            sourceCheckStatus = sourceCheckStatus + (link.key to result)
+                                            linksToken++
+                                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                            sourceCheckStatus = sourceCheckStatus - link.key
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            sourceCheckStatus = sourceCheckStatus + (link.key to "The update check failed. Try again.")
+                                        } finally {
+                                            sourceCheckRunning = false
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
             } else {
                 emptyList()
             } + elsewhereRows(
