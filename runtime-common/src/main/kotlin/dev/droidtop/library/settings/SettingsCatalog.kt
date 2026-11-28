@@ -279,6 +279,8 @@ class ActionItem(
     // (mytop-project/tracker#531).
     val leaves: Boolean = false,
     override val glyphName: String? = null,
+    /** Alternative phrases a person might search for to find this action. */
+    val searchAliases: List<String> = emptyList(),
 ) : CatalogItem {
     /** Whether this row has nothing to do: a value, an empty state, a line that says what happened. */
     val inert: Boolean get() = run === NOTHING

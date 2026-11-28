@@ -76,6 +76,7 @@ object ComputersCatalog {
                                 id = "computers_pair_one",
                                 title = "Pair a computer",
                                 subtitle = "Shows a code",
+                                searchAliases = listOf("Pair Pythia", "Pair PC", "Connect a computer"),
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
@@ -84,6 +85,7 @@ object ComputersCatalog {
                                 id = "computers_pair_handheld",
                                 title = "Pair a handheld",
                                 subtitle = "Another handheld with droidtop",
+                                searchAliases = listOf("Pair another Droidtop", "Pair Android device", "Connect a handheld"),
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx, handheld = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
