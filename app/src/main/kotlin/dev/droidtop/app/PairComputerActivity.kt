@@ -215,7 +215,7 @@ private fun PairScreen(
                     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (handheld) {
                             Text(
-                                "On the other handheld, open Settings > Computers > Pair a handheld, and under Use a code from the other handheld type this address and code:",
+                                stringResource(R.string.pair_computer_show_handheld_instructions),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                             Text(s.at ?: "This device is on no network", style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace)
@@ -261,7 +261,7 @@ private fun PairScreen(
             Text(stringResource(R.string.pair_computer_use_a_code_from_the, other), style = MaterialTheme.typography.titleMedium)
             Text(
                 if (handheld) {
-                    "Or the other way round: open Pair a handheld on the other handheld, and type the address and code it shows."
+                    stringResource(R.string.pair_computer_use_handheld_instructions)
                 } else {
                     stringResource(R.string.pair_computer_reverse_instructions)
                 },

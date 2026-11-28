@@ -23769,7 +23769,11 @@ streamed by windowcast's host, which the agent embeds (Stream from
   device's key and name, the computer's id and its known addresses, and
   remembers the address that answered.
 - **Pairing** (`PairComputerActivity`, opened from Settings > Accounts and
-  sources > Computers > Pair a computer):
+  sources > Computers and handhelds). The settings row counts both kinds of
+  paired device and offers separate Pair a computer and Pair a handheld
+  actions. Two Droidtop devices can pair by entering the address and code
+  displayed by either handheld. Computer pairing works with Pythia or
+  droidtop-agent:
   - the screens draw their text in the theme's text colour
     (`onBackground`): they have no Surface to set it, and the default is
     black on the ground (mytop-project/tracker#527);

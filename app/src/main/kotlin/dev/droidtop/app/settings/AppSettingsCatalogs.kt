@@ -1119,7 +1119,7 @@ object AppSettingsCatalogs {
 
     private suspend fun networkGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
-        val pairedComputers = dev.droidtop.net.peer.Computers.list(context).size
+        val pairedDevices = dev.droidtop.net.peer.Computers.devices(context).size
         listOf(
             CatalogGroup(
                 id = "network_connection",
@@ -1133,7 +1133,7 @@ object AppSettingsCatalogs {
                 title = "Devices",
                 items = listOf(
                     // The person's computers running droidtop-agent (docs/SPEC.md 7o).
-                    ComputersCatalog.linkRow(pairedComputers),
+                    ComputersCatalog.linkRow(pairedDevices),
                     // Phones and computers with KDE Connect, and Pythia (docs/SPEC.md "KDE Connect").
                     KdeConnectCatalog.linkRow(dev.droidtop.net.kdeconnect.KdeConnect.isOn(context)),
                 ),
