@@ -17462,6 +17462,7 @@ and Rockstar games without their own launchers. droidtop takes it as follows:
   entity-free parser; licence fields and output content identifiers are validated and parse diagnostics reveal no
   licence payload. This layer only formats EA licence files and does not contact EA or launch a game. Network
   activation and LSX remain the next integration, under root's 2026-11-27 requirement: "official owned-game licence flow".
+  A socket-identity helper prepares fail-closed LSX admission: both kernel TCP tables must be readable within 1 MiB each, and exactly one ESTABLISHED client row must match both addresses and both ports. IPv4, IPv4-mapped IPv6 and native IPv6 use explicit proc word decoding for the supported little-endian Android ABIs. Unknown, malformed or ambiguous ownership is refusal; the only accepted UID is the actual app process UID. It does not inherit upstream's ports-only match or unknown-owner credential fallback. Bounded reads consume the shared mytop-net0.2.7 copier. This helper is not wired to a server or credential minting path; where Android hides these tables, future LSX must report unsupported rather than guess (root, 2026-11-27: "LSX must fail closed on unverifiable same-UID clients").
 
 ### Ownership is a fact (mytop-project/tracker#397 slice B)
 
