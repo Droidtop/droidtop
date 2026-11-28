@@ -23784,6 +23784,8 @@ streamed by windowcast's host, which the agent embeds (Stream from
     code into Droidtop;
   - the handheld is the SPAKE2 host and listens only while that screen is
     open; the code works once, and three wrong codes end the attempt;
+    each screen owns its listener, so closing an old screen cannot
+    cancel a new invitation;
   - neither a desktop PC nor the Retroid Pocket 5 has a camera, so the QR
     code is for a laptop webcam or a phone acting for the computer.
   - the other way round, for a device the computer cannot reach (an

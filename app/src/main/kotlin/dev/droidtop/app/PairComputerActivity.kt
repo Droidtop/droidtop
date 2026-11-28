@@ -61,6 +61,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.util.UUID
 
 /**
  * Pairing a computer (docs/SPEC.md 7o "Computers"): shows a 6-digit code to
@@ -78,6 +79,8 @@ import org.json.JSONObject
  */
 class PairComputerActivity : AppCompatActivity() {
     private var multicast: WifiManager.MulticastLock? = null
+    private val owner = UUID.randomUUID().toString()
+    @Volatile private var closed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +91,13 @@ class PairComputerActivity : AppCompatActivity() {
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().groundBackground()) {
                         Box(Modifier.weight(1f)) {
-                            PairScreen(handheld = intent.getBooleanExtra(EXTRA_HANDHELD, false), onDone = { finish() }, holdMulticast = ::holdMulticast)
+                            PairScreen(
+                                handheld = intent.getBooleanExtra(EXTRA_HANDHELD, false),
+                                owner = owner,
+                                startPairing = ::startPairing,
+                                onDone = { finish() },
+                                holdMulticast = ::holdMulticast,
+                            )
                         }
                         HintRow(bindings = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back")))
                     }
@@ -119,13 +128,21 @@ class PairComputerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // Ends the listener the moment the screen goes: nothing listens once it is closed.
-        AppScopes.io.launch { AgentNative.call("pair_cancel") }
+        closed = true
+        AppScopes.io.launch {
+            synchronized(pairingStartLock) { cancelPairing(owner) }
+        }
         runCatching { multicast?.release() }
         multicast = null
         super.onDestroy()
     }
 
+    private fun startPairing(args: JSONObject): JSONObject? = synchronized(pairingStartLock) {
+        if (closed) null else AgentNative.call("pair_start", args.put("owner", owner))
+    }
+
     companion object {
+        private val pairingStartLock = Any()
         /** The page where droidtop-agent's builds are. */
         const val AGENT_RELEASES = "https://github.com/mytop-project/droidtop-agent/releases/latest"
 
@@ -146,7 +163,13 @@ private sealed interface PairState {
 }
 
 @Composable
-private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () -> Unit) {
+private fun PairScreen(
+    handheld: Boolean,
+    owner: String,
+    startPairing: (JSONObject) -> JSONObject?,
+    onDone: () -> Unit,
+    holdMulticast: () -> Unit,
+) {
     val other = if (handheld) "handheld" else "computer"
     val context = LocalContext.current
     var state by remember { mutableStateOf<PairState>(PairState.Starting) }
@@ -158,17 +181,16 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
             if (!AgentNative.available) return@withContext PairState.Failed("This build of droidtop has no computer sync library.")
             val seed = DeviceIdentity.seed(context) ?: return@withContext PairState.Failed("This device's key could not be made.")
             val lan = HandoffServer.lanAddress()
-            val started = AgentNative.call(
-                "pair_start",
+            val started = startPairing(
                 JSONObject().put("seed", seed).put("name", Computers.deviceName(context)).put("address", lan ?: ""),
-            )
+            ) ?: return@withContext PairState.Failed("Pairing was cancelled.")
             AgentNative.failure(started)?.let { return@withContext PairState.Failed(it) }
             val port = started.optInt("port")
             PairState.Showing(started.optString("code"), started.optString("uri"), lan?.takeIf { port > 0 }?.let { "$it:$port" })
         }
         if (state !is PairState.Showing) return@LaunchedEffect
         val waited = withContext(Dispatchers.IO) {
-            val reply = AgentNative.call("pair_wait", JSONObject().put("timeout_ms", WAIT_MS))
+            val reply = AgentNative.call("pair_wait", JSONObject().put("owner", owner).put("timeout_ms", WAIT_MS))
             AgentNative.failure(reply)?.let { return@withContext PairState.Failed(it.replaceFirstChar { c -> c.uppercase() }) }
             PairState.Paired(keep(context, reply))
         }
@@ -276,7 +298,7 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                             AgentNative.failure(reply)?.let { return@withContext null to it.replaceFirstChar { c -> c.uppercase() } }
                             val computer = keep(context, reply)
                             // This screen's own code is not needed any more.
-                            AgentNative.call("pair_cancel")
+                            cancelPairing(owner)
                             computer to null
                         }
                         connecting = failure
@@ -369,3 +391,7 @@ private fun PairedChoices(computer: Computer, onDone: () -> Unit) {
 }
 
 private const val WAIT_MS = 10 * 60 * 1000L
+
+private fun cancelPairing(owner: String) {
+    AgentNative.call("pair_cancel", JSONObject().put("owner", owner))
+}
