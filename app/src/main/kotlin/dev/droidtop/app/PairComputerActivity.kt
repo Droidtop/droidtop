@@ -211,6 +211,7 @@ private fun PairScreen(
             PairState.Starting -> Text(stringResource(R.string.pair_computer_getting_a_code), style = MaterialTheme.typography.bodyLarge)
             is PairState.Showing -> BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val wide = maxWidth >= 640.dp
+                val qrSize = minOf(maxWidth, 220.dp)
                 val instructions: @Composable (Modifier) -> Unit = { modifier ->
                     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (handheld) {
@@ -245,7 +246,7 @@ private fun PairScreen(
                         TextButton(onClick = { showQr = !showQr }) {
                             Text(stringResource(if (showQr) R.string.pair_computer_hide_qr else R.string.pair_computer_show_qr))
                         }
-                        if (showQr) QrCode(content = s.uri, size = minOf(maxWidth, 220.dp))
+                        if (showQr) QrCode(content = s.uri, size = qrSize)
                     }
                 }
             }
