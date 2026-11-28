@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import dev.droidtop.shared.net.BoundedStreamCopy
 import kotlinx.coroutines.*
 
 /** One-use bodies stay in memory; the persisted marker forbids ever refetching their provenance URL. */
@@ -101,7 +102,7 @@ internal object BrowserBodyOffers {
                     ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
                         destination.outputStream().use { output ->
                             val poll = StructPollfd().apply { this.fd = fd.fileDescriptor; events = (OsConstants.POLLIN or OsConstants.POLLHUP or OsConstants.POLLERR).toShort() }
-                            BrowserBodyCopy.receive(input, output, entry.metadata.size, cap,
+                            BoundedStreamCopy.copy(input, output, maxBytes = cap, expectedBytes = entry.metadata.size,
                                 beforeRead = {
                                     do {
                                         coroutine.ensureActive()
