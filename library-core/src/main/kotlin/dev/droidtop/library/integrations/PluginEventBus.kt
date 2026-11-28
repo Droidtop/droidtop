@@ -78,7 +78,7 @@ object PluginEventBus {
         try {
             for (record in candidates) {
                 val result = policy.notifyEvent(record, PluginEvent.DEFAULT_PLAYER_CHANGED, args) ?: continue
-                if (!result.ok) continue
+                if (!result.ok || record.manifest.id == "droidtop.retroarch") continue
                 val jobCapabilityId = result.values["startJob"] ?: continue
                 val jobCapability = PluginCapability.fromId(jobCapabilityId) ?: continue
                 val jobArgs = result.values - "startJob"

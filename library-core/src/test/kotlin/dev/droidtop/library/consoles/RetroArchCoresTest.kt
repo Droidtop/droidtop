@@ -69,31 +69,4 @@ class RetroArchCoresTest {
         assertTrue(line, line.contains("mupen64plus_next_gles3 in com.retroarch.aarch64, /data/user/0/com.retroarch.aarch64/cores/mupen64plus_next_gles3_libretro_android.so"))
         assertTrue(RetroArchCores.troubleHint(need).contains("com.retroarch.aarch64"))
     }
-
-    @Test
-    fun `only a legacy-storage RetroArch with storage access can sideload a core droidtop leaves in Download`() {
-        // The buildbot builds target SDK 28; the Play Store builds target 35 (pkg/android/phoenix/build.gradle, 1.22.0).
-        assertTrue(RetroArchCores.canSideload(targetSdk = 28, storageGranted = true))
-        assertFalse(RetroArchCores.canSideload(targetSdk = 28, storageGranted = false))
-        assertFalse(RetroArchCores.canSideload(targetSdk = 35, storageGranted = true))
-        val need = RetroArchCores.Need("com.retroarch.aarch64", "mgba", "/data/user/0/com.retroarch.aarch64/cores/mgba_libretro_android.so")
-        // RetroArch's sideload keeps the file's own name in its cores folder, so the copy carries the name a launch loads.
-        assertEquals(
-            "/storage/emulated/0/Download/droidtop-cores/mgba_libretro_android.so",
-            RetroArchCores.sharedCorePath("/storage/emulated/0/Download", need),
-        )
-    }
-
-    @Test
-    fun `the manager's downloaded core is read only from its own data folder`() {
-        val data = java.nio.file.Files.createTempDirectory("plugin-data").toFile()
-        val core = java.io.File(data, "cores/arm64-v8a/mgba_libretro_android.so").apply { parentFile.mkdirs(); writeBytes(ByteArray(8)) }
-        val outside = java.io.File(data.parentFile, "outside-${data.name}.so").apply { writeBytes(ByteArray(8)); deleteOnExit() }
-        assertEquals(core.canonicalFile, RetroArchCores.managerFile(data, "cores/arm64-v8a/mgba_libretro_android.so"))
-        assertNull(RetroArchCores.managerFile(data, "../${outside.name}"))
-        assertNull(RetroArchCores.managerFile(data, outside.absolutePath))
-        assertNull(RetroArchCores.managerFile(data, "cores/arm64-v8a/missing_libretro_android.so"))
-        // One file and its folders, one level at a time.
-        core.delete(); core.parentFile.delete(); core.parentFile.parentFile.delete(); data.delete()
-    }
 }

@@ -463,6 +463,8 @@ class PluginGrants(private val dir: File) {
          * [capability] is served for ([LegacyManifest.CAPABILITY_POINTS]).
          */
         fun jobRefusal(record: PluginRecord, snapshot: Snapshot, capability: PluginCapability, args: Map<String, String>): String? {
+            // Published versions of this plugin offered only jobs that downloaded or installed executable cores.
+            if (record.manifest.id == "droidtop.retroarch") return "Install cores in RetroArch's Core Downloader"
             val point = args["call"]?.let { PluginCall.fromJson(it)?.point } ?: LegacyManifest.CAPABILITY_POINTS[capability] ?: return null
             return pointRefusal(record, snapshot, point)
         }

@@ -172,7 +172,7 @@ object PluginAppStatus {
                                     ),
                                 )
                             }
-                            val job = result.values["job"]
+                            val job = result.values["job"].takeUnless { m.id == "droidtop.retroarch" }
                             val jobArgKey = result.values["jobArgKey"]
                             if (job != null && jobArgKey != null) {
                                 val jobLabel = result.values["jobLabel"] ?: "Run \"$job\""

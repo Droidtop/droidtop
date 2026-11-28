@@ -393,7 +393,7 @@ object LaunchWatchdog {
 
     /**
      * The alert's "Get the core" for a stuck RetroArch launch ([LaunchAlert.retroArchCore]): closes the
-     * stuck RetroArch by the one close path, then hands the core to [RetroArchCores.ensure], which
+     * stuck RetroArch by the one close path, then opens RetroArch through [RetroArchCores.ensure], which
      * installs it without opening RetroArch where the root helper can place it, and otherwise opens
      * RetroArch for its Core Downloader (RetroArch has no command that installs a core). Returns the
      * line to show; null when there is nothing to say.

@@ -1190,7 +1190,7 @@ internal fun GamepadShellBody(
                 }, launchProblems.missingCore?.let { problem ->
                     // The launch watchdog's Get the core, here before anything started: RetroArch's Core
                     // Downloader, or droidtop placing it once the person confirms on the emulator screen.
-                    LaunchFailureAction("Get the core") {
+                    LaunchFailureAction("Open RetroArch") {
                         launchProblems.missingCore = null
                         launchProblems.error = null
                         scope.launch {
@@ -1235,7 +1235,7 @@ internal fun GamepadShellBody(
                     // A stuck RetroArch whose core is not confirmed installed: getting the core is the likely fix, so
                     // it comes first.
                     val core = alert.retroArchCore?.let {
-                        LaunchFailureAction("Get the core") {
+                        LaunchFailureAction("Open RetroArch") {
                             scope.launch {
                                 dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchProblems.error = it }
                             }

@@ -161,12 +161,12 @@ object EmulatorsCatalog {
             },
             value = when (state) {
                 RetroArchCores.State.INSTALLED -> "Installed"
-                // The RetroArch manager fetches it, and places it or has RetroArch install it (RetroArchCores.ensure).
-                RetroArchCores.State.MISSING, RetroArchCores.State.UNKNOWN -> "Get the core"
+                // RetroArch owns core installation.
+                RetroArchCores.State.MISSING, RetroArchCores.State.UNKNOWN -> "Open RetroArch for core setup"
                 RetroArchCores.State.PARTIAL -> "Incomplete: reinstall in RetroArch"
             },
-            run = { ctx, onStatus ->
-                outcomeLine(RetroArchCores.ensure(ctx, need, asked = true, onStatus = onStatus), need)
+            run = { ctx, _ ->
+                outcomeLine(RetroArchCores.ensure(ctx, need, asked = true), need)
             },
         )
     }
@@ -292,8 +292,8 @@ object EmulatorsCatalog {
                 }.distinctBy { it.packageName to it.core }
                 val retroArchCores = AsyncActionItem(
                     id = "emulators_retroarch_cores",
-                    title = "RetroArch cores",
-                    run = { ctx, onStatus -> RetroArchCores.ensureForLibrary(ctx, withGames, onStatus) },
+                    title = "Set up cores in RetroArch",
+                    run = { ctx, _ -> RetroArchCores.ensureForLibrary(ctx, withGames) },
                 )
                 val usesRetroArch = needs.isNotEmpty()
                 (if (usesRetroArch) listOf<CatalogItem>(retroArchCores) else emptyList()) + rows.map { it.third }

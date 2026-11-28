@@ -777,7 +777,9 @@ private class PluginPage(
         confirm: String?,
         action: ViewAction?,
         glyph: String? = null,
-    ): CatalogItem = if (action == null) {
+    ): CatalogItem = if (action?.kind == ViewAction.Kind.JOB && record.manifest.id == "droidtop.retroarch") {
+        ActionItem(id = itemId, title = "Install cores in RetroArch", subtitle = "Online Updater > Core Downloader")
+    } else if (action == null) {
         ActionItem(id = itemId, title = title, subtitle = subtitle, value = value, glyphName = glyph)
     } else when (action.kind) {
         ViewAction.Kind.VIEW -> NestedScreenItem(

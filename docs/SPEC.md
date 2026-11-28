@@ -13085,58 +13085,14 @@ Owner: "do this over the API. We want retroarch to TRY to be touchless" and, on 
 - **Games keep running in the background.** No RetroArch launch passes `QUITFOCUS`
   (RetroActivityFuture quits on focus loss with it, and on two screens focus moves whenever the other
   screen is touched). The players database rows carry none; `DefaultPlayers` never adds it.
-- **What RetroArch offers another app** (1.19.1 to 1.22.0 source, rechecked 2026-10-15): intent extras on
-  RetroActivityFuture, the UDP network commands (command.h: none downloads or installs a core), and an exported
-  `com.retroarch.browser.debug.CoreSideloadActivity` that copies the file its `LIBRETRO` extra names into RetroArch's
-  own cores folder, as RetroArch, then starts RetroArch with that core. Its core loader `dlopen`s the LIBRETRO path as
-  given; shared storage is mounted noexec; the cores folder `/data/user/0/<pkg>/cores` is RetroArch's private data,
-  out of reach of droidtop and of the shell user (Shizuku). The installed-cores broadcast
-  (`com.retroarch.QUERY_INSTALLED_CORES`) is on RetroArch's master branch only, in no release, so droidtop does not
-  use it.
-- **One source of truth for cores** (coordinator, 2026-10-15, after the 1921 rig: N64 stayed black while the
-  RetroArch manager had "installed" Mupen64Plus-Next). The RetroArch package is the one droidtop's preset launches,
-  and the core is fetched by the RetroArch manager plugin (`droidtop.retroarch`): `RetroArchCores.ensure` runs its
-  `download_core` job with `core` and `playerPackage`, the package droidtop launches, which the manager uses instead
-  of its own guess. droidtop's own buildbot downloader and its root placement (the `retroarch_core` download
-  post step, the zip and ELF checks, the root copy) are deleted. Then:
-  - the manager placed the core (it has a root-level helper): done;
-  - otherwise droidtop copies the manager's downloaded file (`file`, read only from the manager's own data folder)
-    to `Download/droidtop-cores/<core>_libretro_android.so` through MediaStore and starts RetroArch's
-    `CoreSideloadActivity` with that path, so RetroArch installs the core itself and opens with it; the person starts
-    the game again from droidtop. This needs a RetroArch that reads shared storage: the buildbot builds (target
-    SDK 28, legacy storage) once RetroArch has its storage permission, on Android 10 and up. The Play Store builds
-    (target SDK 35, scoped storage) cannot read it;
-  - otherwise, and when the manager is not installed or approved, the line names RetroArch's Core Downloader
-    (Online Updater > Core Downloader) and RetroArch opens when the person asked.
-  The launch-failure sentence and the watchdog's hint name the core, the RetroArch package and the file droidtop
-  checked (`RetroArchCores.checked`), so a mismatch between them shows. Looking into the cores folder still needs
-  root and Risky actions > Root-level commands ("Core checks are off for safety" otherwise), which no longer
-  places anything.
-- **When it runs:** from a system's emulator screen ("RetroArch core"); from Emulators > Systems with
-  games > "RetroArch cores" for every system with games that RetroArch runs; and from a launch's
-  **Get the core**. Before every launch through RetroArch the root helper checks the core, and a core
-  that is missing, or there but not a whole ELF file (`RetroArchCores.elfWhole`: the section header
-  table must end inside the file, which an interrupted copy loses; state `PARTIAL`), stops the launch
-  with that sentence and **Get the core** in the launch failure dialog (`RetroArchCores.Missing`). The
-  launch used to call `ensure` without asking, which for a missing core only returned a line nobody
-  showed, and went on into the black screen. droidtop never replaces a core file RetroArch already has,
-  incomplete or not: Get the core for an incomplete one opens RetroArch's Core Downloader, which does.
-- **Without root** droidtop cannot see RetroArch's cores, so a launch goes ahead as it is. A system's row and a
-  launch's Get the core still fetch through the manager and sideload; "RetroArch cores" for every system opens
-  RetroArch and names the cores, since a sideload brings RetroArch to the front one core at a time.
-- **A stuck RetroArch names its core** (console, build 1386). A Game Boy Color game launched with
-  exactly ES-DE Android's Gambatte command (CONFIGFILE, `gambatte_libretro_android.so`, ROM; the Android
-  es_systems.xml rows) sat black at 0% CPU after RetroArch's "Auto-start game" line and stopped answering
-  on Back, while mGBA ran through the same launch; the console's audit log shows RetroArch executing
-  `mgba_libretro_android.so` on every GBA launch and never `gambatte_libretro_android.so`, so the core was
-  not installed. Without root droidtop cannot look in the cores folder, so the launch watchdog's
-  report for a RetroArch launch (not responding, closed at once, gone, stalled) adds one sentence naming the core
-  and RetroArch's Core Downloader unless the root helper confirmed the core is there
-  (`RetroArchCores.suspect` and `troubleHint`, from the launch intent's LIBRETRO extra), and the system's
-  "RetroArch core" row says that games staying black means the core is missing. That report also offers
-  **Get the core** first (owner: "if it fails, we can always tell RetroArch to install it"): it closes the
-  stuck RetroArch by the task manager's close path and hands the core to `RetroArchCores.ensure`, the same
-  path as the emulator screen's row (the manager's job, then RetroArch's own sideload, above).
+- **RetroArch owns core setup** (2026-11-27). Use the selected RetroArch package and its Core Downloader
+  (Online Updater > Core Downloader). Droidtop and its RetroArch plugin do not download, stage,
+  sideload or copy cores. The host refuses executable-core jobs from older RetroArch manager releases.
+  Changing the default player updates the manager's system list and does not start a core job.
+- **Launch checks.** When a read-only core check confirms the selected core is missing or incomplete,
+  the launch explains which core is needed and offers to open RetroArch. When Droidtop cannot inspect
+  the installed core, it can still try the normal launch. The watchdog and emulator settings point to
+  the same RetroArch-owned setup.
 
 ## 7e3. Lutris install-script integration (directed 2026-08-30, scoped and built 2026-09-25)
 
