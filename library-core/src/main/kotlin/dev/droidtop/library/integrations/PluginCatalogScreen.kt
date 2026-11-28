@@ -711,7 +711,7 @@ object PluginCatalogScreen {
                     PluginCatalog.OriginState.Offered -> ""
                 },
             )
-            else -> ActionItem(id = id, title = "Not offered", value = "No stable release yet")
+            else -> TextBlockItem(id = id, text = "No release is available on this channel yet.")
         }
     }
 }

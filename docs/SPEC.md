@@ -28385,6 +28385,8 @@ what the index says is display data, never a trust decision.
   droidtop"; owner, 2026-11-12, mytop-project/tracker#932: "include incompatible
   modules, add a red 'Incompatible with your version : (reason)' tag"); it has
   no Install, and Install all and Update all leave it out. Above the rows, when there is something to do,
+  A plugin without a release on the selected channel shows a status paragraph
+  in place of its install action (mytop-project/tracker#541).
   **Install all** (every plugin the catalog offers that is not installed:
   an origin it offers, a newest stable release it is consistent about;
   `PluginCatalog.installable`) and **Update all** (every installed plugin
