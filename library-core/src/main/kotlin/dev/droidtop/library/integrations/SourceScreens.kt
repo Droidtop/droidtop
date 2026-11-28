@@ -111,12 +111,17 @@ object SourceScreens {
                 // A plain sentence first; what the source actually reported (a platform exception text, a
                 // stack line) is for its developer and sits one step behind "Technical details".
                 val headline = dev.droidtop.pluginhost.PluginFailureWords.of(null, source.label).title
-                add(ActionItem("source_failure_${source.id}", headline, subtitle = "It did not answer. Try again in a moment."))
+                val reply = error as? SourceReplyFailure
+                val reason = SourceFailures.forCode(reply?.code, error.message)
+                add(ActionItem("source_failure_${source.id}", headline, subtitle = reason))
                 val technical = SourceFailures.details(
                     call = "library.sources search",
-                    headline = headline,
-                    exception = error.javaClass.simpleName,
+                    headline = reason,
+                    plugin = "${source.record.manifest.id} ${source.record.manifest.version}",
+                    code = reply?.code,
+                    exception = if (reply == null) error.javaClass.simpleName else null,
                     said = error.message,
+                    detail = reply?.detail,
                 )
                 // Always shown, not only with the Developer menu (mytop-project/tracker#883 §3.7: Info always).
                 add(
