@@ -60,7 +60,9 @@
     <string name="pair_computer_pair_a">Pair a %1$s</string>
     <string name="pair_computer_getting_a_code">Getting a code…</string>
     <string name="pair_computer_keep_this_screen_open_until">Keep this open until the other handheld is paired. Same network</string>
-    <string name="pair_computer_on_the_computer_open_droidtop">In droidtop-agent, choose Pair a handheld and type:</string>
+    <string name="pair_computer_on_the_computer_open_droidtop">On the computer, open Devices in Pythia or Pair a handheld in droidtop-agent, then enter this code.</string>
+    <string name="pair_computer_show_handheld_instructions">On the other Droidtop device, open Settings → Accounts and sources → Computers and handhelds → Pair a handheld. Enter the address and code shown here.</string>
+    <string name="pair_computer_use_handheld_instructions">Open Pair a handheld on the other Droidtop device and enter the address and code it shows.</string>
     <string name="pair_computer_reverse_instructions">In Pythia, open Devices and select Show a code for a handheld. In droidtop-agent, open Pair a handheld and select Show a code. Enter the address and code from your computer below.</string>
     <string name="pair_computer_show_qr">Show QR code</string>
     <string name="pair_computer_hide_qr">Hide QR code</string>

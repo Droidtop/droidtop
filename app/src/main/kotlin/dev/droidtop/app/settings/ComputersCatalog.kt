@@ -32,7 +32,7 @@ import java.util.Date
 import kotlinx.coroutines.launch
 
 /**
- * Settings > Accounts and sources > Computers (docs/SPEC.md 7o): the person's
+ * Settings > Accounts and sources > Computers and handhelds (docs/SPEC.md 7o): the person's
  * computers running droidtop-agent. Pair one, see what the last sync with it
  * did, sync the library now, see the games and apps it has, prefer its saves,
  * or forget it. Saves sync by
@@ -41,20 +41,21 @@ import kotlinx.coroutines.launch
  */
 object ComputersCatalog {
     const val SCREEN_ID = "computers"
+    private const val TITLE = "Computers and handhelds"
 
     /** How long "Sync now" waits for the library's first scan before it gives up. */
     private const val WAIT_FOR_LIBRARY_MS = 60_000L
 
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
-        title = "Computers",
+        title = TITLE,
         groups = { context -> groups(context) },
     )
 
-    /** The row that opens this screen, with how many computers are paired ([paired] is read off the main thread by the caller). */
+    /** The row that opens this screen, with the total number of paired devices. */
     fun linkRow(paired: Int) = NestedScreenItem(
         id = "accounts_computers_link",
-        title = "Computers",
+        title = TITLE,
         registryId = SCREEN_ID,
         valueLabel = { if (paired == 0) "None" else "$paired paired" },
         icon = CatalogIcon.DESKTOP,
@@ -75,7 +76,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_pair_one",
                                 title = "Pair a computer",
-                                subtitle = "Shows a code",
+                                subtitle = "A computer running Pythia or droidtop-agent",
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
@@ -83,7 +84,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_pair_handheld",
                                 title = "Pair a handheld",
-                                subtitle = "Another handheld with droidtop",
+                                subtitle = "Another device running Droidtop",
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx, handheld = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
