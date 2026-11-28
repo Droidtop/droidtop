@@ -543,35 +543,40 @@ object PluginCatalog {
         }
     }
 
+    data class BulkInstallResult(val summary: String, val installedIds: List<String> = emptyList())
+
     /**
      * "Install all" for one catalog: a fresh fetch of it, then the same [install] path for each plugin it offers
      * that is not installed. A plugin still lands waiting for the person's approval, as a single install does.
      * The return is the summary line.
      */
-    suspend fun installAll(context: Context, source: PluginCatalogSource, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
+    suspend fun installAll(context: Context, source: PluginCatalogSource, onStatus: (String) -> Unit): BulkInstallResult = withContext(Dispatchers.IO) {
         onStatus("Loading ${source.name}...")
         val (fresh, skipped) = freshListings(context, source)
         val listing = fresh.firstOrNull()
-            ?: return@withContext if (skipped.isEmpty()) "Nothing is published in ${source.name} yet." else "Couldn't load ${source.name}: ${skipped.joinToString("; ")}."
+            ?: return@withContext BulkInstallResult(
+                if (skipped.isEmpty()) "Nothing is published in ${source.name} yet." else "Couldn't load ${source.name}: ${skipped.joinToString("; ")}."
+            )
         val todo = installable(listing.source, listing.index, PluginStore.installed(context), userKeys(context))
-        if (todo.isEmpty()) return@withContext "All installed"
+        if (todo.isEmpty()) return@withContext BulkInstallResult("All installed")
         val failures = mutableListOf<String>()
+        val installedIds = mutableListOf<String>()
         todo.forEachIndexed { i, (plugin, release) ->
             onStatus("Installing ${i + 1}/${todo.size}")
-            val outcome = installOutcome(context, plugin, release) { status -> onStatus("${plugin.label}: $status") }
-            if (!outcome.installed) failures.add("${plugin.label}: ${outcome.line}")
+            val outcome = installOutcome(context, plugin, release) { status -> onStatus("${i + 1}/${todo.size} · $status") }
+            if (outcome.installed) installedIds.add(plugin.id) else failures.add("${plugin.label}: ${outcome.line}")
         }
-        val done = todo.size - failures.size
-        val names = todo.map { it.first.label }.filter { label -> failures.none { it.startsWith("$label:") } }
-        buildString {
+        val done = installedIds.size
+        val summary = buildString {
             if (done > 0) {
-                append("Installed $done. Approve them in Plugins")
+                append(if (done == 1) "Installed 1 plugin. Approve it in Plugins." else "Installed $done plugins. Approve them in Plugins.")
             }
             if (failures.isNotEmpty()) {
                 if (done > 0) append(' ')
                 append("Not installed: ${failures.joinToString("; ")}.")
             }
         }
+        BulkInstallResult(summary, installedIds.toList())
     }
 
     /** Fetches [source]'s index fresh and replaces the cached copy only after it parsed and, for an added catalog, passed [checkAdded] (the platform databases' own validate-before-replace contract). */

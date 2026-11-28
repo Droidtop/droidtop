@@ -15,10 +15,14 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
+import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.shared.trust.Sha256
@@ -71,7 +75,7 @@ object PluginCatalogScreen {
      * What the last Install all or Update all of a catalog did (mytop-project/tracker#517), by catalog id: its row goes once
      * nothing is left to do, so the result is a notice in its place, where the cursor already is, until dismissed.
      */
-    private val lastBulk = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val lastBulk = java.util.concurrent.ConcurrentHashMap<String, PluginCatalog.BulkInstallResult>()
 
     /**
      * Whether [plugin], listed under [origin], answers a search: every word of [query] is somewhere in its name, id,
@@ -362,6 +366,7 @@ object PluginCatalogScreen {
         needsNetwork = true,
         subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) null else "Unofficial",
         groups = { context -> catalogGroups(context, sourceId) },
+        live = PluginJobsCenter.entries(),
     )
 
     private suspend fun catalogGroups(context: Context, sourceId: String): List<CatalogGroup> = withContext(Dispatchers.IO) {
@@ -392,10 +397,26 @@ object PluginCatalogScreen {
                             title = "Install all",
                             value = toInstall.toString(),
                             run = { ctx, onStatus ->
-                                PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus).also { lastBulk[sourceId] = it }
+                                PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus)
+                                    .also { lastBulk[sourceId] = it }.summary
                             },
                         ),
                     )
+                } else {
+                    val pending = lastBulk[sourceId]?.installedIds.orEmpty().asSequence()
+                        .mapNotNull { installed[it] }
+                        .firstOrNull { it.trust == PluginTrustState.PENDING }
+                    val approval = pending?.let { SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, it.manifest.id) }
+                    if (approval != null) {
+                        add(
+                            NestedScreenItem(
+                                id = "plugins_catalog_install_all_$sourceId",
+                                title = "Review plugin approval",
+                                subtitle = approval.title,
+                                inline = approval,
+                            ),
+                        )
+                    }
                 }
                 if (toUpdate > 0) {
                     add(
@@ -404,12 +425,13 @@ object PluginCatalogScreen {
                             title = "Update all",
                             value = toUpdate.toString(),
                             run = { ctx, onStatus ->
-                                PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current).also { lastBulk[sourceId] = it }
+                                PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current)
+                                    .also { lastBulk[sourceId] = PluginCatalog.BulkInstallResult(it) }
                             },
                         ),
                     )
                 }
-                lastBulk[sourceId]?.let { said ->
+                lastBulk[sourceId]?.summary?.let { said ->
                     add(
                         NoticeItem(
                             id = "plugins_catalog_bulk_result_$sourceId",
@@ -488,10 +510,16 @@ object PluginCatalogScreen {
             if (!current.official) {
                 originDecisions(current, index, userKeys)?.let { groups += it }
             }
+            val jobs = DownloadJobs.updateJobs().filterValues { !it.done }
             val rows = index.origins.flatMap { origin ->
                 val state = PluginCatalog.originState(current, origin, userKeys)
                 val kind = kinds[sourceId] ?: ALL_KINDS
-                origin.plugins.filter { matchesQuery(it, origin.origin, query) && (kind == ALL_KINDS || it.category == kind) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it) }) }
+                origin.plugins.filter { matchesQuery(it, origin.origin, query) && (kind == ALL_KINDS || it.category == kind) }.map { plugin ->
+                    val record = installed[plugin.id]
+                    val release = PluginCatalog.latest(plugin, PluginCatalog.channelFor(current, plugin.id))
+                    val job = release?.let { jobs[UpdateTags.plugin(plugin.id, it.version)] }
+                    rowFor(current, origin, state, plugin, record, record?.let { PluginStore.iconFile(context, it) }, job)
+                }
             }
             groups += CatalogGroup(
                 id = "plugins_catalog_list",
@@ -613,6 +641,7 @@ object PluginCatalogScreen {
         installed: PluginRecord?,
         // The installed plugin's own icon; the catalog index carries none, so a plugin not installed has none yet.
         iconFile: String?,
+        job: PluginJobsCenter.Entry? = null,
     ): CatalogItem {
         val action = actionFor(source, state, plugin, installed)
         val id = "plugins_catalog_${plugin.id}"
@@ -660,7 +689,8 @@ object PluginCatalogScreen {
             title = plugin.label,
             subtitle = plugin.summary ?: plugin.description?.substringBefore(". ")?.take(120) ?: "No description",
             inline = page,
-            valueLabel = { action.value },
+            valueLabel = { job?.statusLine ?: action.value },
+            progress = job?.let { if (it.percent < 0) -1f else it.percent / 100f },
             chip = if (incompatible != null) dev.droidtop.library.settings.RowTag.INCOMPATIBLE else chipFor(source),
             iconFile = iconFile,
             // The summary is always under the name (#514), not only in Info.

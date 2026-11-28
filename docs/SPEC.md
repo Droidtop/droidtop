@@ -28395,7 +28395,10 @@ what the index says is display data, never a trust decision.
   install path once per plugin, so nothing is trusted that one press would
   not have; a new plugin still waits for the person's approval ("Approve them
   on the Plugins screen before they run"), and the summary names each one that
-  failed. They need no confirmation: the plugins listed are the ones the
+  failed. During the batch, each catalog row reports the progress of its
+  own release download. When the batch leaves no installs available, the
+  Install all row becomes a shortcut to its first plugin awaiting approval
+  (mytop-project/tracker#517). They need no confirmation: the plugins listed are the ones the
   person already chose by choosing the catalog. The same two actions are on
   every catalog's screen, official or added. Install and update are the SAME download-verify-
   install path (`PluginCatalog.install`): fetch to cache, whole-file
