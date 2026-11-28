@@ -90,7 +90,7 @@ class ConsoleGamePageTest {
         val app = LibraryEntry(id = "org.example.reader", title = "Reader", kind = LibraryEntryKind.NATIVE_ANDROID_APP)
         val details = groupRowsByTab(consolePageRows(app, systemName = null, emulator = null, now = 0, onAddSwitchContent = {}), emptyList())
             .getValue(PageTab.DETAILS)
-        assertEquals(listOf("Kind" to "Android app", "Package" to "org.example.reader"), details.map { it.title to it.value })
+        assertEquals(listOf("Kind" to "Android app", "Runs with" to "Native Android", "Package" to "org.example.reader"), details.map { it.title to it.value })
         assertEquals("Open", consolePlayState(kind = PageKind.APP, emulatorsKnown = false, emulator = null, systemName = null).verb)
     }
 

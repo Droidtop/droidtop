@@ -232,8 +232,7 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
     }
 
     override suspend fun launch(entry: LibraryEntry) {
-        val pm = context.packageManager
-        val intent = pm.getLaunchIntentForPackage(entry.id) ?: return
+        val intent = NativeAppLaunch.requireIntent(context, entry.id)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         LaunchDisplay.start(context, intent)
     }

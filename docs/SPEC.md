@@ -19549,6 +19549,18 @@ A console game's page (`EntryDetailScreen`, the same frame) has the same arrow f
 then each installed emulator (`GameEmulatorChoice.options`, the model the Quick Menu, the metadata editor and the
 companion already draw), the one Play uses marked; pressing one saves it as the game's own choice.
 
+**Native Android pages (2026-11-27 follow-up, #965).** Mobile, Desktop and Gaming use the same app page. It states
+"Runs with Native Android" beside Open and in Details, using the same package launch-intent resolution as
+`NativeAppProvider`. Availability is read off the main thread; while it is unknown the action waits, and a missing
+launch activity is shown rather than marked ready. Unknown and unavailable targets disable Open; the missing-target
+message directs the person to refresh Apps. Switching entries or refreshing resets readiness before the new check.
+A launch re-resolves the intent and reports its absence instead
+of returning success and recording an opening. There is only one supported local route for an installed Android
+package, so no ineffective PC/engine override or one-item selector is added. The existing more-than-one-way rule
+for the arrow remains. Native app computer-library keys fall back to titles; that is insufficient identity evidence
+to advertise a remote copy as another way to run this app. No remote option is inferred from those title matches.
+Alternative Android runners remain an open part of #965 until a real launch mechanism and persisted choice exist.
+
 ### Home (decided 2026-10-14, mytop-project/tracker#485 F7a; the final design's section B)
 
 What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter, no Sort By and no List options: Select does nothing there, **Y is Search**, L1/R1 step the strip, L2 (or a long press) is the focused game's Options, A opens and X plays (mytop-project/tracker#641). Top to bottom:

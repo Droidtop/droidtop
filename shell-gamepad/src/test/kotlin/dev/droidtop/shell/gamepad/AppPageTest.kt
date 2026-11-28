@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import dev.droidtop.library.InstalledAppFacts
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.NativeAppLaunch
 import dev.droidtop.library.integrations.AppCatalogs
 import dev.droidtop.shell.gamepad.pc.PageKind
 import dev.droidtop.shell.gamepad.pc.PageOptionRows
@@ -97,7 +98,8 @@ class AppPageTest {
         // The later of droidtop's own record and Android's usage record, in an app's words.
         assertEquals(listOf("Last opened" to "2 days ago"), byTab.getValue(PageTab.ACTIVITY).map { it.title to it.value })
         val details = byTab.getValue(PageTab.DETAILS)
-        assertEquals(listOf("Source", "Kind", "Package", "Installed", "Last updated", "Permissions"), details.map { it.title })
+        assertEquals(listOf("Source", "Kind", "Runs with", "Package", "Installed", "Last updated", "Permissions"), details.map { it.title })
+        assertEquals(NativeAppLaunch.RUNNER, details.first { it.title == "Runs with" }.value)
         val source = details.first { it.title == "Source" }
         assertEquals("F-Droid", source.value)
         assertEquals("org.fdroid.fdroid", source.tip)
@@ -106,6 +108,23 @@ class AppPageTest {
         assertTrue(byTab.getValue(PageTab.OVERVIEW).isEmpty())
         assertTrue(byTab.getValue(PageTab.EXTRAS).isEmpty())
         assertTrue(byTab.getValue(PageTab.THREAD).isEmpty())
+    }
+
+    @Test
+    fun nativeLaunchReadinessIsNotAnEmulatorOrAnInventedRunnerChoice() {
+        val checking = consolePlayState(PageKind.APP, false, null, null, nativeLaunch = null)
+        assertFalse(checking.ready)
+        assertFalse(checking.pressable)
+        val missing = consolePlayState(PageKind.APP, false, null, null, NativeAppLaunch.State(false, NativeAppLaunch.MISSING))
+        assertFalse(missing.ready)
+        assertFalse(missing.pressable) // Opening again cannot recover a missing target; the reason names Apps refresh.
+        assertEquals(NativeAppLaunch.MISSING, missing.detail)
+        val ready = consolePlayState(PageKind.APP, false, null, null, NativeAppLaunch.Ready)
+        assertTrue(ready.ready)
+        assertEquals("Runs with Native Android", ready.detail)
+        assertEquals("Ready to open with Native Android", pageStatuses(app, ready, NativeAppLaunch.RUNNER, null, null, null, false).single().label)
+        val details = consolePageRows(app, null, null, now, {}, nativeLaunch = NativeAppLaunch.State(false, NativeAppLaunch.MISSING))
+        assertEquals(NativeAppLaunch.MISSING, details.first { it.title == "Runs with" }.subtitle)
     }
 
     @Test

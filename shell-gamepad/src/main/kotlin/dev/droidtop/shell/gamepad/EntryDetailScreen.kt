@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -15,6 +16,7 @@ import dev.droidtop.library.GameNaming
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
+import dev.droidtop.library.NativeAppLaunch
 import dev.droidtop.library.consoles.EmulatorResolution
 import dev.droidtop.library.consoles.GameEmulatorChoice
 import dev.droidtop.library.consoles.SwitchContentHandoff
@@ -156,8 +158,15 @@ internal fun EntryDetailScreen(
     val emulators = rememberSystemEmulators(entry)
     val emulator = emulators?.let { EmulatorResolution.matchGameChoice(it.candidates, entry.altEmulator) ?: it.withoutGameChoice?.player }
     val systemName = emulators?.system?.displayName
-    val play = remember(kind, emulators, emulator) {
-        consolePlayState(kind = kind, emulatorsKnown = emulators != null, emulator = emulator?.name, systemName = systemName)
+    // A new entry or refresh starts unknown synchronously; produceState alone retains the old value until its effect runs.
+    val nativeLaunch = key(entry.id, isApp, appFactsToken) {
+        produceState<NativeAppLaunch.State?>(null) {
+            value = null
+            value = if (isApp) withContext(Dispatchers.IO) { NativeAppLaunch.state(context, entry.id) } else null
+        }.value
+    }
+    val play = remember(kind, emulators, emulator, nativeLaunch) {
+        consolePlayState(kind = kind, emulatorsKnown = emulators != null, emulator = emulator?.name, systemName = systemName, nativeLaunch = nativeLaunch)
     }
     // An app's version, dates, last use and update, read once on IO (an app only).
     val app = rememberAppPageFacts(entry, enabled = isApp, token = appFactsToken)
@@ -207,7 +216,7 @@ internal fun EntryDetailScreen(
             }
         }
     }
-    val rowsByTab = remember(entry, systemName, emulators, infoFacts, openWithFacts, pluginRows.facts, app, appUpdateStatus) {
+    val rowsByTab = remember(entry, systemName, emulators, infoFacts, openWithFacts, pluginRows.facts, app, appUpdateStatus, nativeLaunch) {
         val now = System.currentTimeMillis()
         val appRows = app?.let { facts ->
             appPageRows(entry, facts, now, appUpdateStatus) {
@@ -225,6 +234,7 @@ internal fun EntryDetailScreen(
                     scope.launch { Notices.flash(SwitchContentHandoff.open(context, entry), context = context) }
                 },
                 usedElsewhere = app?.lastUsed,
+                nativeLaunch = nativeLaunch,
             ) + appRows + infoFacts + openWithFacts + pluginRows.facts,
             emptyList(),
         )
@@ -233,7 +243,7 @@ internal fun EntryDetailScreen(
         pageStatuses(
             entry = entry,
             play = play,
-            runsWith = emulator?.name,
+            runsWith = if (isApp) NativeAppLaunch.RUNNER else emulator?.name,
             cloudSaves = null,
             saves = savesInfo?.value,
             achievements = achievementsInfo?.value,
@@ -441,8 +451,19 @@ internal fun EntryDetailScreen(
  * are known ([emulatorsKnown]) and none is installed. Still pressable then: the launch says what is missing and how
  * to get it. Pure.
  */
-internal fun consolePlayState(kind: PageKind, emulatorsKnown: Boolean, emulator: String?, systemName: String?): PcPlayState = when {
-    kind == PageKind.APP -> PcPlayState(verb = kind.primary, detail = "", pressable = true, ready = true)
+internal fun consolePlayState(
+    kind: PageKind,
+    emulatorsKnown: Boolean,
+    emulator: String?,
+    systemName: String?,
+    nativeLaunch: NativeAppLaunch.State? = NativeAppLaunch.Ready,
+): PcPlayState = when {
+    kind == PageKind.APP -> PcPlayState(
+        verb = kind.primary,
+        detail = nativeLaunch?.let { if (it.available) "Runs with ${NativeAppLaunch.RUNNER}" else it.reason.orEmpty() } ?: "Checking Android launch…",
+        pressable = nativeLaunch?.available == true,
+        ready = nativeLaunch?.available == true,
+    )
     emulator != null -> PcPlayState(verb = kind.primary, detail = "Runs with $emulator", pressable = true, ready = true)
     emulatorsKnown -> PcPlayState(
         verb = kind.primary,
@@ -467,6 +488,7 @@ internal fun consolePageRows(
     now: Long,
     onAddSwitchContent: () -> Unit,
     usedElsewhere: Long? = null,
+    nativeLaunch: NativeAppLaunch.State? = NativeAppLaunch.Ready,
 ): List<PageFact> = buildList {
     if (!entry.hideMetadata) {
         entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it, tab = PageTab.OVERVIEW)) }
@@ -493,6 +515,9 @@ internal fun consolePageRows(
     }
     add(PageFact("Kind", entry.kind.itemName(), tab = PageTab.DETAILS))
     if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
+        add(PageFact("Runs with", NativeAppLaunch.RUNNER, subtitle = nativeLaunch?.let {
+            if (it.available) "Opens this app directly on Android" else it.reason
+        } ?: "Checking Android launch…", tab = PageTab.DETAILS))
         add(PageFact("Package", entry.id, tab = PageTab.DETAILS))
     } else {
         (systemName ?: entry.systemId)?.let { add(PageFact("System", it, tab = PageTab.DETAILS)) }
