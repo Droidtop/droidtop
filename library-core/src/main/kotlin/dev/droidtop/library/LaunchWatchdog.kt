@@ -392,11 +392,9 @@ object LaunchWatchdog {
     }
 
     /**
-     * The alert's "Get the core" for a stuck RetroArch launch ([LaunchAlert.retroArchCore]): closes the
-     * stuck RetroArch by the one close path, then opens RetroArch through [RetroArchCores.ensure], which
-     * installs it without opening RetroArch where the root helper can place it, and otherwise opens
-     * RetroArch for its Core Downloader (RetroArch has no command that installs a core). Returns the
-     * line to show; null when there is nothing to say.
+     * The alert's "Open RetroArch" for a stuck RetroArch launch ([LaunchAlert.retroArchCore]): closes the
+     * stuck RetroArch through the task manager, then opens it for its Core Downloader if the core
+     * still needs setup. Returns the follow-up message when the alert has a core to check.
      */
     suspend fun getCore(context: Context, alert: LaunchAlert): String? {
         val need = alert.retroArchCore ?: return null

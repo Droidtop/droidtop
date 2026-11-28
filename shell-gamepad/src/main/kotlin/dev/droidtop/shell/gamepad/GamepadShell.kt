@@ -1188,14 +1188,15 @@ internal fun GamepadShellBody(
                         launchProblems.error = null
                     }
                 }, launchProblems.missingCore?.let { problem ->
-                    // The launch watchdog's Get the core, here before anything started: RetroArch's Core
-                    // Downloader, or droidtop placing it once the person confirms on the emulator screen.
+                    // Open RetroArch for core setup after a launch stopped before starting.
                     LaunchFailureAction("Open RetroArch") {
                         launchProblems.missingCore = null
                         launchProblems.error = null
                         scope.launch {
                             when (val outcome = dev.droidtop.library.consoles.RetroArchCores.ensure(context, problem.need, asked = true)) {
-                                dev.droidtop.library.consoles.RetroArchCores.Outcome.Ready -> Unit
+                                dev.droidtop.library.consoles.RetroArchCores.Outcome.Ready -> {
+                                    launchProblems.error = "${problem.need.core} is installed. Start the game again."
+                                }
                                 is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchProblems.error = outcome.line
                                 is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchProblems.error = outcome.line
                             }

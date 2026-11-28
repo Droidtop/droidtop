@@ -173,8 +173,11 @@ object RetroArchCores {
         if (needs.isEmpty()) return "No RetroArch cores need setup"
         val target = needs.first().packageName
         val cores = needs.filter { it.packageName == target }.map { it.core }.joinToString(", ")
-        return if (openRetroArch(context, target)) "Use RetroArch's Core Downloader: $cores"
-        else "Couldn’t open RetroArch. Open it and install these cores: $cores"
+        val otherBuilds = needs.filter { it.packageName != target }.map { it.core }.distinct()
+        val remaining = if (otherBuilds.isEmpty()) "" else " Other RetroArch builds also need: ${otherBuilds.joinToString(", ")}."
+        val setup = if (openRetroArch(context, target)) "Use RetroArch's Core Downloader for $cores."
+        else "Couldn’t open RetroArch. Open it and install $cores in Core Downloader."
+        return setup + remaining
     }
 
     private fun openRetroArch(context: Context, packageName: String): Boolean {
