@@ -194,17 +194,19 @@ private fun CompanionPluginPanel(panel: PluginPanels.Panel, onBack: (() -> Unit)
     val uiMode by UiModeRefresh.mode.collectAsState()
     val settings by CompanionPrefs.settings.collectAsState()
     val game = rememberRunningTarget()
-    var reply by remember(panel.pluginId) { mutableStateOf<CatalogScreen?>(null) }
-    val screen by produceState<CatalogScreen?>(null, panel.pluginId, game?.id, mode) {
-        value = withContext(Dispatchers.IO) {
-            PluginPanels.panelScreen(
-                context.applicationContext,
-                panel,
-                PluginPanels.surfaceCompanion(mode),
-                game,
-                withMore = true,
-                onReplyScreen = { reply = it },
-            )
+    var reply by remember(panel.pluginId, game?.id, mode) { mutableStateOf<CatalogScreen?>(null) }
+    val screen by androidx.compose.runtime.key(panel.pluginId, game?.id, mode) {
+        produceState<CatalogScreen?>(null, panel) {
+            value = withContext(Dispatchers.IO) {
+                PluginPanels.panelScreen(
+                    context.applicationContext,
+                    panel,
+                    PluginPanels.surfaceCompanion(mode),
+                    game,
+                    withMore = true,
+                    onReplyScreen = { reply = it },
+                )
+            }
         }
     }
     KeepScreenOn(CompanionAbilities.KEEP_ON in panel.abilities)

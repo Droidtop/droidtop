@@ -221,7 +221,15 @@ internal fun CompanionCatalogItems(
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
                 is ChoiceItem -> CatalogChoiceRow(item, onChanged)
-                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) { nested = item.resolve() }
+                is NestedScreenItem -> CatalogRow(
+                    item.title,
+                    item.subtitle,
+                    item.valueLabel?.invoke(context),
+                    iconFile = item.iconFile,
+                    progress = item.progress,
+                    look = item.progressLook,
+                    statusMark = item.statusMark,
+                ) { nested = item.resolve() }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
                 is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
                 // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
@@ -294,22 +302,31 @@ internal fun CompanionNestedScreen(
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
         if (resumedOnce) version++ else resumedOnce = true
     }
-    val groups by produceState<List<dev.droidtop.library.settings.CatalogGroup>?>(null, screen, version) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val groups = screen.groups(context)
-                // A strip page (Updates' views) is drawn as its top and its first view, All, until the companion
-                // has the strip (mytop-project/tracker#786 S2a2): every view in a row would list each item twice.
-                val shown = if (screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP) {
-                    val top = groups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }
-                    top + groups.filterNot { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }.take(1)
-                } else {
-                    groups
+    val loaded by androidx.compose.runtime.key(screen.id) {
+        produceState<Result<List<dev.droidtop.library.settings.CatalogGroup>>?>(null, screen, version) {
+            if (value?.isFailure == true) value = null
+            value = withContext(Dispatchers.IO) {
+                try {
+                    val groups = screen.groups(context)
+                    // A strip page (Updates' views) is drawn as its top and its first view, All, until the companion
+                    // has the strip (mytop-project/tracker#786 S2a2): every view in a row would list each item twice.
+                    val shown = if (screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP) {
+                        val top = groups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }
+                        top + groups.filterNot { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }.take(1)
+                    } else {
+                        groups
+                    }
+                    Result.success(shown)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    android.util.Log.w("CompanionCatalog", "Could not load catalog screen ${screen.id}", failure)
+                    Result.failure(failure)
                 }
-                shown
-            }.getOrDefault(emptyList())
+            }
         }
     }
+    val groups = loaded?.getOrNull()
     val items = groups?.flatMap { it.items }
     val headings = remember(groups) { companionHeadings(groups.orEmpty()) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -328,7 +345,17 @@ internal fun CompanionNestedScreen(
         lead?.let { CompanionNote(it) }
         val list = items
         CompositionLocalProvider(LocalOneLineSubtitles provides screen.panel) {
-            if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks, headings = headings)
+            when {
+                loaded?.isFailure == true -> {
+                    CompanionNote("Couldn’t load this page.")
+                    CompanionPill("Try again", onClick = { version++ })
+                }
+                list == null -> CompanionNote("Reading…")
+                list.isEmpty() -> CompanionNote("Nothing to show here yet.")
+                else -> androidx.compose.runtime.key(screen.id) {
+                    CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks, headings = headings)
+                }
+            }
         }
     }
 }
