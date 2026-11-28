@@ -30201,6 +30201,7 @@ without its runtime said "Running". Decisions:
   system), and a "not ready" note is shown only for a source that would have served. An entry with no
   `systems` serves everything, as before. When sources exist but none serves a system, that system's search says so
   ("No source gets <system> games") with the way to Plugins; it is never blank.
+- **Source readiness.** The Get games row in Game sources shows how many installed download sources are ready and how many are unavailable. The shared search shows each unavailable source and the action to take (mytop-project/tracker#540).
 - **There is no Get games sheet: sources answer in the one search (owner, 2026-10-16, mytop-project/tracker#218: "The
   Get Games sheet shouldn't really be a sheet. Get Games results should be injected into the search by fetcher
   plugins").** Getting a game is searching for it. Every source plugin (`library.sources`, the "fetcher" plugins)

@@ -370,6 +370,13 @@ internal object StoresCatalog {
      * source installed the search itself says so and leads to Plugins. Then Add a game. Off the main thread.
      */
     suspend fun getGamesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val ready = dev.droidtop.library.integrations.AcquireContentSources.availablePlugins(context).size
+        val unavailable = dev.droidtop.library.integrations.AcquireContentSources.unavailablePlugins(context).size
+        val sourceStatus = when {
+            ready + unavailable == 0 -> "Find and add download sources"
+            unavailable == 0 -> if (ready == 1) "1 source ready" else "$ready sources ready"
+            else -> "$ready ready · $unavailable unavailable"
+        }
         listOf(
             CatalogGroup(
                 id = "stores_sources_group",
@@ -378,6 +385,7 @@ internal object StoresCatalog {
                     ActionItem(
                         id = GetGamesEntry.SEARCH_ROW_ID,
                         title = GetGamesEntry.LABEL,
+                        subtitle = sourceStatus,
                         icon = CatalogIcon.SEARCH,
                         run = { ctx -> ctx.startActivity(dev.droidtop.app.LauncherSearchActivity.getGamesIntent(ctx)) },
                     ),
