@@ -6575,7 +6575,9 @@ rig check in the commit message.
     Shift also offers a named Caps-lock action, so accessibility users need not meet the 400 ms double-press window.
     Virtual accessibility focus follows the selected key without taking real keyboard focus from the editor.
     Action-based node identities survive layout changes; removed keys lose focus and cannot activate their former
-    position's new key. Explore-by-touch uses AndroidX's standard helper. This does not change key geometry or claim
+    position's new key. If the slab already owned accessibility focus, it follows the model's newly selected key;
+    otherwise it does not take accessibility focus from the editor. Explore-by-touch uses AndroidX's standard helper.
+    This does not change key geometry or claim
     TalkBack/device validation; the legacy IME grid's separate accessibility remains outside this bounded batch.
   - Drawn by `SlabView` (`:input-keyboard`): rows of 38 dp (Large keys 48 dp) with 6 dp gaps, so 226 dp (222 dp
     Large); keys on the theme's card colour over its overlay surface; the focused key scaled 1.06 on the focused fill

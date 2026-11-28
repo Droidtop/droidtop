@@ -106,7 +106,9 @@ class SlabAccessibilityTest {
         assertTrue(activate(slab, Slab.Action.Symbols))
         assertEquals(Slab.Layer.SYMBOLS, slab.state.layer)
         assertFalse(activate(slab, Slab.Action.Char('q')))
-        assertNull(provider.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY))
+        val focused = provider.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        assertNotNull(focused)
+        assertEquals(node(slab, checkNotNull(slab.state.focused).action).text.toString(), focused?.text.toString())
         assertTrue(activate(slab, Slab.Action.Char('1')))
         assertEquals(listOf(Slab.Output.Type("1")), outputs)
     }
