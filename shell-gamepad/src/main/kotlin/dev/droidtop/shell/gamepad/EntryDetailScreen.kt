@@ -408,7 +408,8 @@ internal fun EntryDetailScreen(
                 },
             ) + if (isApp) appOptionRows(close) else emptyList()
         },
-        onPrimary = onLaunch,
+        // The frame's pad A/X path also invokes this callback; a disabled touch chip alone is not a launch gate.
+        onPrimary = { if (play.pressable) onLaunch() },
         onToggleFavorite = {
             scope.launch {
                 // Null is a kind with no favourite of its own: no sound, nothing changes.
