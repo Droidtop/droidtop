@@ -21,6 +21,17 @@ class SettingsSearchRankTest {
     )
 
     @Test
+    fun `action aliases match at word boundaries below direct titles`() {
+        val rows = listOf(
+            row("pair", "Pair a handheld").copy(aliases = listOf("Pair another Droidtop")),
+            row("direct", "Another Droidtop"),
+            row("substring", "Unrelated").copy(aliases = listOf("Pair Todroidtop")),
+        )
+        assertEquals(listOf("direct", "pair"), SettingsSearchIndex.search(rows, "another dro").map { it.itemId })
+        assertEquals(listOf("direct", "pair"), SettingsSearchIndex.search(rows, "droidtop").map { it.itemId })
+    }
+
+    @Test
     fun `a title that starts with the text leads, then a title word, then the text inside a title`() {
         val ids = SettingsSearchIndex.search(index, "them").map { it.itemId }
 

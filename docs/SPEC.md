@@ -21453,7 +21453,10 @@ running on the console and asked for the visual pass on top of it. Decided and b
   its equivalent of the shell's hint row: the shell draws one because its dark chrome has no
   toolbar at all, and this surface already has a real, always-correct one.
 - **Search across settings, on the settings home, by pad and by touch.** `SettingsSearchIndex`
-  (`:runtime-common`) builds a flat index ONCE per search session (`build`, suspend, IO-bound —
+  (`:runtime-common`) accepts alternative phrases declared by action rows.
+  Direct title matches lead. Computer and handheld pairing declare their
+  own alternatives so "pair PC" and "pair another Droidtop" reach the
+  corresponding action. It builds a flat index once per search session (`build`, suspend, IO-bound —
   roughly the cost of opening every settings screen once) by walking the root's own
   groups (depth 0) and, for a `NestedScreenItem` found there, one level into whatever
   `CatalogScreen` it opens (depth 1) — never further, and never into a screen a catalog builds

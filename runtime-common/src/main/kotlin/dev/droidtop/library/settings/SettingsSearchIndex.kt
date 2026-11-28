@@ -18,6 +18,7 @@ data class SettingsSearchResult(
      * (a plugin's page found by search opened under Modes, the category on show, mytop-project/tracker#954 item 15).
      */
     val trail: List<Pair<String, CatalogScreen>> = emptyList(),
+    val aliases: List<String> = emptyList(),
 )
 
 /**
@@ -86,6 +87,7 @@ object SettingsSearchIndex {
                         itemSubtitle = item.subtitle,
                         icon = item.icon,
                         trail = trail,
+                        aliases = (item as? ActionItem)?.searchAliases.orEmpty(),
                     )
                     val page = if ((depth <= 1 || screen.indexesItsPages) && item is NestedScreenItem) item.resolve() else null
                     rows += result to page
@@ -110,7 +112,7 @@ object SettingsSearchIndex {
     /**
      * Pure, in-memory: safe to call on every keystroke. Ranked as Android Settings ranks
      * (mytop-project/tracker#505): a title that starts with the text, then a title with a word that does,
-     * then the text inside a title, then the screen's own name, and last a row whose description has
+     * then the text inside a title, then a named alias, then the screen's own name, and last a row whose description has
      * the text as a whole word (a description is prose, so "them" inside "...share them with..." is a
      * weak hit, and a part of a longer word is no hit). Rows of one rank keep the tree's order.
      */
@@ -129,8 +131,9 @@ object SettingsSearchIndex {
             title.startsWith(q, ignoreCase = true) -> 0
             startsAWord(title, q) -> 1
             title.contains(q, ignoreCase = true) -> 2
-            result.screenTitle.contains(q, ignoreCase = true) -> 3
-            result.itemSubtitle?.let { hasWholeWord(it, q) } == true -> 4
+            result.aliases.any { startsAWord(it, q) } -> 3
+            result.screenTitle.contains(q, ignoreCase = true) -> 4
+            result.itemSubtitle?.let { hasWholeWord(it, q) } == true -> 5
             else -> null
         }
     }
