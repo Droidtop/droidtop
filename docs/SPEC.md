@@ -6569,6 +6569,14 @@ rig check in the commit message.
   6224222271), so there is nothing to match, and the open "compare with a Deck" note is closed rather than kept
   as a pending change (mytop-project/tracker#772, 2026-10-29). A rig report that a Deck differs is a new issue. There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
   layer follows the Deck API's email mode.
+  - Accessibility decision (coordinator, 2026-11-27; owner: "let's go through all the user-facing surfaces to see if
+    they're usable"): every drawn key is a virtual button with its current unshortened label and actual key
+    bounds. Actions use `Slab.press` and the same output route as the pad; modifiers expose their latched state.
+    Shift also offers a named Caps-lock action, so accessibility users need not meet the 400 ms double-press window.
+    Virtual accessibility focus follows the selected key without taking real keyboard focus from the editor.
+    Action-based node identities survive layout changes; removed keys lose focus and cannot activate their former
+    position's new key. Explore-by-touch uses AndroidX's standard helper. This does not change key geometry or claim
+    TalkBack/device validation; the legacy IME grid's separate accessibility remains outside this bounded batch.
   - Drawn by `SlabView` (`:input-keyboard`): rows of 38 dp (Large keys 48 dp) with 6 dp gaps, so 226 dp (222 dp
     Large); keys on the theme's card colour over its overlay surface; the focused key scaled 1.06 on the focused fill
     with a 3 dp accent ring; labels 18 sp for a character and 15 sp for a named key, both capped at 60% of the row;

@@ -69,6 +69,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.customview)
     // Inline autofill suggestions in the keyboard (Android 11+, mytop-project/tracker#342).
     implementation(libs.androidx.autofill)
     implementation(libs.androidx.core.ktx)

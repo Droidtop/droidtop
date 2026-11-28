@@ -738,6 +738,14 @@
     <string name="slab_search">Search</string>
     <string name="slab_save">Save</string>
     <string name="slab_enter">Enter</string>
+    <string name="slab_move_left">Move left</string>
+    <string name="slab_move_right">Move right</string>
+    <string name="slab_move_up">Move up</string>
+    <string name="slab_move_down">Move down</string>
+    <string name="slab_letters">Letters</string>
+    <string name="slab_symbols">Numbers and symbols</string>
+    <string name="slab_shift_once">Next character</string>
+    <string name="slab_toggle_caps">Toggle Caps lock</string>
     <string name="summary_dictionaries">Words for suggestions and corrections, one per language, added from a .combined or .gz wordlist file</string>
     <string name="dictionary_add_from_file">Add from a file…</string>
     <string name="dictionary_converting">Converting the wordlist. This takes a moment</string>

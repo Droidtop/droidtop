@@ -5,12 +5,19 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.SystemClock
+import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.customview.widget.ExploreByTouchHelper
 import kotlin.math.min
 
 /**
@@ -66,9 +73,14 @@ class SlabView(
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3 * density }
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val cap = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT; typeface = Typeface.DEFAULT_BOLD }
+    private val accessibleKeys = KeyAccessibility()
 
     init {
+        // ExploreByTouchHelper makes its host focusable by default. A text-entry slab must
+        // retain the editor's real focus; only its virtual accessibility focus may move.
         isFocusable = false
+        ViewCompat.setAccessibilityDelegate(this, accessibleKeys)
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         setBackgroundColor(colors.ground)
         contentDescription = context.getString(R.string.slab_description)
     }
@@ -110,6 +122,7 @@ class SlabView(
         val row = state.row.coerceIn(0, state.keys.lastIndex)
         state = state.copy(row = row, col = state.col.coerceIn(0, state.keys[row].lastIndex))
         invalidate()
+        accessibleKeys.changed()
     }
 
     /** The most rows any layer has at [large] with this state's extras setting. */
@@ -204,6 +217,7 @@ class SlabView(
         if (pressed != null) flash(pressed)
         if (layerChanged) requestLayout()
         invalidate()
+        accessibleKeys.changed()
         next.second?.let(onOutput)
     }
 
@@ -308,6 +322,7 @@ class SlabView(
         onOutput(Slab.Output.Up(held))
         state = Slab.released(state)
         invalidate()
+        accessibleKeys.changed()
     }
 
     override fun onDetachedFromWindow() {
@@ -322,7 +337,110 @@ class SlabView(
         return hit
     }
 
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibleKeys.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    /** Action identities survive layer/layout changes; a stale letter can never activate a different key. */
+    internal fun accessibleId(action: Slab.Action): Int = when (action) {
+        is Slab.Action.Char -> 1024 + action.lower.code
+        is Slab.Action.Function -> 512 + action.n
+        else -> namedActions.indexOf(action).also { check(it >= 0) { "Key action has no accessibility identity" } } + 1
+    }
+
+    private fun accessibleKey(id: Int): Triple<Int, Int, Slab.Key>? {
+        state.keys.forEachIndexed { row, keys -> keys.forEachIndexed { col, key ->
+            if (accessibleId(key.action) == id) return Triple(row, col, key)
+        } }
+        return null
+    }
+
+    private fun accessibleLabel(key: Slab.Key): String = when (key.action) {
+        Slab.Action.CaretLeft -> context.getString(R.string.slab_move_left)
+        Slab.Action.CaretRight -> context.getString(R.string.slab_move_right)
+        Slab.Action.ArrowUp -> context.getString(R.string.slab_move_up)
+        Slab.Action.ArrowDown -> context.getString(R.string.slab_move_down)
+        Slab.Action.Letters -> context.getString(R.string.slab_letters)
+        Slab.Action.Symbols -> context.getString(R.string.slab_symbols)
+        else -> state.label(key, enter, words::getValue)
+    }
+
+    private inner class KeyAccessibility : ExploreByTouchHelper(this@SlabView) {
+        override fun getVirtualViewAt(x: Float, y: Float): Int =
+            hitAt(x, y)?.third?.action?.let(::accessibleId) ?: INVALID_ID
+
+        override fun getVisibleVirtualViews(ids: MutableList<Int>) {
+            forEachKey { _, _, key, _ -> ids += accessibleId(key.action) }
+        }
+
+        override fun onPopulateNodeForVirtualView(id: Int, node: AccessibilityNodeInfoCompat) {
+            val key = accessibleKey(id)?.third
+            node.text = key?.let(::accessibleLabel) ?: context.getString(R.string.slab_description)
+            // No ACTION_FOCUS: accessibility exploration must not take focus from the destination field.
+            node.isFocusable = false
+            node.isEnabled = isEnabled && key != null
+            node.isClickable = key != null
+            node.className = "android.widget.Button"
+            val bounds = Rect()
+            forEachKey { _, _, candidate, rect -> if (accessibleId(candidate.action) == id) rect.roundOut(bounds) }
+            node.setBoundsInParent(bounds)
+            if (key == null) return
+            node.addAction(AccessibilityNodeInfoCompat.ACTION_CLICK)
+            if (key.action in modifierActions) {
+                node.className = "android.widget.ToggleButton"
+                node.isCheckable = true
+                node.isChecked = state.latched(key)
+                if (key.action == Slab.Action.Shift) {
+                    node.stateDescription = when (state.shift) {
+                        Slab.ShiftState.ONCE -> context.getString(R.string.slab_shift_once)
+                        Slab.ShiftState.CAPS -> words.getValue(Slab.Word.CAPS)
+                        Slab.ShiftState.OFF -> null
+                    }
+                    node.isLongClickable = true
+                    node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat(
+                        AccessibilityNodeInfoCompat.ACTION_LONG_CLICK, context.getString(R.string.slab_toggle_caps)))
+                }
+            }
+        }
+
+        override fun onPerformActionForVirtualView(id: Int, action: Int, arguments: Bundle?): Boolean {
+            val (row, col, key) = accessibleKey(id) ?: return false
+            if (!isEnabled || (action != AccessibilityNodeInfoCompat.ACTION_CLICK &&
+                    !(action == AccessibilityNodeInfoCompat.ACTION_LONG_CLICK && key.action == Slab.Action.Shift))) return false
+            holding?.let(::letGo)
+            state = state.copy(row = row, col = col)
+            // Announce the key before a layer action can remove its node.
+            sendEventForVirtualView(id, if (action == AccessibilityNodeInfoCompat.ACTION_LONG_CLICK)
+                AccessibilityEvent.TYPE_VIEW_LONG_CLICKED else AccessibilityEvent.TYPE_VIEW_CLICKED)
+            val next = if (action == AccessibilityNodeInfoCompat.ACTION_LONG_CLICK) {
+                state.copy(shift = if (state.shift == Slab.ShiftState.CAPS) Slab.ShiftState.OFF else Slab.ShiftState.CAPS,
+                    lastShiftAt = Long.MIN_VALUE / 2) to null
+            } else Slab.press(state, key.action, SystemClock.uptimeMillis())
+            apply(next, key)
+            return true
+        }
+
+        override fun onPopulateEventForVirtualView(id: Int, event: AccessibilityEvent) {
+            if (event.eventType == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED) {
+                accessibleKey(id)?.let { (row, col, _) -> state = state.copy(row = row, col = col); invalidate() }
+            }
+        }
+
+        fun changed() {
+            val focused = accessibilityFocusedVirtualViewId
+            if (focused != INVALID_ID && accessibleKey(focused) == null) {
+                getAccessibilityNodeProvider(this@SlabView)?.performAction(focused,
+                    AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null)
+            }
+            invalidateRoot()
+        }
+    }
+
     companion object {
+        private val namedActions = listOf(Slab.Action.Backspace, Slab.Action.Space, Slab.Action.Enter,
+            Slab.Action.Shift, Slab.Action.Symbols, Slab.Action.Letters, Slab.Action.Done, Slab.Action.Clipboard,
+            Slab.Action.SystemKeyboard, Slab.Action.CaretLeft, Slab.Action.CaretRight, Slab.Action.Tab,
+            Slab.Action.Escape, Slab.Action.Ctrl, Slab.Action.Alt, Slab.Action.Super, Slab.Action.ArrowUp, Slab.Action.ArrowDown)
+        private val modifierActions = setOf(Slab.Action.Shift, Slab.Action.Ctrl, Slab.Action.Alt, Slab.Action.Super)
         /** [word] in the person's language, from the keyboard's strings. */
         fun word(context: Context, word: Slab.Word): String = context.getString(
             when (word) {
