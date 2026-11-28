@@ -581,6 +581,34 @@ public class PointerTracker {
         }
     }
 
+    /** One semantic click, through the same output core as touch, without repeat/gesture timers. */
+    void setAccessibleKeyboard(Key[] keys, float hysteresis) {
+        setKeyboard(keys, hysteresis);
+        resetMultiTap();
+    }
+
+    boolean activateAccessibleKey(Key key, long eventTime) {
+        if (mListener == null || key == null || !java.util.Arrays.asList(mKeys).contains(key)) return false;
+        final OnKeyboardActionListener listener = mListener;
+        final Key[] before = mKeys;
+        final int code = key.codes == null || key.codes.length == 0 ? 0 : key.getPrimaryCode();
+        final int index = java.util.Arrays.asList(mKeys).indexOf(key);
+        checkMultiTap(eventTime, index);
+        if (key.codes != null) listener.onPress(code);
+        // A mode/Shift press may replace the layout. The semantic target remains the pressed
+        // modifier, never an unrelated character now occupying its old coordinates.
+        final boolean modePress = code == Keyboard.KEYCODE_SHIFT || code == Keyboard.KEYCODE_MODE_CHANGE
+                || code == LatinKeyboardView.KEYCODE_CTRL_LEFT || code == LatinKeyboardView.KEYCODE_ALT_LEFT
+                || code == LatinKeyboardView.KEYCODE_META_LEFT || code == LatinKeyboardView.KEYCODE_FN;
+        if (before != mKeys && !modePress) {
+            if (key.codes != null) listener.onRelease(code);
+            return false;
+        }
+        detectAndSendKey(key, key.x + key.width / 2, key.y + key.height / 2, eventTime);
+        mLastSentIndex = before == mKeys ? index : NOT_A_KEY;
+        return true;
+    }
+
     private void detectAndSendKey(int index, int x, int y, long eventTime) {
         detectAndSendKey(getKey(index), x, y, eventTime);
         mLastSentIndex = index;

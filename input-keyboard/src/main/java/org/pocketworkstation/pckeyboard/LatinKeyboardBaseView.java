@@ -222,6 +222,9 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     // Main keyboard
     private Keyboard mKeyboard;
     private Key[] mKeys;
+    private LegacyKeyAccessibility mAccessibleKeys;
+    private PointerTracker mAccessibleTracker;
+    private boolean mAccessibilityTouchActive;
     // TODO this attribute should be gotten from Keyboard.
     private int mKeyboardVerticalGap;
 
@@ -666,6 +669,11 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         mHasDistinctMultitouch = context.getPackageManager()
                 .hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT);
         mKeyRepeatInterval = res.getInteger(R.integer.config_key_repeat_interval);
+        mAccessibleKeys = new LegacyKeyAccessibility(this);
+        androidx.core.view.ViewCompat.setAccessibilityDelegate(this, mAccessibleKeys);
+        // Only virtual accessibility focus moves; the destination editor keeps input focus.
+        setFocusable(false);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 
     private boolean showHints7Bit() {
@@ -681,6 +689,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         for (PointerTracker tracker : mPointerTrackers) {
             tracker.setOnKeyboardActionListener(listener);
         }
+        if (mAccessibleTracker != null) mAccessibleTracker.setOnKeyboardActionListener(listener);
     }
 
     /**
@@ -710,11 +719,13 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         // Disable correctionX and correctionY, it doesn't seem to work as intended.
         // mKeys = mKeyDetector.setKeyboard(keyboard, -getPaddingLeft(),-getPaddingTop() + mVerticalCorrection);
         mKeys = mKeyDetector.setKeyboard(keyboard, 0, 0);
+        if (mAccessibleKeys != null) mAccessibleKeys.replace(mKeys);
         mPressMotion.clear();
         mKeyboardVerticalGap = (int)getResources().getDimension(R.dimen.key_bottom_gap);
         for (PointerTracker tracker : mPointerTrackers) {
             tracker.setKeyboard(mKeys, mKeyHysteresisDistance);
         }
+        if (mAccessibleTracker != null) mAccessibleTracker.setAccessibleKeyboard(mKeys, mKeyHysteresisDistance);
         mLabelScale = LatinIME.sKeyboardSettings.labelScalePref;
         // droidtop patch (mytop-project/tracker#903 H2): HKR's modern plates, or the theme's drawing (KeyPlates.colorsFor).
         mPlates = KeyPlates.colorsFor(getContext());
@@ -741,6 +752,31 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
      */
     public Keyboard getKeyboard() {
         return mKeyboard;
+    }
+
+    @Override public boolean dispatchHoverEvent(MotionEvent event) {
+        return (mAccessibleKeys != null && mAccessibleKeys.dispatchHoverEvent(event))
+                || super.dispatchHoverEvent(event);
+    }
+
+    boolean accessibleKeysAvailable() {
+        return isEnabled() && isShown() && !mMiniKeyboardVisible;
+    }
+
+    boolean activateAccessibleKey(Key key) {
+        if (!accessibleKeysAvailable() || mAccessibilityTouchActive || mKeys == null
+                || !java.util.Arrays.asList(mKeys).contains(key)) return false;
+        // Keep semantic multi-tap history independent from physical pointer 0. It uses the
+        // same detector/output core, but never enters the touch queue or starts timers.
+        if (mAccessibleTracker == null) {
+            mAccessibleTracker = new PointerTracker(-1, mHandler, mKeyDetector, this,
+                    getResources(), enableSlideKeyHack());
+            mAccessibleTracker.setAccessibleKeyboard(mKeys, mKeyHysteresisDistance);
+            mAccessibleTracker.setOnKeyboardActionListener(mKeyboardActionListener);
+        }
+        boolean sent = mAccessibleTracker.activateAccessibleKey(key, SystemClock.uptimeMillis());
+        invalidateAllKeys();
+        return sent;
     }
 
     /**
@@ -910,6 +946,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         mMedianKeysFor = null;
         // Release the buffer, if any and it will be reallocated on the next draw
         mBuffer = null;
+        if (mAccessibleKeys != null) mAccessibleKeys.changed();
     }
 
     @Override
@@ -924,8 +961,9 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         // droidtop: a glide's trail over the keys (mytop-project/tracker#341).
         if (mGlide != null) mGlide.drawTrail(canvas, getPaddingLeft(), getPaddingTop(), mGlideTrailPaint);
         // droidtop: the pad's focus ring (mytop-project/tracker#338), over the keys, only while a pad drives.
-        if (mPadFocus != null) {
-            Key k = mPadFocus;
+        Key accessibleFocus = mAccessibleKeys == null ? null : mAccessibleKeys.focusedKey();
+        if (accessibleFocus != null || mPadFocus != null) {
+            Key k = accessibleFocus != null ? accessibleFocus : mPadFocus;
             float inset = mPadRingPaint.getStrokeWidth() / 2f;
             float left = k.x + getPaddingLeft() + inset;
             float top = k.y + getPaddingTop() + inset;
@@ -1514,6 +1552,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
      * @see #invalidateKey(Key)
      */
     public void invalidateAllKeys() {
+        if (mAccessibleKeys != null) mAccessibleKeys.changed();
         mDirtyRect.union(0, 0, getWidth(), getHeight());
         mDrawPending = true;
         invalidate();
@@ -1527,6 +1566,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
      * @see #invalidateAllKeys
      */
     public void invalidateKey(Key key) {
+        if (mAccessibleKeys != null) mAccessibleKeys.changed();
         if (key == null)
             return;
         mInvalidatedKey = key;
@@ -1840,6 +1880,10 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     }
 
     public boolean onTouchEvent(MotionEvent me, boolean continuing) {
+        final int semanticAction = me.getActionMasked();
+        if (semanticAction == MotionEvent.ACTION_DOWN) mAccessibilityTouchActive = true;
+        else if (semanticAction == MotionEvent.ACTION_UP || semanticAction == MotionEvent.ACTION_CANCEL)
+            mAccessibilityTouchActive = false;
         final int action = me.getActionMasked();
         final int pointerCount = me.getPointerCount();
         final int oldPointerCount = mOldPointerCount;
@@ -2007,6 +2051,8 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     }
 
     public void closing() {
+        mAccessibilityTouchActive = false;
+        if (mAccessibleKeys != null) mAccessibleKeys.clearFocus();
         Log.i(TAG, "closing " + this);
         if (mPreviewPopup != null) {
             mPreviewLeaving = false;

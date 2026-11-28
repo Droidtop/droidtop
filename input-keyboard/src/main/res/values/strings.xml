@@ -970,4 +970,13 @@
     <string name="dictionary_refused_not_saved">Couldn\'t save the dictionary</string>
     <string name="dictionary_refused_not_opened">Couldn\'t open the file</string>
     <string name="dictionary_refused_not_read">Couldn\'t read the file: %1$s</string>
+    <string name="legacy_key_close">Close keyboard</string>
+    <string name="legacy_key_tab">Tab</string>
+    <string name="legacy_key_options">Keyboard options</string>
+    <string name="legacy_key_voice">Voice input</string>
+    <string name="legacy_key_next_language">Next language</string>
+    <string name="legacy_key_previous_language">Previous language</string>
+    <string name="legacy_key_compose">Compose</string>
+    <string name="legacy_key_unknown">Key</string>
+    <string name="legacy_key_dead_accent">Dead accent %1$s</string>
 </resources>

@@ -31,7 +31,7 @@ The old `SlabView` painted individual keys and handled their touch hits, but exp
 
 Source consumers are `ui-shared/.../TextEntry.kt:SlabKeys`, `app/.../CompanionKeyboard.kt:CompanionDockedSlab` and `app/.../SecondScreenInput.kt:slab`. These hosts do not explicitly hide the native slab's descendants. The standalone Hacker Keyboard Reborn scaffold needs its normal later source/catalog synchronization; this branch does not claim that mirror is updated.
 
-Authored Robolectric node-provider tests cover every live layout's identity uniqueness, activation/editor focus, modifiers, removed nodes, resizing and pad cursor alignment. They run only in CI; this report does not claim TalkBack or physical geometry verification. The separate `LatinKeyboardBaseView` legacy IME grid remains a plain custom View without a per-key virtual node or hover adapter in the reviewed source, so this change does not complete that grid's accessibility.
+Authored Robolectric node-provider tests cover every live layout's identity uniqueness, activation/editor focus, modifiers, removed nodes, resizing and pad cursor alignment. They run only in CI; this report does not claim TalkBack or physical geometry verification. The separate `LatinKeyboardBaseView` legacy grid now has a bounded per-key adapter and shared pointer delivery; see `legacy-ime-accessibility-static-review-2026-11-27.md`. Opening long-press popups through accessibility and physical TalkBack behavior remain unverified or unimplemented.
 
 ## Needs a rig check
 
