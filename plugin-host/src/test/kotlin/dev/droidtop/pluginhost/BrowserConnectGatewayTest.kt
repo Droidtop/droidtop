@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -69,6 +70,32 @@ class BrowserConnectGatewayTest {
                         assertEquals(BrowserConnectGateway.Failure.LIMIT, gateway.failureReason)
                     }
                 }
+            }
+        }
+    }
+
+    @Test fun completionRechecksRetainedActualAddressAfterTunnelClosure() {
+        val actual = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
+        val revoked = AtomicBoolean()
+        ServerSocket(0, 1, actual).use { origin ->
+            BrowserConnectGateway.open(5000, beforeResolve = {}, authorize = { _, addresses ->
+                assertSame(actual, addresses.single())
+                if (revoked.get()) throw SecurityException("fixture revoked")
+            }, resolve = { listOf(actual) }, connect = { socket, selected, _, timeout ->
+                socket.connect(InetSocketAddress(selected, origin.localPort), timeout)
+            }).use { gateway ->
+                Socket(gateway.endpoint.host, gateway.endpoint.port).use { client ->
+                    assertTrue(request(client, gateway.endpoint.authorization).startsWith("HTTP/1.1 200"))
+                    origin.soTimeout = 3000
+                    origin.accept().use { peer ->
+                        peer.soTimeout = 3000
+                        client.shutdownOutput()
+                        assertEquals(-1, peer.getInputStream().read())
+                    }
+                }
+                revoked.set(true)
+                assertTrue(runCatching { gateway.revalidate() }.isFailure)
+                assertEquals(BrowserConnectGateway.Failure.PERMISSION, gateway.failureReason)
             }
         }
     }

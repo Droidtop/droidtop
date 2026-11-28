@@ -165,6 +165,7 @@ internal object BrowserDocuments {
             }
             val task = try { guards.submit(Callable {
                 check(providerAllowed()) { "The browser permission changed" }
+                gateway.revalidate()
                 guard?.invoke(target, kind) ?: error("The document request ended")
                 true
             }) } catch (_: Exception) { denied.compareAndSet(null, "The browser network policy could not be checked in time"); return false }

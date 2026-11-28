@@ -51,6 +51,8 @@ internal class BrowserConnectGateway private constructor(
     private val closed = AtomicBoolean()
     private val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
+    // Keep completed connections too: returned document data may still depend on their local-network grant.
+    private val destinations = ConcurrentHashMap<String, MutableSet<InetAddress>>()
     private val lifecycle = Any()
     private val attempts = AtomicInteger()
     private val clients = AtomicInteger()
@@ -61,6 +63,14 @@ internal class BrowserConnectGateway private constructor(
     private var expiry: ScheduledFuture<*>? = null
     val endpoint: Endpoint
     val failureReason: Failure? get() = failure.get()
+
+    /** Reuse/coalescing cannot substitute a fresh public DNS answer for an earlier private socket destination. */
+    fun revalidate() {
+        live()
+        try { destinations.forEach { (origin, addresses) -> authorize(origin, addresses.toList()) } }
+        catch (error: Exception) { fail(Failure.PERMISSION); throw IOException("The browser destination permission ended") }
+        live()
+    }
 
     init {
         try {
@@ -134,6 +144,7 @@ internal class BrowserConnectGateway private constructor(
                 try {
                     live()
                     connect(candidate, address, request.port, minOf(5_000, leftMs()))
+                    destinations.computeIfAbsent(request.origin) { ConcurrentHashMap.newKeySet() }.add(address)
                     target = candidate
                     break
                 } catch (_: IOException) { sockets -= candidate; candidate.close() }
@@ -215,6 +226,7 @@ internal class BrowserConnectGateway private constructor(
         runCatching { listener.close() }
         sockets.toList().forEach { runCatching { it.close() } }
         sockets.clear()
+        destinations.clear()
         OPERATIONS.decrementAndGet()
     }
 
