@@ -72,8 +72,16 @@ internal object BrowserBodyOffers {
                 if (!answer.complete(fd)) unclaimed.getAndSet(null)?.close()
             } catch (error: Exception) { answer.completeExceptionally(error) }
         }
-        return try { (withTimeout(5_000) { answer.await() } ?: error("The browser no longer has this download")).also { unclaimed.set(null) } }
-        finally { answer.cancel(); unclaimed.getAndSet(null)?.close() }
+        return try {
+            val fd = withTimeoutOrNull(5_000) {
+                answer.await() ?: error("The browser no longer has this download")
+            } ?: error("The browser did not respond. Open the page and start the download again.")
+            unclaimed.set(null)
+            fd
+        } finally {
+            answer.cancel()
+            unclaimed.getAndSet(null)?.close()
+        }
     }
 
     suspend fun transfer(headers: Map<String, String>, destination: File, maxBytes: Long, numbers: DownloadJobs.TransferNumbers, report: (Int, String, String?) -> Unit): Boolean {
