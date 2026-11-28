@@ -27,6 +27,12 @@ import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.shared.trust.Sha256
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
 /**
@@ -75,7 +81,8 @@ object PluginCatalogScreen {
      * What the last Install all or Update all of a catalog did (mytop-project/tracker#517), by catalog id: its row goes once
      * nothing is left to do, so the result is a notice in its place, where the cursor already is, until dismissed.
      */
-    private val lastBulk = java.util.concurrent.ConcurrentHashMap<String, PluginCatalog.BulkInstallResult>()
+    private val lastBulk = MutableStateFlow<Map<String, PluginCatalog.BulkInstallResult>>(emptyMap())
+    private val installing = MutableStateFlow<Set<String>>(emptySet())
 
     /**
      * Whether [plugin], listed under [origin], answers a search: every word of [query] is somewhere in its name, id,
@@ -366,7 +373,11 @@ object PluginCatalogScreen {
         needsNetwork = true,
         subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) null else "Unofficial",
         groups = { context -> catalogGroups(context, sourceId) },
-        live = PluginJobsCenter.entries(),
+        live = PluginJobsCenter.entries().map { entries ->
+            DownloadJobs.updateJobs(entries).filter { (tag, job) -> tag.startsWith("plugin:") && !job.done }
+        }.distinctUntilChanged()
+            .combine(lastBulk.map { it[sourceId] }.distinctUntilChanged()) { _, _ -> Unit }
+            .combine(installing.map { sourceId in it }.distinctUntilChanged()) { _, _ -> Unit },
     )
 
     private suspend fun catalogGroups(context: Context, sourceId: String): List<CatalogGroup> = withContext(Dispatchers.IO) {
@@ -378,32 +389,43 @@ object PluginCatalogScreen {
                     items = listOf(ActionItem(id = "plugins_catalog_gone_row", title = "This catalog was removed")),
                 ),
             )
-        val load = PluginCatalog.currentIndex(context, source)
+        val jobs = DownloadJobs.updateJobs().filter { (tag, job) -> tag.startsWith("plugin:") && !job.done }
+        val installRunning = sourceId in installing.value
+        val load = PluginCatalog.currentIndex(context, source, refreshStale = jobs.isEmpty() && !installRunning)
         // Read again: a fetch may have recorded the catalog's signing key.
         val current = PluginCatalogSources.byId(context, sourceId) ?: source
         val installed = PluginStore.installed(context).associateBy { it.manifest.id }
         val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
         val index = load.index
         val query = searches[sourceId].orEmpty()
+        val bulkResult = lastBulk.value[sourceId]
         val top = buildList<CatalogItem> {
             if (index != null && PluginCatalog.listable(current, index)) {
                 val installedList = installed.values.toList()
                 val toInstall = PluginCatalog.installable(current, index, installedList, userKeys).size
                 val toUpdate = PluginCatalog.offersFor(installedList, listOf(PluginCatalog.Listing(current, index)), userKeys).size
-                if (toInstall > 0) {
+                if (toInstall > 0 || installRunning) {
                     add(
                         AsyncActionItem(
                             id = "plugins_catalog_install_all_$sourceId",
                             title = "Install all",
-                            value = toInstall.toString(),
+                            value = if (installRunning) "Installing…" else toInstall.toString(),
                             run = { ctx, onStatus ->
-                                PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus)
-                                    .also { lastBulk[sourceId] = it }.summary
+                                if (sourceId in installing.getAndUpdate { it + sourceId }) {
+                                    "An install batch is already running."
+                                } else {
+                                    try {
+                                        PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus)
+                                            .also { result -> lastBulk.update { it + (sourceId to result) } }.summary
+                                    } finally {
+                                        installing.update { it - sourceId }
+                                    }
+                                }
                             },
                         ),
                     )
                 } else {
-                    val pending = lastBulk[sourceId]?.installedIds.orEmpty().asSequence()
+                    val pending = bulkResult?.installedIds.orEmpty().asSequence()
                         .mapNotNull { installed[it] }
                         .firstOrNull { it.trust == PluginTrustState.PENDING }
                     val approval = pending?.let { SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, it.manifest.id) }
@@ -426,12 +448,12 @@ object PluginCatalogScreen {
                             value = toUpdate.toString(),
                             run = { ctx, onStatus ->
                                 PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current)
-                                    .also { lastBulk[sourceId] = PluginCatalog.BulkInstallResult(it) }
+                                    .also { summary -> lastBulk.update { it + (sourceId to PluginCatalog.BulkInstallResult(summary)) } }
                             },
                         ),
                     )
                 }
-                lastBulk[sourceId]?.summary?.let { said ->
+                bulkResult?.summary?.let { said ->
                     add(
                         NoticeItem(
                             id = "plugins_catalog_bulk_result_$sourceId",
@@ -439,7 +461,7 @@ object PluginCatalogScreen {
                                 tone = if (said.contains("Not installed") || said.contains("Couldn't")) NoticeTone.Caution else NoticeTone.Info,
                                 title = if (said.startsWith("Installed") || said.startsWith("Updated")) "Done" else "Finished",
                                 body = said,
-                                action = dev.droidtop.library.settings.NoticeAction("OK") { lastBulk.remove(sourceId) },
+                                action = dev.droidtop.library.settings.NoticeAction("OK") { lastBulk.update { it - sourceId } },
                             ),
                         ),
                     )
@@ -510,7 +532,6 @@ object PluginCatalogScreen {
             if (!current.official) {
                 originDecisions(current, index, userKeys)?.let { groups += it }
             }
-            val jobs = DownloadJobs.updateJobs().filterValues { !it.done }
             val rows = index.origins.flatMap { origin ->
                 val state = PluginCatalog.originState(current, origin, userKeys)
                 val kind = kinds[sourceId] ?: ALL_KINDS

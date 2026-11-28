@@ -113,11 +113,15 @@ object PluginCatalog {
         }
 
     /** What a catalog screen shows: the cache when it is recent, otherwise a fresh fetch; a failed fetch falls back to the cache and the [Load.note] says so. Never throws. */
-    suspend fun currentIndex(context: Context, source: PluginCatalogSource = PluginCatalogSources.OFFICIAL): Load = withContext(Dispatchers.IO) {
+    suspend fun currentIndex(
+        context: Context,
+        source: PluginCatalogSource = PluginCatalogSources.OFFICIAL,
+        refreshStale: Boolean = true,
+    ): Load = withContext(Dispatchers.IO) {
         val cached = lastGoodIndex(context, source)
         val stale = cached == null ||
             System.currentTimeMillis() - cacheFile(context, source).lastModified() >= REFETCH_AFTER_MS
-        if (!stale) return@withContext Load(cached, null)
+        if (!stale || (cached != null && !refreshStale)) return@withContext Load(cached, null)
         try {
             Load(fetchAndCache(context, source), null)
         } catch (failure: NotPublished) {
