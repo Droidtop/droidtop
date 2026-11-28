@@ -23808,7 +23808,7 @@ streamed by windowcast's host, which the agent embeds (Stream from
   mutual TLS, so a computer whose droidtop-agent is older than build-67
   cannot be reached until it updates; its pairing stays.
 - **Pairing a handheld** is the same screen (`PairComputerActivity` with
-  `EXTRA_HANDHELD`, Settings > Computers > Pair a handheld): one handheld
+  `EXTRA_HANDHELD`, Settings > Accounts and sources > Computers and handhelds > Pair a handheld): one handheld
   shows its address and code, the other types both under "Use a code from
   the other handheld". Handhelds share no library or saves yet; they are
   paired for the plugins that keep them in step (below). Each paired
@@ -24133,7 +24133,7 @@ the right ones is the person's call, as in "Removing an older version"
   - its other applications, as `REMOTE_STREAM` entries in Apps.
 
   Each shows only while its computer's switch ("Show this computer's games",
-  "Show this computer's apps") and the global one (Settings > Computers >
+  "Show this computer's apps") and the global one (Settings > Computers and handhelds >
   "Show computers' games" and "Show computers' apps", on by default) are on.
   The pairing-finished screen asks once, with both switches, and leaving it
   without an answer keeps them off. A game this device has too stays one
@@ -24406,7 +24406,7 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
        address kept 5 minutes, a miss asked again after a minute or the
        server's Retry-After). Addresses only; Syncthing's relays are never
        used, and every byte of a sync goes through the WireGuard tunnel.
-     - Settings > Computers > "Find computers away from home" (on by
+     - Settings > Computers and handhelds > "Find computers away from home" (on by
        default) and "Discovery server" (`default` is Syncthing's; droidtop's
        own, mytop-project/tracker#364, can be set there later).
      - The computer's screen says which way the last session went (this
@@ -24416,7 +24416,7 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
        NAT) cannot be punched; the cloud folder (3.) is the path then.
 3. Store and forward through a folder of the person's own that their own
    sync tool carries to both sides (Drive, OneDrive, Dropbox, Nextcloud,
-   Syncthing-Fork, FolderSync): Settings > Computers > "Cloud folder", picked
+   Syncthing-Fork, FolderSync): Settings > Computers and handhelds > "Cloud folder", picked
    with the system's folder picker, and the same folder named on the computer
    with `droidtop-agent share set` (`ComputerShare`).
    - It is used only when the computer does not answer: a library sync then
