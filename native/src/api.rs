@@ -47,8 +47,9 @@ pub fn call(op: &str, args: &str) -> String {
         "pair_wait" => pair_wait(&args),
         "pair_connect" => pair_connect(&args),
         "pair_cancel" => {
-            if let Some(cancel) = CANCEL.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
-                cancel.cancel();
+            let mut active = SESSION.locked();
+            if active.as_ref().is_some_and(|session| Some(session.owner.as_str()) == args["owner"].as_str()) {
+                active.take();
             }
             Ok(json!({}))
         }
@@ -166,23 +167,32 @@ struct PairSession {
     stop: Arc<AtomicBool>,
 }
 
-static SESSION: Mutex<Option<PairSession>> = Mutex::new(None);
-/// The pairing screen's cancel, shared with `pair_cancel` while `pair_wait` is blocked on the listener.
-static CANCEL: Mutex<Option<Arc<Cancel>>> = Mutex::new(None);
+struct OwnedPairSession {
+    owner: String,
+    pending: Option<PairSession>,
+    cancel: Arc<Cancel>,
+    stop: Arc<AtomicBool>,
+}
+
+impl Drop for OwnedPairSession {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+static SESSION: Mutex<Option<OwnedPairSession>> = Mutex::new(None);
 
 /// Opens the pairing listener for as long as the pairing screen is open,
 /// and answers the computer's pairing query on the LAN.
 fn pair_start(args: &Value) -> Outcome {
+    let owner =
+        args["owner"].as_str().filter(|owner| !owner.is_empty()).ok_or_else(|| Failure::Error("pairing owner is missing".into()))?;
     let key = key_of(args)?;
     let kind = kind_of(args)?;
     let name = args["name"].as_str().unwrap_or("droidtop").to_string();
-    if let Some(old) = SESSION.locked().take() {
-        old.stop.store(true, Ordering::Relaxed);
-    }
-    // A pairing screen that is still waiting is ended by opening a new one.
-    if let Some(old) = CANCEL.lock().unwrap_or_else(|e| e.into_inner()).replace(Arc::new(Cancel::new())) {
-        old.cancel();
-    }
+    let mut active = SESSION.locked();
+    active.take();
     let listener = TcpListener::bind(("0.0.0.0", 0)).map_err(|e| Failure::Error(format!("could not open a pairing port ({e})")))?;
     let port = listener.local_addr().map_err(|e| Failure::Error(e.to_string()))?.port();
     let code = pairing::new_code();
@@ -199,7 +209,12 @@ fn pair_start(args: &Value) -> Outcome {
     let at = args["address"].as_str().filter(|a| !a.is_empty()).map(|a| format!("{a}:{port}"));
     let invite = PairInvite { code: code.clone(), peer: Some(key.peer_id()), name: Some(name.clone()), at };
     let uri = invite.to_uri();
-    *SESSION.locked() = Some(PairSession { listener, code: code.clone(), key, name, kind, stop });
+    *active = Some(OwnedPairSession {
+        owner: owner.into(),
+        pending: Some(PairSession { listener, code: code.clone(), key, name, kind, stop: stop.clone() }),
+        cancel: Arc::new(Cancel::new()),
+        stop,
+    });
     Ok(json!({ "code": code, "uri": uri, "port": port }))
 }
 
@@ -207,9 +222,14 @@ fn pair_start(args: &Value) -> Outcome {
 /// the code), up to `timeout_ms`, or until cancelled.
 fn pair_wait(args: &Value) -> Outcome {
     let timeout = Duration::from_millis(args["timeout_ms"].as_u64().unwrap_or(600_000));
-    let session = SESSION.locked().take().ok_or_else(|| Failure::Error("pairing was not started".into()))?;
-    let cancel =
-        CANCEL.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or_else(|| Failure::Error("pairing was not started".into()))?;
+    let (session, cancel) = {
+        let mut active = SESSION.locked();
+        active
+            .as_mut()
+            .filter(|session| Some(session.owner.as_str()) == args["owner"].as_str())
+            .and_then(|session| Some((session.pending.take()?, session.cancel.clone())))
+            .ok_or_else(|| Failure::Error("pairing was not started".into()))?
+    };
     let result = pairing::accept_pairing(
         &session.listener,
         &session.key,
@@ -221,6 +241,10 @@ fn pair_wait(args: &Value) -> Outcome {
         |_, _| {},
     );
     session.stop.store(true, Ordering::Relaxed);
+    let mut active = SESSION.locked();
+    if active.as_ref().is_some_and(|session| Arc::ptr_eq(&session.cancel, &cancel)) {
+        active.take();
+    }
     match result {
         Ok((paired, from)) => Ok(paired_json(&paired, format!("{}:{PORT}", from.ip()))),
         Err(PairingEnded::Cancelled) => Err(Failure::Error("pairing was cancelled".into())),
@@ -1285,16 +1309,19 @@ mod tests {
         let handheld: Value = serde_json::from_str(&call("identity_new", "{}")).unwrap();
         let started: Value = serde_json::from_str(&call(
             "pair_start",
-            &json!({ "seed": handheld["seed"], "name": "Handheld", "address": "127.0.0.1" }).to_string(),
+            &json!({ "seed": handheld["seed"], "name": "Handheld", "address": "127.0.0.1", "owner": "current" }).to_string(),
         ))
         .unwrap();
+        // A previous Activity's late callbacks do not consume or cancel this invitation.
+        assert!(call("pair_wait", r#"{"owner":"previous","timeout_ms":1}"#).contains("pairing was not started"));
+        call("pair_cancel", r#"{"owner":"previous"}"#);
         let uri = started["uri"].as_str().unwrap().to_string();
         let computer = thread::spawn(move || {
             let invite = PairInvite::parse(&uri).unwrap();
             let mut s = TcpStream::connect(invite.at.unwrap()).unwrap();
             pairing::pair_client(&mut s, &DeviceKey::generate(), "PC", Kind::Computer, &invite.code).unwrap()
         });
-        let waited: Value = serde_json::from_str(&call("pair_wait", r#"{"timeout_ms": 10000}"#)).unwrap();
+        let waited: Value = serde_json::from_str(&call("pair_wait", r#"{"owner":"current","timeout_ms":10000}"#)).unwrap();
         let paired = computer.join().unwrap();
         assert_eq!(waited["name"], "PC");
         assert_eq!(waited["kind"], "computer");
@@ -1553,10 +1580,11 @@ mod tests {
         let b: Value = serde_json::from_str(&call("identity_new", "{}")).unwrap();
         let started: Value = serde_json::from_str(&call(
             "pair_start",
-            &json!({ "seed": a["seed"], "name": "Pocket A", "address": "127.0.0.1" }).to_string(),
+            &json!({ "seed": a["seed"], "name": "Pocket A", "address": "127.0.0.1", "owner": "pocket-a" }).to_string(),
         ))
         .unwrap();
-        let waiting = thread::spawn(|| -> Value { serde_json::from_str(&call("pair_wait", r#"{"timeout_ms": 10000}"#)).unwrap() });
+        let waiting =
+            thread::spawn(|| -> Value { serde_json::from_str(&call("pair_wait", r#"{"owner":"pocket-a","timeout_ms":10000}"#)).unwrap() });
         let joined: Value = serde_json::from_str(&call(
             "pair_connect",
             &json!({ "seed": b["seed"], "name": "Pocket B", "code": started["uri"] }).to_string(),

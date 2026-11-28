@@ -23788,8 +23788,16 @@ streamed by windowcast's host, which the agent embeds (Stream from
   - the screen shows windowcast's 6-digit SPAKE2 code, and a QR code of the
     same invitation (`droidtop-pair:1?code=…&id=…&name=…&at=ip:port`);
   - the person types `droidtop-agent pair <code>` on the computer;
+  - on narrow screens the QR code opens on request so the pairing
+    instructions and manual entry have the full width. The code field
+    opens a numeric keyboard and accepts six ASCII digits;
+  - to use a code from Pythia, open Devices and select
+    "Show a code for a handheld", then type the displayed address and
+    code into Droidtop;
   - the handheld is the SPAKE2 host and listens only while that screen is
     open; the code works once, and three wrong codes end the attempt;
+    each screen owns its listener, so closing an old screen cannot
+    cancel a new invitation;
   - neither a desktop PC nor the Retroid Pocket 5 has a camera, so the QR
     code is for a laptop webcam or a phone acting for the computer.
   - the other way round, for a device the computer cannot reach (an
