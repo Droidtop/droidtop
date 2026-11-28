@@ -430,6 +430,13 @@ class SlabView(
             if (focused != INVALID_ID && accessibleKey(focused) == null) {
                 getAccessibilityNodeProvider(this@SlabView)?.performAction(focused,
                     AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS, null)
+            } else if (focused != INVALID_ID) {
+                // If the pad/touch cursor moves while this slab owns accessibility focus,
+                // keep the announced key aligned with the key Confirm will actually press.
+                // With no focused slab key, never take accessibility focus from the editor.
+                val selected = state.focused?.action?.let(::accessibleId)
+                if (selected != null && selected != focused) getAccessibilityNodeProvider(this@SlabView)
+                    ?.performAction(selected, AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
             }
             invalidateRoot()
         }
