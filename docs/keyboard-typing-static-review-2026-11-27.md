@@ -23,7 +23,15 @@ The ownership gate now accepts either the shown grid or a shown deck with an ope
 
 Tracker #903/#772 contain a historical overhaul inventory. Current source already includes split/one-handed/floating/thumb/number-pad modes, simple/Pro settings, explicit pad tooling, clipboard vault, emoji/media panels, candidates/language engine seams and reduced-motion handling. Their presence does not establish task completion, and the old inventory is not proof those features are absent.
 
-This pass establishes one current regression: pad ownership after panels hide the grid. It does not establish a new unimplemented feature claim. Remaining request coverage includes end-to-end Japanese/Chinese engine setup/candidates, layout/preset comprehension, narrow/large-text tool discovery, semantic accessibility, full touch/pad parity, dual-screen focus and external-editor recovery. Those are unreviewed or runtime-unverified requirements, not silently converted into source bugs.
+The initial pass established the pad ownership regression. The bounded accessibility follow-up below establishes a second source gap in Slab's individual key semantics. Remaining request coverage includes end-to-end Japanese/Chinese engine setup/candidates, layout/preset comprehension, narrow/large-text tool discovery, the legacy IME grid's accessibility, full touch/pad parity, dual-screen focus and external-editor recovery. Those remain unreviewed or runtime-unverified requirements.
+
+## Slab key accessibility follow-up
+
+The old `SlabView` painted individual keys and handled their touch hits, but exposed only the whole-view Keyboard description. It now uses AndroidX [ExploreByTouchHelper](https://developer.android.com/reference/androidx/customview/widget/ExploreByTouchHelper) to expose actual key bounds, full labels, button actions and checked modifier state. Action identities remain stable across layouts; removed letters cannot activate a symbol at their old coordinates. Shift offers a named Caps-lock action without the timed double press. The helper's default host focusability is explicitly reset: virtual accessibility focus does not replace the destination editor's real input focus. An already announced key follows pad movement as well as touch exploration.
+
+Source consumers are `ui-shared/.../TextEntry.kt:SlabKeys`, `app/.../CompanionKeyboard.kt:CompanionDockedSlab` and `app/.../SecondScreenInput.kt:slab`. These hosts do not explicitly hide the native slab's descendants. The standalone Hacker Keyboard Reborn scaffold needs its normal later source/catalog synchronization; this branch does not claim that mirror is updated.
+
+Authored Robolectric node-provider tests cover every live layout's identity uniqueness, activation/editor focus, modifiers, removed nodes, resizing and pad cursor alignment. They run only in CI; this report does not claim TalkBack or physical geometry verification. The separate `LatinKeyboardBaseView` legacy IME grid remains a plain custom View without a per-key virtual node or hover adapter in the reviewed source, so this change does not complete that grid's accessibility.
 
 ## Needs a rig check
 
