@@ -22535,6 +22535,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
   - **Known limit, to see on the console:** Cloudflare ties `cf_clearance` to the browser's user agent (droidtop's requests send the browser's) and may tie it to its TLS stack, which droidtop's requests do not share; if a site still refuses droidtop's own requests after a passed check, those requests move into the browser too.
 - **Link fallbacks.** When `apps.view` cannot open a link (no app takes it, or the person turned "Open links in other apps" off), droidtop copies the link and says why in a caution flash; the plugin gets `{opened: false, reason, copied}` or the usual `PERMISSION_DENIED` and draws nothing.
 - **Failures.** An error's `message` is one plain sentence; the new `detail` field carries what the code saw, shown only behind "Technical details" (search outcomes and view notices). droidtop keeps guarding a message that is not plain.
+- **Plugin storage** (mytop-project/tracker#744). The plugin detail page reports saved data and the plugin's managed cache separately and shows the host's storage limit. The measurement skips symbolic links.
 - **`data.read`** answers at most 48 KiB a call (the reply crosses the binder as UTF-16; 120 KiB of base64 was a 327808-byte reply), and a longer `length` gets 48 KiB with `eof: false`, so looping readers are unchanged.
 - **App status (`apps.bridge`).** `status` is `{package, installed?, status?, version?}`; droidtop reads the app's name, whether it is installed and its version from Android for `package`, draws one app row (name, Installed / Not installed, the status sentence, version, Launch) and puts any other value only behind "Technical details", never as "Key: value" (also #521 item 4).
 - **Tiles that need a game.** A tile entry with `"whileGame": true` shows only while a game runs; with `gamePackages` only while one of those apps runs it (`PluginTileProtocol.forGame`, read from `LaunchDisplay`).
@@ -26787,7 +26788,8 @@ Advanced.
   with full access granted is not asked
   (`PluginCrashPolicy.askUnansweredHoles`).
 - **Declining one permission costs only what needs it** (2026-10-16,
-  mytop-project/tracker#518). Not now on the first-use sheet lasts the run of
+  mytop-project/tracker#518). The first-use sheet gives Allow the accent and
+  opens with Not now focused. Not now on the first-use sheet lasts the run of
   droidtop (`PluginRefusals`), so a page does not ask on every visit; a
   choice on the plugin's Permissions page replaces it. A page whose call
   failed on one refused declared permission, passed on unnamed by the

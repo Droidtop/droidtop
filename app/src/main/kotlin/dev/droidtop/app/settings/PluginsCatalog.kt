@@ -43,6 +43,8 @@ import dev.droidtop.library.PcFolderScan
 import dev.droidtop.library.GameEngineDetector
 import dev.droidtop.library.EnginesDatabase
 import dev.droidtop.library.ScanPrune
+import dev.droidtop.pluginhost.PluginContext
+import dev.droidtop.pluginhost.PluginDataStore
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginMainUi
 import dev.droidtop.pluginhost.ApiResolution
@@ -108,8 +110,11 @@ import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.theme.SystemThemeColors
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.attribute.BasicFileAttributes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -1159,6 +1164,11 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         engineCoresGroup(context, m.id),
         runtimeGroupItem.takeIf { runtimeNeed == null },
         aboutGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_about_group", title = "About", items = it) },
+        CatalogGroup(
+            id = "plugin_${m.id}_storage_group",
+            title = null,
+            items = listOf(NestedScreenItem(id = "plugin_${m.id}_storage", title = "Storage", inline = pluginStorageScreen(m.id))),
+        ),
         CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
         // Its id, origin, digest and containment check are for finding faults: Developer menu rows (docs/SPEC.md 7, "Developer menu";
         // the owner, 2026-10-17: "moving a lot of the advanced stuff (like the containment checker) to a dev menu").
@@ -1167,13 +1177,74 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
     return pluginPageTop(context, record, userKeys, catalogNames, grantSnapshot, runtimeNeed, catalogOffer, approveAction, groups)
 }
 
+private fun pluginStorageScreen(pluginId: String) = CatalogScreen(
+    id = "plugin_storage_$pluginId",
+    title = "Plugin storage",
+    groups = { context ->
+        withContext(Dispatchers.IO) {
+            val path = PluginStore.dataPathFor(context, pluginId).toPath()
+            val usage = try {
+                Files.walk(path).use { files ->
+                    val cachePath = path.resolve(PluginContext.CACHE_DIR)
+                    var savedBytes = 0L
+                    var cacheBytes = 0L
+                    for (file in files.iterator()) {
+                        ensureActive()
+                        val attrs = Files.readAttributes(file, BasicFileAttributes::class.java, NOFOLLOW_LINKS)
+                        if (!attrs.isRegularFile) continue
+                        if (file.startsWith(cachePath)) cacheBytes += attrs.size() else savedBytes += attrs.size()
+                    }
+                    savedBytes to cacheBytes
+                }
+            } catch (_: java.nio.file.NoSuchFileException) {
+                if (Files.notExists(path, NOFOLLOW_LINKS)) 0L to 0L else null
+            } catch (_: java.io.IOException) {
+                null
+            } catch (_: java.io.UncheckedIOException) {
+                null
+            }
+            listOf(
+                CatalogGroup(
+                    id = "plugin_storage_usage_$pluginId",
+                    title = null,
+                    items = listOf(
+                        ActionItem(
+                            id = "plugin_storage_data_$pluginId",
+                            title = "Saved data",
+                            value = usage?.first?.let(dev.droidtop.library.format.ValueFormat::size) ?: "Couldn’t measure",
+                        ),
+                        ActionItem(
+                            id = "plugin_storage_cache_$pluginId",
+                            title = "Cache",
+                            value = usage?.second?.let(dev.droidtop.library.format.ValueFormat::size) ?: "Couldn’t measure",
+                        ),
+                        ActionItem(
+                            id = "plugin_storage_limit_$pluginId",
+                            title = "Storage limit",
+                            value = dev.droidtop.library.format.ValueFormat.size(PluginDataStore.LIMIT_BYTES),
+                        ),
+                    ),
+                ),
+            )
+        }
+    },
+    indexGroups = { emptyList() },
+)
+
 /**
  * An app's engine cores as it last listed them (`engines.cores`, docs/plugin-api.md 3 A7b, mytop-project/tracker#752):
  * installed ones first, then what its catalog can install. Null for a plugin that never listed any.
  */
 internal fun AppSettingsCatalogs.engineCoresGroup(context: Context, pluginId: String): CatalogGroup? {
     val answer = dev.droidtop.library.integrations.EngineCoreList.answers(context)[pluginId] ?: return null
-    if (answer.cores.isEmpty()) return null
+    if (answer.cores.isEmpty()) {
+        val status = if (answer.catalogCheckedAtMs > 0) "No engine cores available" else "Engine core catalog has not been checked yet"
+        return CatalogGroup(
+            id = "plugin_${pluginId}_cores_group",
+            title = "Engine cores",
+            items = listOf(ActionItem(id = "plugin_${pluginId}_cores_empty", title = status)),
+        )
+    }
     val items = answer.cores.sortedWith(compareBy({ !it.installed }, { it.label.lowercase() })).map { core ->
         ActionItem(
             id = "plugin_${pluginId}_core_${core.id}",
@@ -1507,6 +1578,7 @@ internal fun AppSettingsCatalogs.providesRows(record: dev.droidtop.pluginhost.Pl
             AsyncActionItem(
                 id = "plugin_${m.id}_provides_$point",
                 title = registry.label,
+                subtitle = registry.lets.ifEmpty { null },
                 value = value,
                 run = { ctx, _ ->
                     val on = withContext(Dispatchers.IO) { PluginGrants.askPoint(ctx, record, point, evenIfOff = true) }

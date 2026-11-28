@@ -23,7 +23,10 @@ object PluginStore {
     }
 
     fun dataDirFor(context: Context, pluginId: String): File =
-        File(root(context), "$pluginId/data").apply { mkdirs() }
+        dataPathFor(context, pluginId).apply { mkdirs() }
+
+    fun dataPathFor(context: Context, pluginId: String): File =
+        File(root(context), "$pluginId/data")
 
     /** The folder [record]'s version runs from ([PluginBundleInstaller.installedDir]); what it was verified against. */
     fun payloadDirFor(context: Context, record: PluginRecord): File = PluginBundleInstaller.installedDir(root(context), record)

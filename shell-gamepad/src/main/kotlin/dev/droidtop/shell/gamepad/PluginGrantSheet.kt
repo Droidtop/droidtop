@@ -83,6 +83,7 @@ fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
                         title = label,
                         selected = index == selected,
                         danger = value == GrantAnswer.NEVER,
+                        accent = MenuTokens.Accent.takeIf { value == GrantAnswer.ALLOW },
                         onClick = {
                             selected = index
                             answer(value)
