@@ -141,6 +141,19 @@ internal class BrowserConnectGateway private constructor(
             }
             val remote = target ?: run { respond(client, 502); return }
             live()
+            val policyLock = Any()
+            var nextPolicyCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+            val currentPolicy = {
+                synchronized(policyLock) {
+                    if (System.nanoTime() >= nextPolicyCheck) {
+                        val policy = POLICY.submit(Callable { live(); authorize(request.origin, addresses) })
+                        try { policy.get(minOf(5_000, leftMs()).toLong(), TimeUnit.MILLISECONDS) }
+                        catch (error: Exception) { policy.cancel(true); fail(Failure.PERMISSION); throw IOException("The browser connection permission ended") }
+                        live()
+                        nextPolicyCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+                    }
+                }
+            }
             client.soTimeout = leftMs()
             remote.soTimeout = leftMs()
             client.getOutputStream().apply {
@@ -148,11 +161,11 @@ internal class BrowserConnectGateway private constructor(
                 flush()
             }
             IO.execute {
-                try { pump(remote.getInputStream(), client.getOutputStream()) }
+                try { pump(remote.getInputStream(), client.getOutputStream(), currentPolicy) }
                 catch (_: Exception) { /* cancellation and peer close never log request or response bytes */ }
                 finally { runCatching { client.shutdownOutput() }; reverseDone.countDown() }
             }
-            try { pump(input, remote.getOutputStream()) }
+            try { pump(input, remote.getOutputStream(), currentPolicy) }
             catch (_: Exception) { /* the operation deadline owns blocked I/O lifetime */ }
             finally { runCatching { remote.shutdownOutput() } }
             reverseDone.await(leftMs().toLong(), TimeUnit.MILLISECONDS)
@@ -166,14 +179,15 @@ internal class BrowserConnectGateway private constructor(
         }
     }
 
-    private fun pump(input: InputStream, output: java.io.OutputStream) {
+    private fun pump(input: InputStream, output: java.io.OutputStream, currentPolicy: () -> Unit) {
         try {
         // The beforeWrite reservation bounds both directions together, including a first oversized chunk.
         BoundedStreamCopy.copy(input, output, maxBytes = Long.MAX_VALUE,
-            beforeRead = { live() },
+            beforeRead = { live(); currentPolicy() },
             beforeWrite = { count ->
                 if (bytes.addAndGet(count.toLong()) > byteLimit) { fail(Failure.LIMIT); throw IOException("The browser operation exceeded its byte budget") }
                 live()
+                currentPolicy()
             },
         )
         } catch (error: IOException) {

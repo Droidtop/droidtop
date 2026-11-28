@@ -11,9 +11,11 @@ import android.system.Os
 import android.system.OsConstants
 import android.system.StructPollfd
 import java.io.ByteArrayOutputStream
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -114,13 +116,17 @@ internal object BrowserDocuments {
         @Volatile var provider: IWebHiddenProvider? = null
         var death: IBinder.DeathRecipient? = null
         private val checks = AtomicInteger()
+        private val authorizedAuthorities = ConcurrentHashMap.newKeySet<String>()
+        private fun authority(target: String): String = URI(target).let { "${it.host.lowercase()}:${if (it.port < 0) 443 else it.port}" }
         private val gateway = BrowserConnectGateway.open(timeoutMs,
             beforeResolve = { target ->
                 check(live() && providerAllowed())
+                check(authority(target) in authorizedAuthorities) { "No channel authorization for this browser destination" }
                 HostNetApis.reachName(environment, requestRecord, target)
             },
             authorize = { target, addresses ->
                 check(live() && providerAllowed())
+                check(authority(target) in authorizedAuthorities) { "No channel authorization for this browser destination" }
                 HostNetApis.reachResolved(environment, requestRecord, target, addresses)
             },
             resolve = environment::addressesOf,
@@ -162,7 +168,11 @@ internal object BrowserDocuments {
                 guard?.invoke(target, kind) ?: error("The document request ended")
                 true
             }) } catch (_: Exception) { denied.compareAndSet(null, "The browser network policy could not be checked in time"); return false }
-            return try { task.get(minOf(5_000L, left()), TimeUnit.MILLISECONDS) && live() }
+            return try {
+                val accepted = task.get(minOf(5_000L, left()), TimeUnit.MILLISECONDS) && live()
+                if (accepted) authorizedAuthorities += authority(target)
+                accepted
+            }
             catch (error: Exception) {
                 val broker = error.cause as? BrokerException
                 denied.compareAndSet(null, broker?.message?.take(512) ?: "The browser page is outside this plugin's allowed network sites")
@@ -208,6 +218,7 @@ internal object BrowserDocuments {
         fun close() {
             synchronized(this) { closed = true; guard = null; cookie = null }
             gateway.close()
+            authorizedAuthorities.clear()
             runCatching { descriptor.getAndSet(null)?.close() }
             provider?.let { p ->
                 death?.let { runCatching { p.asBinder().unlinkToDeath(it, 0) } }
@@ -234,6 +245,10 @@ internal object BrowserDocuments {
             }
         }
         check(output.size() == metadata.bodyBytes) { "The browser document ended before all bytes arrived" }
+        op.denied.get()?.let { throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it) }
+        if (!op.allowed(metadata.finalUrl, "document")) {
+            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, op.denied.get() ?: "The document permission changed before completion")
+        }
         output.toByteArray()
     }
 

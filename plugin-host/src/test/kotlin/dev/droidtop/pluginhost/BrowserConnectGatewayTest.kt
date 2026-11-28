@@ -50,6 +50,29 @@ class BrowserConnectGatewayTest {
         }
     }
 
+    @Test fun duplexBudgetNeverWritesMoreThanItsAllowance() {
+        val address = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
+        ServerSocket(0, 1, address).use { origin ->
+            BrowserConnectGateway.open(5000, byteLimit = 1, beforeResolve = {}, authorize = { _, _ -> },
+                resolve = { listOf(address) }, connect = { socket, selected, _, timeout ->
+                    socket.connect(InetSocketAddress(selected, origin.localPort), timeout)
+                }).use { gateway ->
+                Socket(gateway.endpoint.host, gateway.endpoint.port).use { client ->
+                    assertTrue(request(client, gateway.endpoint.authorization).startsWith("HTTP/1.1 200"))
+                    origin.soTimeout = 3000
+                    origin.accept().use { peer ->
+                        peer.soTimeout = 3000
+                        client.getOutputStream().write(byteArrayOf(1, 2))
+                        // TCP may split the write; neither a split nor a whole chunk may exceed the budget.
+                        val received = peer.getInputStream().readBytes()
+                        assertTrue(received.size <= 1)
+                        assertEquals(BrowserConnectGateway.Failure.LIMIT, gateway.failureReason)
+                    }
+                }
+            }
+        }
+    }
+
     @Test fun sameAuthorizedAddressConnectsOnceAndProxyHeadersDoNotEnterTunnel() {
         val address = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
         val resolutions = AtomicInteger()
