@@ -901,7 +901,11 @@ internal fun LibrarySearchDialog(
                         SearchLine.Entry(
                             "failed:${source.id}",
                             "${source.label}: ${status.failure}",
-                            subtitle = if (fix == SourceFix.OPEN_PAGE) "$label. Allow it there, then search again" else "$label. Searches again after",
+                            subtitle = when (fix) {
+                                SourceFix.OPEN_PAGE -> "$label. Allow it there, then search again."
+                                SourceFix.TRY_AGAIN -> label
+                                else -> "$label. Droidtop retries the search when you’re done."
+                            },
                             iconFile = record?.let { PluginStore.iconFile(context, it) },
                             mark = StatusMark.ATTENTION,
                         ) {

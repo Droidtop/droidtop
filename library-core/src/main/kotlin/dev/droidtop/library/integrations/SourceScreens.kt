@@ -1,5 +1,7 @@
 package dev.droidtop.library.integrations
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.consoles.ConsoleSystemDef
@@ -10,6 +12,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.pluginhost.PluginView
+import dev.droidtop.pluginhost.SourceFailures
 import dev.droidtop.pluginhost.SourceSystems
 import dev.droidtop.pluginhost.ViewNode
 import dev.droidtop.pluginhost.ViewSection
@@ -107,14 +110,27 @@ object SourceScreens {
             onFailure = { error -> listOf(CatalogGroup("source_error_${source.id}", null, buildList {
                 // A plain sentence first; what the source actually reported (a platform exception text, a
                 // stack line) is for its developer and sits one step behind "Technical details".
-                add(ActionItem("source_failure_${source.id}", dev.droidtop.pluginhost.PluginFailureWords.of(null, source.label).title, subtitle = "It did not answer. Try again in a moment."))
-                val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
+                val headline = dev.droidtop.pluginhost.PluginFailureWords.of(null, source.label).title
+                add(ActionItem("source_failure_${source.id}", headline, subtitle = "It did not answer. Try again in a moment."))
+                val technical = SourceFailures.details(
+                    call = "library.sources search",
+                    headline = headline,
+                    exception = error.javaClass.simpleName,
+                    said = error.message,
+                )
                 // Always shown, not only with the Developer menu (mytop-project/tracker#883 §3.7: Info always).
                 add(
                     NestedScreenItem(
                         "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",
                         inline = CatalogScreen("source_failure_detail_screen_${source.id}", "Technical details", groups = {
-                            listOf(CatalogGroup("detail", null, listOf(ActionItem("source_failure_text_${source.id}", technical))))
+                            val lines = technical.lines().mapIndexed { index, line ->
+                                ActionItem("source_failure_text_${source.id}_$index", line)
+                            }
+                            val copy = ActionItem("source_failure_copy_${source.id}", "Copy technical details", run = { ctx ->
+                                ctx.getSystemService(ClipboardManager::class.java)
+                                    ?.setPrimaryClip(ClipData.newPlainText("Source search failure", technical))
+                            })
+                            listOf(CatalogGroup("detail", null, listOf(copy) + lines))
                         }),
                     ),
                 )
