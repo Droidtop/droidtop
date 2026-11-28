@@ -242,6 +242,10 @@ interface BrokerEnvironment {
      */
     fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? = null
 
+    /** A host-owned browser document operation preserves the requesting plugin and every-hop policy. */
+    fun browserDocument(record: PluginRecord, url: String, headers: Map<String, String>, timeoutMs: Long, maxBytes: Int, authorize: (String, String) -> Unit): WebFetch.Result? =
+        webFetch(url, headers.entries.firstOrNull { it.key.equals("Cookie", true) }?.value, timeoutMs, maxBytes)
+
     /** D4: opens a picked document (`r`, `w`, `rw`); null when it is gone or its grant was withdrawn. */
     fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = null
 

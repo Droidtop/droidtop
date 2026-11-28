@@ -40,7 +40,7 @@ object WebFetch {
         "text: document.body ? document.body.innerText : document.documentElement.textContent})"
 
     /** What the view ended on: the page ([answer]), or a check it could not pass ([challenged]), and the cookies it now holds for the host. */
-    data class Result(val answer: HttpAnswer?, val challenged: Boolean, val cookies: String?)
+    data class Result(val answer: HttpAnswer?, val challenged: Boolean, val cookies: String?, val userAgent: String? = null)
 
     /**
      * Loads [url] with [cookies] (a Cookie header for its host) and returns the final page, at most [maxBytes] of it.

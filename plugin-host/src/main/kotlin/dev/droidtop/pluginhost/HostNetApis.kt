@@ -175,17 +175,22 @@ internal object HostNetApis {
         val target = url(args)
         val host = NetScope.hostOf(target)
         val replaced = added.keys.map { it.lowercase() }.toSet()
-        val sent = withClearance(env, record, host, headers(args).filterKeys { it.lowercase() !in replaced } + added)
+        val supplied = headers(args).filterKeys { it.lowercase() !in replaced } + added
+        val sent = withClearance(env, record, host, supplied)
         // A host that has shown this plugin a browser check is read by droidtop's web view, never its HTTP client,
         // which Cloudflare refuses even with the clearance (mytop-project/tracker#600). The plugin gets an ordinary answer.
         if (method == "GET" && host != null && checks(env, record, host)) {
             hopCheck(target)
             reach(env, record, target)
-            val cookie = sent.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
-            env.webFetch(target, cookie, timeout(env, record, args), MAX_BODY)?.let { fetched ->
-                fetched.cookies?.let { jar -> env.vault()?.let { SiteChecks.keep(it, record.manifest.id, WebSessions.Stored(null, mapOf(host to jar))) } }
+            // Gecko reports its actual UA; the vault's old clearance UA is not a requested header override.
+            val browserHeaders = sent.filterKeys { !it.equals("user-agent", true) || supplied.keys.any { name -> name.equals("user-agent", true) } }
+            env.browserDocument(record, target, browserHeaders, timeout(env, record, args), MAX_BODY) { hop, kind ->
+                if (kind == "document") hopCheck(hop)
+                reach(env, record, hop)
+            }?.let { fetched ->
+                fetched.cookies?.let { jar -> env.vault()?.let { SiteChecks.keep(it, record.manifest.id, WebSessions.Stored(fetched.userAgent, mapOf(host to jar))) } }
                 val answer = fetched.answer
-                if (fetched.challenged || answer == null) {
+                if (fetched.challenged || answer == null || SiteCheck.isChallenge(answer.status, answer.headers, answer.body)) {
                     SiteChecks.met(record.manifest.id, target)
                     note("${record.manifest.id}: $host still checks the browser in droidtop's web view")
                     throw BrokerException(PluginErrorCode.BROWSER_CHECK_REQUIRED, SiteChecks.refusal(host))

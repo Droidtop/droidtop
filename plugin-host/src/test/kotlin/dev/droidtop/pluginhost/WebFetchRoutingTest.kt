@@ -24,7 +24,7 @@ class WebFetchRoutingTest {
     private fun withWebView(fake: FakeEnv, answer: (String) -> WebFetch.Result?): Pair<BrokerEnvironment, MutableList<String>> {
         val asked = mutableListOf<String>()
         return object : BrokerEnvironment by fake {
-            override fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? {
+            override fun browserDocument(record: PluginRecord, url: String, headers: Map<String, String>, timeoutMs: Long, maxBytes: Int, authorize: (String, String) -> Unit): WebFetch.Result? {
                 asked += url
                 return answer(url)
             }
@@ -60,5 +60,26 @@ class WebFetchRoutingTest {
         call(fake, "https://forum.example/threads/1/")
         assertEquals(PluginErrorCode.BROWSER_CHECK_REQUIRED, call(fake, "https://forum.example/threads/4/").code)
         assertEquals(2, fake.httpCalls.size)
+    }
+
+    @Test fun `a browser resource outside the plugin grant is denied without HTTP fallback`() {
+        val fake = FakeEnv(record).apply { httpAnswer = challenge }
+        val env = object : BrokerEnvironment by fake {
+            override fun browserDocument(record: PluginRecord, url: String, headers: Map<String, String>, timeoutMs: Long, maxBytes: Int, authorize: (String, String) -> Unit): WebFetch.Result? {
+                authorize("https://unapproved.example/script.js", "resource")
+                throw AssertionError("The resource must be denied before network dispatch")
+            }
+        }
+        call(env, "https://forum.example/threads/1/")
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, call(env, "https://forum.example/threads/2/").code)
+        assertEquals(1, fake.httpCalls.size)
+    }
+
+    @Test fun `a challenge document is not mistaken for a passed check`() {
+        val fake = FakeEnv(record).apply { httpAnswer = challenge }
+        val (env, _) = withWebView(fake) { WebFetch.Result(challenge, false, null) }
+        call(env, "https://forum.example/threads/1/")
+        assertEquals(PluginErrorCode.BROWSER_CHECK_REQUIRED, call(env, "https://forum.example/threads/2/").code)
+        assertEquals(1, fake.httpCalls.size)
     }
 }

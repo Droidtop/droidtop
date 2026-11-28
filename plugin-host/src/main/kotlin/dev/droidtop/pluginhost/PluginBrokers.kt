@@ -533,6 +533,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     override fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? =
         WebFetch.fetch(appContext, url, cookies, timeoutMs, maxBytes)
 
+    override fun browserDocument(record: PluginRecord, url: String, headers: Map<String, String>, timeoutMs: Long, maxBytes: Int, authorize: (String, String) -> Unit): WebFetch.Result? =
+        BrowserDocuments.fetch(appContext, this, record, url, headers, timeoutMs, maxBytes, authorize)
+            ?: webFetch(url, headers.entries.firstOrNull { it.key.equals("Cookie", true) }?.value, timeoutMs, maxBytes)
+
     override fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = runCatching {
         val resolverMode = when (mode) {
             "w" -> "wt"
