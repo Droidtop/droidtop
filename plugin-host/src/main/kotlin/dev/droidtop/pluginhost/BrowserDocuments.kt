@@ -234,10 +234,15 @@ internal object BrowserDocuments {
         val poll = StructPollfd().apply { this.fd = fd.fileDescriptor; events = (OsConstants.POLLIN or OsConstants.POLLHUP or OsConstants.POLLERR).toShort() }
         val bytes = ByteArray(16 * 1024)
         val output = ByteArrayOutputStream(metadata.bodyBytes)
+        var nextPermissionCheck = 0L
         ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
             while (true) {
                 ensureActive()
                 check(!op.closed && SystemClock.elapsedRealtime() < op.deadline) { "The browser document deadline expired" }
+                if (SystemClock.elapsedRealtime() >= nextPermissionCheck) {
+                    if (!op.allowed(metadata.finalUrl, "document")) throw BrokerException(PluginErrorCode.PERMISSION_DENIED, op.denied.get() ?: "The document permission changed during transfer")
+                    nextPermissionCheck = SystemClock.elapsedRealtime() + 1_000
+                }
                 if (Os.poll(arrayOf(poll), 250) == 0) continue
                 val count = input.read(bytes)
                 if (count < 0) { fd.checkError(); break }
